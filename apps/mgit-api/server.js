@@ -68,6 +68,7 @@ const pendingChallenges = new Map();
 
 // Path to repositories storage - secure path verified by security module
 const REPOS_PATH = security.ensureSecurePath();
+const MGIT_PATH = `${process.env.MGITPATH}/mgit` || '../../mgit/mgit';
 
 // Get base URL from environment or construct from request
 const getBaseUrl = (req) => {
@@ -258,16 +259,6 @@ if (!fs.existsSync(REPOS_PATH)) {
   fs.mkdirSync(REPOS_PATH, { recursive: true });
 }
 
-/* 
- * Admin Routes
- */
-// create admin routes
-const createAdminRoutes = require('./admin-routes');
-const adminRoutes = createAdminRoutes(REPOS_PATH, authPersistence, validateAuthToken);
-
-// // admin-related API endpoints 
-app.use('/api/admin', adminRoutes);
-
 app.get('/api/auth/:type/status', (req, res) => {
   const { type } = req.params;
   const { k1 } = req.query;
@@ -288,10 +279,6 @@ app.get('/api/auth/:type/status', (req, res) => {
     } : null
   });
 });
-
-const { setupProviderEndpoints } = require('./provider-endpoints');
-setupProviderEndpoints(app, validateAuthToken);
-
 
 // Token validation endpoint
 app.get('/api/auth/validate', validateAuthToken, (req, res) => {
@@ -843,14 +830,11 @@ app.get('/api/mgit/repos/:repoId/show', validateMGitToken, (req, res) => {
       reason: 'Repository not found' 
     });
   }
-  
-  console.log('MGITPATH set by system: ', process.env.MGITPATH)
-  const mgitPath = `${process.env.MGITPATH}/mgit` || '../mgit/mgit';
 
   // Execute mgit status command for now
   const { exec } = require('child_process');
   // the current working directory of exec is private_repos/hello-world
-  exec(`${mgitPath} show`, { cwd: repoPath }, (error, stdout, stderr) => {
+  exec(`${MGIT_PATH} show`, { cwd: repoPath }, (error, stdout, stderr) => {
     if (error) {
       console.error(`Error executing mgit show: ${error.message}`);
       return res.status(500).json({ 
@@ -870,7 +854,6 @@ app.get('/api/mgit/repos/:repoId/show', validateMGitToken, (req, res) => {
   });
 });
 
-//was validateMGitToken
 app.get('/api/mgit/repos/:repoId/clone', validateMGitToken, (req, res) => {
   const { repoId } = req.params;
   const { access } = req.user;
@@ -893,15 +876,12 @@ app.get('/api/mgit/repos/:repoId/clone', validateMGitToken, (req, res) => {
       reason: 'Repository not found' 
     });
   }
-
-  console.log('MGITPATH set by system: ', process.env.MGITPATH)
-  const mgitPath = `${process.env.MGITPATH}/mgit` || '../mgit/mgit';
   
   console.log(`Executing mgit status for repository ${repoId}`);
   
   // Execute mgit show command
   const { exec } = require('child_process');
-  exec(`${mgitPath} log --oneline --graph --decorate=short --all`, { cwd: repoPath }, (error, stdout, stderr) => {
+  exec(`${MGIT_PATH} log --oneline --graph --decorate=short --all`, { cwd: repoPath }, (error, stdout, stderr) => {
     if (error) {
       console.error(`Error executing mgit clone: ${error.message}`);
       return res.status(500).json({ 
@@ -1552,12 +1532,6 @@ app.get('/api/mgit/user/repositories', validateAuthToken, async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch repositories' });
   }
 });
-
-// helper fns moved to mgitUtils
-
-// Express static file serving for the React frontend ONLY
-// This should point to your compiled frontend files, NOT the repository directory
-app.use(express.static(path.join(__dirname, 'public')));
 
 // For any routes that should render the React app (client-side routing)
 app.get('*', (req, res, next) => {

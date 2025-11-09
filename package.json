@@ -1,7 +1,11 @@
 {
-  "name": "mgit-repo-server",
+  "name": "limbo-health-monorepo",
   "version": "1.0.0",
-  "description": "Git repository server with scheduling services",
+  "private": true,
+  "workspaces": [
+      "apps/*",
+      "packages/*"
+    ],
   "scripts": {
     "build": "scripts/build.sh",
     "dev": "scripts/dev.sh",
@@ -12,27 +16,12 @@
     "stop": "scripts/backup-mysql.sh && docker-compose -f docker-compose.yml -f docker-compose.development.yml --env-file .env.development down",
     "stop:prod": "docker-compose -f docker-compose.yml -f docker-compose.production.yml --env-file .env.production down",
     "logs": "docker-compose -f docker-compose.yml -f docker-compose.development.yml --env-file .env.development logs -f",
-    "logs:prod": "docker-compose -f docker-compose.yml -f docker-compose.production.yml --env-file .env.production logs -f"
+    "logs:prod": "docker-compose -f docker-compose.yml -f docker-compose.production.yml --env-file .env.production logs -f",
+    "mgit:start": "cd apps/mgit-api && npm start",
+    "admin:dev": "cd apps/admin-frontend && npm run dev",
+    "patient:dev": "cd apps/patient-frontend && npm run dev"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
-  },
-  "dependencies": {
-    "@getalby/sdk": "^5.1.0",
-    "@noble/hashes": "^1.8.0",
-    "axios": "^1.7.9",
-    "bech32": "^2.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^17.0.1",
-    "express": "^4.21.2",
-    "express-rate-limit": "^7.5.0",
-    "helmet": "^8.0.0",
-    "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.14.3",
-    "node-fetch": "^3.3.2",
-    "nostr-tools": "^2.10.4",
-    "qrcode": "^1.5.3",
-    "sqlite3": "^5.1.6",
-    "ws": "^8.18.3"
   }
 }

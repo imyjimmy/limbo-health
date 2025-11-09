@@ -4,43 +4,48 @@
 services:
   admin-frontend:
     networks:
-      - plebemr_admin_network
+      - limbo_network
     volumes:
       - ./admin/dist:/usr/share/nginx/html
 
   patient-frontend:
     networks:
-      - plebemr_admin_network
+      - limbo_network
     volumes:
       - ./patient/dist:/usr/share/nginx/html
       
-  mgit-web:
-    command: sh -c "npm install nodemon --save-dev 2>/dev/null; npx nodemon server.js"
+  mgit-api:
+    env_file:
+      - .env.development
+    command: sh -c "cd apps/mgit-api && npx nodemon server.js"
     volumes:
-      - ../private_repos:/private_repos
-      - .:/app                     # Mount source code for hot reload
-      - /app/node_modules          # Anonymous volume for node_modules
-      - ./.env.development:/app/.env
+      # Override with source mounting for hot reload
+      - ./apps/mgit-api:/app/apps/mgit-api
+      - /app/apps/mgit-api/node_modules  # Protect node_modules
+      - ./private_repos:/repos
+      - ./users:/app/users
+    ports:
+      - "3004:3003"  # Direct access for testing
     networks:
-      - plebemr_admin_network
+      - limbo_network
 
   gateway:
     ports:
       - "3003:80"
     networks:
-      - plebemr_admin_network
+      - limbo_network
 
   mysql:
     ports:
       - "3306:3306"              # Expose MySQL for local development
     networks:
-      - plebemr_admin_network
+      - limbo_network
 
   phpmyadmin:
     ports:
       - "8089:80"
     networks:
-      - plebemr_admin_network
+      - limbo_network
 
   plebdoc-api:
     ports:
@@ -51,14 +56,14 @@ services:
       - ../plebdoc-scheduler-service/api:/app
       - /app/node_modules
     networks:
-      - plebemr_admin_network
+      - limbo_network
 
   swagger-ui:
     ports:
       - "8090:8080"
     networks:
-      - plebemr_admin_network
+      - limbo_network
 
 networks:
-  plebemr_admin_network:
+  limbo_network:
     external: false
