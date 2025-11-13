@@ -17,15 +17,13 @@ services:
   mgit-api:
     env_file:
       - .env.development
-    command: sh -c "cd apps/mgit-api && npx nodemon server.js"
+    command: npx nodemon server.js
     volumes:
       # Override with source mounting for hot reload
       - ./apps/mgit-api:/app/apps/mgit-api
       - /app/apps/mgit-api/node_modules  # Protect node_modules
       - ./private_repos:/repos
       - ./users:/app/users
-    ports:
-      - "3004:3003"  # Direct access for testing
     networks:
       - limbo_network
 
@@ -47,14 +45,15 @@ services:
     networks:
       - limbo_network
 
-  plebdoc-api:
+  scheduler-api:
     ports:
       - "3005:3005"
     env_file:
       - ./.env.development
     volumes:
-      - ../plebdoc-scheduler-service/api:/app
+      - ./apps/scheduler-api:/app
       - /app/node_modules
+    command: bun --watch server.js
     networks:
       - limbo_network
 

@@ -1,0 +1,21 @@
+{
+  "name": "plebdoc-appointments-service",
+  "version": "1.0.0",
+  "description": "Appointments API service built with Bun",
+  "main": "server.js",
+  "scripts": {
+    "dev": "bun --watch server.js",
+    "start": "bun server.js",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@getalby/sdk": "6.0.0",
+    "mysql2": "^3.6.0",
+    "jsonwebtoken": "^9.0.2",
+    "nostr-tools": "^2.12.0",
+    "googleapis": "^162.0.0"
+  },
+  "devDependencies": {
+    "bun-types": "latest"
+  }
+}

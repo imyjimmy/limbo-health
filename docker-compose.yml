@@ -28,41 +28,27 @@ services:
       - mysql
     restart: unless-stopped
 
-  # mgit-web:
-  #   image: imyjimmy/mgit-repo-server:latest
-  #   container_name: ${CONTAINER_PREFIX}_web_1
-  #   environment:
-  #     - NODE_ENV=${NODE_ENV}
-  #     - MGITPATH=/usr/local/bin
-  #     - JWT_SECRET=${JWT_SECRET}
-  #     - APPOINTMENTS_DB_HOST=${CONTAINER_PREFIX}_plebdoc_mysql_1
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - mysql
-
   gateway:
     image: imyjimmy/mgit-gateway:latest
     container_name: ${CONTAINER_PREFIX}_gateway_1
     environment:
       - CONTAINER_PREFIX=${CONTAINER_PREFIX}
-    # volumes:
-      # - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
     restart: unless-stopped
     depends_on:
       - mgit-api
+      - scheduler-api
 
   mysql:
     image: mysql:8.0
-    container_name: ${CONTAINER_PREFIX}_plebdoc_mysql_1
+    container_name: ${CONTAINER_PREFIX}_mysql_1
     environment:
-      - MYSQL_ROOT_PASSWORD=secret
-      - MYSQL_DATABASE=easyappointments
-      - MYSQL_USER=user
-      - MYSQL_PASSWORD=password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+      MYSQL_DATABASE: limbo_health
+      MYSQL_USER: ${MYSQL_USER:-user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
     volumes:
       - mysql_data:/var/lib/mysql
-      - ../plebdoc-scheduler-service/init-scripts:/docker-entrypoint-initdb.d
-    restart: unless-stopped
+      - ./apps/scheduler-api/db:/docker-entrypoint-initdb.d
 
   phpmyadmin:
     image: phpmyadmin:5.2.1
@@ -76,9 +62,27 @@ services:
       - mysql
     restart: unless-stopped
 
-  plebdoc-api:
-    build: ../plebdoc-scheduler-service/api
-    container_name: ${CONTAINER_PREFIX}_plebdoc_api_1
+  scheduler-api:
+    build:
+      context: .
+      dockerfile: apps/scheduler-api/Dockerfile
+    container_name: ${CONTAINER_PREFIX}_scheduler_api_1
+    depends_on:
+      - mysql
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql
+      - DB_NAME=limbo_health
+      - DB_USER=${MYSQL_USER:-user}
+      - DB_PASSWORD=${MYSQL_PASSWORD:-password}
+      - DB_PORT=3306
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+    volumes:
+      - ./apps/scheduler-api/uploads:/app/uploads
+
+  # plebdoc-api:
+  #   build: ../plebdoc-scheduler-service/api
+  #   container_name: ${CONTAINER_PREFIX}_plebdoc_api_1
     # environment:
     #   - NODE_ENV=${NODE_ENV}
     #   - JWT_SECRET=${JWT_SECRET}
@@ -93,9 +97,9 @@ services:
     #   - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     #   - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
     #   - GOOGLE_REDIRECT_URI_ADMIN=${GOOGLE_REDIRECT_URI_ADMIN}
-    depends_on:
-      - mysql
-    restart: unless-stopped
+    # depends_on:
+    #   - mysql
+    # restart: unless-stopped
 
   swagger-ui:
     image: swaggerapi/swagger-ui:latest
@@ -104,7 +108,7 @@ services:
       - SWAGGER_JSON_URL=http://localhost:3005/api-docs.json
       - API_URL=http://localhost:3005/api-docs.json
     depends_on:
-      - plebdoc-api
+      - scheduler-api
     restart: unless-stopped
 
 volumes:
