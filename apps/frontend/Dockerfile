@@ -12,15 +12,15 @@ RUN curl -fsSL https://bun.sh/install | bash && \
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY bun.lockb* ./
+# Copy package files from apps/frontend
+COPY apps/frontend/package*.json ./
+COPY apps/frontend/bun.lockb* ./
 
 # Install dependencies
 RUN bun install
 
-# Copy source code
-COPY . .
+# Copy source code from apps/frontend
+COPY apps/frontend/ ./
 
 # Clean esbuild/vite cache before build (THIS IS THE FIX)
 RUN rm -rf node_modules/.vite && \

@@ -2,10 +2,7 @@
 # Extends docker-compose.yml with dev-specific settings
 
 services:
-  admin-frontend:
-    build:
-      context: ./admin
-      dockerfile: Dockerfile.dev
+  frontend:
     env_file:
       - .env.development
     volumes:

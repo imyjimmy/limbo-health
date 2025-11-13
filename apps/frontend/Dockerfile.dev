@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files from apps/frontend
+COPY apps/frontend/package.json apps/frontend/package-lock.json* ./
+
+RUN npm install
+
+# Copy source code from apps/frontend
+COPY apps/frontend/ ./
+
+EXPOSE 5173
+
+CMD ["npx", "vite", "--host", "0.0.0.0"]

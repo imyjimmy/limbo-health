@@ -2,9 +2,11 @@
 # This file defines the core services shared across environments
 
 services:
-  admin-frontend:
-    build: ./admin
-    container_name: ${CONTAINER_PREFIX}_admin_frontend_1
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: ${CONTAINER_PREFIX}_frontend_1
     restart: unless-stopped
     environment:
       - NODE_ENV=${NODE_ENV}
@@ -29,7 +31,10 @@ services:
     restart: unless-stopped
 
   gateway:
-    build: ./gateway
+    # build: ./gateway
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
     container_name: ${CONTAINER_PREFIX}_gateway_1
     environment:
       - CONTAINER_PREFIX=${CONTAINER_PREFIX}
