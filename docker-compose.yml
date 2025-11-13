@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
 
   gateway:
-    image: imyjimmy/mgit-gateway:latest
+    build: ./gateway
     container_name: ${CONTAINER_PREFIX}_gateway_1
     environment:
       - CONTAINER_PREFIX=${CONTAINER_PREFIX}

@@ -20,19 +20,19 @@ http {
 
   # Define upstream backends
   upstream mgit_backend {
-    server ${CONTAINER_PREFIX}_web_1:3003;
+    server ${CONTAINER_PREFIX}_mgit_api_1:3003;  # CHANGED: was _web_1
   }
 
   upstream plebdoc_backend {
-    server ${CONTAINER_PREFIX}_plebdoc_api_1:3005;
+    server ${CONTAINER_PREFIX}_scheduler_api_1:3005;  # CHANGED: was _plebdoc_api_1
   }
 
-  upstream patient_frontend {
-    server ${CONTAINER_PREFIX}_patient_frontend_1:80;
-  }
+#  upstream patient_frontend {
+#    server ${CONTAINER_PREFIX}_patient_frontend_1:80;
+#  }
 
   upstream admin_frontend {
-    server ${CONTAINER_PREFIX}_admin_frontend_1:80;
+    server ${CONTAINER_PREFIX}_admin_frontend_1:5173;
   }
 
   # Patient subdomain server block
@@ -40,22 +40,15 @@ http {
     listen 80;
     server_name patient.plebdoc.com;
 
-    # ... all your proxy settings and API routes ...
-    # warning, copied from admin block
     error_log /var/log/nginx/debug.log debug;
-
-    # Increase client max body size for file uploads
     client_max_body_size 100M;
 
-    # Proxy settings for all locations
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_buffering off;
 
-    # scheduler services
-    # Route plebdoc API endpoints
     location /api/admin {
       proxy_pass http://plebdoc_backend;
     }
@@ -78,21 +71,17 @@ http {
       proxy_pass http://plebdoc_backend;
     }
 
-    # mgit-backend is responsible for these routes:
-    # mgit routes
     location /api/mgit {
       proxy_pass http://mgit_backend;
     }
 
-    # verifies nostr logins
     location /api/auth {
       proxy_pass http://mgit_backend;
     }
     
-    # Route root to patient frontend
-    location / {
-      proxy_pass http://patient_frontend;
-    }
+#    location / {
+#      proxy_pass http://patient_frontend;
+#    }
   }
 
   server {
@@ -100,49 +89,40 @@ http {
     server_name _;
 
     error_log /var/log/nginx/debug.log debug;
-
-    # Increase client max body size for file uploads
     client_max_body_size 100M;
 
-    # Proxy settings for all locations
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_buffering off;
     
-    # mgit routes (most specific)
     location /api/mgit {
       proxy_pass http://mgit_backend;
     }
 
-    # Nostr auth routes (specific)
     location /api/auth {
       proxy_pass http://mgit_backend;
     }
 
-    # WebRTC with specific logging
     location /api/webrtc {
       access_log /var/log/nginx/webrtc_access.log;
       error_log /var/log/nginx/webrtc_error.log debug;
       proxy_pass http://plebdoc_backend;
     }
 
-    # All other /api routes go to scheduler backend (catch-all)
     location /api/ {
       proxy_pass http://plebdoc_backend;
     }
 
-    # Patient frontend (for development, you can access at /patient)
-    location /patient/ {
-      proxy_pass http://patient_frontend/;
-    }
+#    location /patient/ {
+#      proxy_pass http://patient_frontend/;
+#    }
 
     location = /patient {
       return 301 /patient/;
     }
 
-    # Serve admin frontend as default
     location / {
       proxy_pass http://admin_frontend;
     }

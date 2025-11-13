@@ -1,18 +1,50 @@
-FROM oven/bun:1.1.38-alpine
+# FROM oven/bun:latest
+
+# WORKDIR /app
+
+# # Copy package files
+# COPY apps/scheduler-api/package.json apps/scheduler-api/package-lock.json* ./
+
+# # Install with npm (fast), cache the npm cache
+# RUN --mount=type=cache,target=/root/.npm \
+#     npm ci --prefer-offline
+
+# # Copy source code
+# COPY apps/scheduler-api/ .
+
+# EXPOSE 3005
+
+# # Run with Bun (keeps your Bun HTTP server benefits)
+# CMD ["bun", "run", "server.js"]
+
+# Stage 1: Install dependencies with Node/npm (fast!)
+# Stage 1: Install dependencies with Node/npm (fast!)
+FROM node:20-alpine AS deps
 
 WORKDIR /app
 
-# Copy package files
-COPY apps/scheduler-api/package.json apps/scheduler-api/bun.lock* ./
+# Copy ONLY scheduler-api package.json
+COPY apps/scheduler-api/package.json ./
 
-# Install dependencies
-RUN bun install --frozen-lockfile
+# Install as standalone (no workspace complexity)
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
 
-# Copy application code
+# Stage 2: Runtime with Bun
+FROM oven/bun:latest
+
+WORKDIR /app
+
+# Copy node_modules from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy package.json
+COPY apps/scheduler-api/package.json ./
+
+# Copy source code
 COPY apps/scheduler-api/ ./
 
-# Expose port (documentation only, actual port mapping in compose)
-EXPOSE 3001
+EXPOSE 3005
 
-# Start server
-CMD ["bun", "server.js"]
+# Run with Bun
+CMD ["bun", "run", "server.js"]

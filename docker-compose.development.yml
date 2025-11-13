@@ -3,10 +3,18 @@
 
 services:
   admin-frontend:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env.development
+    volumes:
+      # - ./admin/dist:/usr/share/nginx/html
+      - ./admin:/app
+      - /app/node_modules
+    command: npx vite --host 0.0.0.0  # Vite dev server
     networks:
       - limbo_network
-    volumes:
-      - ./admin/dist:/usr/share/nginx/html
 
   patient-frontend:
     networks:
@@ -34,6 +42,8 @@ services:
       - limbo_network
 
   mysql:
+    env_file:
+      - .env.development
     ports:
       - "3306:3306"              # Expose MySQL for local development
     networks:
@@ -46,10 +56,10 @@ services:
       - limbo_network
 
   scheduler-api:
+    env_file:
+      - .env.development
     ports:
       - "3005:3005"
-    env_file:
-      - ./.env.development
     volumes:
       - ./apps/scheduler-api:/app
       - /app/node_modules
