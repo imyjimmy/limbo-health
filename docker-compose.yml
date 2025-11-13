@@ -52,12 +52,13 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:5.2.1
-    container_name: ${CONTAINER_PREFIX}_plebdoc_phpmyadmin_1
+    container_name: ${CONTAINER_PREFIX}_phpmyadmin_1
     environment:
-      - PMA_HOST=${CONTAINER_PREFIX}_plebdoc_mysql_1
-      - UPLOAD_LIMIT=102400K
-      - PMA_USER=user
-      - PMA_PASSWORD=password
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_USER=${MYSQL_USER:-user}
+      - PMA_PASSWORD=${MYSQL_PASSWORD:-password}
+      - UPLOAD_LIMIT=100M
     depends_on:
       - mysql
     restart: unless-stopped
