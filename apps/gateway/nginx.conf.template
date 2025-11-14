@@ -18,6 +18,10 @@ http {
   access_log /var/log/nginx/access.log;
   error_log /var/log/nginx/error.log;
 
+  upstream auth_backend {
+    server ${CONTAINER_PREFIX}_auth_api_1:3010;
+  }
+
   # Define upstream backends
   upstream mgit_backend {
     server ${CONTAINER_PREFIX}_mgit_api_1:3003;  # CHANGED: was _web_1
@@ -76,7 +80,7 @@ http {
     }
 
     location /api/auth {
-      proxy_pass http://mgit_backend;
+      proxy_pass http://auth_backend;
     }
     
 #    location / {
@@ -102,7 +106,7 @@ http {
     }
 
     location /api/auth {
-      proxy_pass http://mgit_backend;
+      proxy_pass http://auth_backend;
     }
 
     location /api/webrtc {

@@ -2,12 +2,27 @@
 # Extends docker-compose.yml with dev-specific settings
 
 services:
+  auth-api:
+    env_file:
+      - .env.development
+    ports:
+      - "3010:3010"
+    volumes:
+      - ./apps/auth-api:/app
+      - /app/node_modules
+    command: npx nodemon server.js
+    networks:
+      - limbo_network
+
   frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile.dev
     env_file:
       - .env.development
     volumes:
       # - ./admin/dist:/usr/share/nginx/html
-      - ./admin:/app
+      - ./apps/frontend:/app
       - /app/node_modules
     command: npx vite --host 0.0.0.0  # Vite dev server
     networks:

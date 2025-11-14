@@ -299,89 +299,89 @@ app.get('/api/auth/validate', validateAuthToken, (req, res) => {
 * User is now registered and logged in
 */
 
-app.post('/api/auth/nostr/challenge', (req, res) => {
-  const challenge = crypto.randomBytes(32).toString('hex');
+// app.post('/api/auth/nostr/challenge', (req, res) => {
+//   const challenge = crypto.randomBytes(32).toString('hex');
   
-  pendingChallenges.set(challenge, {
-    timestamp: Date.now(),
-    verified: false,
-    pubkey: null,
-    type: 'nostr'
-  });
+//   pendingChallenges.set(challenge, {
+//     timestamp: Date.now(),
+//     verified: false,
+//     pubkey: null,
+//     type: 'nostr'
+//   });
 
-  console.log('Generated Nostr challenge:', challenge);
+//   console.log('Generated Nostr challenge:', challenge);
 
-  res.json({
-    challenge,
-    tag: 'login'
-  });
-});
+//   res.json({
+//     challenge,
+//     tag: 'login'
+//   });
+// });
 
-app.post('/api/auth/nostr/verify', async (req, res) => {
-  const { signedEvent } = req.body;
-  console.log('Received Signed Event: ', signedEvent)
+// app.post('/api/auth/nostr/verify', async (req, res) => {
+//   const { signedEvent } = req.body;
+//   console.log('Received Signed Event: ', signedEvent)
   
-  try {
-    // Validate the event format
-    if (!validateEvent(signedEvent)) {
-      return res.status(400).json({ 
-        status: 'error', 
-        reason: 'Invalid event format' 
-      });
-    }
+//   try {
+//     // Validate the event format
+//     if (!validateEvent(signedEvent)) {
+//       return res.status(400).json({ 
+//         status: 'error', 
+//         reason: 'Invalid event format' 
+//       });
+//     }
 
-    // Verify the event signature
-    if (!verifyEvent(signedEvent)) {
-      return res.status(400).json({ 
-        status: 'error', 
-        reason: 'Invalid signature' 
-      });
-    }
+//     // Verify the event signature
+//     if (!verifyEvent(signedEvent)) {
+//       return res.status(400).json({ 
+//         status: 'error', 
+//         reason: 'Invalid signature' 
+//       });
+//     }
 
-    // Fixed metadata fetching with proper error handling
-    let metadata = null;
-    try {
-      console.log(`Fetching metadata for pubkey: ${signedEvent.pubkey}`);
-      metadata = await fetchNostrMetadata(signedEvent.pubkey);
+//     // Fixed metadata fetching with proper error handling
+//     let metadata = null;
+//     try {
+//       console.log(`Fetching metadata for pubkey: ${signedEvent.pubkey}`);
+//       metadata = await fetchNostrMetadata(signedEvent.pubkey);
       
-      if (metadata) {
-        console.log('✅ Successfully fetched user metadata:', {
-          name: metadata.name,
-          display_name: metadata.display_name,
-          has_picture: !!metadata.picture
-        });
-      } else {
-        console.log('⚠️ No metadata found for this pubkey');
-      }
-    } catch (error) {
-      console.warn('Failed to fetch Nostr metadata:', error.message);
-      // Continue without metadata - this is handled gracefully
-    }
+//       if (metadata) {
+//         console.log('✅ Successfully fetched user metadata:', {
+//           name: metadata.name,
+//           display_name: metadata.display_name,
+//           has_picture: !!metadata.picture
+//         });
+//       } else {
+//         console.log('⚠️ No metadata found for this pubkey');
+//       }
+//     } catch (error) {
+//       console.warn('Failed to fetch Nostr metadata:', error.message);
+//       // Continue without metadata - this is handled gracefully
+//     }
     
-    // Generate JWT token
-    const token = jwt.sign({ 
-      pubkey: signedEvent.pubkey,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hour expiration
-    }, JWT_SECRET);
+//     // Generate JWT token
+//     const token = jwt.sign({ 
+//       pubkey: signedEvent.pubkey,
+//       iat: Math.floor(Date.now() / 1000),
+//       exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24 hour expiration
+//     }, JWT_SECRET);
 
-    console.log('Nostr login verified for pubkey:', signedEvent.pubkey);
-    console.log('Created JWT:', token);
-    res.json({ 
-      status: 'OK',
-      pubkey: signedEvent.pubkey,
-      metadata,
-      token
-    });
+//     console.log('Nostr login verified for pubkey:', signedEvent.pubkey);
+//     console.log('Created JWT:', token);
+//     res.json({ 
+//       status: 'OK',
+//       pubkey: signedEvent.pubkey,
+//       metadata,
+//       token
+//     });
 
-  } catch (error) {
-    console.error('Nostr verification error:', error);
-    res.status(500).json({ 
-      status: 'error', 
-      reason: 'Verification failed' 
-    });
-  }
-});
+//   } catch (error) {
+//     console.error('Nostr verification error:', error);
+//     res.status(500).json({ 
+//       status: 'error', 
+//       reason: 'Verification failed' 
+//     });
+//   }
+// });
 
 // Add this function right after your imports and before your routes
 // This is the corrected metadata fetching function based on your working test
