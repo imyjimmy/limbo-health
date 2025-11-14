@@ -11,12 +11,12 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV}
 
-  patient-frontend:
-    build: ./patient
-    container_name: ${CONTAINER_PREFIX}_patient_frontend_1
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=${NODE_ENV}
+  # patient-frontend:
+  #   build: ./patient
+  #   container_name: ${CONTAINER_PREFIX}_patient_frontend_1
+  #   restart: unless-stopped
+  #   environment:
+  #     - NODE_ENV=${NODE_ENV}
 
   mgit-api:
     build:

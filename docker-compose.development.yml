@@ -13,11 +13,11 @@ services:
     networks:
       - limbo_network
 
-  patient-frontend:
-    networks:
-      - limbo_network
-    volumes:
-      - ./patient/dist:/usr/share/nginx/html
+  # patient-frontend:
+  #   networks:
+  #     - limbo_network
+  #   volumes:
+  #     - ./patient/dist:/usr/share/nginx/html
       
   mgit-api:
     env_file:
