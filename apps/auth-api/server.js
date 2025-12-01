@@ -11,7 +11,7 @@ const db = mysql.createPool({
   host: process.env.DB_HOST || 'mysql',
   user: process.env.DB_USER || 'user',
   password: process.env.DB_PASSWORD || 'password',
-  database: process.env.DB_NAME || 'limbo_health',
+  database: 'limbo_health',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
