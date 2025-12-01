@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { NostrAuthService } from '@/services/auth';
 
-export function LoginPage() {
+export function PatientLoginPage() {
   const { setSession } = useAuth()
   const [activeTab, ] = useState<'patient' | 'doctor'>('patient');
   const [email, setEmail] = useState('');
@@ -32,7 +32,7 @@ export function LoginPage() {
 
   const handleNostrLogin = async () => {
     try {
-      const { token, pubkey, metadata } = await NostrAuthService.login();
+      const { token, pubkey, metadata } = await NostrAuthService.login('patient');
       
       // Store credentials
       localStorage.setItem('admin_token', token);
@@ -68,7 +68,7 @@ export function LoginPage() {
   const handleGoogleLogin = async () => {
     try {
       // No authentication needed - this is the login endpoint!
-      const response = await fetch('/api/google/login/start');
+      const response = await fetch('/api/google/login/start?userType=patient');
       
       const data = await response.json();
       
@@ -225,8 +225,8 @@ export function LoginPage() {
             {/* Patient Portal Link */}
             <div className="mt-4 text-center">
               <p className="text-sm text-[rgba(55,50,47,0.60)]">
-                Are you a patient?{' '}
-                <a href="/ppatient" className="text-[#37322F] font-medium hover:underline">
+                Are you a healthcare provider?{' '}
+                <a href="/login" className="text-[#37322F] font-medium hover:underline">
                   Sign in here
                 </a>
               </p>

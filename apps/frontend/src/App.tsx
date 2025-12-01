@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AdminDashboard from '@/pages/AdminDashboard';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
+import { PatientLoginPage } from './pages/PatientLoginPage';
 import { MeetingPage } from '@/pages/MeetingPage';
 import { BillingPage } from '@/pages/BillingPage';
 import { EditProfile } from '@/pages/EditProfile';
@@ -24,6 +25,10 @@ function AppRoutes() {
         <Route
           path="/login" 
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
+        />
+        <Route 
+          path="/ppatient" 
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <PatientLoginPage />} 
         />
         <Route
           path="/dashboard" 

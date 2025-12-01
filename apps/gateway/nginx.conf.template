@@ -31,10 +31,6 @@ http {
     server ${CONTAINER_PREFIX}_scheduler_api_1:3005;  # CHANGED: was _plebdoc_api_1
   }
 
-#  upstream patient_frontend {
-#    server ${CONTAINER_PREFIX}_patient_frontend_1:80;
-#  }
-
   upstream frontend {
     server ${CONTAINER_PREFIX}_frontend_1:5173;
   }
@@ -117,14 +113,6 @@ http {
 
     location /api/ {
       proxy_pass http://plebdoc_backend;
-    }
-
-#    location /patient/ {
-#      proxy_pass http://patient_frontend/;
-#    }
-
-    location = /patient {
-      return 301 /patient/;
     }
 
     location / {

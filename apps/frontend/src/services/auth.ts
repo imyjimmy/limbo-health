@@ -24,11 +24,11 @@ class AuthService {
     });
   }
   
-  async verify(signedEvent: any): Promise<{ token: string; pubkey: string; metadata: NostrProfile }> {
+  async verify(signedEvent: any, userType: 'provider' | 'patient' = 'provider'): Promise<{ token: string; pubkey: string; metadata: NostrProfile }> {
     const response = await fetch(`${this.baseUrl}/api/auth/nostr/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ signedEvent })
+      body: JSON.stringify({ signedEvent, userType })
     });
     
     const data = await response.json();
@@ -43,10 +43,10 @@ class AuthService {
     };
   }
   
-  async login(): Promise<{ token: string; pubkey: string; metadata: NostrProfile }> {
+  async login(userType: 'provider' | 'patient' = 'provider'): Promise<{ token: string; pubkey: string; metadata: NostrProfile }> {
     const challenge = await this.challenge();
     const signedEvent = await this.signChallenge(challenge);
-    return await this.verify(signedEvent);
+    return await this.verify(signedEvent, userType);
   }
 
   async registerUser(userData: { firstName: string; lastName: string; email: string; phoneNumber?: string; nostr_pubkey: string }, token: string): Promise<any> {

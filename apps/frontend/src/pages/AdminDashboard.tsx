@@ -13,6 +13,7 @@ import { OnboardingModal } from '@/components/OnboardingModal';
 
 import { WebRTCTest } from '../components/WebRTCTest';
 import { DatabaseTest } from '../components/DatabaseTest';
+import { SignatureDeterminismTest } from '../components/test-signature-determinism';
 // import { RegistrationView } from '../components/RegistrationView';
 
 import { useNavigate } from 'react-router-dom';
@@ -109,7 +110,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({onLogout}) => {
             {activeSection === 'settings' && token && (
               <Settings token={token} />
             )}
-            {activeSection === 'database' && <DatabaseTest />}
+            {activeSection === 'database' && <SignatureDeterminismTest />}
             {activeSection === 'repositories' && token && (
               <MedicalRepos token={token} />
             )}

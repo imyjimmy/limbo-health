@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS `migrations` (
 
 INSERT INTO `roles` (`id`, `create_datetime`, `update_datetime`, `name`, `slug`, `is_admin`, `appointments`, `customers`, `services`, `users`, `system_settings`, `user_settings`, `webhooks`, `blocked_periods`) VALUES
 (1, NULL, NULL, 'Administrator', 'admin', 1, 15, 15, 15, 15, 15, 15, 15, 15),
-(2, NULL, NULL, 'Provider', 'provider', 0, 15, 15, 0, 0, 0, 15, 0, 0),
+(2, NULL, NULL, 'Provider', 'provider', 1, 15, 15, 15, 15, 15, 15, NULL, NULL),
 (3, NULL, NULL, 'Customer', 'customer', 0, 0, 0, 0, 0, 0, 0, 0, 0),
 (4, NULL, NULL, 'Secretary', 'secretary', 0, 15, 15, 0, 0, 0, 15, 0, 0),
 (5, NULL, NULL, 'Admin Provider', 'admin-provider', 1, 15, 15, 15, 15, 15, 15, NULL, NULL);

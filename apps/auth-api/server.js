@@ -2,9 +2,20 @@ import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
+import mysql from 'mysql2/promise';
 
 import { NostrAuthService } from './services/NostrAuthService.js';
 import { GoogleAuthService } from './services/GoogleAuthService.js';
+
+const db = mysql.createPool({
+  host: process.env.DB_HOST || 'mysql',
+  user: process.env.DB_USER || 'user',
+  password: process.env.DB_PASSWORD || 'password',
+  database: process.env.DB_NAME || 'limbo_health',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
 
 const app = express();
 const PORT = process.env.PORT || 3010;
@@ -30,7 +41,7 @@ app.post('/api/auth/nostr/challenge', (req, res) => {
 });
 
 app.post('/api/auth/nostr/verify', async (req, res) => {
-  const { signedEvent } = req.body;
+  const { signedEvent, userType = 'provider' } = req.body; // ADD userType extraction
   
   try {
     const result = await nostrAuth.verifySignedEvent(signedEvent);
@@ -38,16 +49,54 @@ app.post('/api/auth/nostr/verify', async (req, res) => {
     if (!result.valid) {
       return res.status(400).json({ status: 'error', reason: result.error });
     }
+
+    // Step 2: Look up user by nostr_pubkey
+    const [users] = await db.query(
+      'SELECT id, id_roles FROM users WHERE nostr_pubkey = ?',
+      [result.pubkey]
+    );
     
-    // Generate JWT
+    let userId;
+    let userRole;
+    
+    if (users.length === 0) {
+      // Step 3: New user - create with role based on userType
+      const roleId = userType === 'patient' ? 3 : 2; // Verify these IDs match your roles table
+      
+      const [insertResult] = await db.query(
+        'INSERT INTO users (nostr_pubkey, id_roles) VALUES (?, ?)',
+        [result.pubkey, roleId]
+      );
+      
+      userId = insertResult.insertId;
+      userRole = roleId;
+    } else {
+      // Step 4: Existing user - verify role matches login type
+      const user = users[0];
+      const expectedRole = userType === 'patient' ? 3 : 2;
+      
+      if (user.id_roles !== expectedRole) {
+        return res.status(400).json({ 
+          status: 'error', 
+          reason: `This account is registered as a ${user.id_roles === 2 ? 'provider' : 'patient'}. Please use the correct login page.`
+        });
+      }
+      
+      userId = user.id;
+      userRole = user.id_roles;
+    }
+    
+    // MODIFY JWT to include userId and role
     const token = jwt.sign({
+      userId,
       pubkey: result.pubkey,
+      role: userRole,
       authMethod: 'nostr',
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24h
+      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
     }, JWT_SECRET);
     
-    console.log('Nostr login verified for pubkey:', result.pubkey);
+    console.log('Nostr login verified for pubkey:', result.pubkey, 'as', userType);
     
     res.json({
       status: 'OK',
@@ -63,7 +112,6 @@ app.post('/api/auth/nostr/verify', async (req, res) => {
 });
 
 // ========== GOOGLE AUTH ==========
-
 app.get('/api/auth/google/url', (req, res) => {
   const { redirectUri } = req.query;
   const authUrl = googleAuth.generateAuthUrl('login', redirectUri);
