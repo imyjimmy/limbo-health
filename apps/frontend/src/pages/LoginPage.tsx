@@ -32,7 +32,7 @@ export function LoginPage() {
 
   const handleNostrLogin = async () => {
     try {
-      const { token, pubkey, metadata } = await NostrAuthService.login();
+      const { metadata, pubkey, token } = await NostrAuthService.login();
       
       // Store credentials
       localStorage.setItem('admin_token', token);

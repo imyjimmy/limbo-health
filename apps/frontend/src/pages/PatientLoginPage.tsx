@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { NostrAuthService } from '@/services/auth';
+import { generateOrRetrieveEd25519Keys } from '@/lib/utils';
 
 export function PatientLoginPage() {
   const { setSession } = useAuth()
@@ -9,6 +10,7 @@ export function PatientLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>();
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,37 +33,32 @@ export function PatientLoginPage() {
   };
 
   const handleNostrLogin = async () => {
+    setLoading(true);
+    setError('');
+    
     try {
-      const { token, pubkey, metadata } = await NostrAuthService.login('patient');
+      const { metadata, pubkey, token } = await NostrAuthService.login('patient');
+      localStorage.setItem('token', token);
+      localStorage.setItem('nostr_pubkey', pubkey);
       
-      // Store credentials
-      localStorage.setItem('admin_token', token);
-      localStorage.setItem('admin_pubkey', pubkey);
-      localStorage.setItem('admin_profile', JSON.stringify(metadata));
+      try {
+        const ed25519Keys = await generateOrRetrieveEd25519Keys(pubkey, token);
+        console.log('Ed25519 keys ready. Public key:', ed25519Keys.publicKey);
 
-      // Check if user is registered
-      const registrationCheck = await NostrAuthService.checkUserRegistration(pubkey, token);
-      
-      if (registrationCheck.isRegistered) {
-      // Existing user - login normally
         setSession(token, pubkey, { ...metadata, pubkey }, {
           dashboard: false,
           billing: false,
           services: false,
           telehealth: false
         });
-      } else {
-        // New user - login but flag needs onboarding
-        setSession(token, pubkey, { ...metadata, pubkey }, {
-          dashboard: true,
-          billing: true,
-          services: true,
-          telehealth: true
-        });
+      } catch (err) {
+        console.error('Failed to setup ed25519 keys:', err);
       }
-    } catch (error) {
-      console.error('Nostr login failed:', error);
-      alert('Please install a Nostr browser extension like nos2x');
+      
+    } catch (err: any) {
+      setError(err.message || 'Nostr login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -91,7 +88,7 @@ export function PatientLoginPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-[#37322F] mb-2">Welcome to PlebDoc</h1>
-          <p className="text-[rgba(55,50,47,0.80)]">Sign in to your doctor dashboard</p>
+          <p className="text-[rgba(55,50,47,0.80)]">Sign in to your Patient dashboard</p>
         </div>
 
         {/* Login Form Card */}

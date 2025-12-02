@@ -2,7 +2,8 @@ import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { GoogleProfile, NostrProfile } from '@/types';
 import * as ed from '@noble/ed25519';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import { sha512 } from '@noble/hashes/sha2.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -80,6 +81,16 @@ export function getEmail(profile: GoogleProfile | NostrProfile | null): string {
   return '';
 }
 
+// (function setupSha512() {
+//   // @ts-ignore
+//   ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
+//   // @ts-ignore
+//   ed.etc.sha512Async = (...m: Uint8Array[]) => Promise.resolve(sha512(ed.etc.concatBytes(...m)));
+// })();
+
+ed.hashes.sha512 = sha512;
+ed.hashes.sha512Async = (m: Uint8Array) => Promise.resolve(sha512(m));
+
 export async function generateOrRetrieveEd25519Keys(
   nostrPubkey: string,
   token: string
@@ -98,7 +109,7 @@ export async function generateOrRetrieveEd25519Keys(
   }
 
   // Check if server has encrypted blob
-  const response = await fetch('/api/mgit/keys', {
+  const response = await fetch('/api/user/keys', {
     headers: { 'Authorization': `Bearer ${token}` }
   });
   
@@ -109,31 +120,39 @@ export async function generateOrRetrieveEd25519Keys(
   const data = await response.json();
   
   if (data.encryptedKey) {
-    // Decrypt existing key (comes back as hex string)
-    const privateKey = await window.nostr.nip04.decrypt(
-      nostrPubkey,
-      data.encryptedKey
-    );
-    
-    // Get public key from private key
+    // Decrypt existing key
+    const privateKey = await window.nostr.nip04.decrypt(nostrPubkey, data.encryptedKey);
     const privateKeyBytes = hexToBytes(privateKey);
-    const publicKeyBytes = await ed.getPublicKey(privateKeyBytes);
+    
+    // Set SHA-512 RIGHT before using it
+    // @ts-ignore
+    if (!ed.etc.sha512Sync) {
+      // @ts-ignore
+      ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
+    }
+    
+    const publicKeyBytes = ed.getPublicKey(privateKeyBytes);
     const publicKey = bytesToHex(publicKeyBytes);
     
-    // Cache in sessionStorage
     sessionStorage.setItem('mgit_ed25519_privkey', privateKey);
     sessionStorage.setItem('mgit_ed25519_pubkey', publicKey);
     
     return { privateKey, publicKey };
     
   } else {
-    // First login - generate new keypair
-    const privateKeyBytes = ed.utils.randomSecretKey(); // Generate as bytes
+    // First login
+    const privateKeyBytes = ed.utils.randomSecretKey();
     const privateKey = bytesToHex(privateKeyBytes);
     
-    const publicKeyBytes = await ed.getPublicKey(privateKeyBytes); // Pass bytes
-    const publicKey = bytesToHex(publicKeyBytes);
+    // Set SHA-512 RIGHT before using it
+    // @ts-ignore
+    if (!ed.etc.sha512Sync) {
+      // @ts-ignore
+      ed.etc.sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
+    }
     
+    const publicKeyBytes = await ed.getPublicKey(privateKeyBytes);
+    const publicKey = bytesToHex(publicKeyBytes);
     // Encrypt private key (hex string) with Nostr
     const encrypted = await window.nostr.nip04.encrypt(
       nostrPubkey,
@@ -141,7 +160,7 @@ export async function generateOrRetrieveEd25519Keys(
     );
     
     // Send to server
-    const saveResponse = await fetch('/api/mgit/keys', {
+    const saveResponse = await fetch('/api/user/keys', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
