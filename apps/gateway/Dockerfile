@@ -1,5 +1,5 @@
 FROM nginx:alpine
-COPY apps/gateway/nginx.conf.template /etc/nginx/nginx.conf.template
+COPY apps/gateway/nginx.conf /etc/nginx/nginx.conf
 COPY apps/gateway/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
