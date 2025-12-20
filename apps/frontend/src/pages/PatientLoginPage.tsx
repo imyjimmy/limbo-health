@@ -87,8 +87,8 @@ export function PatientLoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#37322F] mb-2">Welcome to PlebDoc</h1>
-          <p className="text-[rgba(55,50,47,0.80)]">Sign in to your Patient dashboard</p>
+          <h1 className="text-3xl font-bold text-[#37322F] mb-2">Welcome to Your Patient Dashboard</h1>
+          <p className="text-[rgba(55,50,47,0.80)]">View Your Appointments, Patient Records, Pay Bills</p>
         </div>
 
         {/* Login Form Card */}

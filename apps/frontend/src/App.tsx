@@ -27,7 +27,7 @@ function AppRoutes() {
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
         />
         <Route 
-          path="/ppatient" 
+          path="/patient" 
           element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <PatientLoginPage />} 
         />
         <Route
@@ -45,11 +45,11 @@ function AppRoutes() {
         <Route path="/meeting/:roomId" element={<MeetingPage token={token || ''}/>} />
         {/* Public profile route - must be last to avoid matching other routes */}
         <Route 
-          path='/providers/:username'
+          path='/:username'
           element={<PublicProfile />}
         />
         <Route 
-          path='/providers/:username/book'
+          path='/:username/book'
           element={<BookAppointment />}
         />
         <Route path="/login/google-callback" element={<GoogleCallbackPage />} />

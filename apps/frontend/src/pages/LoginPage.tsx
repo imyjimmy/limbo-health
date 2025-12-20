@@ -90,8 +90,8 @@ export function LoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#37322F] mb-2">Welcome to PlebDoc</h1>
-          <p className="text-[rgba(55,50,47,0.80)]">Sign in to your doctor dashboard</p>
+          <h1 className="text-3xl font-bold text-[#37322F] mb-2">Welcome to Limbo Health</h1>
+          <p className="text-[rgba(55,50,47,0.80)]">Sign in to your Doctor Dashboard</p>
         </div>
 
         {/* Login Form Card */}
@@ -226,7 +226,7 @@ export function LoginPage() {
             <div className="mt-4 text-center">
               <p className="text-sm text-[rgba(55,50,47,0.60)]">
                 Are you a patient?{' '}
-                <a href="/ppatient" className="text-[#37322F] font-medium hover:underline">
+                <a href="/patient" className="text-[#37322F] font-medium hover:underline">
                   Sign in here
                 </a>
               </p>
