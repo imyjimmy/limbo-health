@@ -7,7 +7,8 @@ interface AuthContextType extends AuthState {
   setSession: (
     token: string, 
     pubkey: string, 
-    profile: any, 
+    profile: any,
+    role: 'patient' | 'provider' | null,
     needsOnboarding?: Partial<AuthState['needsOnboarding']> ) => void;
   logout: () => void;
   refreshAuth: () => void;
@@ -22,12 +23,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const pubkey = localStorage.getItem('admin_pubkey');
     const profile = localStorage.getItem('admin_profile');
     const onboarding = localStorage.getItem('needs_onboarding');
+    const role = localStorage.getItem('admin_role') as 'patient' | 'provider' | null;
 
     return {
       isAuthenticated: !!(token),
       token: token,
       pubkey: pubkey,
       profile: profile ? JSON.parse(profile) : null,
+      role: role,  // ← Add this
       needsOnboarding: onboarding ? JSON.parse(onboarding) : {
         dashboard: false,
         billing: false,
@@ -40,7 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setSession = async (
     token: string, 
     pubkey: string, 
-    profile: any, 
+    profile: any,
+    role: 'patient' | 'provider',
     needsOnboarding?: Partial<AuthState['needsOnboarding']>
   ) => {
     const defaultOnboarding = {
@@ -66,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       pubkey,
       profile: finalProfile,
+      role,  // ← Add this
       needsOnboarding: needsOnboarding 
         ? { ...defaultOnboarding, ...needsOnboarding }
         : defaultOnboarding
@@ -74,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('admin_token', token);
     localStorage.setItem('admin_pubkey', pubkey);
     localStorage.setItem('admin_profile', JSON.stringify(finalProfile));
+    localStorage.setItem('admin_role', role);  // ← Add this
     localStorage.setItem('needs_onboarding', JSON.stringify(
       needsOnboarding || defaultOnboarding
     ));
@@ -105,7 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: false,
       token: null,
       pubkey: null,
-      profile: null
+      profile: null,
+      role: null,
     });
   };
 
@@ -113,11 +120,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('admin_token');
     const pubkey = localStorage.getItem('admin_pubkey');
     const profile = localStorage.getItem('admin_profile');
-    
+    const role = localStorage.getItem('admin_role') as 'patient' | 'provider' | null; 
+
     setAuthState({ ...authState,
       isAuthenticated: !!(token && pubkey),
       token: token,
       pubkey: pubkey,
+      role: role,
       profile: profile ? JSON.parse(profile) : null,
     });
   };
@@ -131,7 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('refreshProfile, providerProfile: ', providerProfile);
       setAuthState(prev => ({
         ...prev,
-        profile: providerProfile
+        profile: providerProfile,
+        role: prev.role,
       }));
 
       // Update localStorage

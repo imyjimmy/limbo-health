@@ -22,6 +22,7 @@ export interface AuthState {
   token: string | null;
   pubkey: string | null;
   profile: GoogleProfile | NostrProfile | null;
+  role: 'patient' | 'provider' | null;
   needsOnboarding: {
     dashboard: boolean;
     billing: boolean;
