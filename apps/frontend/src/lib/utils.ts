@@ -183,3 +183,143 @@ export async function generateOrRetrieveEd25519Keys(
     return { privateKey, publicKey };
   }
 }
+
+/**
+ * 
+ * NIP-44 support
+ */
+
+/**
+ * Check if nos2x extension is available with NIP-44 support
+ */
+export function checkNostrExtension(): boolean {
+  if (typeof window === 'undefined') return false;
+  
+  if (!window.nostr) {
+    throw new Error('Please install a Nostr browser extension like nos2x');
+  }
+  
+  if (!window.nostr.nip44) {
+    throw new Error('Your Nostr extension does not support NIP-44 encryption. Please update nos2x.');
+  }
+  
+  return true;
+}
+
+/**
+ * Get the current user's public key from nos2x
+ */
+export async function getNostrPublicKey(): Promise<string> {
+  checkNostrExtension();
+  
+  try {
+    const pubkey = await window.nostr.getPublicKey();
+    return pubkey;
+  } catch (error) {
+    throw new Error(`Failed to get public key: ${error.message}`);
+  }
+}
+
+/**
+ * Encrypt medical data using NIP-44
+ * @param plaintext - The data to encrypt (will be stringified if object)
+ * @param recipientPubkey - The recipient's public key (use your own for self-encryption)
+ * @returns Encrypted ciphertext
+ */
+export async function encryptMedicalData(
+  plaintext: string | object,
+  recipientPubkey: string
+): Promise<string> {
+  checkNostrExtension();
+  
+  try {
+    const dataString = typeof plaintext === 'string' 
+      ? plaintext 
+      : JSON.stringify(plaintext);
+    
+    const encrypted = await window.nostr.nip44.encrypt(
+      recipientPubkey,
+      dataString
+    );
+    
+    return encrypted;
+  } catch (error) {
+    throw new Error(`Encryption failed: ${error.message}`);
+  }
+}
+
+/**
+ * Decrypt medical data using NIP-44
+ * @param ciphertext - The encrypted data
+ * @param senderPubkey - The sender's public key (use your own for self-decryption)
+ * @returns Decrypted plaintext
+ */
+export async function decryptMedicalData(
+  ciphertext: string,
+  senderPubkey: string
+): Promise<string> {
+  checkNostrExtension();
+  
+  try {
+    const decrypted = await window.nostr.nip44.decrypt(
+      senderPubkey,
+      ciphertext
+    );
+    
+    return decrypted;
+  } catch (error) {
+    throw new Error(`Decryption failed: ${error.message}`);
+  }
+}
+
+/**
+ * Encrypt medical data to yourself (for storage)
+ * @param medicalData - The medical history object
+ * @returns Encrypted ciphertext
+ */
+export async function encryptForStorage(
+  medicalData: object
+): Promise<string> {
+  const myPubkey = await getNostrPublicKey();
+  return encryptMedicalData(medicalData, myPubkey);
+}
+
+/**
+ * Decrypt your own medical data (from storage)
+ * @param ciphertext - The encrypted data
+ * @returns Parsed medical data object
+ */
+export async function decryptFromStorage<T = any>(
+  ciphertext: string
+): Promise<T> {
+  const myPubkey = await getNostrPublicKey();
+  const decrypted = await decryptMedicalData(ciphertext, myPubkey);
+  return JSON.parse(decrypted);
+}
+
+/**
+ * Re-encrypt medical data for a doctor (for sharing during appointment)
+ * @param medicalData - The medical history object
+ * @param doctorPubkey - The doctor's Nostr public key
+ * @returns Encrypted ciphertext that only the doctor can decrypt
+ */
+export async function encryptForDoctor(
+  medicalData: object,
+  doctorPubkey: string
+): Promise<string> {
+  return encryptMedicalData(medicalData, doctorPubkey);
+}
+
+/**
+ * Decrypt medical data shared by a patient (doctor's perspective)
+ * @param ciphertext - The encrypted data from patient
+ * @param patientPubkey - The patient's public key
+ * @returns Parsed medical data object
+ */
+export async function decryptFromPatient<T = any>(
+  ciphertext: string,
+  patientPubkey: string
+): Promise<T> {
+  const decrypted = await decryptMedicalData(ciphertext, patientPubkey);
+  return JSON.parse(decrypted);
+}
