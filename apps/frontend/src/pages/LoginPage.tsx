@@ -5,7 +5,7 @@ import { NostrAuthService } from '@/services/auth';
 
 export function LoginPage() {
   const { setSession } = useAuth()
-  const [activeTab, ] = useState<'patient' | 'doctor'>('patient');
+  const [activeTab, ] = useState<'patient' | 'provider'>('patient');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,7 @@ export function LoginPage() {
 
   const handleNostrLogin = async () => {
     try {
-      const { metadata, pubkey, token } = await NostrAuthService.login();
+      const { metadata, pubkey, token } = await NostrAuthService.login('provider');
       
       // Store credentials
       localStorage.setItem('admin_token', token);

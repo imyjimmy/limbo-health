@@ -36,7 +36,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({onLogout}) => {
       <OnboardingModal
         isOpen={!!needsOnboarding['dashboard'] && !!token}
         
-        title="Welcome to PlebDoc!"
+        title="Welcome to Limbo Health!"
         description="Let's set up your doctor profile so patients can book with you."
         actionLabel="Complete Profile Setup →"
         onAction={() => {

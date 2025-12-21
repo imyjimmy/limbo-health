@@ -15,6 +15,9 @@ mysql-backups/*
 # production
 /build
 
+# vite
+.vite
+
 # misc
 .DS_Store
 .env

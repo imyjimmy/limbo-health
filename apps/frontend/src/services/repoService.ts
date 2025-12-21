@@ -17,7 +17,7 @@ export class RepoService {
     if (!response.ok) {
       throw new Error(`Failed to load repositories: ${response.status}`)
     }
-
+    
     return response.json()
   }
 
@@ -88,5 +88,23 @@ export class RepoService {
     }
 
     return response.text()
+  }
+
+  static async createBareRepository(token: string, repoName: string): Promise<any> {
+    const response = await fetch('/api/mgit/repos/create-bare', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ repoName })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.reason || 'Failed to create bare repository');
+    }
+
+    return response.json();
   }
 }

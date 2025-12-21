@@ -7,7 +7,8 @@ const axios = require('axios');
 const WebSocket = require('ws');
 const fs = require('fs');
 const path = require('path');
-const { execSync, exec } = require('child_process');
+const { exec } = require('child_process');
+const { promisify } = require('util'); // Add this line
 const jwt = require('jsonwebtoken');
 const QRCode = require('qrcode');
 const authPersistence = require('./auth-persistence');
@@ -23,7 +24,7 @@ const configureSecurity = require('./security');
 const mgitUtils = require('./mgitUtils');
 const utils = require('./utils');
 
-// const setupWebRTCRoutes = require('./webrtc-signaling');
+const execAsync = promisify(exec);
 
 const app = express();
 app.use(express.json());
@@ -217,9 +218,10 @@ const validateAuthToken = (req, res, next) => {
 };
 
 // validates the MGitToken which includes RepoId
-const validateMGitToken = (req, res, next) => {
+// Simplified: Just validate JWT and check repo access
+const validateMGitToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  console.log("validating mGitToken, authHeader: ", authHeader)
+  
   if (!authHeader) {
     return res.status(401).json({ 
       status: 'error', 
@@ -227,7 +229,7 @@ const validateMGitToken = (req, res, next) => {
     });
   }
 
-  console.log('utils.processAuthToken', authHeader, JWT_SECRET);
+  // Verify JWT is valid
   const result = utils.processAuthToken(authHeader, JWT_SECRET);
   
   if (!result.success) {
@@ -237,18 +239,24 @@ const validateMGitToken = (req, res, next) => {
     });
   }
   
-  // Add the decoded token to the request object for route handlers to use
   req.user = result.decoded;
-
-  const token = authHeader.split(' ')[1];
   
-  if (req.params.repoId && req.params.repoId !== result.decoded.repoId) {
-    return res.status(403).json({ 
-      status: 'error', 
-      reason: 'Token not valid for this repository' 
-    });
-  }
+  // If this route has a repoId, check if user has access
+  if (req.params.repoId) {
+    const { pubkey } = result.decoded;
+    const accessCheck = await checkRepoAccess(req.params.repoId, pubkey);
     
+    if (!accessCheck.success) {
+      return res.status(accessCheck.status).json({ 
+        status: 'error', 
+        reason: accessCheck.error 
+      });
+    }
+    
+    // Add access level to request for downstream handlers
+    req.user.access = accessCheck.access;
+  }
+  
   next();
 };
 
@@ -723,7 +731,6 @@ async function checkRepoAccess(repoId, pubkey) {
 /*
  * MGit Repository API Endpoints
  */
-//was validateMGitToken
 app.get('/api/mgit/repos/:repoId/show', validateMGitToken, (req, res) => {
   const { repoId } = req.params;
   const { access } = req.user;
@@ -858,6 +865,77 @@ app.get('/api/mgit/qr/clone/:repoId', validateMGitToken, async (req, res) => {
     res.status(500).json({
       status: 'error',
       reason: 'Failed to generate QR code',
+      details: error.message
+    });
+  }
+});
+
+// NEW: Create bare repository only (client handles encryption and commits)
+app.post('/api/mgit/repos/create-bare', validateAuthToken, async (req, res) => {
+  try {
+    const { repoName } = req.body;
+    const { pubkey } = req.user;
+    
+    if (!repoName) {
+      return res.status(400).json({
+        status: 'error',
+        reason: 'Repository name is required'
+      });
+    }
+
+    // Normalize repo name
+    const normalizedRepoName = repoName.trim().replace(/\s+/g, '-').toLowerCase();
+    
+    // Check if repository already exists
+    const existingConfig = await authPersistence.loadRepositoryConfig(normalizedRepoName);
+    if (existingConfig) {
+      return res.status(409).json({
+        status: 'error',
+        reason: 'Repository already exists'
+      });
+    }
+    
+    const repoPath = path.join(REPOS_PATH, normalizedRepoName);
+    
+    // Check if directory exists
+    if (fs.existsSync(repoPath)) {
+      return res.status(409).json({
+        status: 'error',
+        reason: 'Repository directory already exists'
+      });
+    }
+    
+    // Create directory and initialize as bare git repository
+    fs.mkdirSync(repoPath, { recursive: true });
+    await execAsync('git init --bare', { cwd: repoPath });
+    await execAsync(`echo "ref: refs/heads/main" > ${repoPath}/HEAD`);
+    
+    console.log(`✅ Created bare repository at ${repoPath}`);
+    
+    // Save auth configuration
+    await authPersistence.saveRepositoryConfig(normalizedRepoName, {
+      authorized_keys: [{ pubkey: utils.hexToBech32(pubkey), access: 'admin' }],
+      metadata: {
+        created: new Date().toISOString(),
+        description: 'Encrypted medical repository',
+        type: 'medical-history',
+        encrypted: true
+      }
+    });
+    
+    console.log(`✅ Saved auth config for ${normalizedRepoName}`);
+    
+    res.json({
+      status: 'OK',
+      repoId: normalizedRepoName,
+      message: 'Bare repository created successfully. Client can now push encrypted commits.'
+    });
+    
+  } catch (error) {
+    console.error('Bare repository creation error:', error);
+    res.status(500).json({
+      status: 'error',
+      reason: 'Failed to create bare repository',
       details: error.message
     });
   }
@@ -1441,27 +1519,12 @@ app.get('/api/mgit/user/repositories', validateAuthToken, async (req, res) => {
     
     // Sort by creation date (newest first)
     userRepositories.sort((a, b) => new Date(b.created) - new Date(a.created));
-    
+    console.log('user repos:', userRepositories);
     res.json(userRepositories);
   } catch (error) {
     console.error('Error fetching user repositories:', error);
     res.status(500).json({ error: 'Failed to fetch repositories' });
   }
-});
-
-// For any routes that should render the React app (client-side routing)
-app.get('*', (req, res, next) => {
-  // Skip API routes
-  if (req.path.startsWith('/api/')) {
-    return next();
-  }
-
-  if (req.path.startsWith('/admin')) {
-    return res.sendFile(path.join(__dirname, 'admin/dist', 'index.html'));
-  }
-  
-  // Serve the main index.html for all non-API routes to support client-side routing
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // health check
