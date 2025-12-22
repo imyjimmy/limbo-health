@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, Plus, FolderOpen, Lock, CheckCircle2, QrCode, Key } from "lucide-react"
+import { RepositoryCard } from "@/components/RepositoryCard";
+import { Loader2, Plus, FolderOpen, Lock, CheckCircle2 } from "lucide-react"
 import { MedicalRepository, CreateRepositoryData } from '../types/repository'
 import { RepoService } from '../services/repoService'
 import { useAuth } from '../contexts/AuthContext'
@@ -15,7 +16,7 @@ import {
   MedicalHistoryData 
 } from '../lib/encryptedGit'
 import { checkNostrExtension } from '../lib/utils'
-import { NostrProfile } from '@/types'
+// import { NostrProfile } from '@/types'
 
 interface MedicalReposProps {
   token: string
@@ -366,148 +367,3 @@ export function MedicalRepos({ token }: MedicalReposProps) {
     </div>
   )
 }
-
-function RepositoryCard({ repository }: { repository: MedicalRepository }) {
-  const [showAuth, setShowAuth] = useState(true)
-  const [authLoading, setAuthLoading] = useState(false)
-  const [qrCode, setQrCode] = useState<string | null>(null)
-  const [repoToken, setRepoToken] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleGetAccess = async () => {
-    if (!window.nostr?.signEvent) {
-      setError('No Nostr extension found. Please install nos2x or similar.')
-      return
-    }
-
-    setAuthLoading(true)
-    setError(null)
-
-    try {
-      // Get challenge
-      const challengeData = await RepoService.getAuthChallenge(repository.name)
-      
-      // Sign with nostr extension
-      const event = {
-        kind: 22242,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [],
-        content: `MGit auth challenge: ${challengeData.challenge}`
-      }
-      
-      const signedEvent = await window.nostr.signEvent(event)
-      
-      // Verify and get token
-      const verifyData = await RepoService.verifyAuth(signedEvent, challengeData.challenge, repository.name)
-      
-      // Generate QR code
-      const qrSvg = await RepoService.generateQRCode(repository.name, verifyData.token)
-      
-      setQrCode(qrSvg)
-      setRepoToken(verifyData.token)
-      setShowAuth(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed')
-    } finally {
-      setAuthLoading(false)
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FolderOpen className="h-5 w-5" />
-          {repository.name}
-        </CardTitle>
-        <CardDescription>
-          <div>Created: {new Date(repository.created).toLocaleDateString()}</div>
-          <div>Access Level: {repository.access}</div>
-          {repository.description && <div>Description: {repository.description}</div>}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {showAuth ? (
-          <div className="border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-950/20 p-4 rounded">
-            <h4 className="font-semibold text-orange-700 dark:text-orange-300 mb-2">
-              Repository Access Required
-            </h4>
-            <p className="text-sm text-orange-600 dark:text-orange-400 mb-4">
-              Generate a secure access token for this repository to get the mobile QR code
-            </p>
-            {error && (
-              <div className="text-red-600 dark:text-red-400 text-sm mb-2">{error}</div>
-            )}
-            <Button onClick={handleGetAccess} disabled={authLoading} variant="outline">
-              {authLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Key className="h-4 w-4 mr-2" />}
-              Get Repository Access
-            </Button>
-          </div>
-        ) : (
-          <div className="border-l-4 border-green-500 bg-green-50 dark:bg-green-950/20 p-4 rounded">
-            <h4 className="font-semibold text-green-700 dark:text-green-300 mb-4 flex items-center gap-2">
-              <QrCode className="h-4 w-4" />
-              Scan with Medical Binder App
-            </h4>
-            
-            {qrCode && (
-              <div className="text-center mb-4" dangerouslySetInnerHTML={{ __html: qrCode }} />
-            )}
-            
-            {repoToken && (
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor={`token-${repository.name}`}>Repository JWT Token:</Label>
-                  <Textarea
-                    id={`token-${repository.name}`}
-                    value={repoToken}
-                    readOnly
-                    className="font-mono text-xs h-20"
-                  />
-                </div>
-                
-                <div>
-                  <Label>Debug Command:</Label>
-                  <code className="block bg-muted p-3 rounded text-xs break-all">
-                    mgit clone -jwt {repoToken} {window.location.protocol}//{window.location.host}/{repository.name}
-                  </code>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Copy and run this command in terminal to test mgit clone manually
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-// Keep existing RepositoryCard component unchanged for now
-// function RepositoryCard({ repository, token }: { repository: MedicalRepository; token: string }) {
-//   return (
-//     <Card>
-//       <CardHeader>
-//         <CardTitle className="flex items-center gap-2">
-//           <Lock className="h-5 w-5 text-green-600" />
-//           <FolderOpen className="h-5 w-5" />
-//           {repository.name}
-//         </CardTitle>
-//         <CardDescription>
-//           <div>Created: {new Date(repository.created).toLocaleDateString()}</div>
-//           <div>Access Level: {repository.access}</div>
-//           {repository.description && <div>Description: {repository.description}</div>}
-//           <div className="text-xs text-green-600 dark:text-green-400 mt-2">
-//             🔒 Encrypted with NIP-44
-//           </div>
-//         </CardDescription>
-//       </CardHeader>
-//       <CardContent>
-//         <p className="text-sm text-muted-foreground">
-//           Repository management features coming soon...
-//         </p>
-//       </CardContent>
-//     </Card>
-//   )
-// }

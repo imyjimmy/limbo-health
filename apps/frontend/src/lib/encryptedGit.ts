@@ -124,7 +124,7 @@ export async function pushToServer(
       remote: 'origin',
       ref: 'main',
       headers: {
-        Authorization: `Bearer ${token}` // ← Send JWT as Bearer token
+        Authorization: `Bearer ${token}`
       }
     });
     
@@ -172,7 +172,9 @@ export async function cloneFromServer(
       ref: 'main',
       singleBranch: true,
       depth: 1,
-      onAuth: () => ({ username: token, password: 'x-oauth-basic' })
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
     });
     
     console.log(`✅ Cloned repository: ${repoName}`);
@@ -193,7 +195,7 @@ export async function listLocalRepos(): Promise<string[]> {
     
     for (const entry of entries) {
       try {
-        // Check if it's a git repo by looking for .git directory
+        // Check if it's a git repo
         const gitDir = `/${entry}/.git`;
         await fs.promises.stat(gitDir);
         repos.push(entry);
@@ -205,6 +207,25 @@ export async function listLocalRepos(): Promise<string[]> {
     return repos;
   } catch (error) {
     console.error('Failed to list repos:', error);
+    return [];
+  }
+}
+
+/**
+ * List all files in the repository
+ */
+export async function listRepoFiles(dir: string): Promise<string[]> {
+  try {
+    const files = await git.listFiles({
+      fs,
+      dir,
+      ref: 'HEAD'
+    });
+    
+    console.log('📁 Repository files:', files);
+    return files;
+  } catch (error) {
+    console.error('Failed to list files:', error);
     return [];
   }
 }
