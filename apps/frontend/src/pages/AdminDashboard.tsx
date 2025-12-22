@@ -26,7 +26,7 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({onLogout}) => {
   const navigate = useNavigate();
-  const { isAuthenticated, token, pubkey, profile, needsOnboarding, completeOnboarding } = useAuth();
+  const { isAuthenticated, token, pubkey, profile, needsOnboarding, completeOnboarding, role } = useAuth();
   // const [showUserRegModal, setShowUserRegModal] = useState<boolean>(false);
   const [activeSection, setActiveSection] = useState('webrtc');
 
@@ -81,7 +81,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({onLogout}) => {
         } as React.CSSProperties}
       >
         <AppSidebar 
-          authState={{ isAuthenticated, token, pubkey, profile, needsOnboarding }}
+          authState={{ isAuthenticated, token, pubkey, profile, role, needsOnboarding }}
           activeSection={activeSection}
           onLogout={onLogout}
           onSectionChange={setActiveSection}
