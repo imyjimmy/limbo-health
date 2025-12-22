@@ -14,7 +14,7 @@ interface EditProfileProps {
 
 export const EditProfile: React.FC<EditProfileProps> = ({ token, onSave }) => {
   const navigate = useNavigate();
-  const { profile: nostrProfile, refreshProfile, setSession, pubkey } = useAuth();
+  const { profile: nostrProfile, refreshProfile, setSession, pubkey, role } = useAuth();
   const [profile, setProfile] = useState<Partial<ProviderProfile>&{ nostrPubkey?: string | null }>({});
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -74,6 +74,7 @@ export const EditProfile: React.FC<EditProfileProps> = ({ token, onSave }) => {
       setSession(token,
         pubkey || '',
         updatedProfile,
+        role,
         undefined // Don't change onboarding flags
       );
 

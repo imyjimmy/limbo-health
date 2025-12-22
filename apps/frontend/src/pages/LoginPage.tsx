@@ -44,7 +44,7 @@ export function LoginPage() {
       
       if (registrationCheck.isRegistered) {
       // Existing user - login normally
-        setSession(token, pubkey, { ...metadata, pubkey }, {
+        setSession(token, pubkey, { ...metadata, pubkey }, 'provider', {
           dashboard: false,
           billing: false,
           services: false,
@@ -52,7 +52,7 @@ export function LoginPage() {
         });
       } else {
         // New user - login but flag needs onboarding
-        setSession(token, pubkey, { ...metadata, pubkey }, {
+        setSession(token, pubkey, { ...metadata, pubkey }, 'provider', {
           dashboard: true,
           billing: true,
           services: true,
@@ -67,8 +67,7 @@ export function LoginPage() {
 
   const handleGoogleLogin = async () => {
     try {
-      // No authentication needed - this is the login endpoint!
-      const response = await fetch('/api/google/login/start');
+      const response = await fetch('/api/google/login/start?userType=provider');
       
       const data = await response.json();
       

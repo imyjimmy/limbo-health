@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export function GoogleCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setSession } = useAuth();
+  const { role, setSession } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get('token');
@@ -26,10 +26,12 @@ export function GoogleCallbackPage() {
       // Login with Google token
       // Note: pubkey is empty string for Google OAuth users
       setSession(token, '', { 
-        email, 
-        loginMethod: 'google',
-        isNewUser 
-      }, isNewUser ? ({
+          email, 
+          loginMethod: 'google',
+          isNewUser 
+        }, 
+        role, 
+        isNewUser ? ({
           dashboard: true,
           billing: true,
           services: true,

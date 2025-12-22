@@ -45,7 +45,7 @@ export function PatientLoginPage() {
         const ed25519Keys = await generateOrRetrieveEd25519Keys(pubkey, token);
         console.log('Ed25519 keys ready. Public key:', ed25519Keys.publicKey);
 
-        setSession(token, pubkey, { ...metadata, pubkey }, {
+        setSession(token, pubkey, { ...metadata, pubkey }, 'patient', {
           dashboard: false,
           billing: false,
           services: false,
