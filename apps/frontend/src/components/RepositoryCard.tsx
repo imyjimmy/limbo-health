@@ -13,7 +13,8 @@ import {
   pushToServer,
   MedicalHistoryData,
   listLocalRepos,
-  listRepoFiles
+  listRepoFiles,
+  getCommitLog
 } from '../lib/encryptedGit'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -53,6 +54,9 @@ export function RepositoryCard({ repository, token }: { repository: MedicalRepos
       console.log('🔓 Reading encrypted medical history...')
       const data = await readEncrypted(repoDir, 'medical-history.json')
       console.log('📋 Medical history:', data)
+      
+      const commits = await getCommitLog(dir)
+      console.log('commits:', commits)
       
       setMedicalData(data)
       setLocalDir(repoDir)

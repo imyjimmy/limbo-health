@@ -45,12 +45,12 @@ export async function createEncryptedRepo(
     return dir;
   } catch (error) {
     console.error('Failed to initialize repo:', error);
-    throw new Error(`Failed to create repository: ${error.message}`);
+    throw new Error(`Failed to create repository: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 /**
- * Commit encrypted medical data to local repository
+ * Commit encrypted medical data to local repository with encrypted commit message
  */
 export async function commitEncrypted(
   dir: string,
@@ -60,34 +60,105 @@ export async function commitEncrypted(
   author: { name: string; email: string }
 ): Promise<string> {
   try {
-    // 1. Encrypt data with NIP-44
+    // 1. Encrypt file data with NIP-44
     const encrypted = await encryptForStorage(data);
     
-    // 2. Write encrypted content to virtual filesystem
+    // 2. Encrypt commit message with NIP-44
+    const myPubkey = await getNostrPublicKey();
+    const encryptedMessage = await window.nostr!.nip44!.encrypt(
+      myPubkey,
+      message
+    );
+    
+    // 3. Write encrypted content to virtual filesystem
     await fs.promises.writeFile(`${dir}/${filepath}`, encrypted);
     console.log(`📝 Wrote encrypted file: ${filepath}`);
     
-    // 3. Stage file
+    // 4. Stage file
     await git.add({ fs, dir, filepath });
     console.log(`➕ Staged: ${filepath}`);
     
-    // 4. Commit
+    // 5. Commit with ENCRYPTED message and anonymized author
     const sha = await git.commit({
       fs,
       dir,
-      message,
+      message: encryptedMessage,  // ← Encrypted commit message
       author: {
-        name: author.name,
-        email: author.email,
+        name: myPubkey.substring(0, 8),  // ← Just pubkey fragment
+        email: '',  // ← Empty to avoid leaking info
         timestamp: Math.floor(Date.now() / 1000)
       }
     });
     
-    console.log(`✅ Committed: ${sha}`);
+    console.log(`✅ Committed with encrypted message: ${sha}`);
     return sha;
   } catch (error) {
     console.error('Failed to commit:', error);
-    throw new Error(`Failed to commit: ${error.message}`);
+    throw new Error(`Failed to commit: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Read git log and decrypt commit messages for display
+ */
+export async function getCommitLog(dir: string): Promise<any[]> {
+  try {
+    const commits = await git.log({ fs, dir, depth: 50 });
+    const myPubkey = await getNostrPublicKey();
+    
+    console.log('🔑 Decrypting with pubkey:', myPubkey);
+    console.log('📝 Total commits to decrypt:', commits.length);
+    
+    // Decrypt each commit message
+    const decryptedCommits = await Promise.all(
+      commits.map(async (commit, index) => {
+        const encryptedMessage = commit.commit.message.trim();
+        console.log(`\n--- Commit ${index + 1} ---`);
+        console.log('Encrypted message:', encryptedMessage.substring(0, 50) + '...');
+        
+        try {
+          // Check if nos2x is available
+          if (!window.nostr?.nip44?.decrypt) {
+            throw new Error('nos2x NIP-44 not available');
+          }
+          
+          const decryptedMessage = await window.nostr.nip44.decrypt(
+            myPubkey,
+            encryptedMessage
+          );
+          
+          console.log('✅ Decrypted:', decryptedMessage);
+          
+          return {
+            ...commit,
+            commit: {
+              ...commit.commit,
+              message: decryptedMessage
+            }
+          };
+        } catch (error) {
+          console.error('❌ Decryption failed for commit:', commit.oid);
+          console.error('Error details:', error);
+          console.error('Encrypted message length:', encryptedMessage.length);
+          console.error('First 100 chars:', encryptedMessage.substring(0, 100));
+          
+          // Return with error marker
+          return {
+            ...commit,
+            commit: {
+              ...commit.commit,
+              message: `[DECRYPTION FAILED] ${encryptedMessage.substring(0, 50)}...`,
+              decryptionError: error instanceof Error ? error.message : String(error)
+            }
+          };
+        }
+      })
+    );
+    
+    return decryptedCommits;
+  } catch (error) {
+    console.error('Failed to read commit log:', error);
+    return [];
   }
 }
 
@@ -116,7 +187,7 @@ export async function pushToServer(
       console.log(`🔗 Added remote: ${remoteUrl}`);
     }
     
-    // 2. Push to server with authentication
+    // 2. Push with Bearer token in headers
     const pushResult = await git.push({
       fs,
       http,
@@ -131,7 +202,7 @@ export async function pushToServer(
     console.log(`🚀 Pushed to server:`, pushResult);
   } catch (error) {
     console.error('Failed to push:', error);
-    throw new Error(`Failed to push to server: ${error.message}`);
+    throw new Error(`Failed to push to server: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -148,7 +219,7 @@ export async function readEncrypted(
     return decrypted;
   } catch (error) {
     console.error('Failed to read encrypted file:', error);
-    throw new Error(`Failed to read file: ${error.message}`);
+    throw new Error(`Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -181,33 +252,7 @@ export async function cloneFromServer(
     return dir;
   } catch (error) {
     console.error('Failed to clone:', error);
-    throw new Error(`Failed to clone repository: ${error.message}`);
-  }
-}
-
-/**
- * List all local repositories
- */
-export async function listLocalRepos(): Promise<string[]> {
-  try {
-    const repos: string[] = [];
-    const entries = await fs.promises.readdir('/');
-    
-    for (const entry of entries) {
-      try {
-        // Check if it's a git repo
-        const gitDir = `/${entry}/.git`;
-        await fs.promises.stat(gitDir);
-        repos.push(entry);
-      } catch {
-        // Not a git repo, skip
-      }
-    }
-    
-    return repos;
-  } catch (error) {
-    console.error('Failed to list repos:', error);
-    return [];
+    throw new Error(`Failed to clone repository: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -226,6 +271,32 @@ export async function listRepoFiles(dir: string): Promise<string[]> {
     return files;
   } catch (error) {
     console.error('Failed to list files:', error);
+    return [];
+  }
+}
+
+/**
+ * List all local repositories in browser storage
+ */
+export async function listLocalRepos(): Promise<string[]> {
+  try {
+    const repos: string[] = [];
+    const entries = await fs.promises.readdir('/');
+    
+    for (const entry of entries) {
+      try {
+        // Check if it's a git repo by looking for .git directory
+        const gitDir = `/${entry}/.git`;
+        await fs.promises.stat(gitDir);
+        repos.push(entry);
+      } catch {
+        // Not a git repo, skip
+      }
+    }
+    
+    return repos;
+  } catch (error) {
+    console.error('Failed to list repos:', error);
     return [];
   }
 }
