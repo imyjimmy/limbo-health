@@ -5,7 +5,7 @@ import { NostrAuthService } from '@/services/auth';
 
 export function LoginPage() {
   const { setSession } = useAuth()
-  const [activeTab, ] = useState<'patient' | 'doctor'>('patient');
+  const [activeTab, ] = useState<'patient' | 'provider'>('patient');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

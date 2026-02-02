@@ -15,17 +15,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-const items = [
+const providerItems = [
   {
     id: "repositories",
     title: "Patients", 
     icon: FolderOpen,
   },
-  // {
-  //   id: "booking",
-  //   title: "Book Appointment",
-  //   icon: CalendarCheck,
-  // },
   {
     id: "calendar",
     title: "Calendar",
@@ -58,6 +53,24 @@ const items = [
   }
 ]
 
+const patientItems = [
+  {
+    id: "repositories",
+    title: "Records",
+    icon: FolderOpen,
+  },
+  {
+    id: "calendar",
+    title: "Appointments",
+    icon: CalendarCheck,
+  },
+  {
+    id: "billing",
+    title: "Billing",
+    icon: CreditCard,
+  },
+]
+
 interface AppSidebarProps {
   authState: AuthState
   activeSection: string
@@ -66,13 +79,15 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ authState, activeSection, onSectionChange, onLogout }: AppSidebarProps) {
+  const items = authState.role === 'patient' ? patientItems : providerItems;
   return (
     <Sidebar variant="inset">
       <SidebarHeader>
         <div className="p-4">
-          <h1 className="text-lg font-bold text-primary">MGit Admin</h1>
+          <h1 className="text-lg font-bold text-primary">Limbo Health {authState.role}</h1>
           <p className="text-sm text-muted-foreground">Server Dashboard</p>
         </div>
+        <>{console.log('role: ', authState.role)}</>
       </SidebarHeader>
       
       <SidebarContent>

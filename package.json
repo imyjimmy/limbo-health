@@ -2,10 +2,6 @@
   "name": "limbo-health-monorepo",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-      "apps/*",
-      "packages/*"
-    ],
   "scripts": {
     "build": "scripts/build.sh",
     "dev": "scripts/dev.sh",
@@ -19,7 +15,10 @@
     "logs:prod": "docker-compose -f docker-compose.yml -f docker-compose.production.yml --env-file .env.production logs -f",
     "mgit:start": "cd apps/mgit-api && npm start",
     "admin:dev": "cd apps/admin-frontend && npm run dev",
-    "patient:dev": "cd apps/patient-frontend && npm run dev"
+    "patient:dev": "cd apps/patient-frontend && npm run dev",
+    "restart": "docker-compose -f docker-compose.yml -f docker-compose.development.yml restart",
+    "down": "docker-compose -f docker-compose.yml -f docker-compose.development.yml down",
+    "up": "docker-compose -f docker-compose.yml -f docker-compose.development.yml up -d"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

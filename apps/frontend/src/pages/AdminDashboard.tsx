@@ -26,7 +26,7 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({onLogout}) => {
   const navigate = useNavigate();
-  const { isAuthenticated, token, pubkey, profile, needsOnboarding, completeOnboarding } = useAuth();
+  const { isAuthenticated, token, pubkey, profile, needsOnboarding, completeOnboarding, role } = useAuth();
   // const [showUserRegModal, setShowUserRegModal] = useState<boolean>(false);
   const [activeSection, setActiveSection] = useState('webrtc');
 
@@ -36,7 +36,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({onLogout}) => {
       <OnboardingModal
         isOpen={!!needsOnboarding['dashboard'] && !!token}
         
-        title="Welcome to PlebDoc!"
+        title="Welcome to Limbo Health!"
         description="Let's set up your doctor profile so patients can book with you."
         actionLabel="Complete Profile Setup →"
         onAction={() => {
@@ -81,7 +81,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({onLogout}) => {
         } as React.CSSProperties}
       >
         <AppSidebar 
-          authState={{ isAuthenticated, token, pubkey, profile, needsOnboarding }}
+          authState={{ isAuthenticated, token, pubkey, profile, role, needsOnboarding }}
           activeSection={activeSection}
           onLogout={onLogout}
           onSectionChange={setActiveSection}

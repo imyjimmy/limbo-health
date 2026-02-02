@@ -17,6 +17,8 @@ export interface NostrProfile {
   pubkey: string;
 }
 
+export type Profile = GoogleProfile | NostrProfile;
+
 export interface AuthState {
   isAuthenticated: boolean;
   token: string | null;
