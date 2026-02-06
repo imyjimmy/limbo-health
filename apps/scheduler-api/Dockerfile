@@ -27,8 +27,7 @@ WORKDIR /app
 COPY apps/scheduler-api/package.json ./
 
 # Install as standalone (no workspace complexity)
-RUN --mount=type=cache,target=/root/.npm \
-    npm install
+RUN npm install
 
 # Stage 2: Runtime with Bun
 FROM oven/bun:latest

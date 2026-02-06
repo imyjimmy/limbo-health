@@ -4,8 +4,7 @@ WORKDIR /app
 
 COPY apps/auth-api/package.json apps/auth-api/package-lock.json* ./
 
-RUN --mount=type=cache,target=/root/.npm \
-    npm install
+RUN npm install
 
 COPY apps/auth-api/ ./
 
