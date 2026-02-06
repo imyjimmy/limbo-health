@@ -15,19 +15,16 @@ RUN mkdir -p /app /repos /app/users && \
 USER node
 WORKDIR /app
 
-# Copy ROOT workspace files first
-COPY --chown=node:node package*.json ./
+# Copy mgit-api package files directly
+COPY --chown=node:node apps/mgit-api/package*.json ./
 
-# Copy mgit-api package.json
-COPY --chown=node:node apps/mgit-api/package.json ./apps/mgit-api/
-
-# Install using workspace
-RUN npm ci --workspace=apps/mgit-api --omit=dev
+# Install dependencies (no workspace)
+RUN npm ci --omit=dev
 
 # Copy application files
-COPY --chown=node:node apps/mgit-api/*.js ./apps/mgit-api/
+COPY --chown=node:node apps/mgit-api/*.js ./
 
-WORKDIR /app/apps/mgit-api
+WORKDIR /app
 EXPOSE 3003
 ENV REPOS_PATH=/repos
 CMD ["node", "server.js"]
