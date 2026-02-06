@@ -1,4 +1,4 @@
-// mgitUtils.js - Helper functions for MGit operations
+// mgitUtils.js - Helper functions for Git operations
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -10,18 +10,12 @@ const { execSync } = require('child_process');
  */
 function getDefaultBranch(repoPath) {
   try {
-    // Try to find which branch HEAD points to
-    const headPath = path.join(repoPath, '.mgit', 'HEAD');
-    if (fs.existsSync(headPath)) {
-      const headContent = fs.readFileSync(headPath, 'utf8').trim();
-      const match = headContent.match(/ref: refs\/heads\/(.+)/);
-      if (match && match[1]) {
-        return match[1];
-      }
-    }
-    
-    // Fallback to assuming main or master
-    return 'main';
+    // Try to get the default branch from git
+    const output = execSync('git symbolic-ref --short HEAD', {
+      cwd: repoPath,
+      encoding: 'utf8'
+    });
+    return output.trim();
   } catch (err) {
     console.error('Error getting default branch:', err);
     return 'main'; // Default fallback
@@ -35,14 +29,15 @@ function getDefaultBranch(repoPath) {
  */
 function getBranches(repoPath) {
   try {
-    // Use mgit branch command to list branches
-    const output = execSync('mgit branch', { cwd: repoPath, encoding: 'utf8' });
+    // Use git branch command to list branches
+    const output = execSync('git branch -r', { cwd: repoPath, encoding: 'utf8' });
     
     // Parse output to get branch names
     return output.split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0)
-      .map(line => line.replace(/^\*\s+/, '')); // Remove asterisk from current branch
+      .map(line => line.replace(/^origin\//, ''))
+      .filter(line => !line.includes('HEAD'));
   } catch (err) {
     console.error('Error getting branches:', err);
     return ['main']; // Default fallback
@@ -74,9 +69,10 @@ function getRepoDescription(repoPath) {
  */
 function getLastCommitDate(repoPath) {
   try {
-    // Use mgit log to get last commit date
-    const output = execSync('mgit log -1 --format=%cd', { cwd: repoPath, encoding: 'utf8' });
-    return new Date(output.trim()).toISOString();
+    // Use git log to get last commit date
+    const output = execSync('git log -1 --format=%at', { cwd: repoPath, encoding: 'utf8' });
+    const timestamp = parseInt(output.trim());
+    return new Date(timestamp * 1000).toISOString();
   } catch (err) {
     console.error('Error getting last commit date:', err);
     return new Date().toISOString(); // Fallback to current date
@@ -90,9 +86,11 @@ function getLastCommitDate(repoPath) {
  */
 function getRepoCreationDate(repoPath) {
   try {
-    // Use mgit log to get first commit date
-    const output = execSync('mgit log --reverse --format=%cd | head -1', { cwd: repoPath, encoding: 'utf8' });
-    return new Date(output.trim()).toISOString();
+    // Use git log to get first commit date
+    const output = execSync('git log --reverse --format=%at', { cwd: repoPath, encoding: 'utf8' });
+    const firstLine = output.split('\n')[0];
+    const timestamp = parseInt(firstLine.trim());
+    return new Date(timestamp * 1000).toISOString();
   } catch (err) {
     console.error('Error getting repo creation date:', err);
     return new Date().toISOString(); // Fallback to current date
@@ -106,7 +104,7 @@ function getRepoCreationDate(repoPath) {
  */
 function getLicense(repoPath) {
   // Check for common license files
-  const licenseFiles = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'LICENSE.md'];
+  const licenseFiles = ['LICENSE', 'LICENSE.md', 'LICENSE.txt'];
   
   for (const file of licenseFiles) {
     const licensePath = path.join(repoPath, file);
@@ -129,59 +127,67 @@ function getLicense(repoPath) {
  * Gets contents of a directory or info about a file in the repository
  * @param {string} repoPath - Path to the repository
  * @param {string} filePath - Path to the file or directory within the repository
- * @param {string} branch - Branch name (unused in current implementation)
+ * @param {string} branch - Branch name
  * @returns {Object|Array<Object>} - Information about the file or directory contents
  */
 function getRepoContents(repoPath, filePath, branch) {
-  const fullPath = path.join(repoPath, filePath);
-  
-  // Check if path exists
-  if (!fs.existsSync(fullPath)) {
-    throw new Error('Path not found');
-  }
-  
-  // Check if it's a directory
-  const isDirectory = fs.statSync(fullPath).isDirectory();
-  
-  if (isDirectory) {
-    // List directory contents
-    const entries = fs.readdirSync(fullPath, { withFileTypes: true });
+  try {
+    // Ensure we're on the right branch
+    execSync(`git checkout ${branch}`, { cwd: repoPath });
     
-    return entries.map(entry => {
-      const entryPath = path.join(filePath, entry.name);
+    const fullPath = path.join(repoPath, filePath);
+    
+    // Check if path exists
+    if (!fs.existsSync(fullPath)) {
+      throw new Error('Path not found');
+    }
+    
+    // Check if it's a directory
+    const isDirectory = fs.statSync(fullPath).isDirectory();
+    
+    if (isDirectory) {
+      // List directory contents
+      const entries = fs.readdirSync(fullPath, { withFileTypes: true });
       
-      if (entry.isDirectory()) {
-        return {
-          name: entry.name,
-          path: entryPath,
-          type: 'dir',
-          lastCommit: getLastCommitForPath(repoPath, entryPath)
-        };
-      } else {
-        const stats = fs.statSync(path.join(repoPath, entryPath));
+      return entries.map(entry => {
+        const entryPath = path.join(filePath, entry.name);
         
-        return {
-          name: entry.name,
-          path: entryPath,
-          type: 'file',
-          size: stats.size,
-          sha: '', // Would normally compute this
-          lastCommit: getLastCommitForPath(repoPath, entryPath)
-        };
-      }
-    });
-  } else {
-    // Return file content info
-    const stats = fs.statSync(fullPath);
-    
-    return {
-      name: path.basename(filePath),
-      path: filePath,
-      type: 'file',
-      size: stats.size,
-      sha: '', // Would normally compute this
-      lastCommit: getLastCommitForPath(repoPath, filePath)
-    };
+        if (entry.isDirectory()) {
+          return {
+            name: entry.name,
+            path: entryPath,
+            type: 'dir',
+            lastCommit: getLastCommitForPath(repoPath, entryPath)
+          };
+        } else {
+          const stats = fs.statSync(path.join(repoPath, entryPath));
+          
+          return {
+            name: entry.name,
+            path: entryPath,
+            type: 'file',
+            size: stats.size,
+            sha: '', // Would normally compute this
+            lastCommit: getLastCommitForPath(repoPath, entryPath)
+          };
+        }
+      });
+    } else {
+      // Return file content info
+      const stats = fs.statSync(fullPath);
+      
+      return {
+        name: path.basename(filePath),
+        path: filePath,
+        type: 'file',
+        size: stats.size,
+        sha: '', // Would normally compute this
+        lastCommit: getLastCommitForPath(repoPath, filePath)
+      };
+    }
+  } catch (err) {
+    console.error('Error getting repo contents:', err);
+    throw err;
   }
 }
 
@@ -193,8 +199,8 @@ function getRepoContents(repoPath, filePath, branch) {
  */
 function getLastCommitForPath(repoPath, filePath) {
   try {
-    // Use mgit log to get last commit for this file or directory
-    const output = execSync(`mgit log -1 --format="%h|%an|%at|%s" -- "${filePath}"`, { 
+    // Use git log to get last commit for this file or directory
+    const output = execSync(`git log -1 --format="%h|%an|%at|%s" -- "${filePath}"`, { 
       cwd: repoPath, 
       encoding: 'utf8' 
     });
@@ -230,7 +236,7 @@ function getLastCommitForPath(repoPath, filePath) {
 function getFileContent(repoPath, filePath, branch) {
   try {
     // First, ensure we're on the right branch
-    execSync(`mgit checkout ${branch}`, { cwd: repoPath });
+    execSync(`git checkout ${branch}`, { cwd: repoPath });
     
     // Read the file
     const fullPath = path.join(repoPath, filePath);
@@ -267,7 +273,7 @@ function isBinaryFile(extension) {
 function getCommitHistory(repoPath, branch, filePath) {
   try {
     // Create the git log command
-    let command = 'mgit log --format="%h|%an|%ae|%at|%s"';
+    let command = 'git log --format="%h|%an|%ae|%at|%s"';
     
     if (branch) {
       command += ` ${branch}`;
@@ -286,12 +292,8 @@ function getCommitHistory(repoPath, branch, filePath) {
       .map(line => {
         const [hash, author, email, timestamp, message] = line.split('|');
         
-        // Look for mgit commit mapping if available
-        let mgitHash = getMGitHash(repoPath, hash);
-        
         return {
           hash: hash,
-          mgitHash: mgitHash || null,
           author: {
             name: author,
             email: email
@@ -315,7 +317,7 @@ function getCommitHistory(repoPath, branch, filePath) {
 function getCommitDetail(repoPath, sha) {
   try {
     // Get commit details
-    const commitOutput = execSync(`mgit show --no-color --format="%H|%an|%ae|%at|%cn|%ce|%ct|%P|%B" ${sha}`, {
+    const commitOutput = execSync(`git show --no-color --format="%H|%an|%ae|%at|%cn|%ce|%ct|%P|%B" ${sha}`, {
       cwd: repoPath,
       encoding: 'utf8'
     });
@@ -333,7 +335,6 @@ function getCommitDetail(repoPath, sha) {
     
     return {
       hash: hash,
-      mgitHash: getMGitHash(repoPath, hash) || null,
       author: {
         name: authorName,
         email: authorEmail,
@@ -351,33 +352,6 @@ function getCommitDetail(repoPath, sha) {
     };
   } catch (err) {
     console.error(`Error getting commit detail for ${sha}:`, err);
-    return null;
-  }
-}
-
-/**
- * Gets the MGit hash corresponding to a Git hash
- * @param {string} repoPath - Path to the repository
- * @param {string} gitHash - Git commit hash
- * @returns {string|null} - MGit hash or null if not found
- */
-function getMGitHash(repoPath, gitHash) {
-  try {
-    // Try to read the nostr_mappings.json file
-    const mappingsPath = path.join(repoPath, '.mgit', 'nostr_mappings.json');
-    
-    if (!fs.existsSync(mappingsPath)) {
-      return null;
-    }
-    
-    const mappings = JSON.parse(fs.readFileSync(mappingsPath, 'utf8'));
-    
-    // Find the mapping for this git hash
-    const mapping = mappings.find(m => m.GitHash === gitHash);
-    
-    return mapping ? mapping.MGitHash : null;
-  } catch (err) {
-    console.error(`Error getting MGit hash for ${gitHash}:`, err);
     return null;
   }
 }
@@ -409,7 +383,7 @@ function getNostrPubkey(repoPath, gitHash) {
   }
 }
 
-// Helper function to create a new mgit repository
+// Helper function to create a new git repository
 async function createRepository(repoName, userName, userEmail, ownerPubkey, description = '', reposPath) {
   console.log('reposPath: ', reposPath);
   const { spawn, exec } = require('child_process');
@@ -467,7 +441,7 @@ async function createRepository(repoName, userName, userEmail, ownerPubkey, desc
     
     const readmeContent = `# Medical History Repository
 
-This is a personal medical history repository managed with MGit.
+This is a personal medical history repository.
 
 **Owner:** ${ownerPubkey.substring(0, 8)}...
 **Created:** ${new Date().toISOString()}
@@ -597,6 +571,7 @@ async function debugGitState(tempDir, execAsync) {
     }
   }
 }
+
 module.exports = {
   getDefaultBranch,
   getBranches,
@@ -610,7 +585,6 @@ module.exports = {
   isBinaryFile,
   getCommitHistory,
   getCommitDetail,
-  getMGitHash,
   getNostrPubkey,
   createRepository
 };

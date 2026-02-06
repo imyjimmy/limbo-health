@@ -69,7 +69,7 @@ const pendingChallenges = new Map();
 
 // Path to repositories storage - secure path verified by security module
 const REPOS_PATH = security.ensureSecurePath();
-const MGIT_PATH = `${process.env.MGITPATH}/mgit` || '../../mgit/mgit';
+const GIT_PATH = 'git';
 
 // Get base URL from environment or construct from request
 const getBaseUrl = (req) => {
@@ -757,9 +757,9 @@ app.get('/api/mgit/repos/:repoId/show', validateMGitToken, (req, res) => {
   // Execute mgit status command for now
   const { exec } = require('child_process');
   // the current working directory of exec is private_repos/hello-world
-  exec(`${MGIT_PATH} show`, { cwd: repoPath }, (error, stdout, stderr) => {
+  exec(`${GIT_PATH} show`, { cwd: repoPath }, (error, stdout, stderr) => {
     if (error) {
-      console.error(`Error executing mgit show: ${error.message}`);
+      console.error(`Error executing git show: ${error.message}`);
       return res.status(500).json({ 
         status: 'error', 
         reason: 'Failed to execute mgit show',
@@ -804,7 +804,7 @@ app.get('/api/mgit/repos/:repoId/clone', validateMGitToken, (req, res) => {
   
   // Execute mgit show command
   const { exec } = require('child_process');
-  exec(`${MGIT_PATH} log --oneline --graph --decorate=short --all`, { cwd: repoPath }, (error, stdout, stderr) => {
+  exec(`${GIT_PATH} log --oneline --graph --decorate=short --all`, { cwd: repoPath }, (error, stdout, stderr) => {
     if (error) {
       console.error(`Error executing mgit clone: ${error.message}`);
       return res.status(500).json({ 
