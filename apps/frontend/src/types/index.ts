@@ -2,6 +2,7 @@ export interface GoogleProfile {
   id?: string;
   userId: number;
   profilePic?: string;
+  picture?: string;
   email: string;
   loginMethod: 'google';
   oauthProvider?: 'google';
@@ -15,6 +16,7 @@ export interface NostrProfile {
   name?: string;
   picture?: string;
   pubkey: string;
+  nip05?: string;
 }
 
 export type Profile = GoogleProfile | NostrProfile;
@@ -31,6 +33,59 @@ export interface AuthState {
     services: boolean;
     telehealth: boolean;
   };
+}
+
+export function isGoogleProfile(profile: GoogleProfile | NostrProfile | null): profile is GoogleProfile {
+  if (!profile) return false;
+  return 'email' in profile && 'firstName' in profile;
+}
+
+export function isNostrProfile(profile: GoogleProfile | NostrProfile | null): profile is NostrProfile {
+  if (!profile) return false;
+  return 'name' in profile || 'display_name' in profile;
+}
+
+export function getDisplayName(profile: GoogleProfile | NostrProfile | null): string {
+  if (!profile) return 'Unknown User';
+  
+  if (isGoogleProfile(profile)) {
+    return `${profile.firstName} ${profile.lastName}`.trim();
+  }
+  
+  if (isNostrProfile(profile)) {
+    return profile.display_name || profile.name || 'Nostr User';
+  }
+  
+  return 'Unknown User';
+}
+
+export function getEmail(profile: GoogleProfile | NostrProfile | null): string | null {
+  if (!profile) return null;
+  
+  if (isGoogleProfile(profile)) {
+    return profile.email;
+  }
+  
+  // Nostr profiles might have nip05
+  if (isNostrProfile(profile) && profile.nip05) {
+    return profile.nip05;
+  }
+  
+  return null;
+}
+
+export function getProfilePicture(profile: GoogleProfile | NostrProfile | null): string | null {
+  if (!profile) return null;
+  
+  if (isGoogleProfile(profile)) {
+    return profile.profilePic || profile.picture || null;
+  }
+  
+  if (isNostrProfile(profile)) {
+    return profile.picture || null;
+  }
+  
+  return null;
 }
 
 export interface WebRTCState {

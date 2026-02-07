@@ -10,7 +10,7 @@ export function PatientLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>();
+  const [, setError] = useState<string>();
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();

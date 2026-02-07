@@ -17,6 +17,7 @@ import {
   getCommitLog
 } from '../lib/encryptedGit'
 import { useAuth } from '../contexts/AuthContext'
+import { getDisplayName, getEmail } from '@/types';
 
 export function RepositoryCard({ repository, token }: { repository: MedicalRepository; token: string }) {
   const { profile } = useAuth()
@@ -99,7 +100,7 @@ export function RepositoryCard({ repository, token }: { repository: MedicalRepos
             id: `note-${Date.now()}`,
             timestamp: new Date().toISOString(),
             content: newNote,
-            author: profile?.name || 'Patient'
+            author: getDisplayName(profile) || 'Patient'
           }
         ]
       }
@@ -112,8 +113,8 @@ export function RepositoryCard({ repository, token }: { repository: MedicalRepos
         updatedData,
         `Added note: ${newNote.substring(0, 50)}...`,
         {
-          name: profile?.name || 'Patient',
-          email: profile?.email || 'patient@example.com'
+          name: getDisplayName(profile) || 'Patient',
+          email: getEmail(profile) || 'patient@example.com'
         }
       )
       console.log(`✅ Committed: ${sha}`)

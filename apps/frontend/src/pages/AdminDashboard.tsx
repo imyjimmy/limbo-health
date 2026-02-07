@@ -12,7 +12,7 @@ import { ServicesManager } from '@/components/ServicesManager';
 import { OnboardingModal } from '@/components/OnboardingModal';
 
 import { WebRTCTest } from '../components/WebRTCTest';
-import { DatabaseTest } from '../components/DatabaseTest';
+// import { DatabaseTest } from '../components/DatabaseTest';
 import { SignatureDeterminismTest } from '../components/test-signature-determinism';
 // import { RegistrationView } from '../components/RegistrationView';
 

@@ -33,6 +33,8 @@ export async function createEncryptedRepo(
 ): Promise<string> {
   const dir = `/${repoName}`;
   
+  console.log(`userName: ${userName} email: ${userEmail}`);
+  
   try {
     // Initialize git repo in browser memory
     await git.init({ 
@@ -84,8 +86,8 @@ export async function commitEncrypted(
       dir,
       message: encryptedMessage,  // ← Encrypted commit message
       author: {
-        name: myPubkey.substring(0, 8),  // ← Just pubkey fragment
-        email: '',  // ← Empty to avoid leaking info
+        name: author.name || myPubkey.substring(0, 8),  // ← Just pubkey fragment
+        email: author.email || '',
         timestamp: Math.floor(Date.now() / 1000)
       }
     });
