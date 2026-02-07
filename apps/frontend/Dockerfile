@@ -1,43 +1,35 @@
-# Multi-stage build for React app
-FROM node:20-bullseye-slim as builder
-
-# Install system dependencies including curl
-RUN apt-get update && \
-    apt-get install -y curl zip unzip ca-certificates git build-essential && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install bun
-RUN curl -fsSL https://bun.sh/install | bash && \
-    mv /root/.bun/bin/bun /usr/local/bin/
+# Build stage
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files from apps/frontend
+# Copy package files
 COPY apps/frontend/package*.json ./
-COPY apps/frontend/bun.lockb* ./
 
 # Install dependencies
-RUN bun install
+RUN npm ci
 
-# Copy source code from apps/frontend
+# Copy source code
 COPY apps/frontend/ ./
 
-# Clean esbuild/vite cache before build (THIS IS THE FIX)
-RUN rm -rf node_modules/.vite && \
-    rm -rf node_modules/esbuild && \
-    bun install --force
-    
 # Build the app
-RUN bun run build
+RUN npm run build
 
 # Production stage - serve with nginx
 FROM nginx:alpine
 
-# Copy built files to nginx
+# Copy built files
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx config for SPA routing
-COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf
+# Create simple nginx config for SPA routing
+RUN echo 'server { \
+    listen 80; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
