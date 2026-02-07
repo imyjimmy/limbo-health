@@ -179,7 +179,7 @@ app.post('/internal/validate', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔐 Auth API running on port ${PORT}`);
   console.log(`✅ Nostr auth: enabled`);
   console.log(`✅ Google auth: ${googleAuth.clientId ? 'enabled' : 'not configured'}`);
