@@ -4,7 +4,6 @@ WORKDIR /app
 
 # Copy package files
 COPY apps/scheduler-api/package.json ./
-COPY apps/scheduler-api/bun.lockb ./
 
 # Install dependencies with Bun
 RUN bun install --frozen-lockfile
