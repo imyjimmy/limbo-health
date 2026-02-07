@@ -213,10 +213,14 @@ export async function getNostrPublicKey(): Promise<string> {
   checkNostrExtension();
   
   try {
+    if (!window.nostr) {
+      throw new Error('Nostr extension not available');
+    }
     const pubkey = await window.nostr.getPublicKey();
     return pubkey;
   } catch (error) {
-    throw new Error(`Failed to get public key: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to get public key: ${message}`);
   }
 }
 
@@ -237,6 +241,10 @@ export async function encryptMedicalData(
       ? plaintext 
       : JSON.stringify(plaintext);
     
+    if (!window.nostr) {
+      throw new Error('Nostr extension not available');
+    }
+
     const encrypted = await window.nostr.nip44.encrypt(
       recipientPubkey,
       dataString
@@ -244,7 +252,8 @@ export async function encryptMedicalData(
     
     return encrypted;
   } catch (error) {
-    throw new Error(`Encryption failed: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Encryption failed: ${message}`);
   }
 }
 
@@ -261,6 +270,9 @@ export async function decryptMedicalData(
   checkNostrExtension();
   
   try {
+    if (!window.nostr) {
+      throw new Error('Nostr extension not available');
+    }
     const decrypted = await window.nostr.nip44.decrypt(
       senderPubkey,
       ciphertext
@@ -268,7 +280,8 @@ export async function decryptMedicalData(
     
     return decrypted;
   } catch (error) {
-    throw new Error(`Decryption failed: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Decryption failed: ${message}`);
   }
 }
 

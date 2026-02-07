@@ -94,7 +94,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({onLogout}) => {
           */}
 
           <SiteHeader 
-            authState={{ isAuthenticated, token, pubkey, profile, needsOnboarding }}
+            authState={{ isAuthenticated, token, pubkey, profile, needsOnboarding, role }}
             onLogout={onLogout}
             activeSection={activeSection}
             toggleHeader={false}

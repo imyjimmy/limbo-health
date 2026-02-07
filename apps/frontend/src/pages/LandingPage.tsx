@@ -12,6 +12,7 @@ export function LandingPage() {
       token: null,
       pubkey: null,
       profile: null,
+      role: null,
       needsOnboarding: {
         dashboard: false,
         billing: false,
@@ -35,6 +36,7 @@ export function LandingPage() {
       token: null,
       pubkey: null,
       profile: null,
+      role: null,
       needsOnboarding: {
         dashboard: false,
         billing: false,

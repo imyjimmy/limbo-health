@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token: token,
       pubkey: pubkey,
       profile: profile ? JSON.parse(profile) : null,
-      role: role,  // ← Add this
+      role: role,
       needsOnboarding: onboarding ? JSON.parse(onboarding) : {
         dashboard: false,
         billing: false,
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     token: string, 
     pubkey: string, 
     profile: any,
-    role: 'patient' | 'provider',
+    role: 'patient' | 'provider' | null,
     needsOnboarding?: Partial<AuthState['needsOnboarding']>
   ) => {
     const defaultOnboarding = {
@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       pubkey,
       profile: finalProfile,
-      role,  // ← Add this
+      role,
       needsOnboarding: needsOnboarding 
         ? { ...defaultOnboarding, ...needsOnboarding }
         : defaultOnboarding
@@ -79,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('admin_token', token);
     localStorage.setItem('admin_pubkey', pubkey);
     localStorage.setItem('admin_profile', JSON.stringify(finalProfile));
-    localStorage.setItem('admin_role', role);  // ← Add this
+    localStorage.setItem('admin_role', role || '');
     localStorage.setItem('needs_onboarding', JSON.stringify(
       needsOnboarding || defaultOnboarding
     ));
