@@ -51,6 +51,7 @@ console.log(`📋 Registered routes:`, {
 
 const server = Bun.serve({
   port: PORT,
+  hostname: '0.0.0.0',
   idleTimeout: 255, // 255 seconds, about 4 minutes
   async fetch(req) {
     const url = new URL(req.url);
