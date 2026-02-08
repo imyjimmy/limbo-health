@@ -1,71 +1,130 @@
 # Production environment overrides
 # Extends docker-compose.yml with prod-specific settings
-#     REPOS_PATH="/home/imyjimmy/umbrel/app-data/mgitreposerver-mgit-repo-server/repos"
+# Use: docker-compose -f docker-compose.yml -f docker-compose.production.yml up
+
+version: '3.8'
 
 services:
-
-  admin-frontend:
-    networks:
-      - umbrel_main_network
-    platform: linux/amd64
-    
-  patient-frontend:
-    networks:
-      - umbrel_main_network
-    platform: linux/amd64
-    
-  mgit-web:
-    command: node server.js
-    volumes:
-      - ${REPOS_PATH}:/private_repos    # Use named volume instead of host mount
-    networks:
-      - umbrel_main_network
-    platform: linux/amd64
-
-  gateway:
+  # Auth API - Nostr & Google OAuth authentication
+  auth-api:
+    build:
+      context: .
+      dockerfile: apps/auth-api/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3010
+      - DB_HOST=mysql.railway.internal
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-railway}
+      - JWT_SECRET=${JWT_SECRET}
+      - NOSTR_RELAYS=${NOSTR_RELAYS}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     ports:
-      - "3003:80"
+      - "3010:3010"
     networks:
-      - ${NETWORK}
-    platform: linux/amd64
+      - limbo-network
+    depends_on:
+      - mysql
+    restart: unless-stopped
 
-  mysql:
+  # MGit API - Encrypted medical record repositories
+  mgit-api:
+    build:
+      context: .
+      dockerfile: apps/mgit-api/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - REPOS_PATH=/repos
+      - JWT_SECRET=${JWT_SECRET}
     volumes:
-      - /opt/plebdoc-scheduler-service/mysql:/var/lib/mysql
-    networks:
-      - umbrel_main_network
-    platform: linux/amd64
-
-  phpmyadmin:
+      - repos-data:/repos
     ports:
-      - "8089:80"
+      - "3003:3003"
     networks:
-      - umbrel_main_network
-    platform: linux/amd64
+      - limbo-network
+    restart: unless-stopped
 
-  plebdoc-api:
-    env_file:
-      - ./.env.production
+  # Scheduler API - Appointments, billing, WebRTC
+  scheduler-api:
+    build:
+      context: .
+      dockerfile: apps/scheduler-api/Dockerfile
+    environment:
+      - NODE_ENV=production
+      - PORT=3005
+      - DB_HOST=mysql
+      - DB_USER=${DB_USER:-root}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-railway}
+      - DB_PORT=3306
+      - JWT_SECRET=${JWT_SECRET}
+      - ALBY_CLIENT_ID=${ALBY_CLIENT_ID}
+      - ALBY_CLIENT_SECRET=${ALBY_CLIENT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
     ports:
       - "3005:3005"
     networks:
-      - umbrel_main_network
-    platform: linux/amd64
+      - limbo-network
+    depends_on:
+      - mysql
+    restart: unless-stopped
 
-  swagger-ui:
+  # Frontend - React SPA
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
     ports:
-      - "8090:8080"
+      - "5173:80"
     networks:
-      - umbrel_main_network
-    platform: linux/amd64
+      - limbo-network
+    restart: unless-stopped
+
+  # Gateway - Nginx reverse proxy
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - limbo-network
+    depends_on:
+      - auth-api
+      - mgit-api
+      - scheduler-api
+      - frontend
+    restart: unless-stopped
+    volumes:
+      - ./apps/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  # MySQL Database
+  mysql:
+    image: mysql:9.4
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME:-railway}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./apps/scheduler-api/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    ports:
+      - "3306:3306"
+    networks:
+      - limbo-network
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
 
 networks:
-  umbrel_main_network:
-    external: true
+  limbo-network:
+    driver: bridge
 
 volumes:
-  repos_data:
-    driver_opts:
-      type: none
-      o: bind
-      device: /home/imyjimmy/umbrel/app-data/mgitreposerver-mgit-repo-server/repos
+  mysql-data:
+    driver: local
+  repos-data:
+    driver: local
