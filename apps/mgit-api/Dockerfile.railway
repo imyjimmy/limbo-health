@@ -1,0 +1,29 @@
+FROM node:20-bullseye-slim
+
+# Install system dependencies including git
+RUN apt-get update && \
+    apt-get install -y git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create only app directories - Railway volume provides /repos
+RUN mkdir -p /app /app/users
+
+# NO USER directive - run as root for Railway volume access
+WORKDIR /app
+
+# Copy ROOT workspace files first
+COPY package*.json ./
+
+# Copy mgit-api package.json
+COPY apps/mgit-api/package.json ./apps/mgit-api/
+
+# Install using workspace
+RUN npm ci --workspace=apps/mgit-api --omit=dev
+
+# Copy application files
+COPY apps/mgit-api/*.js ./apps/mgit-api/
+
+WORKDIR /app/apps/mgit-api
+EXPOSE 3003
+ENV REPOS_PATH=/repos
+CMD ["node", "server.js"]
