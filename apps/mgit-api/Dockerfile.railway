@@ -9,21 +9,17 @@ RUN apt-get update && \
 RUN mkdir -p /app /app/users
 
 # NO USER directive - run as root for Railway volume access
-WORKDIR /app
+WORKDIR /app/apps/mgit-api
 
-# Copy ROOT workspace files first
-COPY package*.json ./
+# Copy mgit-api package files
+COPY apps/mgit-api/package*.json ./
 
-# Copy mgit-api package.json
-COPY apps/mgit-api/package.json ./apps/mgit-api/
-
-# Install using workspace
-RUN npm ci --workspace=apps/mgit-api --omit=dev
+# Install dependencies directly (no workspace)
+RUN npm ci --omit=dev
 
 # Copy application files
-COPY apps/mgit-api/*.js ./apps/mgit-api/
+COPY apps/mgit-api/*.js ./
 
-WORKDIR /app/apps/mgit-api
 EXPOSE 3003
 ENV REPOS_PATH=/repos
 CMD ["node", "server.js"]
