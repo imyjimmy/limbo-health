@@ -49,10 +49,13 @@ export function setupGoogleRoutes(app) {
     try {
       console.log('🔍 GOOGLE_REDIRECT_URI env var:', process.env.GOOGLE_REDIRECT_URI);
       // Use a special state to indicate this is a login flow
-      const state = JSON.stringify({ 
+      const userType = req.query.userType || 'patient';
+
+      const state = Buffer.from(JSON.stringify({ 
         flow: 'login',
+        role: userType,
         timestamp: Date.now() 
-      });
+      })).toString('base64url');
       
       // Generate OAuth URL for login flow
       const oauth2Client = new google.auth.OAuth2(
