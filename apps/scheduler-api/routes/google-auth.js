@@ -234,11 +234,11 @@ export function setupGoogleRoutes(app) {
              VALUES (?, 'google', ?, ?, ?, ?, ?)`,
             [
               userId,
-              userInfo.id,
+              userInfo.googleId,
               userInfo.email,
               tokens.accessToken,
               tokens.refreshToken || null,
-              tokens.expiresAt ? new Date(tokens.expiresAt) : null
+              tokens.expiryDate ? new Date(tokens.expiryDate) : null
             ]
           );
         } else {
@@ -250,7 +250,7 @@ export function setupGoogleRoutes(app) {
               tokens.accessToken,
               tokens.refreshToken || null,
               userInfo.email,
-              tokens.expiresAt ? new Date(tokens.expiresAt) : null,
+              tokens.expiryDate ? new Date(tokens.expiryDate) : null,
               userId
             ]
           );
