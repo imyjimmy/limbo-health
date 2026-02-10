@@ -174,6 +174,9 @@ export function setupGoogleRoutes(app) {
       const tokens = await googleAuthService.getTokensFromCode(code);
       const userInfo = await googleAuthService.getUserInfo(tokens.accessToken);
 
+      console.log('🔍 tokens keys:', Object.keys(tokens));
+      console.log('🔍 userInfo keys:', Object.keys(userInfo));
+      
       const connection = await pool.getConnection();
 
       try {
