@@ -5,6 +5,20 @@ patient/dist
 private_repos
 users
 mysql-backups/*
+
+# react native
+ios/
+android/
+dist/
+.expo/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
 # dependencies
 **/node_modules
 /.pnp
