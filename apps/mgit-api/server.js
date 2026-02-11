@@ -644,7 +644,38 @@ app.post('/api/mgit/auth/verify', async (req, res) => {
   }
 });
 
-async function checkRepoAccess(repoId, pubkey) {
+/**
+ * Auto-create a bare repository and auth config for push-to-create workflow.
+ * Called when a push targets a repo that doesn't exist yet.
+ */
+async function autoCreateRepository(repoId, ownerPubkey) {
+  const repoPath = path.join(REPOS_PATH, repoId);
+
+  console.log(`📦 Auto-creating repository '${repoId}' for pubkey ${ownerPubkey}`);
+
+  // Initialize bare git repo
+  const { execSync } = require('child_process');
+  fs.mkdirSync(repoPath, { recursive: true });
+  execSync(`${GIT_PATH} init --bare`, { cwd: repoPath });
+
+  // Create auth config with pushing user as admin owner
+  const newConfig = {
+    authorized_keys: [{ pubkey: ownerPubkey, access: 'admin' }],
+    metadata: {
+      description: 'Auto-created by push-to-create',
+      type: 'medical-binder',
+      created: new Date().toISOString(),
+      auto_created: true
+    }
+  };
+
+  await authPersistence.saveRepositoryConfig(repoId, newConfig);
+  console.log(`✅ Auto-created repository '${repoId}' with owner ${ownerPubkey}`);
+
+  return repoPath;
+}
+
+async function checkRepoAccess(repoId, pubkey, { allowAutoCreate = false } = {}) {
   try {
     const repoConfig = await authPersistence.loadRepositoryConfig(repoId);
     
@@ -675,6 +706,18 @@ async function checkRepoAccess(repoId, pubkey) {
         };
       }
       
+      // No physical repo and no auth config — repo doesn't exist
+      if (allowAutoCreate) {
+        // Push-to-create: auto-create the repo and grant admin to the pusher
+        await autoCreateRepository(repoId, pubkey);
+        return {
+          success: true,
+          access: 'admin',
+          authEntry: { pubkey: pubkey, access: 'admin' },
+          autoCreated: true
+        };
+      }
+
       return { 
         success: false, 
         status: 404, 
@@ -1047,7 +1090,10 @@ app.get('/api/mgit/repos/:repoId/info/refs', validateMGitToken, async (req, res)
   const { repoId } = req.params;
   const { pubkey } = req.user;
   
-  const accessCheck = await checkRepoAccess(repoId, pubkey);
+  const service = req.query.service;
+  const accessCheck = await checkRepoAccess(repoId, pubkey, {
+    allowAutoCreate: service === 'git-receive-pack'
+  });
   
   if (!accessCheck.success) {
     return res.status(accessCheck.status).json({ 
@@ -1055,8 +1101,6 @@ app.get('/api/mgit/repos/:repoId/info/refs', validateMGitToken, async (req, res)
       reason: accessCheck.error 
     });
   }
-
-  const service = req.query.service;
 
   // Support both upload-pack (clone) and receive-pack (push)
   if (service !== 'git-upload-pack' && service !== 'git-receive-pack') {
@@ -1182,7 +1226,7 @@ app.post('/api/mgit/repos/:repoId/git-receive-pack', validateMGitToken, async (r
   const { repoId } = req.params;
   const { pubkey } = req.user;
   
-  const accessCheck = await checkRepoAccess(repoId, pubkey);
+  const accessCheck = await checkRepoAccess(repoId, pubkey, { allowAutoCreate: true });
   
   if (!accessCheck.success) {
     return res.status(accessCheck.status).json({ 
@@ -1201,14 +1245,6 @@ app.post('/api/mgit/repos/:repoId/git-receive-pack', validateMGitToken, async (r
   
   // Get repository path
   const repoPath = path.join(REPOS_PATH, repoId);
-  
-  // Check if the repository exists
-  if (!fs.existsSync(repoPath)) {
-    return res.status(404).json({ 
-      status: 'error', 
-      reason: 'Repository not found' 
-    });
-  }
   
   // Set content type for git response
   res.setHeader('Content-Type', 'application/x-git-receive-pack-result');
