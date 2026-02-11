@@ -5,13 +5,20 @@ import { useAuth } from '@/contexts/AuthContext';
 export function GoogleCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { role, setSession } = useAuth();
+  const { setSession } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get('token');
     const email = searchParams.get('email');
     const isNewUser = searchParams.get('new_user') === 'true';
     const error = searchParams.get('error');
+
+    const roleFromParams = searchParams.get('role') as 'patient' | 'provider' | null;
+    
+    if (!roleFromParams) {
+      navigate('/login?error=missing_role');
+      return;
+    }
 
     console.log('🔍 GoogleCallbackPage params:', { token: token?.substring(0, 20), email, isNewUser, error });
 
@@ -30,7 +37,7 @@ export function GoogleCallbackPage() {
           loginMethod: 'google',
           isNewUser 
         }, 
-        role, 
+        roleFromParams, 
         isNewUser ? ({
           dashboard: true,
           billing: true,
