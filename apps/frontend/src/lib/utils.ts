@@ -50,7 +50,7 @@ export function getInitials(profile: GoogleProfile | NostrProfile | null): strin
   if (isGoogleProfile(profile)) {
     const firstInitial = profile.firstName?.[0]?.toUpperCase() || '';
     const lastInitial = profile.lastName?.[0]?.toUpperCase() || '';
-    return `${firstInitial}${lastInitial}` || profile.email.slice(0,2).toUpperCase() || 'U';
+    return `${firstInitial}${lastInitial}` || profile.email?.slice(0,2).toUpperCase() || 'U';
   }
   
   // For Nostr profile, take first 2 letters of display_name or name

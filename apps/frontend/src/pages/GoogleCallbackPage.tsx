@@ -8,54 +8,56 @@ export function GoogleCallbackPage() {
   const { setSession } = useAuth();
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const email = searchParams.get('email');
-    const isNewUser = searchParams.get('new_user') === 'true';
-    const error = searchParams.get('error');
+    ( async () => {
+      const token = searchParams.get('token');
+      const email = searchParams.get('email');
+      const isNewUser = searchParams.get('new_user') === 'true';
+      const error = searchParams.get('error');
 
-    const roleFromParams = searchParams.get('role') as 'patient' | 'provider' | null;
-    
-    if (!roleFromParams) {
-      navigate('/login?error=missing_role');
-      return;
-    }
+      const roleFromParams = searchParams.get('role') as 'patient' | 'provider' | null;
+      
+      if (!roleFromParams) {
+        navigate('/login?error=missing_role');
+        return;
+      }
 
-    console.log('🔍 GoogleCallbackPage params:', { token: token?.substring(0, 20), email, isNewUser, error });
+      console.log('🔍 GoogleCallbackPage params:', { token: token?.substring(0, 20), email, isNewUser, error });
 
-    if (error) {
-      console.error('Google login error:', error);
-      navigate('/login?error=' + encodeURIComponent(error));
-      return;
-    }
+      if (error) {
+        console.error('Google login error:', error);
+        navigate('/login?error=' + encodeURIComponent(error));
+        return;
+      }
 
-    if (token && email) {
-      console.log('✅ Logging in with Google token');
-      // Login with Google token
-      // Note: pubkey is empty string for Google OAuth users
-      setSession(token, '', { 
-          email, 
-          loginMethod: 'google',
-          isNewUser 
-        }, 
-        roleFromParams, 
-        isNewUser ? ({
-          dashboard: true,
-          billing: true,
-          services: true,
-          telehealth: true
-        }) : ({
-          dashboard: false,
-          billing: false,
-          services: false,
-          telehealth: false
-        }));
-      console.log('✅ Navigating to dashboard');
-      // Redirect to dashboard
-      navigate('/dashboard');
-    } else {
-      console.log('❌ Missing token or email, redirecting to login');
-      navigate('/login?error=invalid_callback');
-    }
+      if (token && email) {
+        console.log('✅ Logging in with Google token');
+        // Login with Google token
+        // Note: pubkey is empty string for Google OAuth users
+        await setSession(token, '', { 
+            email, 
+            loginMethod: 'google',
+            isNewUser 
+          }, 
+          roleFromParams, 
+          isNewUser ? ({
+            dashboard: true,
+            billing: true,
+            services: true,
+            telehealth: true
+          }) : ({
+            dashboard: false,
+            billing: false,
+            services: false,
+            telehealth: false
+          }));
+        console.log('✅ Navigating to dashboard');
+        // Redirect to dashboard
+        navigate('/dashboard');
+      } else {
+        console.log('❌ Missing token or email, redirecting to login');
+        navigate('/login?error=invalid_callback');
+      }
+    })();
   }, []);
 
   return (
