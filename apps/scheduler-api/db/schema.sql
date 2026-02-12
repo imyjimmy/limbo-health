@@ -101,6 +101,43 @@ CREATE TABLE `user_settings` (
   CONSTRAINT `user_settings_users` FOREIGN KEY (`id_users`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Repository ownership and metadata
+CREATE TABLE repositories (
+  id VARCHAR(128) PRIMARY KEY,
+  description TEXT,
+  repo_type VARCHAR(64) DEFAULT 'medical-history',
+  owner_pubkey VARCHAR(128) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_owner (owner_pubkey)
+);
+
+-- Per-repo access grants (supports multi-user access in the future)
+CREATE TABLE repository_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  repo_id VARCHAR(128) NOT NULL,
+  pubkey VARCHAR(128) NOT NULL,
+  access_level ENUM('admin', 'read-write', 'read-only') NOT NULL DEFAULT 'read-only',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY idx_repo_pubkey (repo_id, pubkey),
+  INDEX idx_pubkey (pubkey),
+  FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE
+);
+
+-- Scan sessions for doctor sharing
+CREATE TABLE scan_sessions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  session_token VARCHAR(128) UNIQUE NOT NULL,
+  staging_repo_id VARCHAR(128) NOT NULL,
+  patient_pubkey VARCHAR(128) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  expires_at DATETIME NOT NULL,
+  is_revoked BOOLEAN DEFAULT FALSE,
+  INDEX idx_token (session_token),
+  INDEX idx_expires (expires_at),
+  INDEX idx_staging_repo (staging_repo_id)
+);
+
 -- ============================================================================
 -- PROVIDER PROFILES
 -- ============================================================================
