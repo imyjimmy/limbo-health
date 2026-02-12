@@ -1,0 +1,34 @@
+sequenceDiagram
+    title Patient Clone/Pull (JWT Auth)
+
+    participant Phone as Patient Phone
+    participant GW as Gateway (nginx)
+    participant MGit as mgit-api
+    participant Auth as auth-api
+    participant MySQL as MySQL
+    participant Disk as Repo on Disk
+
+    Phone->>GW: GET /api/mgit/repos/{repoId}/info/refs?service=git-upload-pack<br/>Authorization: Bearer {jwt}
+    GW->>MGit: proxy request
+    Note over MGit: authMiddleware starts
+    MGit->>MGit: jwt.verify(token, JWT_SECRET)<br/>extract pubkey
+    MGit->>Auth: POST /api/auth/check-access<br/>{ pubkey, repoId, operation: "read" }<br/>X-Internal-Secret: {secret}
+    Auth->>MySQL: SELECT access_level FROM repository_access<br/>WHERE repo_id = ? AND pubkey = ?
+    MySQL-->>Auth: { access_level: "admin" }
+    Auth-->>MGit: { allowed: true, access: "admin", authMethod: "jwt" }
+    Note over MGit: authMiddleware passes → req.user set
+    MGit->>Disk: spawn git upload-pack --advertise-refs
+    Disk-->>MGit: refs advertisement
+    MGit-->>GW: 200 + refs data
+    GW-->>Phone: refs data
+
+    Phone->>GW: POST /api/mgit/repos/{repoId}/git-upload-pack<br/>Authorization: Bearer {jwt}<br/>(packfile negotiation)
+    GW->>MGit: proxy request
+    MGit->>Auth: POST /api/auth/check-access<br/>{ pubkey, repoId, operation: "read" }
+    Auth-->>MGit: { allowed: true }
+    MGit->>Disk: spawn git upload-pack --stateless-rpc
+    Note over MGit,Disk: req.pipe(stdin) → stdout.pipe(res)
+    Disk-->>MGit: packfile stream
+    MGit-->>GW: 200 + packfile
+    GW-->>Phone: packfile (encrypted repo contents)
+    Note over Phone: isomorphic-git unpacks into local fs<br/>All files are NIP-44 ciphertext

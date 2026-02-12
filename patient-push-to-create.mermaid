@@ -1,0 +1,46 @@
+sequenceDiagram
+    title Patient Push-to-Create (JWT Auth, New Repo)
+
+    participant Phone as Patient Phone
+    participant GW as Gateway (nginx)
+    participant MGit as mgit-api
+    participant Auth as auth-api
+    participant MySQL as MySQL
+    participant Disk as Repo on Disk
+
+    Phone->>GW: GET /api/mgit/repos/{newRepoId}/info/refs?service=git-receive-pack<br/>Authorization: Bearer {jwt}
+    GW->>MGit: proxy request
+    Note over MGit: authMiddleware starts
+    MGit->>MGit: jwt.verify(token, JWT_SECRET)<br/>extract pubkey
+
+    Note over MGit: Repo directory does NOT exist yet<br/>Push-to-create logic triggers
+
+    MGit->>Disk: git init --bare {newRepoId}<br/>set HEAD to refs/heads/main
+    Note over Disk: Empty bare repo created
+
+    MGit->>Auth: POST /api/auth/register-repo<br/>{ repoId, ownerPubkey, description }<br/>X-Internal-Secret: {secret}
+    Auth->>MySQL: INSERT INTO repositories (...)<br/>INSERT INTO repository_access (repo_id, pubkey, 'admin')
+    MySQL-->>Auth: OK
+    Auth-->>MGit: { success: true }
+
+    MGit->>Auth: POST /api/auth/check-access<br/>{ pubkey, repoId, operation: "write" }
+    Auth->>MySQL: SELECT access_level ...
+    MySQL-->>Auth: { access_level: "admin" }
+    Auth-->>MGit: { allowed: true, access: "admin" }
+
+    MGit->>Disk: spawn git receive-pack --advertise-refs
+    Disk-->>MGit: refs advertisement (empty repo)
+    MGit-->>GW: 200 + refs data
+    GW-->>Phone: refs data
+
+    Phone->>GW: POST /api/mgit/repos/{newRepoId}/git-receive-pack<br/>Authorization: Bearer {jwt}<br/>(packfile with encrypted commits)
+    GW->>MGit: proxy request
+    MGit->>Auth: POST /api/auth/check-access<br/>{ pubkey, repoId, operation: "write" }
+    Auth-->>MGit: { allowed: true }
+    MGit->>Disk: spawn git receive-pack --stateless-rpc
+    Note over MGit,Disk: req.pipe(stdin) → stdout.pipe(res)
+    Phone-->>Disk: packfile stream (NIP-44 ciphertext blobs)
+    Disk-->>MGit: success
+    MGit-->>GW: 200
+    GW-->>Phone: push successful
+    Note over Phone: Binder now exists on server<br/>Server has only encrypted blobs — zero knowledge of content

@@ -1,0 +1,38 @@
+sequenceDiagram
+    title Doctor Clone Staging Repo (Scan Token Auth)
+
+    participant Doc as Doctor Browser<br/>limbo.health/scan
+    participant GW as Gateway (nginx)
+    participant MGit as mgit-api
+    participant Auth as auth-api
+    participant MySQL as MySQL
+    participant Disk as Staging Repo on Disk
+
+    Note over Doc: Doctor scans QR code from patient's phone<br/>QR contains: { ephemeralPrivkey, sessionToken,<br/>repoId: "scan-abc123", endpoint }
+
+    Doc->>GW: GET /api/mgit/repos/scan-abc123/info/refs?service=git-upload-pack&scan_token=sctk_xxx
+    GW->>MGit: proxy request
+    Note over MGit: authMiddleware starts
+    MGit->>MGit: No JWT found<br/>Extract scan_token from query param
+
+    MGit->>Auth: POST /api/auth/check-access<br/>{ scanToken: "sctk_xxx", repoId: "scan-abc123", operation: "read" }<br/>X-Internal-Secret: {secret}
+    Auth->>MySQL: SELECT * FROM scan_sessions<br/>WHERE session_token = 'sctk_xxx'
+    MySQL-->>Auth: { staging_repo_id: "scan-abc123",<br/>expires_at: future, is_revoked: false }
+    Note over Auth: ✓ Token valid<br/>✓ Not expired<br/>✓ Not revoked<br/>✓ repoId matches staging_repo_id
+    Auth-->>MGit: { allowed: true, access: "read-write", authMethod: "scan_token" }
+
+    MGit->>Disk: spawn git upload-pack --advertise-refs
+    Disk-->>MGit: refs advertisement
+    MGit-->>GW: 200 + refs data
+    GW-->>Doc: refs data
+
+    Doc->>GW: POST /api/mgit/repos/scan-abc123/git-upload-pack?scan_token=sctk_xxx<br/>(packfile negotiation)
+    GW->>MGit: proxy request
+    MGit->>Auth: POST /api/auth/check-access<br/>{ scanToken: "sctk_xxx", repoId: "scan-abc123", operation: "read" }
+    Auth-->>MGit: { allowed: true }
+    MGit->>Disk: spawn git upload-pack --stateless-rpc
+    Disk-->>MGit: packfile stream
+    MGit-->>GW: 200 + packfile
+    GW-->>Doc: packfile (ephemeral-key ciphertext)
+
+    Note over Doc: isomorphic-git unpacks in browser memory (memfs)<br/>For each file:<br/>  conversationKey = getConversationKey(ephemeralPriv, ephemeralPub)<br/>  plaintext = nip44.decrypt(ciphertext, conversationKey)<br/>  document = JSON.parse(plaintext)<br/>Render medical history timeline

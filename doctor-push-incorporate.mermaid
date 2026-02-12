@@ -1,0 +1,65 @@
+sequenceDiagram
+    title Doctor Pushes Note → Patient Incorporates (Full /scan Write Flow)
+
+    participant Doc as Doctor Browser
+    participant GW as Gateway (nginx)
+    participant MGit as mgit-api
+    participant Auth as auth-api
+    participant MySQL as MySQL
+    participant Disk as Staging Repo
+    participant Phone as Patient Phone
+    participant Real as Real Repo on Disk
+
+    Note over Doc: Doctor writes clinical note in browser editor<br/>Builds MedicalDocument { value, metadata, children }<br/>Encrypts with NIP-44 using ephemeral keypair<br/>Commits to in-memory git repo
+
+    Doc->>GW: GET /api/mgit/repos/scan-abc123/info/refs?service=git-receive-pack&scan_token=sctk_xxx
+    GW->>MGit: proxy request
+    MGit->>Auth: POST /api/auth/check-access<br/>{ scanToken, repoId: "scan-abc123", operation: "write" }
+    Auth->>MySQL: Validate scan session
+    Auth-->>MGit: { allowed: true, access: "read-write" }
+    MGit->>Disk: spawn git receive-pack --advertise-refs
+    Disk-->>MGit: refs advertisement
+    MGit-->>Doc: refs data
+
+    Doc->>GW: POST /api/mgit/repos/scan-abc123/git-receive-pack?scan_token=sctk_xxx
+    GW->>MGit: proxy request
+    MGit->>Auth: POST /api/auth/check-access<br/>{ scanToken, repoId: "scan-abc123", operation: "write" }
+    Auth-->>MGit: { allowed: true }
+    MGit->>Disk: spawn git receive-pack --stateless-rpc
+    Doc-->>Disk: packfile (doctor's encrypted note)
+    Disk-->>MGit: success
+    MGit-->>Doc: 200 push successful
+
+    Note over Doc: Doctor sees "Note submitted" confirmation<br/>Doctor closes tab and moves on
+
+    Note over Phone,Real: === Patient Incorporation Flow ===
+
+    Note over Phone: Patient taps "Check for Doctor Notes"<br/>Phone pulls staging repo using JWT
+
+    Phone->>GW: POST /api/mgit/repos/scan-abc123/git-upload-pack<br/>Authorization: Bearer {jwt}
+    GW->>MGit: proxy
+    MGit->>Auth: check-access { pubkey, "scan-abc123", "read" }
+    Note over Auth: Patient is admin on staging repo<br/>(they created it via push-to-create)
+    Auth-->>MGit: { allowed: true }
+    MGit->>Disk: git upload-pack
+    Disk-->>Phone: packfile with doctor's new commit
+
+    Note over Phone: StagingDiff: compare HEAD vs snapshot commit<br/>Found new file: visits/2026-02-11-doctor-note.json<br/><br/>IncorporateNotes:<br/>  1. Read from staging with ephemeral key<br/>     decrypt(ciphertext, ephemeralConversationKey) → plaintext<br/>  2. Re-encrypt with master key<br/>     encrypt(plaintext, masterConversationKey) → new ciphertext<br/>  3. Write to real binder working tree<br/>  4. git add + git commit
+
+    Phone->>GW: POST /api/mgit/repos/my-medical-binder/git-receive-pack<br/>Authorization: Bearer {jwt}
+    GW->>MGit: proxy
+    MGit->>Auth: check-access { pubkey, "my-medical-binder", "write" }
+    Auth-->>MGit: { allowed: true }
+    MGit->>Real: git receive-pack
+    Phone-->>Real: packfile (doctor's note, re-encrypted with master key)
+    Real-->>MGit: success
+    MGit-->>Phone: 200
+
+    Note over Phone: Doctor's note now lives permanently in patient's real repo<br/>Encrypted with patient's master key, under patient's control
+
+    Phone->>GW: POST /api/auth/scan/revoke<br/>Authorization: Bearer {jwt}<br/>{ sessionToken: "sctk_xxx" }
+    GW->>Auth: proxy
+    Auth->>MySQL: UPDATE scan_sessions SET is_revoked = TRUE
+    Auth-->>Phone: { success: true }
+
+    Note over Auth,Disk: 15 minutes later: cleanup job runs<br/>auth-api returns expired/revoked staging repo IDs<br/>mgit-api deletes scan-abc123 from disk<br/>Session row deleted from MySQL<br/><br/>Ephemeral keys are gone. Staging repo is gone.<br/>Doctor's note survives only in the real repo,<br/>encrypted with the patient's master key.
