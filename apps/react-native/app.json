@@ -8,6 +8,7 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "jsEngine": "hermes",
+    "scheme": "limbohealth",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
