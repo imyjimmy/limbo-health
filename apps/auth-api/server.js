@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 
+import reposRouter from './routes/repos.js';
+import scanRouter from './routes/scan.js';
 import { NostrAuthService } from './services/NostrAuthService.js';
 import { GoogleAuthService } from './services/GoogleAuthService.js';
 
@@ -21,6 +23,7 @@ const app = express();
 const PORT = process.env.PORT || 3010;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+app.set('db', db);
 app.use(cors());
 app.use(express.json());
 
@@ -178,6 +181,9 @@ app.post('/internal/validate', (req, res) => {
     res.status(401).json({ valid: false, error: error.message });
   }
 });
+
+app.use(reposRouter);
+app.use(scanRouter);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔐 Auth API running on port ${PORT}`);
