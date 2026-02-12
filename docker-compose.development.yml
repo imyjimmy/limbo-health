@@ -39,9 +39,8 @@ services:
       - .env.development
     command: npx nodemon server.js
     volumes:
-      # Override with source mounting for hot reload
-      - ./apps/mgit-api:/app/apps/mgit-api
-      - /app/apps/mgit-api/node_modules  # Protect node_modules
+      - ./apps/mgit-api:/app          # Mount source to /app, not /app/apps/mgit-api
+      - /app/node_modules             # Protect container's node_modules
       - ./private_repos:/repos
       - ./users:/app/users
     networks:

@@ -917,12 +917,14 @@ app.get('/api/mgit/qr/clone/:repoId', validateMGitToken, async (req, res) => {
   }
 });
 
-// NEW: Create bare repository only (client handles encryption and commits)
-app.post('/api/mgit/repos/create-bare', validateAuthToken, async (req, res) => {
+/**
+ * Git create-bare and create endpoints
+ */
+app.post('/api/mgit/repos/create-bare', jwtOnly, async (req, res) => {
   try {
     const { repoName } = req.body;
     const { pubkey } = req.user;
-    
+
     if (!repoName) {
       return res.status(400).json({
         status: 'error',
@@ -930,54 +932,44 @@ app.post('/api/mgit/repos/create-bare', validateAuthToken, async (req, res) => {
       });
     }
 
-    // Normalize repo name
     const normalizedRepoName = repoName.trim().replace(/\s+/g, '-').toLowerCase();
-    
-    // Check if repository already exists
-    const existingConfig = await authPersistence.loadRepositoryConfig(normalizedRepoName);
-    if (existingConfig) {
-      return res.status(409).json({
-        status: 'error',
-        reason: 'Repository already exists'
-      });
-    }
-    
     const repoPath = path.join(REPOS_PATH, normalizedRepoName);
-    
-    // Check if directory exists
+
     if (fs.existsSync(repoPath)) {
       return res.status(409).json({
         status: 'error',
         reason: 'Repository directory already exists'
       });
     }
-    
-    // Create directory and initialize as bare git repository
+
+    // Create bare repo on disk
     fs.mkdirSync(repoPath, { recursive: true });
     await execAsync('git init --bare', { cwd: repoPath });
     await execAsync(`echo "ref: refs/heads/main" > ${repoPath}/HEAD`);
-    
     console.log(`✅ Created bare repository at ${repoPath}`);
-    
-    // Save auth configuration
-    await authPersistence.saveRepositoryConfig(normalizedRepoName, {
-      authorized_keys: [{ pubkey: utils.hexToBech32(pubkey), access: 'admin' }],
-      metadata: {
-        created: new Date().toISOString(),
+
+    // Register in auth-api
+    try {
+      await authApiClient.registerRepo({
+        repoId: normalizedRepoName,
+        ownerPubkey: pubkey,
         description: 'Encrypted medical repository',
-        type: 'medical-history',
-        encrypted: true
-      }
-    });
-    
-    console.log(`✅ Saved auth config for ${normalizedRepoName}`);
-    
+        repoType: 'medical-history'
+      });
+    } catch (err) {
+      // Rollback: delete the repo directory
+      fs.rmSync(repoPath, { recursive: true, force: true });
+      throw err;
+    }
+
+    console.log(`✅ Registered auth config for ${normalizedRepoName}`);
+
     res.json({
       status: 'OK',
       repoId: normalizedRepoName,
       message: 'Bare repository created successfully. Client can now push encrypted commits.'
     });
-    
+
   } catch (error) {
     console.error('Bare repository creation error:', error);
     res.status(500).json({
@@ -988,75 +980,75 @@ app.post('/api/mgit/repos/create-bare', validateAuthToken, async (req, res) => {
   }
 });
 
-// Repository creation endpoint
-app.post('/api/mgit/repos/create', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ 
-      status: 'error', 
-      reason: 'Authentication required' 
-    });
-  }
-
-  const token = authHeader.split(' ')[1];
+app.post('/api/mgit/repos/create', jwtOnly, async (req, res) => {
   try {
-    // Verify the token (but don't require a specific repoId since we're creating one)
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const { pubkey } = decoded;
-    
+    const { pubkey } = req.user;
     const { repoName, userName, userEmail, description } = req.body;
+
     if (!repoName || !userName || !userEmail) {
       return res.status(400).json({
         status: 'error',
         reason: 'Display name, user name, and email are required'
       });
     }
-    
-    // Check if repository already exists
-    const existingConfig = await authPersistence.loadRepositoryConfig(repoName);
-    if (existingConfig) {
+
+    const repoPath = path.join(REPOS_PATH, repoName);
+    if (fs.existsSync(repoPath)) {
       return res.status(409).json({
         status: 'error',
         reason: 'Repository already exists'
       });
     }
-    
-    // Create the repository
+
+    // Create the repository on disk
     console.log('REPOS_PATH:', REPOS_PATH);
     const repoResult = await mgitUtils.createRepository(repoName, userName, userEmail, pubkey, description, REPOS_PATH);
-    
-    if (repoResult.success) {
-      await authPersistence.saveRepositoryConfig(repoName, repoResult.repoConfig);
-      console.log(`✅ Saved repository config for '${repoName}' to persistent storage`);
-      res.json({
-        status: 'OK',
-        repoId: repoName,
-        repoPath: repoResult.repoPath,
-        cloneUrl: `http://localhost:3003/${repoName}`,
-        message: 'Repository created successfully'
-      });
-    } else {
-      res.status(500).json({
+
+    if (!repoResult.success) {
+      return res.status(500).json({
         status: 'error',
         reason: 'Failed to create repository',
         details: repoResult.error
       });
     }
-    
+
+    // Register in auth-api
+    try {
+      await authApiClient.registerRepo({
+        repoId: repoName,
+        ownerPubkey: pubkey,
+        description: description || 'Medical repository',
+        repoType: 'medical-history'
+      });
+    } catch (err) {
+      // Rollback: delete the repo directory
+      fs.rmSync(repoPath, { recursive: true, force: true });
+      throw err;
+    }
+
+    console.log(`✅ Registered auth config for '${repoName}'`);
+
+    res.json({
+      status: 'OK',
+      repoId: repoName,
+      repoPath: repoResult.repoPath,
+      cloneUrl: `http://localhost:3003/${repoName}`,
+      message: 'Repository created successfully'
+    });
+
   } catch (error) {
     console.error('Repository creation error:', error);
-    
+
     if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ 
-        status: 'error', 
-        reason: 'Token expired' 
+      return res.status(401).json({
+        status: 'error',
+        reason: 'Token expired'
       });
     }
-    
-    return res.status(500).json({ 
-      status: 'error', 
-      reason: 'Repository creation failed: ' + error.message 
+
+    return res.status(500).json({
+      status: 'error',
+      reason: 'Repository creation failed: ' + error.message
     });
   }
 });
@@ -1088,76 +1080,50 @@ app.get('/api/mgit/repos/:repoId/info', validateMGitToken, async (req, res) => {
   });
 });
 
-app.get('/api/mgit/repos/:repoId/info/refs', validateMGitToken, async (req, res) => {
+app.get('/api/mgit/repos/:repoId/info/refs', authMiddleware, async (req, res) => {
   const { repoId } = req.params;
-  const { pubkey } = req.user;
-  
   const service = req.query.service;
-  const accessCheck = await checkRepoAccess(repoId, pubkey, {
-    allowAutoCreate: service === 'git-receive-pack'
-  });
-  
-  if (!accessCheck.success) {
-    return res.status(accessCheck.status).json({ 
-      status: 'error', 
-      reason: accessCheck.error 
-    });
-  }
 
-  // Support both upload-pack (clone) and receive-pack (push)
+  // Validate service
   if (service !== 'git-upload-pack' && service !== 'git-receive-pack') {
     return res.status(400).json({
       status: 'error',
       reason: 'Service not supported'
     });
   }
-  
-  // For push operations (git-receive-pack), check write permissions
-  if (service === 'git-receive-pack') {
-    const access = accessCheck.access;  // ✅ Use access from the check
-    if (access !== 'admin' && access !== 'read-write') {
-      return res.status(403).json({ 
-        status: 'error', 
-        reason: 'Insufficient permissions to push to repository' 
-      });
-    }
+
+  // Repo must exist on disk
+  const repoPath = path.join(REPOS_PATH, repoId);
+  if (!fs.existsSync(repoPath)) {
+    return res.status(404).json({
+      status: 'error',
+      reason: 'Repository not found'
+    });
   }
-  
+
   // Set appropriate headers
   res.setHeader('Content-Type', `application/x-${service}-advertisement`);
   res.setHeader('Cache-Control', 'no-cache');
-  
-  // Get repository path
-  const repoPath = path.join(REPOS_PATH, repoId);
-  
+
   // Format the packet properly
   const serviceHeader = `# service=${service}\n`;
   const length = (serviceHeader.length + 4).toString(16).padStart(4, '0');
-  
-  // Write the packet
   res.write(length + serviceHeader);
-  // Write the flush packet (0000)
   res.write('0000');
-  
-  // Extract the command name from the service
-  const gitCommand = service.replace('git-', ''); // 'upload-pack' or 'receive-pack'
-  
-  // Log what we're doing
+
+  const gitCommand = service.replace('git-', '');
   console.log(`Advertising refs for ${repoId} using ${service}`);
-  
-  // Run git command to advertise refs
+
   const { spawn } = require('child_process');
-  const process = spawn('git', [gitCommand, '--stateless-rpc', '--advertise-refs', repoPath]);
-  
-  // Pipe stdout to response
-  process.stdout.pipe(res);
-  
-  // Log any errors
-  process.stderr.on('data', (data) => {
+  const proc = spawn('git', [gitCommand, '--stateless-rpc', '--advertise-refs', repoPath]);
+
+  proc.stdout.pipe(res);
+
+  proc.stderr.on('data', (data) => {
     console.error(`git ${gitCommand} stderr: ${data}`);
   });
-  
-  process.on('error', (err) => {
+
+  proc.on('error', (err) => {
     console.error(`Error spawning git process: ${err}`);
     if (!res.headersSent) {
       res.status(500).json({
@@ -1171,106 +1137,56 @@ app.get('/api/mgit/repos/:repoId/info/refs', validateMGitToken, async (req, res)
 
 // Git protocol endpoint for git-upload-pack (needed for clone)
 // data transfer phase
-app.post('/api/mgit/repos/:repoId/git-upload-pack', validateMGitToken, async (req, res) => {
-  console.log('🔧 DEBUG: git-upload-pack route hit for repoId:', req.params.repoId);
+app.post('/api/mgit/repos/:repoId/git-upload-pack', authMiddleware, async (req, res) => {
   const { repoId } = req.params;
-  const { pubkey } = req.user;
-  
-  const accessCheck = await checkRepoAccess(repoId, pubkey);
-  
-  if (!accessCheck.success) {
-    return res.status(accessCheck.status).json({ 
-      status: 'error', 
-      reason: accessCheck.error 
-    });
-  }
-
-  // Get repository path
   const repoPath = path.join(REPOS_PATH, repoId);
-  
-  // Set content type for git response
-  res.setHeader('Content-Type', 'application/x-git-upload-pack-result');
-  
-  // Spawn git upload-pack process
-  const { spawn } = require('child_process');
-  const process = spawn('git', ['upload-pack', '--stateless-rpc', repoPath]);
-  
-  // Add better logging
+
   console.log(`POST git-upload-pack for ${repoId}`);
-  
-  // Pipe the request body to git's stdin
-  req.pipe(process.stdin);
-  
-  // Pipe git's stdout to the response
-  process.stdout.pipe(res);
-  
-  // Log stderr
-  process.stderr.on('data', (data) => {
+
+  res.setHeader('Content-Type', 'application/x-git-upload-pack-result');
+
+  const { spawn } = require('child_process');
+  const proc = spawn('git', ['upload-pack', '--stateless-rpc', repoPath]);
+
+  req.pipe(proc.stdin);
+  proc.stdout.pipe(res);
+
+  proc.stderr.on('data', (data) => {
     console.error(`git-upload-pack stderr: ${data.toString()}`);
   });
-  
-  // Handle errors
-  process.on('error', (err) => {
+
+  proc.on('error', (err) => {
     console.error(`git-upload-pack process error: ${err.message}`);
     if (!res.headersSent) {
       res.status(500).send('Git error');
     }
   });
-  
-  // Handle process exit
-  process.on('exit', (code) => {
+
+  proc.on('exit', (code) => {
     console.log(`git-upload-pack process exited with code ${code}`);
   });
 });
 
 // Git protocol endpoint for git-receive-pack (needed for push)
-app.post('/api/mgit/repos/:repoId/git-receive-pack', validateMGitToken, async (req, res) => {
+app.post('/api/mgit/repos/:repoId/git-receive-pack', authMiddleware, async (req, res) => {
   const { repoId } = req.params;
-  const { pubkey } = req.user;
-  
-  const accessCheck = await checkRepoAccess(repoId, pubkey, { allowAutoCreate: true });
-  
-  if (!accessCheck.success) {
-    return res.status(accessCheck.status).json({ 
-      status: 'error', 
-      reason: accessCheck.error 
-    });
-  }
-  
-  // Check write permissions
-  if (accessCheck.access !== 'admin' && accessCheck.access !== 'read-write') {
-    return res.status(403).json({ 
-      status: 'error', 
-      reason: 'Insufficient permissions to push to repository' 
-    });
-  }
-  
-  // Get repository path
   const repoPath = path.join(REPOS_PATH, repoId);
-  
-  // Set content type for git response
-  res.setHeader('Content-Type', 'application/x-git-receive-pack-result');
-  
-  // Spawn git receive-pack process
-  const { spawn } = require('child_process');
-  const process = spawn('git', ['receive-pack', '--stateless-rpc', repoPath]);
-  
-  // Add better logging
+
   console.log(`POST git-receive-pack for ${repoId}`);
-  
-  // Pipe the request body to git's stdin
-  req.pipe(process.stdin);
-  
-  // Pipe git's stdout to the response
-  process.stdout.pipe(res);
-  
-  // Log stderr
-  process.stderr.on('data', (data) => {
+
+  res.setHeader('Content-Type', 'application/x-git-receive-pack-result');
+
+  const { spawn } = require('child_process');
+  const proc = spawn('git', ['receive-pack', '--stateless-rpc', repoPath]);
+
+  req.pipe(proc.stdin);
+  proc.stdout.pipe(res);
+
+  proc.stderr.on('data', (data) => {
     console.error(`git-receive-pack stderr: ${data.toString()}`);
   });
-  
-  // Handle errors
-  process.on('error', (err) => {
+
+  proc.on('error', (err) => {
     console.error(`git-receive-pack process error: ${err.message}`);
     if (!res.headersSent) {
       res.status(500).json({
@@ -1280,20 +1196,11 @@ app.post('/api/mgit/repos/:repoId/git-receive-pack', validateMGitToken, async (r
       });
     }
   });
-  
-  // Handle process exit
-  process.on('exit', (code) => {
+
+  proc.on('exit', (code) => {
     console.log(`git-receive-pack process exited with code ${code}`);
-    
-    // If we wanted to extend this to handle MGit metadata, we would do it here
-    // after the git process completes successfully
     if (code === 0) {
       console.log(`Successfully processed push for repository ${repoId}`);
-      
-      // In the future, you might want to add code here to:
-      // 1. Extract commit info from the pushed data
-      // 2. Update nostr_mappings.json
-      // 3. Perform any other MGit-specific operations
     }
   });
 });
