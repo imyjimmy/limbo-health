@@ -68,8 +68,25 @@ async function deleteRepoConfig(repoId) {
   return res.json();
 }
 
+async function cleanupStagingRepos() {
+  const res = await fetch(`${AUTH_API_URL}/api/auth/scan/cleanup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Internal-Secret': INTERNAL_SECRET
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`scan/cleanup returned ${res.status}`);
+  }
+
+  return res.json();
+}
+
 module.exports = {
   checkAccess,
+  cleanupStagingRepos,
   registerRepo,
   getUserRepositories,
   deleteRepoConfig

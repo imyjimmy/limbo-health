@@ -52,6 +52,21 @@ async function authMiddleware(req, res, next) {
     });
 
     if (!result.allowed) {
+      // Allow push-to-create: if repo doesn't exist and user has a JWT, let the handler decide
+      const isPushToCreate = !result.allowed
+        && result.reason === 'Not authorized for this repository'
+        && operation === 'write'
+        && pubkey;
+
+      if (isPushToCreate) {
+        req.user = {
+          pubkey,
+          authMethod: 'jwt',
+          access: null,
+          pushToCreate: true
+        };
+        return next();
+      }
       return res.status(403).json({ error: result.reason || 'Access denied' });
     }
 
