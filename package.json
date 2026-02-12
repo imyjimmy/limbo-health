@@ -18,9 +18,22 @@
     "patient:dev": "cd apps/patient-frontend && npm run dev",
     "restart": "docker-compose -f docker-compose.yml -f docker-compose.development.yml restart",
     "down": "docker-compose -f docker-compose.yml -f docker-compose.development.yml down",
-    "up": "docker-compose -f docker-compose.yml -f docker-compose.development.yml up -d"
+    "up": "docker-compose -f docker-compose.yml -f docker-compose.development.yml up -d",
+    "test:integration": "vitest run",
+    "test:integration:watch": "vitest watch",
+    "test:integration:verbose": "vitest run --reporter=verbose",
+    "test:auth": "vitest run tests/auth/",
+    "test:mgit": "vitest run tests/mgit/"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "@isomorphic-git/lightning-fs": "^4.6.0",
+    "@noble/curves": "^1.8.2",
+    "@noble/hashes": "^1.7.2",
+    "dotenv": "^16.5.0",
+    "fake-indexeddb": "^6.2.5",
+    "isomorphic-git": "^1.29.0",
+    "nodemon": "^3.1.10",
+    "nostr-tools": "^2.12.0",
+    "vitest": "^3.2.1"
   }
 }
