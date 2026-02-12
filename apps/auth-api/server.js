@@ -96,7 +96,7 @@ app.post('/api/auth/nostr/verify', async (req, res) => {
       role: userRole,
       authMethod: 'nostr',
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
+      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // make token expire in 7 days
     }, JWT_SECRET);
     
     console.log('Nostr login verified for pubkey:', result.pubkey, 'as', userType);
