@@ -11,6 +11,8 @@ const { exec } = require('child_process');
 const { promisify } = require('util'); // Add this line
 const jwt = require('jsonwebtoken');
 const QRCode = require('qrcode');
+const authApiClient = require('./authApiClient');
+const { authMiddleware, jwtOnly } = require('./authMiddleware');
 const authPersistence = require('./auth-persistence');
 
 console.log('=== MGit Server Starting - Build Version 2025-06-08-v2 ===');
@@ -1531,32 +1533,23 @@ app.get('/api/mgit/repos/:repoId/database', validateMGitToken, async (req, res) 
 });
 
 // show repos of a user
-app.get('/api/mgit/user/repositories', validateAuthToken, async (req, res) => {
+app.get('/api/mgit/user/repositories', jwtOnly, async (req, res) => {
   try {
-    console.log('USER REPOSITORIES LIST')
+    console.log('USER REPOSITORIES LIST');
     const userPubkey = req.user.pubkey;
-    const userRepositories = [];
-    
-    // Search through all repository configurations to find user's repos
-    const allRepoConfigs = await authPersistence.loadAllRepositoryConfigs();
-    for (const [repoId, config] of Object.entries(allRepoConfigs)) {
-      // Check if user has access to this repository
-      const hasAccess = config.authorized_keys.some(key => key.pubkey === utils.hexToBech32(userPubkey));
-      
-      if (hasAccess) {
-        userRepositories.push({
-          name: repoId,
-          id: repoId,
-          description: config.metadata?.description || '',
-          created: config.metadata?.created || new Date().toISOString(),
-          type: config.metadata?.type || 'repository',
-          access: config.authorized_keys.find(key => key.pubkey === userPubkey)?.access || 'read-only'
-        });
-      }
-    }
-    
-    // Sort by creation date (newest first)
-    userRepositories.sort((a, b) => new Date(b.created) - new Date(a.created));
+
+    const repos = await authApiClient.getUserRepositories(userPubkey);
+
+    // Map to the shape the frontend expects
+    const userRepositories = repos.map(r => ({
+      name: r.repoId,
+      id: r.repoId,
+      description: r.description || '',
+      created: r.createdAt || new Date().toISOString(),
+      type: r.repoType || 'repository',
+      access: r.access || 'read-only'
+    }));
+
     console.log('user repos:', userRepositories);
     res.json(userRepositories);
   } catch (error) {
