@@ -1,7 +1,8 @@
 // app/(tabs)/index.tsx
-// Week 1 milestone: fetch repos, clone, decrypt, display.
+// Binder list → open → clone → decrypt → display.
+// Refactored to use BinderService for all CRUD.
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,11 +15,13 @@ import {
 import RNFS from 'react-native-fs';
 import { useAuthContext } from '../../providers/AuthProvider';
 import { useCryptoContext } from '../../providers/CryptoProvider';
-import { GitEngine } from '../../core/git/GitEngine';
+import { BinderService } from '../../core/binder/BinderService';
 import { API_BASE_URL } from '../../constants/api';
-import type { MedicalDocument } from '../../types/document';
 import { useCamera } from '../../hooks/useCamera';
-import { generateDocPath, sidecarPathFrom, conditionFolder } from '../../core/binder/FileNaming';
+import type { MedicalDocument } from '../../types/document';
+import { useShareSession } from '../../hooks/useShareSession';
+import { QRDisplay } from '../../components/QRDisplay';
+import { ProfileAvatar } from '../../components/ProfileAvatar';
 
 // --- Types ---
 
@@ -57,16 +60,34 @@ async function isAlreadyCloned(repoId: string): Promise<boolean> {
 
 export default function BinderListScreen() {
   const { state: authState } = useAuthContext();
-  const { ready: cryptoReady, createEncryptedIO } = useCryptoContext();
+  const { ready: cryptoReady, masterConversationKey } = useCryptoContext();
   const { capture } = useCamera();
 
   const [screenState, setScreenState] = useState<ScreenState>({
     phase: 'loading-repos',
   });
 
+  const binderRef = useRef<BinderService | null>(null);
+
   const jwt = authState.status === 'authenticated' ? authState.jwt : null;
 
-  // --- Fetch repo list on mount ---
+  // --- Share session (active only when viewing a binder) ---
+
+  const activeRepoId =
+    screenState.phase === 'displaying' ? screenState.repoId : '';
+  const activeRepoDir = activeRepoId ? repoDir(activeRepoId) : '';
+
+  const { state: shareState, startShare, cancel: cancelShare } =
+    useShareSession(activeRepoDir, masterConversationKey, jwt);
+
+  // --- Build auth config ---
+
+  function authConfig() {
+    if (!jwt) throw new Error('Not authenticated');
+    return { type: 'jwt' as const, token: jwt };
+  }
+
+  // --- Fetch repo list ---
 
   const fetchRepos = useCallback(async () => {
     if (!jwt) return;
@@ -78,19 +99,18 @@ export default function BinderListScreen() {
         headers: { Authorization: `Bearer ${jwt}` },
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
 
       const data = await res.json();
 
       // Normalize response — may be an array or { repositories: [...] }
-      const repoList: RepoSummary[] = Array.isArray(data)
+      const repoList: RepoSummary[] = (Array.isArray(data)
         ? data.map((r: any) => ({ id: r.id ?? r.repoId ?? r.name, name: r.name ?? r.id }))
         : (data.repositories ?? []).map((r: any) => ({
             id: r.id ?? r.repoId ?? r.name,
             name: r.name ?? r.id,
-          }));
+          }))
+      ).filter((r: RepoSummary) => !r.id.startsWith('scan-'));
 
       setScreenState({ phase: 'repos-loaded', repos: repoList });
     } catch (err) {
@@ -100,45 +120,45 @@ export default function BinderListScreen() {
   }, [jwt]);
 
   useEffect(() => {
-    if (jwt && cryptoReady) {
-      fetchRepos();
-    }
+    if (jwt && cryptoReady) fetchRepos();
   }, [jwt, cryptoReady, fetchRepos]);
 
-  // --- Clone + decrypt a repo ---
+  // --- Open binder: clone if needed, list entries, decrypt ---
 
   const openBinder = useCallback(
     async (repo: RepoSummary) => {
-      if (!jwt || !cryptoReady) return;
+      if (!jwt || !masterConversationKey) return;
 
       const dir = repoDir(repo.id);
+      const auth = authConfig();
 
       try {
-        // Clone if needed
         const cloned = await isAlreadyCloned(repo.id);
         if (!cloned) {
           setScreenState({ phase: 'cloning', repoId: repo.id });
-          await GitEngine.cloneRepo(dir, repo.id, { type: 'jwt', token: jwt });
+          const { GitEngine } = await import('../../core/git/GitEngine');
+          await GitEngine.cloneRepo(dir, repo.id, auth);
         }
 
-        // List files and decrypt .json documents
         setScreenState({ phase: 'decrypting', repoId: repo.id });
 
-        const allFiles = await GitEngine.listFiles(dir);
-        const jsonFiles = allFiles.filter(
-          (f) => f.endsWith('.json') && !f.startsWith('.'),
+        const service = new BinderService(
+          { repoId: repo.id, repoDir: dir, auth },
+          masterConversationKey,
         );
+        binderRef.current = service;
 
-        const io = createEncryptedIO(dir);
+        // List all entries (metadata only)
+        const entryMetas = await service.listEntries();
+
+        // Decrypt full content for display
         const entries: DecryptedEntry[] = [];
-
-        for (const filePath of jsonFiles) {
+        for (const meta of entryMetas) {
           try {
-            const doc = await io.readDocument('/' + filePath);
-            entries.push({ path: filePath, doc });
+            const doc = await service.readEntry(meta.path);
+            entries.push({ path: meta.path, doc });
           } catch (err) {
-            console.warn(`Failed to decrypt ${filePath}:`, err);
-            // Skip unreadable files rather than crashing
+            console.warn(`Failed to read ${meta.path}:`, err);
           }
         }
 
@@ -146,73 +166,23 @@ export default function BinderListScreen() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         Alert.alert('Error', msg);
-        // Fall back to repo list
         fetchRepos();
       }
     },
-    [jwt, cryptoReady, createEncryptedIO, fetchRepos],
+    [jwt, masterConversationKey, fetchRepos],
   );
 
   // --- Back to repo list ---
 
   const goBack = useCallback(() => {
+    binderRef.current = null;
     fetchRepos();
   }, [fetchRepos]);
 
-  // --- Capture photo and add to current binder ---
-  const addPhoto = useCallback(
-    async (repoId: string) => {
-      if (!jwt || !cryptoReady) return;
-
-      try {
-        const result = await capture();
-        if (!result) return; // user cancelled
-
-        const dir = repoDir(repoId);
-        const condition = conditionFolder('back-acne');
-
-        // Generate collision-safe paths
-        const docPath = await generateDocPath(dir, condition, 'photo');
-        const encPath = sidecarPathFrom(docPath);
-
-        const io = createEncryptedIO(dir);
-
-        // Write encrypted sidecar (.enc) — the actual JPEG bytes
-        await io.writeSidecar('/' + encPath, result.binaryData);
-
-        // Write metadata document (.json) — points to the sidecar
-        const doc: MedicalDocument = {
-          value: encPath.split('/').pop()!, // just the filename: '2026-02-13-photo.enc'
-          metadata: {
-            type: 'attachment_ref',
-            created: new Date().toISOString(),
-            format: 'jpeg',
-            encoding: 'base64',
-            originalSizeBytes: result.sizeBytes,
-            condition: 'back-acne',
-          },
-          children: [],
-        };
-        await io.writeDocument('/' + docPath, doc);
-
-        // Commit both files and push
-        await GitEngine.commitEntry(dir, [docPath, encPath], 'Add photo');
-        await GitEngine.push(dir, repoId, { type: 'jwt', token: jwt });
-
-        // Refresh the entry list
-        await openBinder({ id: repoId, name: repoId });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Unknown error';
-        Alert.alert('Photo Failed', msg);
-      }
-    },
-    [jwt, cryptoReady, capture, createEncryptedIO, openBinder],
-  );
-
-  // --- Create a new binder ---
+  // --- Create binder (hardcoded for Week 1 testing) ---
 
   const createBinder = useCallback(async () => {
-    if (!jwt || !cryptoReady) return;
+    if (!jwt || !masterConversationKey) return;
 
     const binderId = `binder-${Date.now()}`;
     const dir = repoDir(binderId);
@@ -220,33 +190,44 @@ export default function BinderListScreen() {
     try {
       setScreenState({ phase: 'cloning', repoId: binderId });
 
-      // Init local git repo
-      await GitEngine.initBinder(dir);
+      await BinderService.create(
+        dir,
+        binderId,
+        authConfig(),
+        masterConversationKey,
+        'My Medical Binder',
+      );
 
-      // Write encrypted patient-info.json
-      const io = createEncryptedIO(dir);
-      const patientInfo: MedicalDocument = {
-        value: '# My Medical Binder\n\nCreated on ' + new Date().toISOString(),
-        metadata: {
-          type: 'patient-info',
-          created: new Date().toISOString(),
-        },
-        children: [],
-      };
-      await io.writeDocument('/patient-info.json', patientInfo);
-
-      // Commit and push
-      await GitEngine.commitEntry(dir, ['patient-info.json'], 'Initialize binder');
-      await GitEngine.push(dir, binderId, { type: 'jwt', token: jwt });
-
-      // Refresh list
       await fetchRepos();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       Alert.alert('Create Failed', msg);
       fetchRepos();
     }
-  }, [jwt, cryptoReady, createEncryptedIO, fetchRepos]);
+  }, [jwt, masterConversationKey, fetchRepos]);
+
+  // --- Take photo and add to binder ---
+
+  const addPhoto = useCallback(
+    async (repoId: string) => {
+      const service = binderRef.current;
+      if (!service) return;
+
+      try {
+        const result = await capture();
+        if (!result) return;
+
+        await service.addPhoto('back-acne', result.binaryData, result.sizeBytes);
+
+        // Refresh entry list
+        await openBinder({ id: repoId, name: repoId });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        Alert.alert('Photo Failed', msg);
+      }
+    },
+    [capture, openBinder],
+  );
 
   // --- Render ---
 
@@ -280,33 +261,29 @@ export default function BinderListScreen() {
 
     case 'repos-loaded':
       return (
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.scrollContent}
-        >
-          <Text style={styles.title}>Medical Binders</Text>
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.headerRow}>
+            <Text style={styles.screenTitle}>Binders</Text>
+            <ProfileAvatar />
+          </View>
 
           {screenState.repos.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>
-                No binders yet.
-              </Text>
+              <Text style={styles.emptyText}>No binders yet.</Text>
               <Pressable style={styles.createButton} onPress={createBinder}>
-                <Text style={styles.createButtonText}>Create Medical Binder</Text>
+                <Text style={styles.createButtonText}>Create Binder</Text>
               </Pressable>
             </View>
           ) : (
             screenState.repos.map((repo) => (
-              <Pressable
-                key={repo.id}
-                style={styles.repoCard}
-                onPress={() => openBinder(repo)}
-              >
+              <Pressable key={repo.id} style={styles.repoCard} onPress={() => openBinder(repo)}>
                 <Text style={styles.repoName}>{repo.name}</Text>
                 <Text style={styles.repoId}>{repo.id}</Text>
               </Pressable>
             ))
           )}
+          {/* Header row */}
+          
         </ScrollView>
       );
 
@@ -314,9 +291,7 @@ export default function BinderListScreen() {
       return (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#111" />
-          <Text style={styles.loadingText}>
-            Cloning {screenState.repoId}...
-          </Text>
+          <Text style={styles.loadingText}>Cloning {screenState.repoId}...</Text>
         </View>
       );
 
@@ -330,18 +305,14 @@ export default function BinderListScreen() {
 
     case 'displaying':
       return (
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.scrollContent}
-        >
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           <Pressable onPress={goBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Binders</Text>
           </Pressable>
 
           <Text style={styles.title}>{screenState.repoId}</Text>
           <Text style={styles.subtitle}>
-            {screenState.entries.length} record
-            {screenState.entries.length !== 1 ? 's' : ''}
+            {screenState.entries.length} record{screenState.entries.length !== 1 ? 's' : ''}
           </Text>
 
           <Pressable
@@ -350,7 +321,35 @@ export default function BinderListScreen() {
           >
             <Text style={styles.addPhotoButtonText}>Take Photo</Text>
           </Pressable>
+          <Pressable
+            style={styles.shareButton}
+            onPress={startShare}
+          >
+            <Text style={styles.shareButtonText}>Share with Doctor</Text>
+          </Pressable>
 
+          {shareState.phase !== 'idle' && shareState.phase !== 'error' && (
+            <View style={styles.shareOverlay}>
+              {shareState.phase === 'showing-qr' && shareState.qrPayload ? (
+                <QRDisplay payload={shareState.qrPayload} onCancel={cancelShare} />
+              ) : (
+                <View style={styles.centered}>
+                  <ActivityIndicator size="large" color="#111" />
+                  <Text style={styles.loadingText}>
+                    {shareState.phase === 're-encrypting'
+                      ? `Re-encrypting${shareState.progress ? ` (${shareState.progress.filesProcessed}/${shareState.progress.totalFiles})` : '...'}`
+                      : shareState.phase === 'pushing-staging'
+                        ? 'Uploading staging repo...'
+                        : 'Creating session...'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {shareState.phase === 'error' && (
+            <Text style={styles.errorText}>{shareState.error}</Text>
+          )}
           {screenState.entries.map((entry) => (
             <View key={entry.path} style={styles.entryCard}>
               <View style={styles.entryHeader}>
@@ -375,143 +374,85 @@ export default function BinderListScreen() {
 // --- Styles ---
 
 const styles = StyleSheet.create({
-  addPhotoButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 24,
+addPhotoButton: {
+    backgroundColor: '#007AFF', borderRadius: 12,
+    paddingVertical: 14, alignItems: 'center', marginBottom: 24,
   },
-  addPhotoButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  backButton: {
-    marginBottom: 16,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
+  addPhotoButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  backButton: { marginBottom: 16 },
+  backButtonText: { fontSize: 16, color: '#007AFF' },
   centered: {
-    flex: 1,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    flex: 1, backgroundColor: '#fff',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24,
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
   createButton: {
-    backgroundColor: '#111',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    marginTop: 20,
+    backgroundColor: '#111', borderRadius: 12,
+    paddingVertical: 14, paddingHorizontal: 32, marginTop: 20,
   },
-  createButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
+  createButtonText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  emptyContainer: { alignItems: 'center', marginTop: 48 },
+  emptyText: { fontSize: 16, color: '#999', textAlign: 'center' },
+  entryCard: {
+    backgroundColor: '#f9f9f9', borderRadius: 12,
+    padding: 16, marginBottom: 12,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 48,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    marginTop: 32,
-    textAlign: 'center',
-  },
-    entryCard: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  entryDate: {
-    fontSize: 13,
-    color: '#999',
-  },
+  entryDate: { fontSize: 13, color: '#999' },
   entryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
+    flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6,
   },
   entryPath: {
-    fontSize: 12,
-    fontFamily: 'Courier',
-    color: '#bbb',
-    marginBottom: 8,
+    fontSize: 12, fontFamily: 'Courier', color: '#bbb', marginBottom: 8,
   },
   entryType: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#555',
-    textTransform: 'uppercase',
+    fontSize: 13, fontWeight: '600', color: '#555', textTransform: 'uppercase',
   },
-  entryValue: {
-    fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
+  entryValue: { fontSize: 15, color: '#333', lineHeight: 22 },
+  errorText: { fontSize: 15, color: '#c00', textAlign: 'center', marginBottom: 16 },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingBottom: 12,
+    paddingHorizontal: 0,
   },
-  errorText: {
-    fontSize: 15,
-    color: '#c00',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  loadingText: {
-    fontSize: 15,
-    color: '#666',
-    marginTop: 12,
-  },
-  retryButton: {
-    backgroundColor: '#111',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  loadingText: { fontSize: 15, color: '#666', marginTop: 12 },
   repoCard: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: '#f5f5f5', borderRadius: 12,
+    padding: 16, marginBottom: 12,
   },
-  repoName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#111',
-    marginBottom: 4,
+  repoId: { fontSize: 13, fontFamily: 'Courier', color: '#999' },
+  repoName: { fontSize: 17, fontWeight: '600', color: '#111', marginBottom: 4 },
+  retryButton: {
+    backgroundColor: '#111', borderRadius: 10,
+    paddingVertical: 12, paddingHorizontal: 32,
   },
-  repoId: {
-    fontSize: 13,
-    fontFamily: 'Courier',
-    color: '#999',
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 80,
-    paddingBottom: 48,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#666',
-    marginBottom: 24,
-  },
-  title: {
+  retryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  screenTitle: {
     fontSize: 28,
     fontWeight: '700',
     color: '#111',
-    marginBottom: 8,
   },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 48 },
+  shareButton: {
+    backgroundColor: '#34C759',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  shareOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#fff',
+    zIndex: 10,
+  },
+  subtitle: { fontSize: 15, color: '#666', marginBottom: 16 },
+  title: { fontSize: 28, fontWeight: '700', color: '#111', marginBottom: 8 },
 });

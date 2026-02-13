@@ -6,6 +6,7 @@ import { schnorr } from '@noble/curves/secp256k1';
 import { sha256 } from '@noble/hashes/sha2';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { KeyManager } from './KeyManager';
+import type { NostrMetadata } from '../../types/auth';
 
 // --- NIP-01 Event ---
 
@@ -63,6 +64,7 @@ export function signChallenge(
 export interface AuthResult {
   jwt: string;
   pubkey: string;
+  metadata: NostrMetadata | null;
 }
 
 /**
@@ -110,10 +112,11 @@ export async function authenticateNostr(
     );
   }
 
-  const { token } = await verifyRes.json();
+  const { token, metadata } = await verifyRes.json();
+
   if (!token || typeof token !== 'string') {
     throw new Error('Invalid verify response: missing token');
   }
 
-  return { jwt: token, pubkey: signedEvent.pubkey };
+  return { jwt: token, pubkey: signedEvent.pubkey, metadata: metadata ?? null };
 }

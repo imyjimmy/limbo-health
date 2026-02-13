@@ -45,6 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     status: 'loading',
     jwt: null,
     pubkey: null,
+    metadata: null,
   });
 
   const keyManager = useMemo(
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const hasKey = await keyManager.hasStoredKey();
         if (!hasKey) {
-          setState({ status: 'onboarding', jwt: null, pubkey: null });
+          setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
           return;
         }
 
@@ -67,20 +68,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedJwt = await SecureStore.getItemAsync(JWT_STORAGE_KEY);
         if (storedJwt && !isJwtExpired(storedJwt)) {
           const pubkey = await keyManager.getMasterPubkey();
-          setState({ status: 'authenticated', jwt: storedJwt, pubkey });
+          const cachedMeta = await SecureStore.getItemAsync('limbo_metadata');
+          const metadata = cachedMeta ? JSON.parse(cachedMeta) : null;
+          setState({ status: 'authenticated', jwt: storedJwt, pubkey, metadata });
           return;
         }
 
         // JWT missing or expired — silent re-auth
         const privkey = await keyManager.getMasterPrivkey();
         if (!privkey) {
-          setState({ status: 'onboarding', jwt: null, pubkey: null });
+          setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
           return;
         }
 
-        const { jwt, pubkey } = await authenticateNostr(privkey, API_BASE_URL);
+        const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
         await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
-        setState({ status: 'authenticated', jwt, pubkey });
+        if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
+        setState({ status: 'authenticated', jwt, pubkey, metadata });
       } catch (err) {
         console.error('Auth startup failed:', err);
         // If re-auth fails (network etc.), mark as expired so UI can retry
@@ -89,6 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           status: hasKey ? 'expired' : 'onboarding',
           jwt: null,
           pubkey: null,
+          metadata: null
         });
       }
     })();
@@ -99,9 +104,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (privkey: Uint8Array) => {
       await keyManager.storeMasterPrivkey(privkey);
-      const { jwt, pubkey } = await authenticateNostr(privkey, API_BASE_URL);
+      const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
       await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
-      setState({ status: 'authenticated', jwt, pubkey });
+      if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
+      setState({ status: 'authenticated', jwt, pubkey, metadata });
     },
     [keyManager],
   );
@@ -111,7 +117,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await keyManager.deleteMasterPrivkey();
     await SecureStore.deleteItemAsync(JWT_STORAGE_KEY);
-    setState({ status: 'onboarding', jwt: null, pubkey: null });
+    await SecureStore.deleteItemAsync('limbo_metadata');
+    setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
   }, [keyManager]);
 
   // --- Refresh: re-authenticate with stored key ---
@@ -119,12 +126,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshAuth = useCallback(async () => {
     const privkey = await keyManager.getMasterPrivkey();
     if (!privkey) {
-      setState({ status: 'onboarding', jwt: null, pubkey: null });
+      setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
       return;
     }
-    const { jwt, pubkey } = await authenticateNostr(privkey, API_BASE_URL);
+    const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
     await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
-    setState({ status: 'authenticated', jwt, pubkey });
+    if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
+    setState({ status: 'authenticated', jwt, pubkey, metadata });
   }, [keyManager]);
 
   // --- Render ---

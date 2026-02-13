@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "hermes-spike",
-    "slug": "hermes-spike",
+    "name": "Limbo Health",
+    "slug": "limbo-health",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,7 +16,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.hermesspike"
+      "bundleIdentifier": "com.limbohealth.mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -25,7 +25,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.hermesspike"
+      "package": "com.limbohealth.mobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"

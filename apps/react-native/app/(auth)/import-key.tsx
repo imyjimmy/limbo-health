@@ -3,13 +3,17 @@
 
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
-  Alert,
-  ActivityIndicator,
+  Text,
+  TextInput,
+  TouchableWithoutFeedback,
+  View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { hexToBytes } from '@noble/hashes/utils.js';
@@ -75,42 +79,50 @@ export default function ImportKeyScreen() {
   // }
 
   return (
-    <View style={styles.container}>
-      <View>
-        <Text style={styles.title}>Import Your Key</Text>
-        <Text style={styles.description}>
-          Paste your Nostr secret key (hex format) to restore access to your
-          encrypted medical records.
-        </Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        
+        <View style={styles.container}>
+          <View>
+            <Text style={styles.title}>Import Your Key</Text>
+            <Text style={styles.description}>
+              Paste your Nostr secret key (hex format) to restore access to your
+              encrypted medical records.
+            </Text>
 
-        <TextInput
-          style={styles.input}
-          value={keyInput}
-          onChangeText={setKeyInput}
-          placeholder="Enter 64-character hex private key"
-          placeholderTextColor="#aaa"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="off"
-          secureTextEntry
-        />
-      </View>
+            <TextInput
+              style={styles.input}
+              value={keyInput}
+              onChangeText={setKeyInput}
+              placeholder="nsec1..."
+              placeholderTextColor="#aaa"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              secureTextEntry
+            />
+          </View>
 
-      <Pressable
-        style={[
-          styles.importButton,
-          (loading || !keyInput.trim()) && styles.importButtonDisabled,
-        ]}
-        onPress={handleImport}
-        disabled={loading || !keyInput.trim()}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.importButtonText}>Import & Authenticate</Text>
-        )}
-      </Pressable>
-    </View>
+          <Pressable
+            style={[
+              styles.importButton,
+              (loading || !keyInput.trim()) && styles.importButtonDisabled,
+            ]}
+            onPress={handleImport}
+            disabled={loading || !keyInput.trim()}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.importButtonText}>Import & Authenticate</Text>
+            )}
+          </Pressable>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
