@@ -93,7 +93,6 @@ export default function ImportKeyScreen() {
           autoCorrect={false}
           autoComplete="off"
           secureTextEntry
-          multiline
         />
       </View>
 
