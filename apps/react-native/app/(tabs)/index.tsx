@@ -17,6 +17,8 @@ import { useCryptoContext } from '../../providers/CryptoProvider';
 import { GitEngine } from '../../core/git/GitEngine';
 import { API_BASE_URL } from '../../constants/api';
 import type { MedicalDocument } from '../../types/document';
+import { useCamera } from '../../hooks/useCamera';
+import { generateDocPath, sidecarPathFrom, conditionFolder } from '../../core/binder/FileNaming';
 
 // --- Types ---
 
@@ -56,6 +58,7 @@ async function isAlreadyCloned(repoId: string): Promise<boolean> {
 export default function BinderListScreen() {
   const { state: authState } = useAuthContext();
   const { ready: cryptoReady, createEncryptedIO } = useCryptoContext();
+  const { capture } = useCamera();
 
   const [screenState, setScreenState] = useState<ScreenState>({
     phase: 'loading-repos',
@@ -155,6 +158,56 @@ export default function BinderListScreen() {
   const goBack = useCallback(() => {
     fetchRepos();
   }, [fetchRepos]);
+
+  // --- Capture photo and add to current binder ---
+  const addPhoto = useCallback(
+    async (repoId: string) => {
+      if (!jwt || !cryptoReady) return;
+
+      try {
+        const result = await capture();
+        if (!result) return; // user cancelled
+
+        const dir = repoDir(repoId);
+        const condition = conditionFolder('back-acne');
+
+        // Generate collision-safe paths
+        const docPath = await generateDocPath(dir, condition, 'photo');
+        const encPath = sidecarPathFrom(docPath);
+
+        const io = createEncryptedIO(dir);
+
+        // Write encrypted sidecar (.enc) — the actual JPEG bytes
+        await io.writeSidecar('/' + encPath, result.binaryData);
+
+        // Write metadata document (.json) — points to the sidecar
+        const doc: MedicalDocument = {
+          value: encPath.split('/').pop()!, // just the filename: '2026-02-13-photo.enc'
+          metadata: {
+            type: 'attachment_ref',
+            created: new Date().toISOString(),
+            format: 'jpeg',
+            encoding: 'base64',
+            originalSizeBytes: result.sizeBytes,
+            condition: 'back-acne',
+          },
+          children: [],
+        };
+        await io.writeDocument('/' + docPath, doc);
+
+        // Commit both files and push
+        await GitEngine.commitEntry(dir, [docPath, encPath], 'Add photo');
+        await GitEngine.push(dir, repoId, { type: 'jwt', token: jwt });
+
+        // Refresh the entry list
+        await openBinder({ id: repoId, name: repoId });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        Alert.alert('Photo Failed', msg);
+      }
+    },
+    [jwt, cryptoReady, capture, createEncryptedIO, openBinder],
+  );
 
   // --- Create a new binder ---
 
@@ -291,6 +344,13 @@ export default function BinderListScreen() {
             {screenState.entries.length !== 1 ? 's' : ''}
           </Text>
 
+          <Pressable
+            style={styles.addPhotoButton}
+            onPress={() => addPhoto(screenState.repoId)}
+          >
+            <Text style={styles.addPhotoButtonText}>Take Photo</Text>
+          </Pressable>
+
           {screenState.entries.map((entry) => (
             <View key={entry.path} style={styles.entryCard}>
               <View style={styles.entryHeader}>
@@ -315,14 +375,24 @@ export default function BinderListScreen() {
 // --- Styles ---
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
+  addPhotoButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 80,
-    paddingBottom: 48,
+  addPhotoButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  backButton: {
+    marginBottom: 16,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
   },
   centered: {
     flex: 1,
@@ -331,9 +401,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    marginTop: 48,
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
   },
   createButton: {
     backgroundColor: '#111',
@@ -347,21 +417,47 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111',
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 48,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 32,
+    textAlign: 'center',
+  },
+    entryCard: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  entryDate: {
+    fontSize: 13,
+    color: '#999',
+  },
+  entryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  entryPath: {
+    fontSize: 12,
+    fontFamily: 'Courier',
+    color: '#bbb',
     marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 15,
-    color: '#666',
-    marginBottom: 24,
+  entryType: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#555',
+    textTransform: 'uppercase',
   },
-  loadingText: {
+  entryValue: {
     fontSize: 15,
-    color: '#666',
-    marginTop: 12,
+    color: '#333',
+    lineHeight: 22,
   },
   errorText: {
     fontSize: 15,
@@ -369,11 +465,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    marginTop: 32,
-    textAlign: 'center',
+  loadingText: {
+    fontSize: 15,
+    color: '#666',
+    marginTop: 12,
   },
   retryButton: {
     backgroundColor: '#111',
@@ -403,43 +498,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Courier',
     color: '#999',
   },
-  backButton: {
-    marginBottom: 16,
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 48,
   },
-  backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  entryCard: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  entryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  entryType: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#555',
-    textTransform: 'uppercase',
-  },
-  entryDate: {
-    fontSize: 13,
-    color: '#999',
-  },
-  entryPath: {
-    fontSize: 12,
-    fontFamily: 'Courier',
-    color: '#bbb',
-    marginBottom: 8,
-  },
-  entryValue: {
+  subtitle: {
     fontSize: 15,
-    color: '#333',
-    lineHeight: 22,
+    color: '#666',
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111',
+    marginBottom: 8,
   },
 });
