@@ -4,23 +4,61 @@ const authApiClient = require('./authApiClient');
 
 const REPOS_PATH = process.env.REPOS_PATH || '/repos';
 const CLEANUP_INTERVAL = parseInt(process.env.STAGING_CLEANUP_INTERVAL_MS || '900000'); // 15 minutes
+const STAGING_MAX_AGE_MS = 60 * 2 * 1000; // 2 minutes
 
 function startCleanupJob() {
   console.log(`🧹 Staging cleanup job started (interval: ${CLEANUP_INTERVAL / 1000}s)`);
 
   setInterval(async () => {
     try {
-      const result = await authApiClient.cleanupStagingRepos();
-      const allRepos = [...new Set([...result.expiredRepos, ...result.revokedRepos])];
+      // --- Phase 1: Session-based cleanup (expired/revoked in MySQL) ---
+      const sessionRepos = new Set();
+      try {
+        const result = await authApiClient.cleanupStagingRepos();
+        for (const id of [...result.expiredRepos, ...result.revokedRepos]) {
+          sessionRepos.add(id);
+        }
+      } catch (err) {
+        console.error('🧹 Session cleanup query failed:', err.message);
+        // Continue to filesystem fallback
+      }
+
+      // --- Phase 2: Filesystem fallback (orphaned scan- dirs older than 1 hour) ---
+      const fsRepos = new Set();
+      try {
+        const entries = fs.readdirSync(REPOS_PATH, { withFileTypes: true });
+        const now = Date.now();
+
+        for (const entry of entries) {
+          if (!entry.isDirectory() || !entry.name.startsWith('scan-')) continue;
+
+          const repoPath = path.join(REPOS_PATH, entry.name);
+          const stat = fs.statSync(repoPath);
+          const age = now - stat.birthtimeMs;
+
+          if (age > STAGING_MAX_AGE_MS) {
+            fsRepos.add(entry.name);
+          }
+        }
+      } catch (err) {
+        console.error('🧹 Filesystem scan failed:', err.message);
+      }
+
+      // Merge both sources
+      const allRepos = [...new Set([...sessionRepos, ...fsRepos])];
 
       if (allRepos.length === 0) {
+        console.log('🧹 Cleanup ran — nothing to clean');
         return;
       }
 
-      console.log(`🧹 Cleaning up ${allRepos.length} staging repos:`, allRepos);
+      const sessionOnly = [...sessionRepos].filter(id => !fsRepos.has(id));
+      const fsOnly = [...fsRepos].filter(id => !sessionRepos.has(id));
+      const both = [...sessionRepos].filter(id => fsRepos.has(id));
+
+      console.log(`🧹 Cleaning up ${allRepos.length} staging repos (session: ${sessionOnly.length}, orphaned: ${fsOnly.length}, both: ${both.length})`);
 
       for (const repoId of allRepos) {
-        // Safety check: only delete repos with scan- prefix
         if (!repoId.startsWith('scan-')) {
           console.error(`⚠️  Skipping cleanup of ${repoId} — missing scan- prefix`);
           continue;
@@ -43,7 +81,6 @@ function startCleanupJob() {
       console.log(`🧹 Cleanup complete: ${allRepos.length} staging repos removed`);
     } catch (err) {
       console.error('🧹 Staging cleanup error:', err.message);
-      // Don't crash — cleanup is best-effort
     }
   }, CLEANUP_INTERVAL);
 }
