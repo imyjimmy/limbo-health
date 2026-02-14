@@ -85,7 +85,11 @@ export function QRScanner({ onScan, onError }: QRScannerProps) {
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
+        try {
+          scannerRef.current.stop().catch(() => {});
+        } catch {
+          // already stopped
+        }
         scannerRef.current = null;
       }
     };
