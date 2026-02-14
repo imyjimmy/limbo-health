@@ -39,7 +39,8 @@ function requireInternalAuth(req, res, next) {
 router.post('/api/auth/scan/session', requireJWT, async (req, res) => {
   try {
     const { stagingRepoId } = req.body;
-
+    console.log('/api/auth/scan/session: ', req.body);
+    
     if (!stagingRepoId) {
       return res.status(400).json({ error: 'stagingRepoId is required' });
     }

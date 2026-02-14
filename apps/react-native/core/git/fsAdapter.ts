@@ -1,39 +1,51 @@
+// core/git/fsAdapter.ts
+// Bridges react-native-fs to isomorphic-git's expected fs interface.
+// Each binder gets its own adapter instance rooted at its repo directory.
+//
+// Core layer exception: this file imports react-native-fs directly
+// because it IS the platform bridge. No other core/ file should import RNFS.
+
 import RNFS from 'react-native-fs';
+import { encode as b64encode, decode as b64decode } from '../crypto/base64';
 
-const basePath = RNFS.DocumentDirectoryPath;
+const BASE_PATH = RNFS.DocumentDirectoryPath;
 
-const resolvePath = (filepath: string) => {
-  // isomorphic-git passes paths like '/visits/file.json'
-  // We need to prepend the RN document directory
-  if (filepath.startsWith('/')) {
-    return `${basePath}${filepath}`;
-  }
-  return `${basePath}/${filepath}`;
-};
-
+/**
+ * Create an fs adapter rooted at a specific binder directory.
+ * All paths isomorphic-git passes are resolved relative to this root.
+ *
+ * @param repoDir - Binder directory name (e.g., 'binders/my-binder-id')
+ */
 export const createFSAdapter = (repoDir: string) => {
-  const resolve = (filepath: string) => {
+  const resolve = (filepath: string): string => {
     if (filepath.startsWith('/')) {
-      return `${basePath}/${repoDir}${filepath}`;
+      return `${BASE_PATH}/${repoDir}${filepath}`;
     }
-    return `${basePath}/${repoDir}/${filepath}`;
+    return `${BASE_PATH}/${repoDir}/${filepath}`;
   };
 
   return {
     promises: {
-      readFile: async (path: string, options?: { encoding?: string }) => {
+      readFile: async (
+        path: string,
+        options?: { encoding?: string },
+      ): Promise<string | Uint8Array> => {
         const fullPath = resolve(path);
         if (options?.encoding === 'utf8') {
           return await RNFS.readFile(fullPath, 'utf8');
         }
-        // isomorphic-git often needs binary as Uint8Array
+        // Binary read: RNFS gives us base64, decode to Uint8Array
         const base64 = await RNFS.readFile(fullPath, 'base64');
-        const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-        return binary;
+        return b64decode(base64);
       },
 
-      writeFile: async (path: string, data: string | Uint8Array, options?: { encoding?: string }) => {
+      writeFile: async (
+        path: string,
+        data: string | Uint8Array,
+        options?: { encoding?: string },
+      ): Promise<void> => {
         const fullPath = resolve(path);
+
         // Ensure parent directory exists
         const parentDir = fullPath.substring(0, fullPath.lastIndexOf('/'));
         const parentExists = await RNFS.exists(parentDir);
@@ -45,16 +57,15 @@ export const createFSAdapter = (repoDir: string) => {
           await RNFS.writeFile(fullPath, data, 'utf8');
         } else {
           // Uint8Array → base64 → write
-          let binary = '';
-          for (let i = 0; i < data.length; i++) {
-            binary += String.fromCharCode(data[i]);
-          }
-          const base64 = btoa(binary);
+          const base64 = b64encode(data);
           await RNFS.writeFile(fullPath, base64, 'base64');
         }
       },
 
-      mkdir: async (path: string, options?: { recursive?: boolean }) => {
+      mkdir: async (
+        path: string,
+        _options?: { recursive?: boolean },
+      ): Promise<void> => {
         const fullPath = resolve(path);
         const exists = await RNFS.exists(fullPath);
         if (!exists) {
@@ -62,10 +73,10 @@ export const createFSAdapter = (repoDir: string) => {
         }
       },
 
-      readdir: async (path: string) => {
+      readdir: async (path: string): Promise<string[]> => {
         const fullPath = resolve(path);
         const items = await RNFS.readDir(fullPath);
-        return items.map(item => item.name);
+        return items.map((item) => item.name);
       },
 
       stat: async (path: string) => {
@@ -88,7 +99,6 @@ export const createFSAdapter = (repoDir: string) => {
       },
 
       lstat: async (path: string) => {
-        // Same as stat for our purposes (no symlink support)
         const fullPath = resolve(path);
         const result = await RNFS.stat(fullPath);
         return {
@@ -107,22 +117,21 @@ export const createFSAdapter = (repoDir: string) => {
         };
       },
 
-      unlink: async (path: string) => {
+      unlink: async (path: string): Promise<void> => {
         const fullPath = resolve(path);
         await RNFS.unlink(fullPath);
       },
 
-      rmdir: async (path: string) => {
+      rmdir: async (path: string): Promise<void> => {
         const fullPath = resolve(path);
         await RNFS.unlink(fullPath);
       },
 
-      symlink: async (_target: string, _path: string) => {
-        // No-op, isomorphic-git doesn't need this for basic operations
+      symlink: async (_target: string, _path: string): Promise<void> => {
         throw new Error('symlink not supported');
       },
 
-      readlink: async (_path: string) => {
+      readlink: async (_path: string): Promise<string> => {
         throw new Error('readlink not supported');
       },
     },
