@@ -233,7 +233,8 @@ export function ScanPage() {
   // --- Render ---
 
   const payload = payloadRef.current;
-
+  console.log('Render — phase:', state.phase, 'payloadRef:', payloadRef.current);
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="p-6">
