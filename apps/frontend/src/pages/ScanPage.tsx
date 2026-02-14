@@ -91,12 +91,14 @@ export function ScanPage() {
 
       setState({ phase: 'loading', message: 'Decrypting records...' });
 
-      // List all files in the repo
+      console.log('Clone complete, listing files...');
       const files = await git.listFiles({ fs, dir, ref: 'HEAD' });
+      console.log('Files found:', files);
 
-      // Separate .json metadata files and .enc sidecar files
       const jsonFiles = files.filter((f: string) => f.endsWith('.json'));
       const encFiles = new Set(files.filter((f: string) => f.endsWith('.enc')));
+      console.log('JSON files:', jsonFiles);
+      console.log('ENC files:', [...encFiles]);
 
       const entries: TimelineEntry[] = [];
 
@@ -140,7 +142,7 @@ export function ScanPage() {
           console.error(`Failed to decrypt ${jsonPath}:`, err);
         }
       }
-
+      console.log('Entries to render:', entries.length, entries.map(e => e.path));
       setState({ phase: 'viewing', entries });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
