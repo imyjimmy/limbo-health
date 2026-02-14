@@ -10,6 +10,7 @@ import { EditProfile } from '@/pages/EditProfile';
 import { PublicProfile } from '@/pages/PublicProfile';
 import { BookAppointment } from '@/pages/BookAppointment';
 import { GoogleCallbackPage } from '@/pages/GoogleCallbackPage';
+import { ScanPage } from '@/pages/ScanPage';
 
 
 function AppRoutes() {
@@ -44,6 +45,7 @@ function AppRoutes() {
         />
         <Route path="/meeting/:roomId" element={<MeetingPage token={token || ''}/>} />
         {/* Public profile route - must be last to avoid matching other routes */}
+        <Route path="/scan" element={<ScanPage />} />
         <Route 
           path='/:username'
           element={<PublicProfile />}
