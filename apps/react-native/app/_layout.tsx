@@ -4,7 +4,7 @@
 import '../polyfills/setup';
 
 import React from 'react';
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import { AuthProvider } from '../providers/AuthProvider';
 import { CryptoProvider } from '../providers/CryptoProvider';
 
@@ -12,7 +12,18 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <CryptoProvider>
-        <Slot />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="profile" />
+          <Stack.Screen
+            name="camera"
+            options={{
+              presentation: 'fullScreenModal',
+              animation: 'slide_from_bottom',
+            }}
+          />
+        </Stack>
       </CryptoProvider>
     </AuthProvider>
   );

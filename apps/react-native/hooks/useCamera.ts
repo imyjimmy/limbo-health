@@ -1,11 +1,13 @@
 // hooks/useCamera.ts
-// Launch camera, compress JPEG, return binary data ready for EncryptedIO.writeSidecar.
+// Navigates to the custom camera screen, returns compressed photo data.
+// The camera screen resolves the shared promise via cameraResult bridge.
 
 import { useCallback } from 'react';
-import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import RNFS from 'react-native-fs';
 import { decode as b64decode } from '../core/crypto/base64';
+import { createPending } from '../core/camera/cameraResult';
 
 export interface CaptureResult {
   binaryData: Uint8Array;
@@ -18,33 +20,24 @@ const MAX_WIDTH = 1920;
 const JPEG_QUALITY = 0.7;
 
 export function useCamera() {
+  const router = useRouter();
+
   const capture = useCallback(async (): Promise<CaptureResult | null> => {
-    // Request permission
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      throw new Error('Camera permission denied');
-    }
+    // Create a pending promise, navigate to camera screen
+    const pendingResult = createPending();
+    router.push('/camera');
 
-    // Launch camera
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 1, // full quality — we compress below
-    });
-
-    if (result.canceled || !result.assets?.[0]) {
-      return null; // user cancelled
-    }
-
-    const asset = result.assets[0];
+    // Wait for camera screen to resolve
+    const raw = await pendingResult;
+    if (!raw) return null; // user cancelled
 
     // Compress: resize if wider than MAX_WIDTH, JPEG compression
     const actions: any[] = [];
-    if (asset.width > MAX_WIDTH) {
+    if (raw.width > MAX_WIDTH) {
       actions.push({ resize: { width: MAX_WIDTH } });
     }
 
-    const compressed = await manipulateAsync(asset.uri, actions, {
+    const compressed = await manipulateAsync(raw.uri, actions, {
       compress: JPEG_QUALITY,
       format: SaveFormat.JPEG,
     });
@@ -64,7 +57,7 @@ export function useCamera() {
       width: compressed.width,
       height: compressed.height,
     };
-  }, []);
+  }, [router]);
 
   return { capture };
 }
