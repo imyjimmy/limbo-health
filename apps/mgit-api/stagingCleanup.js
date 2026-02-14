@@ -4,7 +4,7 @@ const authApiClient = require('./authApiClient');
 
 const REPOS_PATH = process.env.REPOS_PATH || '/repos';
 const CLEANUP_INTERVAL = parseInt(process.env.STAGING_CLEANUP_INTERVAL_MS || '900000'); // 15 minutes
-const STAGING_MAX_AGE_MS = 60 * 2 * 1000; // 2 minutes
+const STAGING_MAX_AGE_MS = 60 * 20 * 1000; // 20 minutes
 
 function startCleanupJob() {
   console.log(`🧹 Staging cleanup job started (interval: ${CLEANUP_INTERVAL / 1000}s)`);
