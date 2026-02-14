@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
@@ -16,7 +17,13 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@noble/curves/secp256k1": ["./node_modules/@noble/curves/secp256k1.js"],
+      "@noble/hashes/hkdf": ["./node_modules/@noble/hashes/hkdf.js"],
+      "@noble/hashes/sha2": ["./node_modules/@noble/hashes/sha2.js"],
+      "@noble/hashes/hmac": ["./node_modules/@noble/hashes/hmac.js"],
+      "@noble/hashes/utils": ["./node_modules/@noble/hashes/utils.js"],
+      "@noble/ciphers/chacha": ["./node_modules/@noble/ciphers/chacha.js"]
     }
   },
   "include": ["src"]
