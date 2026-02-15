@@ -21,7 +21,6 @@ import { useCamera } from '../../hooks/useCamera';
 import type { MedicalDocument } from '../../types/document';
 import { useShareSession } from '../../hooks/useShareSession';
 import { QRDisplay } from '../../components/QRDisplay';
-import { ProfileAvatar } from '../../components/ProfileAvatar';
 
 // --- Types ---
 
@@ -264,7 +263,6 @@ export default function BinderListScreen() {
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           <View style={styles.headerRow}>
             <Text style={styles.screenTitle}>Binders</Text>
-            <ProfileAvatar />
           </View>
 
           {screenState.repos.length === 0 ? (
