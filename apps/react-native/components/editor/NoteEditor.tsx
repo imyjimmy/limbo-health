@@ -59,6 +59,13 @@ export function NoteEditor({
   });
 
   const [attachments, setAttachments] = useState<PendingSidecar[]>([]);
+
+  // Existing attachment children from the document, mutable so user can remove
+  const [existingAttachments, setExistingAttachments] = useState(() =>
+    (initialDoc?.children ?? []).filter(
+      (c) => c.metadata.type === 'attachment_ref' || c.metadata.type === 'attachment',
+    ),
+  );
   const [saving, setSaving] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   // When editing, hide the editor until existing content is loaded to avoid "Write something..." flash
@@ -121,6 +128,10 @@ export function NoteEditor({
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
+  const handleRemoveExisting = useCallback((index: number) => {
+    setExistingAttachments((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   const handleSave = async () => {
     if (!title.trim()) {
       Alert.alert('Title Required', 'Please enter a title for this note.');
@@ -148,7 +159,11 @@ export function NoteEditor({
           updated: new Date().toISOString(),
           tags: initialDoc?.metadata.tags ?? [],
         },
-        children: [...existingNonAttachmentChildren, ...newAttachmentChildren],
+        children: [
+          ...existingNonAttachmentChildren,
+          ...existingAttachments,
+          ...newAttachmentChildren,
+        ],
       };
 
       await onSave(doc, attachments);
@@ -215,8 +230,10 @@ export function NoteEditor({
       {!keyboardVisible && (
         <AttachmentList
           attachments={attachments}
+          existingAttachments={existingAttachments}
           onAdd={handleAddAttachment}
           onRemove={handleRemoveAttachment}
+          onRemoveExisting={handleRemoveExisting}
           onCapturePhoto={handleCapturePhoto}
         />
       )}
@@ -229,6 +246,7 @@ export function NoteEditor({
         {keyboardVisible && (
           <AttachmentList
             attachments={attachments}
+            existingAttachments={existingAttachments}
             onAdd={handleAddAttachment}
             onRemove={handleRemoveAttachment}
             onCapturePhoto={handleCapturePhoto}

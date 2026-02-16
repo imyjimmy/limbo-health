@@ -45,15 +45,19 @@ export interface PendingSidecar {
 interface AttachmentListProps {
   /** Current list of pending sidecars to be written on save */
   attachments: PendingSidecar[];
+  /** Existing attachment children from the document */
+  existingAttachments?: MedicalDocument[];
   /** Called when user adds a new attachment */
   onAdd: (attachment: PendingSidecar) => void;
   /** Called when user removes an attachment by ID */
   onRemove: (id: string) => void;
+  /** Called when user removes an existing attachment by index */
+  onRemoveExisting?: (index: number) => void;
   /** Capture a photo via camera — provided by parent (hook-based) */
   onCapturePhoto?: () => Promise<PendingSidecar | null>;
 }
 
-export function AttachmentList({ attachments, onAdd, onRemove, onCapturePhoto }: AttachmentListProps) {
+export function AttachmentList({ attachments, existingAttachments = [], onAdd, onRemove, onRemoveExisting, onCapturePhoto }: AttachmentListProps) {
   const handleAddPhoto = async () => {
     if (!onCapturePhoto) return;
     const result = await onCapturePhoto();
@@ -102,17 +106,64 @@ export function AttachmentList({ attachments, onAdd, onRemove, onCapturePhoto }:
     </View>
   );
 
+  const hasAny = existingAttachments.length > 0 || attachments.length > 0;
+
   return (
     <View style={styles.container}>
-      {attachments.length > 0 && (
-        <FlatList
-          data={attachments}
-          keyExtractor={(item) => item.id}
-          renderItem={renderAttachment}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-        />
+      {hasAny && (
+        <View style={styles.listContent}>
+          <FlatList
+            data={[
+              ...existingAttachments.map((child, i) => ({
+                type: 'existing' as const,
+                key: `existing-${i}`,
+                child,
+                index: i,
+              })),
+              ...attachments.map((att) => ({
+                type: 'pending' as const,
+                key: att.id,
+                att,
+              })),
+            ]}
+            keyExtractor={(item) => item.key}
+            renderItem={({ item }) => {
+              if (item.type === 'existing') {
+                const c = item.child;
+                const idx = item.index!;
+                const fmt = c.metadata.format?.toUpperCase() ?? 'FILE';
+                return (
+                  <View style={[styles.attachmentChip, { alignItems: 'flex-start', gap: 2 }]}>
+                    <View style={styles.fileBadge}>
+                      <Text style={styles.fileBadgeText}>{fmt}</Text>
+                    </View>
+                    {onRemoveExisting && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          Alert.alert(
+                            'Remove Attachment',
+                            `Remove ${c.value}?`,
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: 'Remove', style: 'destructive', onPress: () => onRemoveExisting(idx) },
+                            ],
+                          );
+                        }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        style={{ paddingTop: 2 }}
+                      >
+                        <Text style={styles.removeButton}>{ICONS.remove}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              }
+              return renderAttachment({ item: item.att! });
+            }}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          />
+        </View>
       )}
       <View style={styles.addButtons}>
         <TouchableOpacity style={styles.addButton} onPress={handleAddPhoto}>
