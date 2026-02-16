@@ -33,6 +33,9 @@ web-build/
 # vite
 .vite
 
+# local task specs
+tasks/
+
 # misc
 .DS_Store
 .env
