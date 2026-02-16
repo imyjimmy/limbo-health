@@ -21,14 +21,14 @@ import {
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ProfileAvatar } from './ProfileAvatar';
 
-const ICON_SIZE = 26;
+const ICON_SIZE = 24;
 const PLUS_SIZE = 34;
 const INACTIVE_COLOR = 'rgba(255,255,255,0.45)';
 const ACTIVE_COLOR = '#ffffff';
 
 const CREATE_MENU_ITEMS = [
-  { key: 'note', label: 'Add Note', Icon: IconNote },
   { key: 'audio', label: 'Record Audio', Icon: IconMicrophone },
+  { key: 'note', label: 'Add Note', Icon: IconNote },
   { key: 'photo', label: 'Take Photo', Icon: IconCamera },
 ] as const;
 
@@ -139,11 +139,11 @@ export function CustomTabBar({
                 ]}
               >
                 <item.Icon
-                  size={22}
+                  size={24}
                   color={ACTIVE_COLOR}
                   strokeWidth={1.5}
                 />
-                <Text style={styles.menuItemLabel}>{item.label}</Text>
+                {/* <Text style={styles.menuItemLabel}>{item.label}</Text> */}
               </Pressable>
             ))}
           </View>
@@ -169,26 +169,26 @@ function renderTabIcon(
       return isActive ? (
         <IconHomeFilled size={ICON_SIZE} color={color} />
       ) : (
-        <IconHome size={ICON_SIZE} color={color} strokeWidth={1.5} />
+        <IconHome size={ICON_SIZE} color={color} strokeWidth={2} />
       );
 
     case 'page':
       return isActive ? (
         <IconFileFilled size={ICON_SIZE} color={color} />
       ) : (
-        <IconFile size={ICON_SIZE} color={color} strokeWidth={1.5} />
+        <IconFile size={ICON_SIZE} color={color} strokeWidth={2} />
       );
 
     case 'create':
       return (
         <View style={styles.plusButton}>
-          <IconPlus size={PLUS_SIZE} color={ACTIVE_COLOR} strokeWidth={2} />
+          <IconPlus size={PLUS_SIZE} color={ACTIVE_COLOR} strokeWidth={isActive ? 2.5 : 2} />
         </View>
       );
 
     case 'search':
       return (
-        <IconSearch size={ICON_SIZE} color={color} strokeWidth={isActive ? 2.5 : 1.5} />
+        <IconSearch size={ICON_SIZE} color={color} strokeWidth={2} />
       );
 
     case 'profile':
@@ -211,11 +211,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f1923',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255,255,255,0.08)',
-    paddingTop: 10,
-    // borderStyle: 'solid',
-    // borderWidth: 2,
-    // borderColor: 'red',
-    
+    paddingTop: 8,
   },
   tabColumn: {
    flex: 1,
@@ -229,12 +225,14 @@ const styles = StyleSheet.create({
   tabButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 44,
-    minHeight: 44,
-    padding: 8,
-    // flex: 1,
+    minWidth: 32,
+    minHeight: 32,
+    padding: 4,
   },
   plusButton: {
+    borderColor: 'rgba(190, 190, 190, 0.8)',
+    borderWidth: 2,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -243,7 +241,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
     paddingBottom: 100,
-    paddingHorizontal: 20,
+    paddingHorizontal: 80,
   },
   menuContainer: {
     backgroundColor: '#1a2733',
@@ -251,13 +249,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.1)',
+    flexDirection: 'row',
   },
   menuItem: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
-    gap: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    // justifyContent: 'center',
+    // gap: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   menuItemPressed: {
     backgroundColor: 'rgba(255,255,255,0.06)',

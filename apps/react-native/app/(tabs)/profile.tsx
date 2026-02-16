@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProfileAvatar } from '../../components/navigation/ProfileAvatar';
 import { useAuthContext } from '../../providers/AuthProvider';
+import { useRouter } from 'expo-router';
 
 const MENU_ITEMS = [
   { label: 'Account', destructive: false },
@@ -15,6 +16,7 @@ const MENU_ITEMS = [
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { state, logout } = useAuthContext();
+  const router = useRouter();
 
   const displayName = state.metadata?.name ?? 'User';
   const initials = displayName
@@ -45,6 +47,7 @@ export default function ProfileScreen() {
             key={item.label}
             onPress={() => {
               if (item.label === 'Sign Out') logout?.();
+              if (item.label === 'Security & Keys') router.push('/key-management');
             }}
             style={({ pressed }) => [
               styles.menuItem,
