@@ -19,6 +19,7 @@ export interface SecureStoreAdapter {
 // --- Constants ---
 
 const KEYCHAIN_KEY = 'limbo_master_privkey';
+const SENTINEL_KEY = 'limbo_has_key';
 
 // --- KeyManager ---
 
@@ -93,6 +94,8 @@ export class KeyManager {
       // expo-secure-store maps this to kSecAttrAccessibleWhenUnlockedThisDeviceOnly
       keychainAccessible: 6,
     });
+    // Write non-biometric sentinel so hasStoredKey() never triggers Face ID
+    await this.store.setItemAsync(SENTINEL_KEY, 'true');
   }
 
   /**
@@ -100,6 +103,7 @@ export class KeyManager {
    */
   async deleteMasterPrivkey(): Promise<void> {
     await this.store.deleteItemAsync(KEYCHAIN_KEY);
+    await this.store.deleteItemAsync(SENTINEL_KEY);
   }
 
   /**
@@ -107,7 +111,7 @@ export class KeyManager {
    * Uses a non-authenticated read — returns true/false only.
    */
   async hasStoredKey(): Promise<boolean> {
-    const value = await this.store.getItemAsync(KEYCHAIN_KEY);
-    return value !== null;
+    const value = await this.store.getItemAsync(SENTINEL_KEY);
+    return value === 'true';
   }
 }

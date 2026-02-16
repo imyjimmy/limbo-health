@@ -16,6 +16,7 @@ import { KeyManager } from '../core/crypto/KeyManager';
 import { authenticateNostr } from '../core/crypto/nostrAuth';
 import { API_BASE_URL } from '../constants/api';
 import type { AuthState, AuthStatus } from '../types/auth';
+import { decode as base64Decode } from '../core/crypto/base64';
 
 // --- Constants ---
 
@@ -25,6 +26,8 @@ const JWT_STORAGE_KEY = 'limbo_jwt';
 
 interface AuthContextValue {
   state: AuthState;
+  /** Master privkey held in memory after biometric unlock. Never persisted in plaintext. */
+  privkey: Uint8Array | null;
   login: (privkey: Uint8Array) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
@@ -47,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     pubkey: null,
     metadata: null,
   });
+  const [privkeyRef, setPrivkeyRef] = useState<Uint8Array | null>(null);
 
   const keyManager = useMemo(
     () => new KeyManager(SecureStore),
@@ -64,27 +68,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Key exists — check for stored JWT
+        // Key exists — single biometric unlock to get privkey
+        const privkey = await keyManager.getMasterPrivkey();
+        if (!privkey) {
+          setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
+          return;
+        }
+        setPrivkeyRef(privkey);
+        const pubkey = KeyManager.pubkeyFromPrivkey(privkey);
+
+        // Check for stored JWT
         const storedJwt = await SecureStore.getItemAsync(JWT_STORAGE_KEY);
         if (storedJwt && !isJwtExpired(storedJwt)) {
-          const pubkey = await keyManager.getMasterPubkey();
           const cachedMeta = await SecureStore.getItemAsync('limbo_metadata');
           const metadata = cachedMeta ? JSON.parse(cachedMeta) : null;
           setState({ status: 'authenticated', jwt: storedJwt, pubkey, metadata });
           return;
         }
 
-        // JWT missing or expired — silent re-auth
-        const privkey = await keyManager.getMasterPrivkey();
-        if (!privkey) {
-          setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
-          return;
-        }
-
-        const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
-        await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
-        if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
-        setState({ status: 'authenticated', jwt, pubkey, metadata });
+        // JWT missing or expired — silent re-auth (no additional biometric)
+        const auth = await authenticateNostr(privkey, API_BASE_URL);
+        await SecureStore.setItemAsync(JWT_STORAGE_KEY, auth.jwt);
+        if (auth.metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(auth.metadata));
+        setState({ status: 'authenticated', jwt: auth.jwt, pubkey: auth.pubkey, metadata: auth.metadata });
       } catch (err) {
         console.error('Auth startup failed:', err);
         // If re-auth fails (network etc.), mark as expired so UI can retry
@@ -104,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(
     async (privkey: Uint8Array) => {
       await keyManager.storeMasterPrivkey(privkey);
+      setPrivkeyRef(privkey);
       const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
       await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
       if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
@@ -118,28 +125,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await keyManager.deleteMasterPrivkey();
     await SecureStore.deleteItemAsync(JWT_STORAGE_KEY);
     await SecureStore.deleteItemAsync('limbo_metadata');
+    setPrivkeyRef(null);
     setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
   }, [keyManager]);
 
   // --- Refresh: re-authenticate with stored key ---
 
   const refreshAuth = useCallback(async () => {
-    const privkey = await keyManager.getMasterPrivkey();
+    // Prefer in-memory privkey; only hit Keychain (biometric) if not cached
+    let privkey = privkeyRef;
     if (!privkey) {
-      setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
-      return;
+      privkey = await keyManager.getMasterPrivkey();
+      if (!privkey) {
+        setState({ status: 'onboarding', jwt: null, pubkey: null, metadata: null });
+        return;
+      }
+      setPrivkeyRef(privkey);
     }
     const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
     await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
     if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
     setState({ status: 'authenticated', jwt, pubkey, metadata });
-  }, [keyManager]);
+  }, [keyManager, privkeyRef]);
 
   // --- Render ---
 
   const value = useMemo(
-    () => ({ state, login, logout, refreshAuth }),
-    [state, login, logout, refreshAuth],
+    () => ({ state, privkey: privkeyRef, login, logout, refreshAuth }),
+    [state, privkeyRef, login, logout, refreshAuth],
   );
 
   return (
@@ -160,11 +173,8 @@ function isJwtExpired(jwt: string): boolean {
     let payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     while (payload.length % 4) payload += '=';
 
-    // Use TextDecoder on the raw bytes
-    const bytes = Uint8Array.from(
-      globalThis.atob(payload),
-      (c) => c.charCodeAt(0),
-    );
+    // Decode base64 using Hermes-safe decoder
+    const bytes = base64Decode(payload);
     const decoded = new TextDecoder().decode(bytes);
     const { exp } = JSON.parse(decoded);
 

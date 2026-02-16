@@ -10,7 +10,6 @@ import React, {
   useState,
   useMemo,
 } from 'react';
-import * as SecureStore from 'expo-secure-store';
 import { KeyManager } from '../core/crypto/KeyManager';
 import { EncryptedIO } from '../core/binder/EncryptedIO';
 import { createFSAdapter } from '../core/git/fsAdapter';
@@ -36,49 +35,36 @@ export function useCryptoContext(): CryptoContextValue {
 // --- Provider ---
 
 export function CryptoProvider({ children }: { children: React.ReactNode }) {
-  const { state: authState } = useAuthContext();
+  const { state: authState, privkey } = useAuthContext();
   const [masterConversationKey, setMasterConversationKey] =
     useState<Uint8Array | null>(null);
   const [masterPubkey, setMasterPubkey] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
-  const keyManager = useMemo(
-    () => new KeyManager(SecureStore),
-    [],
-  );
-
-  // --- Activate when authenticated ---
+  // --- Activate when authenticated + privkey available (no Keychain read) ---
 
   useEffect(() => {
-    if (authState.status !== 'authenticated') {
+    if (authState.status !== 'authenticated' || !privkey) {
       setReady(false);
       setMasterConversationKey(null);
       setMasterPubkey(null);
       return;
     }
 
-    (async () => {
-      try {
-        const privkey = await keyManager.getMasterPrivkey();
-        if (!privkey) {
-          setReady(false);
-          return;
-        }
+    try {
+      const pubkey = KeyManager.pubkeyFromPrivkey(privkey);
 
-        const pubkey = KeyManager.pubkeyFromPrivkey(privkey);
+      // Encrypt-to-self: conversation key with own pubkey
+      const convKey = KeyManager.computeConversationKey(privkey, pubkey);
 
-        // Encrypt-to-self: conversation key with own pubkey
-        const convKey = KeyManager.computeConversationKey(privkey, pubkey);
-
-        setMasterPubkey(pubkey);
-        setMasterConversationKey(convKey);
-        setReady(true);
-      } catch (err) {
-        console.error('CryptoProvider init failed:', err);
-        setReady(false);
-      }
-    })();
-  }, [authState.status, keyManager]);
+      setMasterPubkey(pubkey);
+      setMasterConversationKey(convKey);
+      setReady(true);
+    } catch (err) {
+      console.error('CryptoProvider init failed:', err);
+      setReady(false);
+    }
+  }, [authState.status, privkey]);
 
   // --- Factory: creates EncryptedIO bound to a specific binder ---
 
