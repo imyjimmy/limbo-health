@@ -142,3 +142,46 @@ export function extractEntryMetadata(
     condition: doc.metadata.condition,
   };
 }
+
+// --- Title extraction ---
+
+/**
+ * Extract a human-readable title from the markdown value field.
+ * Looks for the first H1 heading. Falls back to first line, then type.
+ */
+export function extractTitle(doc: MedicalDocument): string {
+  const val = doc.value;
+  // Match first # heading
+  const h1Match = val.match(/^#\s+(.+)$/m);
+  if (h1Match) return h1Match[1].trim();
+  // Fallback: first non-empty line
+  const firstLine = val.split('\n').find((l) => l.trim().length > 0);
+  if (firstLine) return firstLine.trim().slice(0, 60);
+  // Last resort
+  return doc.metadata.type ?? 'Untitled';
+}
+
+// --- Entry preview (extended metadata for list views) ---
+
+/**
+ * Extended metadata for list views -- includes title, provider, tags.
+ */
+export interface EntryPreview extends EntryMetadata {
+  title: string;
+  provider?: string;
+  tags?: string[];
+  hasChildren: boolean;
+}
+
+export function extractEntryPreview(
+  path: string,
+  doc: MedicalDocument,
+): EntryPreview {
+  return {
+    ...extractEntryMetadata(path, doc),
+    title: extractTitle(doc),
+    provider: doc.metadata.provider,
+    tags: doc.metadata.tags,
+    hasChildren: doc.children.length > 0,
+  };
+}

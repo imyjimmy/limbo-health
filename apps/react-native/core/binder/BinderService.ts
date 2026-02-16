@@ -19,6 +19,7 @@ import { categoryFromPath } from './categories';
 import type { MedicalDocument } from '../../types/document';
 import type { EntryMetadata } from './DocumentModel';
 import type { AuthConfig } from '../git/httpTransport';
+import type { DirItem } from './DirectoryReader';
 
 // --- Types ---
 
@@ -109,6 +110,29 @@ export class BinderService {
    */
   async readSidecar(sidecarPath: string): Promise<Uint8Array> {
     return this.io.readSidecar('/' + sidecarPath);
+  }
+
+  // --- Directory browsing ---
+
+  /**
+   * Read and classify contents of a directory within the binder.
+   * Used by the DirectoryList component for file-browser navigation.
+   */
+  async readDir(dirPath: string): Promise<DirItem[]> {
+    const { readDirectory } = await import('./DirectoryReader');
+    const fs = createFSAdapter(this.info.repoDir);
+    return readDirectory(dirPath, fs, this.io);
+  }
+
+  /**
+   * Read and decrypt patient-info.json from the binder root.
+   */
+  async readPatientInfo(): Promise<MedicalDocument | null> {
+    try {
+      return await this.io.readDocument('/patient-info.json');
+    } catch {
+      return null;
+    }
   }
 
   // --- Write ---
