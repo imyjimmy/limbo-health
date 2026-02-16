@@ -1,7 +1,10 @@
 // core/scan/ReEncryptionPipeline.ts
-// Walks a binder's working tree, decrypts every file with the master key,
-// re-encrypts with an ephemeral key, writes to a staging directory.
-// Plaintext exists only transiently in memory — one file at a time.
+// Walks a binder's working tree and re-keys every file for an ephemeral session.
+//
+// .enc sidecars (photos): DEK re-wrap only — the bulk ciphertext is copied as-is,
+//   only the small wrapped DEK header is re-encrypted. No photo data is decrypted.
+// .json documents (metadata): full decrypt with master key, re-encrypt with
+//   ephemeral key (these are tiny, so full re-encryption is fine).
 
 import { GitEngine } from '../git/GitEngine';
 import { EncryptedIO } from '../binder/EncryptedIO';
@@ -81,10 +84,16 @@ export async function reEncryptBinder(
     }
 
     if (filePath.endsWith('.enc')) {
-      // Sidecar: decrypt binary with master key, re-encrypt with ephemeral key
-      const binary = await sourceIO.readSidecar('/' + filePath);
-      await stagingIO.writeSidecar('/' + filePath, binary);
-      totalBytes += binary.length;
+      // Sidecar: re-wrap the DEK from master key to ephemeral key.
+      // Bulk ciphertext is copied as-is — no photo data is decrypted.
+      // For legacy files, rewrapSidecar falls back to full decrypt/re-encrypt.
+      await sourceIO.rewrapSidecar(
+        '/' + filePath,
+        '/' + filePath,
+        masterConversationKey,
+        ephemeralConversationKey,
+        stagingFS,
+      );
     } else if (filePath.endsWith('.json')) {
       // Document: decrypt JSON with master key, re-encrypt with ephemeral key
       const doc = await sourceIO.readDocument('/' + filePath);
