@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>LimboEditor</title>
+  </head>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    #root > div:nth-of-type(1) {
+      position: absolute;
+      height: 100%;
+      overflow: auto;
+      width: 100%;
+      top: 0;
+      bottom: 0;
+    }
+    #root > div.dynamic-height {
+      height: unset;
+    }
+    #root div .ProseMirror {
+      min-height: 100%;
+      overflow: visible;
+      padding: 12px 16px;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    #root div.dynamic-height .ProseMirror {
+      height: unset;
+    }
+    .ProseMirror:focus {
+      outline: none;
+    }
+    .ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
+      margin-top: 0.8em;
+      margin-bottom: 0.4em;
+    }
+    .ProseMirror p {
+      margin: 0.4em 0;
+    }
+    .ProseMirror ul, .ProseMirror ol {
+      padding-left: 1.5em;
+    }
+    .ProseMirror blockquote {
+      border-left: 3px solid #ddd;
+      padding-left: 1em;
+      margin-left: 0;
+      color: #666;
+    }
+    .ProseMirror code {
+      background: #f0f0f0;
+      border-radius: 3px;
+      padding: 0.15em 0.3em;
+      font-size: 0.9em;
+    }
+    .ProseMirror pre {
+      background: #f5f5f5;
+      border-radius: 6px;
+      padding: 12px;
+      overflow-x: auto;
+    }
+    .ProseMirror pre code {
+      background: none;
+      padding: 0;
+    }
+  </style>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

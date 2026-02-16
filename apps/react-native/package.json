@@ -6,17 +6,27 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "editor:dev": "npx vite --config ./editor-web/vite.config.ts -w build",
+    "editor:build": "npx vite --config ./editor-web/vite.config.ts build && npm run editor:post-build",
+    "editor:post-build": "node ./node_modules/@10play/tentap-editor/scripts/buildEditor.js ./editor-web/build/index.html"
   },
   "overrides": {
     "react-dom": "19.1.0"
   },
   "dependencies": {
+    "@10play/tentap-editor": "^1.0.1",
     "@noble/ciphers": "^2.1.1",
     "@noble/curves": "^2.0.1",
     "@noble/hashes": "^2.0.1",
     "@scure/base": "^2.0.0",
     "@tabler/icons-react-native": "^3.36.1",
+    "@tiptap/extension-document": "^3.19.0",
+    "@tiptap/extension-paragraph": "^3.19.0",
+    "@tiptap/extension-text": "^3.19.0",
+    "@tiptap/markdown": "^3.19.0",
+    "@tiptap/react": "^3.19.0",
+    "@tiptap/starter-kit": "^3.19.0",
     "buffer": "^6.0.3",
     "expo": "~54.0.33",
     "expo-camera": "~17.0.10",
@@ -40,11 +50,16 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "^15.12.1",
+    "react-native-webview": "13.15.0",
     "web-streams-polyfill": "^4.2.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "typescript": "~5.9.2"
+    "@vitejs/plugin-react": "^5.1.4",
+    "react-dom": "19.1.0",
+    "typescript": "~5.9.2",
+    "vite": "^7.3.1",
+    "vite-plugin-singlefile": "^2.3.0"
   },
   "private": true
 }
