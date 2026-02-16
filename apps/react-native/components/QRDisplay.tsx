@@ -80,9 +80,7 @@ export function QRDisplay({ payload, onCancel }: QRDisplayProps) {
       </Text>
 
       <Pressable style={styles.cancelButton} onPress={onCancel}>
-        <Text style={styles.cancelButtonText}>
-          {isExpired ? 'Done' : 'Cancel Sharing'}
-        </Text>
+        <Text style={styles.cancelButtonText}>Done</Text>
       </Pressable>
     </View>
   );

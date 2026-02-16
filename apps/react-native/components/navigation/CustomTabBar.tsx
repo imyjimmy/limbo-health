@@ -59,8 +59,7 @@ export function CustomTabBar({
     <>
       <View
         style={[
-          styles.container,
-          { paddingBottom: Math.max(insets.bottom, 16) },
+          styles.container
         ]}
       >
          
@@ -210,7 +209,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f1923',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255,255,255,0.08)',
-    paddingTop: 8,
+    paddingTop: 4,
+    paddingBottom: 12,
+    // borderBottomWidth: 2,
+    // borderBottomColor: 'red',
   },
   tabColumn: {
    flex: 1,
@@ -220,6 +222,9 @@ const styles = StyleSheet.create({
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
+    paddingBottom: 4,
+    // borderBottomWidth: 2,
+    // borderBottomColor: 'yellow',
   },
   tabButton: {
     alignItems: 'center',

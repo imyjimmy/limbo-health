@@ -11,9 +11,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { IconShare } from '@tabler/icons-react-native';
 import { useBinderDetail } from '../../../../../hooks/useBinderDetail';
 import { PatientInfoCard } from '../../../../../components/binder/PatientInfoCard';
 import { CategoryGrid } from '../../../../../components/binder/CategoryGrid';
+import { QRDisplay } from '../../../../../components/QRDisplay';
+import { useShareSession } from '../../../../../hooks/useShareSession';
 import type { Category } from '../../../../../core/binder/categories';
 import { useAuthContext } from '../../../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../../../providers/CryptoProvider';
@@ -43,13 +46,15 @@ export default function BinderDetailScreen() {
     masterConversationKey,
   );
 
+  const binderRepoDir = `binders/${binderId}`;
+  const { state: shareState, startShare, cancel: cancelShare } = useShareSession(
+    binderRepoDir,
+    masterConversationKey,
+    jwt,
+  );
+
   const handleCategoryPress = (category: Category) => {
     router.push(`/binder/${binderId}/browse/${category.folder}`);
-  };
-
-  const handleSharePress = () => {
-    // TODO: wire to share flow
-    console.log('Share pressed for binder:', binderId);
   };
 
   if (loading) {
@@ -60,18 +65,68 @@ export default function BinderDetailScreen() {
     );
   }
 
+  // Full-screen QR display when sharing
+  if (shareState.phase === 'showing-qr' && shareState.qrPayload) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'Share with Doctor' }} />
+        <QRDisplay payload={shareState.qrPayload} onCancel={cancelShare} />
+      </>
+    );
+  }
+
+  const isSharing = shareState.phase !== 'idle' && shareState.phase !== 'error';
+
   return (
     <>
       <Stack.Screen
         options={{
           title: 'My Binder',
           headerRight: () => (
-            <TouchableOpacity onPress={handleSharePress} style={styles.headerButton}>
-              <Text style={styles.shareIcon}>↗</Text>
+            <TouchableOpacity
+              onPress={startShare}
+              style={styles.headerButton}
+              disabled={isSharing}
+            >
+              {isSharing ? (
+                <ActivityIndicator size="small" color="#007AFF" />
+              ) : (
+                <IconShare size={22} color="#007AFF" strokeWidth={2} />
+              )}
             </TouchableOpacity>
           ),
         }}
       />
+
+      {/* Share progress overlay */}
+      {shareState.phase === 're-encrypting' && shareState.progress && (
+        <View style={styles.shareProgress}>
+          <ActivityIndicator size="small" color="#007AFF" />
+          <Text style={styles.shareProgressText}>
+            Encrypting {shareState.progress.filesProcessed}/{shareState.progress.totalFiles} files...
+          </Text>
+        </View>
+      )}
+      {shareState.phase === 'pushing-staging' && (
+        <View style={styles.shareProgress}>
+          <ActivityIndicator size="small" color="#007AFF" />
+          <Text style={styles.shareProgressText}>Uploading...</Text>
+        </View>
+      )}
+      {shareState.phase === 'creating-session' && (
+        <View style={styles.shareProgress}>
+          <ActivityIndicator size="small" color="#007AFF" />
+          <Text style={styles.shareProgressText}>Creating session...</Text>
+        </View>
+      )}
+      {shareState.phase === 'error' && (
+        <View style={styles.shareError}>
+          <Text style={styles.shareErrorText}>{shareState.error}</Text>
+          <TouchableOpacity onPress={startShare}>
+            <Text style={styles.shareRetryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         {/* Patient info */}
@@ -147,8 +202,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  shareIcon: {
-    fontSize: 20,
+  shareProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#EBF5FF',
+  },
+  shareProgressText: {
+    fontSize: 13,
+    color: '#007AFF',
+  },
+  shareError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFF0F0',
+  },
+  shareErrorText: {
+    fontSize: 13,
+    color: '#c00',
+    flex: 1,
+  },
+  shareRetryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+    paddingLeft: 12,
   },
   patientPlaceholder: {
     marginHorizontal: 16,
