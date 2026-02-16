@@ -11,7 +11,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { IconShare } from '@tabler/icons-react-native';
+import { IconShare3 } from '@tabler/icons-react-native';
 import { useBinderDetail } from '../../../../../hooks/useBinderDetail';
 import { PatientInfoCard } from '../../../../../components/binder/PatientInfoCard';
 import { CategoryGrid } from '../../../../../components/binder/CategoryGrid';
@@ -91,7 +91,7 @@ export default function BinderDetailScreen() {
               {isSharing ? (
                 <ActivityIndicator size="small" color="#007AFF" />
               ) : (
-                <IconShare size={22} color="#007AFF" strokeWidth={2} />
+                <IconShare3 size={22} color="#007AFF" strokeWidth={2} />
               )}
             </TouchableOpacity>
           ),
