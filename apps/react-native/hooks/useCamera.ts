@@ -11,9 +11,12 @@ import { createPending } from '../core/camera/cameraResult';
 
 export interface CaptureResult {
   binaryData: Uint8Array;
+  base64Data: string;
   sizeBytes: number;
   width: number;
   height: number;
+  /** Local file URI for thumbnail preview */
+  uri: string;
 }
 
 const MAX_WIDTH = 1920;
@@ -53,9 +56,11 @@ export function useCamera() {
 
     return {
       binaryData,
+      base64Data: base64String,
       sizeBytes: Number(stat.size),
       width: compressed.width,
       height: compressed.height,
+      uri: compressed.uri,
     };
   }, [router]);
 

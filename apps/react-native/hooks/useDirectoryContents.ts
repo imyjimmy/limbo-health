@@ -1,7 +1,8 @@
 // hooks/useDirectoryContents.ts
 // Hook that loads and caches directory contents for the file browser.
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import type { DirItem } from '../core/binder/DirectoryReader';
 import type { BinderService } from '../core/binder/BinderService';
 
@@ -36,9 +37,12 @@ export function useDirectoryContents(
     }
   }, [binderService, dirPath]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  // Re-load whenever this screen gains focus (e.g., after router.back() from entry/new)
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   return { items, loading, error, refresh: load };
 }

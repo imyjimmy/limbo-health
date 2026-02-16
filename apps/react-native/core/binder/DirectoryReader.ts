@@ -52,7 +52,14 @@ export async function readDirectory(
   io: EncryptedIO,
 ): Promise<DirItem[]> {
   const normalizedDir = dirPath.startsWith('/') ? dirPath : '/' + dirPath;
-  const names = await fs.promises.readdir(normalizedDir);
+
+  let names: string[];
+  try {
+    names = await fs.promises.readdir(normalizedDir);
+  } catch {
+    // Directory doesn't exist yet (e.g., empty category folder) — return empty list
+    return [];
+  }
 
   const items: DirItem[] = [];
 
@@ -71,6 +78,11 @@ export async function readDirectory(
     const stat = await fs.promises.stat(childPath);
 
     if (stat.isDirectory()) {
+      // Skip empty directories (e.g. left behind after git rm)
+      const children = await fs.promises.readdir(childPath);
+      const hasVisibleChildren = children.some((c: string) => !c.startsWith('.'));
+      if (!hasVisibleChildren) continue;
+
       const relativePath = childPath.startsWith('/')
         ? childPath.slice(1)
         : childPath;

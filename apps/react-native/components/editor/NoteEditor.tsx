@@ -1,12 +1,13 @@
 // components/editor/NoteEditor.tsx
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleSheet,
   Alert,
@@ -27,6 +28,7 @@ import {
   type PendingSidecar,
 } from './AttachmentList';
 import type { MedicalDocument } from '../../types/document';
+import { useCamera } from '../../hooks/useCamera';
 
 interface NoteEditorProps {
   /** Directory path where the note will be saved, e.g. "visits/" or "conditions/back-acne/" */
@@ -58,6 +60,16 @@ export function NoteEditor({
 
   const [attachments, setAttachments] = useState<PendingSidecar[]>([]);
   const [saving, setSaving] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  // When editing, hide the editor until existing content is loaded to avoid "Write something..." flash
+  const isEditing = !!initialDoc?.value;
+  const [editorReady, setEditorReady] = useState(!isEditing);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => setKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const editor = useEditorBridge({
     customSource: editorHtml,
@@ -66,18 +78,40 @@ export function NoteEditor({
     bridgeExtensions: [...TenTapStartKit, MarkdownBridge],
   });
 
-  // Load existing markdown content after editor mounts
+  // Load existing markdown content once the editor bridge is connected.
+  // The editor ref from useEditorBridge may update when the WebView connects,
+  // so we depend on it — but use a ref guard to only load content once.
+  const hasLoadedContent = useRef(false);
   useEffect(() => {
-    if (initialDoc?.value) {
-      const bodyMarkdown = initialDoc.value.replace(/^#\s+.+\n*/, '').trim();
-      if (bodyMarkdown) {
-        // Small delay to ensure WebView is ready
-        setTimeout(() => {
-          editor.setMarkdown(bodyMarkdown);
-        }, 300);
-      }
-    }
-  }, []);
+    if (hasLoadedContent.current) return;
+    if (!initialDoc?.value) return;
+    const bodyMarkdown = initialDoc.value.replace(/^#\s+.+\n*/, '').trim();
+    if (!bodyMarkdown) return;
+
+    const timer = setTimeout(() => {
+      editor.setMarkdown(bodyMarkdown);
+      hasLoadedContent.current = true;
+      setEditorReady(true);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [editor, initialDoc]);
+
+  const { capture } = useCamera();
+
+  const handleCapturePhoto = useCallback(async (): Promise<PendingSidecar | null> => {
+    const result = await capture();
+    if (!result) return null;
+    const now = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const id = `photo-${Date.now()}`;
+    return {
+      id,
+      base64Data: result.base64Data,
+      sizeBytes: result.sizeBytes,
+      format: 'jpeg',
+      sidecarFilename: `${now}-photo.enc`,
+      previewUri: result.uri,
+    };
+  }, [capture]);
 
   const handleAddAttachment = useCallback((attachment: PendingSidecar) => {
     setAttachments((prev) => [...prev, attachment]);
@@ -108,6 +142,7 @@ export function NoteEditor({
       const doc: MedicalDocument = {
         value: fullMarkdown,
         metadata: {
+          ...(initialDoc?.metadata ?? {}),
           type: categoryType,
           created: initialDoc?.metadata.created ?? new Date().toISOString(),
           updated: new Date().toISOString(),
@@ -169,23 +204,37 @@ export function NoteEditor({
       {/* Rich text editor */}
       <View style={styles.editorContainer}>
         <RichText editor={editor} />
+        {!editorReady && (
+          <View style={styles.editorOverlay}>
+            <ActivityIndicator size="small" color="#999" />
+          </View>
+        )}
       </View>
 
-      {/* Attachments */}
-      <AttachmentList
-        attachments={attachments}
-        onAdd={handleAddAttachment}
-        onRemove={handleRemoveAttachment}
-      />
+      {/* Attachments: below editor when keyboard hidden, above toolbar when typing */}
+      {!keyboardVisible && (
+        <AttachmentList
+          attachments={attachments}
+          onAdd={handleAddAttachment}
+          onRemove={handleRemoveAttachment}
+          onCapturePhoto={handleCapturePhoto}
+        />
+      )}
 
       {/* Toolbar pinned above keyboard */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
       >
-        <View style={{ backgroundColor: 'red', padding: 4 }}>
-          <Toolbar editor={editor} />
-        </View>
+        {keyboardVisible && (
+          <AttachmentList
+            attachments={attachments}
+            onAdd={handleAddAttachment}
+            onRemove={handleRemoveAttachment}
+            onCapturePhoto={handleCapturePhoto}
+          />
+        )}
+        <Toolbar editor={editor} />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -232,6 +281,13 @@ const styles = StyleSheet.create({
   },
   editorContainer: {
     flex: 1,
+    position: 'relative',
+  },
+  editorOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   keyboardAvoidingView: {
     position: 'absolute',

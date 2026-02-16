@@ -46,6 +46,19 @@ export function sidecarPathFrom(docPath: string): string {
 }
 
 /**
+ * Convert a human-readable title to a filesystem-safe slug.
+ * 'Lower Back Pain' -> 'lower-back-pain'
+ */
+export function slugify(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return slug || 'untitled';
+}
+
+/**
  * Generate a condition subfolder path.
  * 'back-acne' → 'conditions/back-acne'
  */

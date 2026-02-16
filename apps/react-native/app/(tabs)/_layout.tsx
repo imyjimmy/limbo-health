@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs, useRouter, usePathname } from 'expo-router';
 import { CustomTabBar } from '../../components/navigation/CustomTabBar';
 
 import { useAuthContext } from '../../providers/AuthProvider';
@@ -8,6 +8,7 @@ export default function TabLayout() {
   // Pull profile info from your auth context
   // Adjust these to match your actual AuthProvider shape
   const router = useRouter();
+  const pathname = usePathname();
   const { state } = useAuthContext();
 
   const profileImageUrl = state.metadata?.picture ?? null;
@@ -20,19 +21,32 @@ export default function TabLayout() {
         .toUpperCase()
     : 'ME';
 
+  // Extract binderId and dirPath from the current route so [+] is context-free.
+  // Matches: /binder/{id}/browse/{...path}  or  /binder/{id}
+  const binderContext = (() => {
+    const browseMatch = pathname.match(/\/binder\/([^/]+)\/browse\/(.+)/);
+    if (browseMatch) return { binderId: browseMatch[1], dirPath: browseMatch[2] };
+    const binderMatch = pathname.match(/\/binder\/([^/]+)/);
+    if (binderMatch) return { binderId: binderMatch[1], dirPath: '' };
+    return null;
+  })();
+
   const handleCreateAction = (action: 'note' | 'audio' | 'photo') => {
-  // Route to the appropriate capture flow
-  // Adjust these paths to match your binder routes
-  switch (action) {
-    case 'note':
-      router.push('/binder/active/entry/new?type=note');
-      break;
-    case 'audio':
-      router.push('/binder/active/quick-capture?mode=audio');
-      break;
-    case 'photo':
-      router.push('/binder/active/quick-capture?mode=photo');
-      break;
+    if (!binderContext) return; // not inside a binder, nothing to do
+
+    switch (action) {
+      case 'note':
+        router.push({
+          pathname: `/binder/${binderContext.binderId}/entry/new`,
+          params: { dirPath: binderContext.dirPath },
+        });
+        break;
+      case 'audio':
+        router.push(`/binder/${binderContext.binderId}/quick-capture?mode=audio`);
+        break;
+      case 'photo':
+        router.push(`/binder/${binderContext.binderId}/quick-capture?mode=photo`);
+        break;
     }
   };
 

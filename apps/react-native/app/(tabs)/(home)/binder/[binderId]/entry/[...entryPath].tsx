@@ -1,20 +1,21 @@
 // app/binder/[binderId]/entry/[...entryPath].tsx
 // Entry detail screen: decrypt a .json document, render markdown, show children.
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   ScrollView,
   View,
   Text,
   ActivityIndicator,
+  TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-router';
 import type { MedicalDocument } from '../../../../../../types/document';
 import { extractTitle } from '../../../../../../core/binder/DocumentModel';
-
-// TODO: Replace with real BinderService from context/provider
-// import { useBinderService } from '../../../../../../hooks/useBinderService';
+import { BinderService } from '../../../../../../core/binder/BinderService';
+import { useAuthContext } from '../../../../../../providers/AuthProvider';
+import { useCryptoContext } from '../../../../../../providers/CryptoProvider';
 
 export default function EntryDetailScreen() {
   const { binderId, entryPath } = useLocalSearchParams<{
@@ -31,17 +32,66 @@ export default function EntryDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // TODO: wire to real BinderService from provider
-  // const binderService = useBinderService(binderId);
+  const { state: authState } = useAuthContext();
+  const { masterConversationKey } = useCryptoContext();
+  const jwt = authState.status === 'authenticated' ? authState.jwt : null;
+
+  const binderService = useMemo(() => {
+    if (!masterConversationKey || !jwt || !binderId) return null;
+    return new BinderService(
+      {
+        repoId: binderId,
+        repoDir: `binders/${binderId}`,
+        auth: { type: 'jwt' as const, token: jwt },
+      },
+      masterConversationKey,
+    );
+  }, [binderId, masterConversationKey, jwt]);
+
+  const router = useRouter();
+
+  // Re-read document when screen regains focus (e.g., after editing)
+  const [refreshCounter, setRefreshCounter] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setRefreshCounter((c) => c + 1);
+    }, [])
+  );
 
   useEffect(() => {
-    // Placeholder: will call binderService.readEntry(rawPath)
-    // once providers are wired.
-    setLoading(false);
-    setError('BinderService not yet wired to providers');
-  }, [rawPath]);
+    if (!binderService || !rawPath) {
+      setLoading(false);
+      setError('Not ready');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await binderService.readEntry(rawPath);
+        if (!cancelled) {
+          setDoc(result);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const msg = err instanceof Error ? err.message : 'Failed to decrypt';
+          setError(msg);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [binderService, rawPath, refreshCounter]);
 
   const title = doc ? extractTitle(doc) : 'Entry';
+
+  const handleEdit = useCallback(() => {
+    router.push({
+      pathname: '/(tabs)/(home)/binder/[binderId]/entry/edit',
+      params: { binderId: binderId!, entryPath: rawPath },
+    });
+  }, [router, binderId, rawPath]);
 
   if (loading) {
     return (
@@ -68,7 +118,16 @@ export default function EntryDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title }} />
+      <Stack.Screen
+        options={{
+          title,
+          headerRight: () => (
+            <TouchableOpacity onPress={handleEdit}>
+              <Text style={{ color: '#007AFF', fontSize: 16, fontWeight: '600' }}>Edit</Text>
+            </TouchableOpacity>
+          ),
+        }}
+      />
       <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
         {/* Metadata bar */}
         <View style={styles.metaBar}>
@@ -76,6 +135,11 @@ export default function EntryDetailScreen() {
           <Text style={styles.metaDate}>
             {new Date(doc.metadata.created).toLocaleDateString()}
           </Text>
+          {doc.metadata.updated && doc.metadata.updated !== doc.metadata.created ? (
+            <Text style={styles.metaDate}>
+              Updated {new Date(doc.metadata.updated).toLocaleDateString()}
+            </Text>
+          ) : null}
           {doc.metadata.provider ? (
             <Text style={styles.metaProvider}>{doc.metadata.provider}</Text>
           ) : null}

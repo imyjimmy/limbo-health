@@ -49,13 +49,15 @@ interface AttachmentListProps {
   onAdd: (attachment: PendingSidecar) => void;
   /** Called when user removes an attachment by ID */
   onRemove: (id: string) => void;
+  /** Capture a photo via camera — provided by parent (hook-based) */
+  onCapturePhoto?: () => Promise<PendingSidecar | null>;
 }
 
-export function AttachmentList({ attachments, onAdd, onRemove }: AttachmentListProps) {
+export function AttachmentList({ attachments, onAdd, onRemove, onCapturePhoto }: AttachmentListProps) {
   const handleAddPhoto = async () => {
-    // TODO: invoke useCamera hook → compress → base64 → create PendingSidecar
-    // For now, placeholder that shows the integration point
-    Alert.alert('Add Photo', 'Camera/photo library picker will be wired here');
+    if (!onCapturePhoto) return;
+    const result = await onCapturePhoto();
+    if (result) onAdd(result);
   };
 
   const handleAddFile = async () => {
@@ -152,7 +154,6 @@ const styles = StyleSheet.create({
   container: {
     borderTopWidth: 1,
     borderTopColor: '#E5E5E5',
-    paddingTop: 12,
   },
   listContent: {
     paddingHorizontal: 16,
@@ -164,7 +165,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F5F5F5',
     borderRadius: 8,
-    padding: 8,
+    padding: 4,
     gap: 8,
     maxWidth: 200,
   },

@@ -186,6 +186,25 @@ export class BinderService {
     return docPath;
   }
 
+  // --- Update ---
+
+  /**
+   * Update an existing document entry in-place.
+   * Encrypts and overwrites the file at entryPath, then commits and pushes.
+   */
+  async updateEntry(
+    entryPath: string,
+    doc: MedicalDocument,
+  ): Promise<void> {
+    await this.io.writeDocument('/' + entryPath, doc);
+    await GitEngine.commitEntry(
+      this.info.repoDir,
+      [entryPath],
+      `Update ${doc.metadata.type} entry`,
+    );
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+  }
+
   // --- Sync ---
 
   /**

@@ -10,6 +10,7 @@ import type { DirFolder, DirEntry } from '../../../../../../core/binder/Director
 import { useAuthContext } from '../../../../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../../../../providers/CryptoProvider';
 import { BinderService } from '../../../../../../core/binder/BinderService';
+import { categoryFromPath } from '../../../../../../core/binder/categories';
 
 export default function BrowseDirectoryScreen() {
   const { binderId, path } = useLocalSearchParams<{
@@ -52,9 +53,10 @@ export default function BrowseDirectoryScreen() {
   };
 
   const handleAddEntry = () => {
+    const categoryType = categoryFromPath(dirPath);
     router.push({
       pathname: `/binder/${binderId}/entry/new`,
-      params: { dirPath },
+      params: { dirPath, categoryType },
     });
   };
 

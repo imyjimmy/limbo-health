@@ -131,12 +131,14 @@ export default function BinderListScreen() {
       if (!jwt || !masterConversationKey) return;
 
       try {
+        const { GitEngine } = await import('../../../core/git/GitEngine');
         const cloned = await isAlreadyCloned(repo.id);
         if (!cloned) {
           setScreenState({ phase: 'cloning', repoId: repo.id });
-          const { GitEngine } = await import('../../../core/git/GitEngine');
           await GitEngine.cloneRepo(repoDir(repo.id), repo.id, authConfig());
           setScreenState({ phase: 'repos-loaded', repos: (screenState as any).repos ?? [] });
+        } else {
+          await GitEngine.pull(repoDir(repo.id), repo.id, authConfig());
         }
 
         router.push(`/binder/${repo.id}`);
