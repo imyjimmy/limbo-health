@@ -2,14 +2,14 @@
 // Generic directory browser. Works at any depth.
 // URL: /binder/<id>/browse/visits  or  /binder/<id>/browse/conditions/back-acne
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { DirectoryList } from '../../../../components/binder/DirectoryList';
-import { useDirectoryContents } from '../../../../hooks/useDirectoryContents';
-import type { DirFolder, DirEntry } from '../../../../core/binder/DirectoryReader';
-
-// TODO: Replace with real BinderService from context/provider
-// import { useBinderService } from '../../../../hooks/useBinderService';
+import { DirectoryList } from '../../../../../../components/binder/DirectoryList';
+import { useDirectoryContents } from '../../../../../../hooks/useDirectoryContents';
+import type { DirFolder, DirEntry } from '../../../../../../core/binder/DirectoryReader';
+import { useAuthContext } from '../../../../../../providers/AuthProvider';
+import { useCryptoContext } from '../../../../../../providers/CryptoProvider';
+import { BinderService } from '../../../../../../core/binder/BinderService';
 
 export default function BrowseDirectoryScreen() {
   const { binderId, path } = useLocalSearchParams<{
@@ -22,9 +22,21 @@ export default function BrowseDirectoryScreen() {
   const dirPath = Array.isArray(path) ? path.join('/') : (path ?? '');
   const dirDisplayName = formatBreadcrumb(dirPath);
 
-  // TODO: wire to real BinderService from provider
-  // const binderService = useBinderService(binderId);
-  const binderService = null; // Placeholder until providers are wired
+  const { state: authState } = useAuthContext();
+  const { masterConversationKey } = useCryptoContext();
+  const jwt = authState.status === 'authenticated' ? authState.jwt : null;
+
+  const binderService = useMemo(() => {
+    if (!masterConversationKey || !jwt || !binderId) return null;
+    return new BinderService(
+      {
+        repoId: binderId,
+        repoDir: `binders/${binderId}`,
+        auth: { type: 'jwt' as const, token: jwt },
+      },
+      masterConversationKey,
+    );
+  }, [binderId, masterConversationKey, jwt]);
 
   const { items, loading, error, refresh } = useDirectoryContents(
     binderService,

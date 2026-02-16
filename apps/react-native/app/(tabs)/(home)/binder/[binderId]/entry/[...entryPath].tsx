@@ -10,11 +10,11 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
-import type { MedicalDocument } from '../../../../types/document';
-import { extractTitle } from '../../../../core/binder/DocumentModel';
+import type { MedicalDocument } from '../../../../../../types/document';
+import { extractTitle } from '../../../../../../core/binder/DocumentModel';
 
 // TODO: Replace with real BinderService from context/provider
-// import { useBinderService } from '../../../../hooks/useBinderService';
+// import { useBinderService } from '../../../../../../hooks/useBinderService';
 
 export default function EntryDetailScreen() {
   const { binderId, entryPath } = useLocalSearchParams<{

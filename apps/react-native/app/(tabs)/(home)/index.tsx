@@ -12,15 +12,16 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import RNFS from 'react-native-fs';
-import { useAuthContext } from '../../providers/AuthProvider';
-import { useCryptoContext } from '../../providers/CryptoProvider';
-import { BinderService } from '../../core/binder/BinderService';
-import { API_BASE_URL } from '../../constants/api';
-import { useCamera } from '../../hooks/useCamera';
-import type { MedicalDocument } from '../../types/document';
-import { useShareSession } from '../../hooks/useShareSession';
-import { QRDisplay } from '../../components/QRDisplay';
+import { useAuthContext } from '../../../providers/AuthProvider';
+import { useCryptoContext } from '../../../providers/CryptoProvider';
+import { BinderService } from '../../../core/binder/BinderService';
+import { API_BASE_URL } from '../../../constants/api';
+import { useCamera } from '../../../hooks/useCamera';
+import type { MedicalDocument } from '../../../types/document';
+import { useShareSession } from '../../../hooks/useShareSession';
+import { QRDisplay } from '../../../components/QRDisplay';
 
 // --- Types ---
 
@@ -61,6 +62,7 @@ export default function BinderListScreen() {
   const { state: authState } = useAuthContext();
   const { ready: cryptoReady, masterConversationKey } = useCryptoContext();
   const { capture } = useCamera();
+  const router = useRouter();
 
   const [screenState, setScreenState] = useState<ScreenState>({
     phase: 'loading-repos',
@@ -128,47 +130,23 @@ export default function BinderListScreen() {
     async (repo: RepoSummary) => {
       if (!jwt || !masterConversationKey) return;
 
-      const dir = repoDir(repo.id);
-      const auth = authConfig();
-
       try {
         const cloned = await isAlreadyCloned(repo.id);
         if (!cloned) {
           setScreenState({ phase: 'cloning', repoId: repo.id });
-          const { GitEngine } = await import('../../core/git/GitEngine');
-          await GitEngine.cloneRepo(dir, repo.id, auth);
+          const { GitEngine } = await import('../../../core/git/GitEngine');
+          await GitEngine.cloneRepo(repoDir(repo.id), repo.id, authConfig());
+          setScreenState({ phase: 'repos-loaded', repos: (screenState as any).repos ?? [] });
         }
 
-        setScreenState({ phase: 'decrypting', repoId: repo.id });
-
-        const service = new BinderService(
-          { repoId: repo.id, repoDir: dir, auth },
-          masterConversationKey,
-        );
-        binderRef.current = service;
-
-        // List all entries (metadata only)
-        const entryMetas = await service.listEntries();
-
-        // Decrypt full content for display
-        const entries: DecryptedEntry[] = [];
-        for (const meta of entryMetas) {
-          try {
-            const doc = await service.readEntry(meta.path);
-            entries.push({ path: meta.path, doc });
-          } catch (err) {
-            console.warn(`Failed to read ${meta.path}:`, err);
-          }
-        }
-
-        setScreenState({ phase: 'displaying', repoId: repo.id, entries });
+        router.push(`/binder/${repo.id}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         Alert.alert('Error', msg);
         fetchRepos();
       }
     },
-    [jwt, masterConversationKey, fetchRepos],
+    [jwt, masterConversationKey, fetchRepos, router, screenState],
   );
 
   // --- Back to repo list ---

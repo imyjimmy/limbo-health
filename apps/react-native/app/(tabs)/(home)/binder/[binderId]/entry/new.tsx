@@ -6,10 +6,10 @@
 
 import React, { useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { NoteEditor } from '../../../../components/editor/NoteEditor';
-import type { MedicalDocument } from '../../../../types/document';
-import type { PendingSidecar } from '../../../../components/editor/AttachmentList';
-// import { useBinderService } from '../../../../providers/BinderProvider';
+import { NoteEditor } from '../../../../../../components/editor/NoteEditor';
+import type { MedicalDocument } from '../../../../../../types/document';
+import type { PendingSidecar } from '../../../../../../components/editor/AttachmentList';
+// import { useBinderService } from '../../../../../../providers/BinderProvider';
 // ^ uncomment when BinderProvider is wired up
 
 export default function NewEntryScreen() {

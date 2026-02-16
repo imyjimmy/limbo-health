@@ -51,7 +51,7 @@ export default function TabLayout() {
         headerShown: false,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="(home)" options={{ title: 'Home' }} />
       <Tabs.Screen name="page" options={{ title: 'Page' }} />
       <Tabs.Screen name="create" options={{ title: 'Create' }} />
       <Tabs.Screen name="search" options={{ title: 'Search' }} />

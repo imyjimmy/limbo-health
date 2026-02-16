@@ -23,7 +23,7 @@ import { ProfileAvatar } from './ProfileAvatar';
 
 const ICON_SIZE = 24;
 const PLUS_SIZE = 34;
-const INACTIVE_COLOR = 'rgba(255,255,255,0.45)';
+const INACTIVE_COLOR = 'rgb(175, 175, 175, 1)';
 const ACTIVE_COLOR = '#ffffff';
 
 const CREATE_MENU_ITEMS = [
@@ -65,7 +65,6 @@ export function CustomTabBar({
       >
          
         <View style={styles.tabRow}>
-          <>{ console.log('ROUTES:', state.routes.map(r => r.name)) }</>
           {state.routes.map((route, index) => {
             const isActive = state.index === index;
 
@@ -165,7 +164,7 @@ function renderTabIcon(
   const color = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
 
   switch (routeName) {
-    case 'index':
+    case '(home)':
       return isActive ? (
         <IconHomeFilled size={ICON_SIZE} color={color} />
       ) : (

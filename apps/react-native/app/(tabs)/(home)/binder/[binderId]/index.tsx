@@ -1,7 +1,7 @@
 // app/binder/[binderId]/index.tsx
 // Binder detail screen: patient info card + category grid / timeline toggle.
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,12 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
-import { useBinderDetail } from '../../../hooks/useBinderDetail';
-import { PatientInfoCard } from '../../../components/binder/PatientInfoCard';
-import { CategoryGrid } from '../../../components/binder/CategoryGrid';
-import type { Category } from '../../../core/binder/categories';
-
-// TODO: Replace with real values from CryptoProvider / binder list
-// These will come from your providers once wired up.
-// Stubbed here to show the screen structure.
+import { useBinderDetail } from '../../../../../hooks/useBinderDetail';
+import { PatientInfoCard } from '../../../../../components/binder/PatientInfoCard';
+import { CategoryGrid } from '../../../../../components/binder/CategoryGrid';
+import type { Category } from '../../../../../core/binder/categories';
+import { useAuthContext } from '../../../../../providers/AuthProvider';
+import { useCryptoContext } from '../../../../../providers/CryptoProvider';
 
 export default function BinderDetailScreen() {
   const { binderId } = useLocalSearchParams<{ binderId: string }>();
@@ -27,11 +25,23 @@ export default function BinderDetailScreen() {
     'categories',
   );
 
-  // TODO: wire to real provider
-  // const { binderService, patientInfo, loading, error } = useBinderDetail(binderInfo, masterKey);
-  const loading = false;
-  const error: string | null = null;
-  const patientInfo = null; // Will be populated once wired
+  const { state: authState } = useAuthContext();
+  const { masterConversationKey } = useCryptoContext();
+  const jwt = authState.status === 'authenticated' ? authState.jwt : null;
+
+  const binderInfo = useMemo(() => {
+    if (!jwt || !binderId) return null;
+    return {
+      repoId: binderId,
+      repoDir: `binders/${binderId}`,
+      auth: { type: 'jwt' as const, token: jwt },
+    };
+  }, [binderId, jwt]);
+
+  const { binderService, patientInfo, loading, error } = useBinderDetail(
+    binderInfo,
+    masterConversationKey,
+  );
 
   const handleCategoryPress = (category: Category) => {
     router.push(`/binder/${binderId}/browse/${category.folder}`);
