@@ -23,7 +23,7 @@ import { ProfileAvatar } from './ProfileAvatar';
 
 const ICON_SIZE = 24;
 const PLUS_SIZE = 34;
-const INACTIVE_COLOR = 'rgb(175, 175, 175, 1)';
+const INACTIVE_COLOR = '#cecece';
 const ACTIVE_COLOR = '#ffffff';
 
 const CREATE_MENU_ITEMS = [
@@ -180,7 +180,7 @@ function renderTabIcon(
     case 'create':
       return (
         <View style={styles.plusButton}>
-          <IconPlus size={PLUS_SIZE} color={ACTIVE_COLOR} strokeWidth={isActive ? 2.5 : 2} />
+          <IconPlus size={PLUS_SIZE} color={color} strokeWidth={isActive ? 2.5 : 2} />
         </View>
       );
 
