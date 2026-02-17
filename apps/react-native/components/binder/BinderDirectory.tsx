@@ -52,7 +52,7 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
 
   // --- Share ---
   const binderRepoDir = `binders/${binderId}`;
-  const { state: shareState, startShare, cancel: cancelShare } = useShareSession(
+  const { state: shareState, startShare, retryPush, cancel: cancelShare } = useShareSession(
     binderRepoDir,
     masterConversationKey,
     jwt,
@@ -148,8 +148,8 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
   if (shareState.phase === 'showing-qr' && shareState.qrPayload) {
     return (
       <>
-        <Stack.Screen options={{ title: 'Share with Doctor' }} />
-        <QRDisplay payload={shareState.qrPayload} onCancel={cancelShare} />
+        <Stack.Screen options={{ title: 'Share with Doctor', headerRight: () => null }} />
+        <QRDisplay payload={shareState.qrPayload} pushStatus={shareState.pushStatus} onRetry={retryPush} onCancel={cancelShare} />
       </>
     );
   }
@@ -182,12 +182,6 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
             Encrypting {shareState.progress.filesProcessed}/
             {shareState.progress.totalFiles} files...
           </Text>
-        </View>
-      )}
-      {shareState.phase === 'pushing-staging' && (
-        <View style={styles.shareProgress}>
-          <ActivityIndicator size="small" color="#007AFF" />
-          <Text style={styles.shareProgressText}>Uploading...</Text>
         </View>
       )}
       {shareState.phase === 'creating-session' && (

@@ -79,7 +79,7 @@ export default function BinderListScreen() {
     screenState.phase === 'displaying' ? screenState.repoId : '';
   const activeRepoDir = activeRepoId ? repoDir(activeRepoId) : '';
 
-  const { state: shareState, startShare, cancel: cancelShare } =
+  const { state: shareState, startShare, retryPush, cancel: cancelShare } =
     useShareSession(activeRepoDir, masterConversationKey, jwt);
 
   // --- Build auth config ---
@@ -349,16 +349,14 @@ export default function BinderListScreen() {
           {shareState.phase !== 'idle' && shareState.phase !== 'error' && (
             <View style={styles.shareOverlay}>
               {shareState.phase === 'showing-qr' && shareState.qrPayload ? (
-                <QRDisplay payload={shareState.qrPayload} onCancel={cancelShare} />
+                <QRDisplay payload={shareState.qrPayload} pushStatus={shareState.pushStatus} onRetry={retryPush} onCancel={cancelShare} />
               ) : (
                 <View style={styles.centered}>
                   <ActivityIndicator size="large" color="#111" />
                   <Text style={styles.loadingText}>
                     {shareState.phase === 're-encrypting'
                       ? `Re-encrypting${shareState.progress ? ` (${shareState.progress.filesProcessed}/${shareState.progress.totalFiles})` : '...'}`
-                      : shareState.phase === 'pushing-staging'
-                        ? 'Uploading staging repo...'
-                        : 'Creating session...'}
+                      : 'Creating session...'}
                   </Text>
                 </View>
               )}

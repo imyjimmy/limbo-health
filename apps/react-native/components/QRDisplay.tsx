@@ -10,17 +10,20 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import type { ScanQRPayload } from '../core/scan/ScanSession';
+import type { PushStatus } from '../hooks/useShareSession';
 
 // --- Props ---
 
 interface QRDisplayProps {
   payload: ScanQRPayload;
+  pushStatus?: PushStatus;
+  onRetry?: () => void;
   onCancel: () => void;
 }
 
 // --- Component ---
 
-export function QRDisplay({ payload, onCancel }: QRDisplayProps) {
+export function QRDisplay({ payload, pushStatus, onRetry, onCancel }: QRDisplayProps) {
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
     Math.max(0, Math.floor((payload.expiresAt * 1000 - Date.now()) / 1000)),
   );
@@ -78,6 +81,21 @@ export function QRDisplay({ payload, onCancel }: QRDisplayProps) {
           ? 'Session expired'
           : `${minutes}:${seconds.toString().padStart(2, '0')} remaining`}
       </Text>
+
+      {(pushStatus === 'slow' || pushStatus === 'failed') && (
+        <View style={[styles.pill, pushStatus === 'failed' && styles.pillError]}>
+          <Text style={[styles.pillText, pushStatus === 'failed' && styles.pillTextError]}>
+            {pushStatus === 'failed'
+              ? 'Upload failed'
+              : 'Slow connection — uploading records...'}
+          </Text>
+          {pushStatus === 'failed' && onRetry && (
+            <Pressable onPress={onRetry} style={styles.retryButton}>
+              <Text style={styles.retryText}>Retry</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
       <Pressable style={styles.cancelButton} onPress={onCancel}>
         <Text style={styles.cancelButtonText}>Done</Text>
@@ -139,6 +157,39 @@ const styles = StyleSheet.create({
   },
   timerExpired: {
     color: '#c00',
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3CD',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+    gap: 8,
+  },
+  pillError: {
+    backgroundColor: '#F8D7DA',
+  },
+  pillText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#856404',
+    textAlign: 'center',
+  },
+  pillTextError: {
+    color: '#721C24',
+  },
+  retryButton: {
+    backgroundColor: '#721C24',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  retryText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
   },
   cancelButton: {
     backgroundColor: '#f5f5f5',
