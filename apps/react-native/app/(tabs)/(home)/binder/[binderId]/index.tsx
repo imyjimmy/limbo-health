@@ -1,49 +1,43 @@
 // app/binder/[binderId]/index.tsx
-// Binder detail screen: patient info card + category grid / timeline toggle.
+// Binder root: same DirectoryList as every other level, plus share button.
 
-import React, { useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { IconShare3 } from '@tabler/icons-react-native';
-import { useBinderDetail } from '../../../../../hooks/useBinderDetail';
-import { PatientInfoCard } from '../../../../../components/binder/PatientInfoCard';
-import { CategoryGrid } from '../../../../../components/binder/CategoryGrid';
+import { DirectoryList } from '../../../../../components/binder/DirectoryList';
+import { useDirectoryContents } from '../../../../../hooks/useDirectoryContents';
 import { QRDisplay } from '../../../../../components/QRDisplay';
 import { useShareSession } from '../../../../../hooks/useShareSession';
-import type { Category } from '../../../../../core/binder/categories';
 import { useAuthContext } from '../../../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../../../providers/CryptoProvider';
+import { BinderService } from '../../../../../core/binder/BinderService';
+import { getCategory } from '../../../../../core/binder/categories';
+import type { DirFolder, DirEntry } from '../../../../../core/binder/DirectoryReader';
 
 export default function BinderDetailScreen() {
   const { binderId } = useLocalSearchParams<{ binderId: string }>();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'categories' | 'timeline'>(
-    'categories',
-  );
 
   const { state: authState } = useAuthContext();
   const { masterConversationKey } = useCryptoContext();
   const jwt = authState.status === 'authenticated' ? authState.jwt : null;
 
-  const binderInfo = useMemo(() => {
-    if (!jwt || !binderId) return null;
-    return {
-      repoId: binderId,
-      repoDir: `binders/${binderId}`,
-      auth: { type: 'jwt' as const, token: jwt },
-    };
-  }, [binderId, jwt]);
+  const binderService = useMemo(() => {
+    if (!masterConversationKey || !jwt || !binderId) return null;
+    return new BinderService(
+      {
+        repoId: binderId,
+        repoDir: `binders/${binderId}`,
+        auth: { type: 'jwt' as const, token: jwt },
+      },
+      masterConversationKey,
+    );
+  }, [binderId, masterConversationKey, jwt]);
 
-  const { binderService, patientInfo, loading, error } = useBinderDetail(
-    binderInfo,
-    masterConversationKey,
+  const { items, loading, error, refresh } = useDirectoryContents(
+    binderService,
+    '', // root directory
   );
 
   const binderRepoDir = `binders/${binderId}`;
@@ -53,17 +47,25 @@ export default function BinderDetailScreen() {
     jwt,
   );
 
-  const handleCategoryPress = (category: Category) => {
-    router.push(`/binder/${binderId}/browse/${category.folder}`);
-  };
+  const handleNavigateFolder = useCallback(
+    (folder: DirFolder) => {
+      router.push(`/binder/${binderId}/browse/${folder.relativePath}`);
+    },
+    [router, binderId],
+  );
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
+  const handleOpenEntry = useCallback(
+    (entry: DirEntry) => {
+      router.push(`/binder/${binderId}/entry/${entry.relativePath}`);
+    },
+    [router, binderId],
+  );
+
+  // Resolve emoji/color for root-level folders from category definitions
+  const getFolderIcon = useCallback((folder: DirFolder) => {
+    const cat = getCategory(folder.name);
+    return cat ? { emoji: cat.emoji, color: cat.color } : {};
+  }, []);
 
   // Full-screen QR display when sharing
   if (shareState.phase === 'showing-qr' && shareState.qrPayload) {
@@ -81,7 +83,7 @@ export default function BinderDetailScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'My Binder',
+          title: 'Binder',
           headerRight: () => (
             <TouchableOpacity
               onPress={startShare}
@@ -128,78 +130,22 @@ export default function BinderDetailScreen() {
         </View>
       )}
 
-      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-        {/* Patient info */}
-        {patientInfo ? (
-          <PatientInfoCard doc={patientInfo} />
-        ) : (
-          <View style={styles.patientPlaceholder}>
-            <Text style={styles.placeholderText}>
-              {error ?? 'Loading patient info...'}
-            </Text>
-          </View>
-        )}
-
-        {/* Tab toggle */}
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'categories' && styles.activeTab]}
-            onPress={() => setActiveTab('categories')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'categories' && styles.activeTabText,
-              ]}
-            >
-              Categories
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'timeline' && styles.activeTab]}
-            onPress={() => setActiveTab('timeline')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === 'timeline' && styles.activeTabText,
-              ]}
-            >
-              Timeline
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Content */}
-        {activeTab === 'categories' ? (
-          <CategoryGrid onSelectCategory={handleCategoryPress} />
-        ) : (
-          <View style={styles.timelinePlaceholder}>
-            <Text style={styles.placeholderText}>
-              Timeline view -- coming soon
-            </Text>
-          </View>
-        )}
-      </ScrollView>
+      <DirectoryList
+        items={items}
+        loading={loading}
+        error={error}
+        onNavigateFolder={handleNavigateFolder}
+        onOpenEntry={handleOpenEntry}
+        onRefresh={refresh}
+        getFolderIcon={getFolderIcon}
+      />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#fafafa',
-  },
-  content: {
-    paddingBottom: 40,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   headerButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 6,
   },
   shareProgress: {
@@ -232,55 +178,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF',
     paddingLeft: 12,
-  },
-  patientPlaceholder: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
-    padding: 24,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e0e0e0',
-  },
-  placeholderText: {
-    fontSize: 14,
-    color: '#999',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 12,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    padding: 2,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  activeTab: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#888',
-  },
-  activeTabText: {
-    color: '#1a1a1a',
-  },
-  timelinePlaceholder: {
-    padding: 40,
-    alignItems: 'center',
   },
 });

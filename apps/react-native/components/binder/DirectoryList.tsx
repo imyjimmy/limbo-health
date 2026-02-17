@@ -3,7 +3,6 @@
 // Shows folders and .json entry cards from a binder directory.
 // Tap folder -> onNavigateFolder callback.
 // Tap entry -> onOpenEntry callback.
-// FAB "+" -> onAddEntry callback with current dirPath.
 
 import React from 'react';
 import {
@@ -24,10 +23,14 @@ interface DirectoryListProps {
   error: string | null;
   onNavigateFolder: (folder: DirFolder) => void;
   onOpenEntry: (entry: DirEntry) => void;
-  onAddEntry: () => void;
   onRefresh: () => void;
   /** Optional header component (e.g., breadcrumb) */
   ListHeaderComponent?: React.ReactElement;
+  /** Callback to resolve emoji/color for a folder (from category metadata) */
+  getFolderIcon?: (folder: DirFolder) => { emoji?: string; color?: string };
+  /** If provided, renders an inline "Add a new ..." row at the bottom */
+  onAddSubfolder?: () => void;
+  addSubfolderLabel?: string;
 }
 
 export function DirectoryList({
@@ -36,13 +39,23 @@ export function DirectoryList({
   error,
   onNavigateFolder,
   onOpenEntry,
-  onAddEntry,
   onRefresh,
   ListHeaderComponent,
+  getFolderIcon,
+  onAddSubfolder,
+  addSubfolderLabel,
 }: DirectoryListProps) {
   const renderItem = ({ item }: { item: DirItem }) => {
     if (item.kind === 'folder') {
-      return <FolderRow item={item} onPress={onNavigateFolder} />;
+      const iconInfo = getFolderIcon?.(item);
+      return (
+        <FolderRow
+          item={item}
+          emoji={item.meta?.icon ?? iconInfo?.emoji}
+          iconColor={item.meta?.color ?? iconInfo?.color}
+          onPress={onNavigateFolder}
+        />
+      );
     }
     return <EntryCard item={item} onPress={onOpenEntry} />;
   };
@@ -82,19 +95,26 @@ export function DirectoryList({
             </Text>
           </View>
         }
+        ListFooterComponent={
+          onAddSubfolder ? (
+            <TouchableOpacity
+              style={styles.addSubfolderRow}
+              onPress={onAddSubfolder}
+              activeOpacity={0.6}
+            >
+              <View style={styles.addSubfolderIconContainer}>
+                <Text style={styles.addSubfolderPlus}>+</Text>
+              </View>
+              <Text style={styles.addSubfolderText}>
+                {addSubfolderLabel ?? 'Add new...'}
+              </Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
         refreshing={loading}
         onRefresh={onRefresh}
         contentContainerStyle={items.length === 0 ? styles.emptyContainer : undefined}
       />
-
-      {/* FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={onAddEntry}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -145,25 +165,32 @@ const styles = StyleSheet.create({
     color: '#bbb',
     marginTop: 4,
   },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#1a73e8',
+  addSubfolderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e5e5e5',
+  },
+  addSubfolderIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    marginRight: 12,
   },
-  fabIcon: {
-    fontSize: 28,
-    color: '#fff',
-    lineHeight: 30,
+  addSubfolderPlus: {
+    fontSize: 20,
+    color: '#999',
+    fontWeight: '300',
+  },
+  addSubfolderText: {
+    fontSize: 16,
+    color: '#999',
+    fontWeight: '400',
   },
 });

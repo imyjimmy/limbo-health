@@ -6,7 +6,7 @@
 
 import React, { useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { NoteEditor } from '../../../../../../components/editor/NoteEditor';
 import { BinderService } from '../../../../../../core/binder/BinderService';
 import { slugify } from '../../../../../../core/binder/FileNaming';
@@ -91,11 +91,14 @@ export default function NewEntryScreen() {
   }, [router]);
 
   return (
+    <>
+    <Stack.Screen options={{ headerShown: false }} />
     <NoteEditor
       dirPath={dirPath ?? '/'}
       categoryType={categoryType ?? 'note'}
       onSave={handleSave}
       onCancel={handleCancel}
     />
+    </>
   );
 }

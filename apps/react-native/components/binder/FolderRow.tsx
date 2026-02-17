@@ -6,21 +6,26 @@ import type { DirFolder } from '../../core/binder/DirectoryReader';
 
 interface FolderRowProps {
   item: DirFolder;
+  emoji?: string;
+  iconColor?: string;
   onPress: (folder: DirFolder) => void;
 }
 
-export function FolderRow({ item, onPress }: FolderRowProps) {
+export function FolderRow({ item, emoji, iconColor, onPress }: FolderRowProps) {
+  const bgTint = iconColor ? iconColor + '18' : '#f0f0f0';
+  const displayName = item.meta?.displayName ?? formatFolderName(item.name);
+
   return (
     <TouchableOpacity
       style={styles.container}
       onPress={() => onPress(item)}
       activeOpacity={0.6}
     >
-      <View style={styles.iconContainer}>
-        <Text style={styles.icon}>📁</Text>
+      <View style={[styles.iconContainer, { backgroundColor: bgTint }]}>
+        <Text style={styles.emoji}>{emoji ?? '📁'}</Text>
       </View>
       <View style={styles.textContainer}>
-        <Text style={styles.name}>{formatFolderName(item.name)}</Text>
+        <Text style={styles.name}>{displayName}</Text>
       </View>
       <Text style={styles.chevron}>›</Text>
     </TouchableOpacity>
@@ -49,12 +54,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  icon: {
+  emoji: {
     fontSize: 20,
   },
   textContainer: {

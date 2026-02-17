@@ -2,15 +2,19 @@
 // Generic directory browser. Works at any depth.
 // URL: /binder/<id>/browse/visits  or  /binder/<id>/browse/conditions/back-acne
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Alert, TouchableOpacity, Text } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { DirectoryList } from '../../../../../../components/binder/DirectoryList';
+import { NewFolderModal } from '../../../../../../components/binder/NewFolderModal';
 import { useDirectoryContents } from '../../../../../../hooks/useDirectoryContents';
 import type { DirFolder, DirEntry } from '../../../../../../core/binder/DirectoryReader';
 import { useAuthContext } from '../../../../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../../../../providers/CryptoProvider';
 import { BinderService } from '../../../../../../core/binder/BinderService';
-import { categoryFromPath } from '../../../../../../core/binder/categories';
+import { categoryFromPath, getCategory } from '../../../../../../core/binder/categories';
+import { slugify } from '../../../../../../core/binder/FileNaming';
+import { createConditionOverview } from '../../../../../../core/binder/DocumentModel';
 
 export default function BrowseDirectoryScreen() {
   const { binderId, path } = useLocalSearchParams<{
@@ -60,11 +64,65 @@ export default function BrowseDirectoryScreen() {
     });
   };
 
+  // Resolve emoji/color for folders from category metadata
+  const topLevelCategory = categoryFromPath(dirPath);
+  const getFolderIcon = useCallback(
+    (folder: DirFolder) => {
+      // If we're at root, each folder IS a category
+      if (!dirPath || dirPath === '/') {
+        const cat = getCategory(folder.name);
+        return cat ? { emoji: cat.emoji, color: cat.color } : {};
+      }
+      // Inside a category, subfolders inherit the parent category's emoji
+      const parentCat = getCategory(topLevelCategory);
+      return parentCat ? { emoji: parentCat.emoji, color: parentCat.color } : {};
+    },
+    [dirPath, topLevelCategory],
+  );
+
+  // --- New folder modal ---
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const isConditionsDir = dirPath === 'conditions';
+  const parentCat = getCategory(topLevelCategory);
+
+  const handleAddCondition = useCallback(
+    async (name: string, emoji: string, color: string) => {
+      if (!binderService) return;
+      setShowNewFolder(false);
+      const slug = slugify(name);
+      const overviewDoc = createConditionOverview(slug, name);
+      try {
+        await binderService.createSubfolder(
+          `conditions/${slug}`,
+          name,
+          overviewDoc,
+          { icon: emoji, color },
+        );
+        refresh();
+      } catch (err: any) {
+        const message = err?.message ?? '';
+        const isPushError = message.includes('push') || message.includes('network') || message.includes('401');
+        if (isPushError) {
+          console.warn('Push failed, condition created locally:', message);
+          refresh();
+        } else {
+          Alert.alert('Error', 'Failed to create condition. Please try again.');
+        }
+      }
+    },
+    [binderService, refresh],
+  );
+
   return (
     <>
       <Stack.Screen
         options={{
           title: dirDisplayName,
+          headerRight: () => (
+            <TouchableOpacity onPress={handleAddEntry} style={{ paddingHorizontal: 8 }}>
+              <Text style={{ color: '#007AFF', fontSize: 24, fontWeight: '300' }}>+</Text>
+            </TouchableOpacity>
+          ),
         }}
       />
       <DirectoryList
@@ -73,8 +131,18 @@ export default function BrowseDirectoryScreen() {
         error={error}
         onNavigateFolder={handleNavigateFolder}
         onOpenEntry={handleOpenEntry}
-        onAddEntry={handleAddEntry}
         onRefresh={refresh}
+        getFolderIcon={getFolderIcon}
+        onAddSubfolder={isConditionsDir ? () => setShowNewFolder(true) : undefined}
+        addSubfolderLabel={isConditionsDir ? 'Add a new condition...' : undefined}
+      />
+      <NewFolderModal
+        visible={showNewFolder}
+        title="New Condition"
+        defaultEmoji={parentCat?.emoji ?? '❤️‍🩹'}
+        defaultColor={parentCat?.color ?? '#E74C3C'}
+        onConfirm={handleAddCondition}
+        onCancel={() => setShowNewFolder(false)}
       />
     </>
   );

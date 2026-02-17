@@ -14,8 +14,7 @@ export default function HomeStack() {
       <Stack.Screen
         name="binder"
         options={{
-          headerShown: true,
-          headerStatusBarHeight: insets.top,
+          headerShown: false,
         }}
       />
     </Stack>

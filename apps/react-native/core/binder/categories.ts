@@ -15,7 +15,9 @@ export interface Category {
   slug: string;
   label: string;
   folder: string;          // path relative to repo root
-  icon: string;            // Tabler icon name (for future UI)
+  icon: string;            // Tabler icon name (for future custom icon picker)
+  emoji: string;           // Emoji displayed in folder rows
+  color: string;           // Tint color for folder icon background
   templateFn?: () => MedicalDocument;
 }
 
@@ -27,6 +29,8 @@ const CATEGORIES: Category[] = [
     label: 'Visits',
     folder: 'visits',
     icon: 'stethoscope',
+    emoji: '🩺',
+    color: '#4A90D9',
     templateFn: () => createVisitNote(),
   },
   {
@@ -34,6 +38,8 @@ const CATEGORIES: Category[] = [
     label: 'Conditions',
     folder: 'conditions',
     icon: 'heartbeat',
+    emoji: '❤️‍🩹',
+    color: '#E74C3C',
     // No single template — conditions use subfolders per condition
   },
   {
@@ -41,6 +47,8 @@ const CATEGORIES: Category[] = [
     label: 'Lab Results',
     folder: 'labs',
     icon: 'test-pipe',
+    emoji: '🧪',
+    color: '#27AE60',
     templateFn: () => createLabResult(''),
   },
   {
@@ -48,6 +56,8 @@ const CATEGORIES: Category[] = [
     label: 'Medications',
     folder: 'medications',
     icon: 'pill',
+    emoji: '💊',
+    color: '#8E44AD',
     templateFn: () => createMedication(''),
   },
   {
@@ -55,30 +65,40 @@ const CATEGORIES: Category[] = [
     label: 'Immunizations',
     folder: 'immunizations',
     icon: 'vaccine',
+    emoji: '💉',
+    color: '#16A085',
   },
   {
     slug: 'allergies',
     label: 'Allergies',
     folder: 'allergies',
     icon: 'alert-triangle',
+    emoji: '⚠️',
+    color: '#E67E22',
   },
   {
     slug: 'procedures',
     label: 'Procedures',
     folder: 'procedures',
     icon: 'cut',
+    emoji: '🔬',
+    color: '#7F8C8D',
   },
   {
     slug: 'imaging',
     label: 'Imaging',
     folder: 'imaging',
     icon: 'photo-scan',
+    emoji: '📷',
+    color: '#5B6ABF',
   },
   {
     slug: 'documents',
     label: 'Documents',
     folder: 'documents',
     icon: 'file-text',
+    emoji: '📄',
+    color: '#566573',
   },
 ];
 

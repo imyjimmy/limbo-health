@@ -20,11 +20,18 @@ export interface DirFS {
 
 // --- Types ---
 
+export interface FolderMeta {
+  displayName?: string;
+  icon?: string;
+  color?: string;
+}
+
 export interface DirFolder {
   kind: 'folder';
   name: string;
   /** Path relative to repo root, e.g. 'conditions/back-acne' */
   relativePath: string;
+  meta?: FolderMeta;
 }
 
 export interface DirEntry {
@@ -86,10 +93,22 @@ export async function readDirectory(
       const relativePath = childPath.startsWith('/')
         ? childPath.slice(1)
         : childPath;
+
+      // Try to read .meta.json for display metadata (icon, color, displayName)
+      let meta: FolderMeta | undefined;
+      if (children.includes('.meta.json')) {
+        try {
+          meta = await io.readJSON<FolderMeta>(childPath + '/.meta.json');
+        } catch {
+          // .meta.json missing or corrupt — use defaults
+        }
+      }
+
       items.push({
         kind: 'folder',
         name,
         relativePath,
+        meta,
       });
     } else if (name.endsWith('.json')) {
       const relativePath = childPath.startsWith('/')

@@ -89,6 +89,28 @@ export class EncryptedIO {
     await this.writeSidecarWithKey(path, binaryData, this.masterConversationKey);
   }
 
+  // --- Generic encrypted JSON (for .meta.json and other non-document files) ---
+
+  /**
+   * Read and decrypt an arbitrary JSON file using the master key.
+   */
+  async readJSON<T = unknown>(path: string): Promise<T> {
+    const ciphertext = (await this.fs.promises.readFile(path, {
+      encoding: 'utf8',
+    })) as string;
+    const plaintext = decrypt(ciphertext, this.masterConversationKey);
+    return JSON.parse(plaintext) as T;
+  }
+
+  /**
+   * Encrypt and write an arbitrary JSON object using the master key.
+   */
+  async writeJSON(path: string, obj: unknown): Promise<void> {
+    const plaintext = JSON.stringify(obj);
+    const ciphertext = encrypt(plaintext, this.masterConversationKey);
+    await this.fs.promises.writeFile(path, ciphertext, { encoding: 'utf8' });
+  }
+
   // --- Explicit key operations (scan re-encryption pipeline) ---
 
   /**
