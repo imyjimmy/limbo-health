@@ -1,7 +1,7 @@
 // components/binder/FolderRow.tsx
 
 import React from 'react';
-import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+import { Animated, TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import type { DirFolder } from '../../core/binder/DirectoryReader';
 
 interface FolderRowProps {
@@ -9,9 +9,11 @@ interface FolderRowProps {
   emoji?: string;
   iconColor?: string;
   onPress: (folder: DirFolder) => void;
+  /** Animated value 0→1 driving the "delete multiple items" pill visibility */
+  deleteWarningAnim?: Animated.Value;
 }
 
-export function FolderRow({ item, emoji, iconColor, onPress }: FolderRowProps) {
+export function FolderRow({ item, emoji, iconColor, onPress, deleteWarningAnim }: FolderRowProps) {
   const bgTint = iconColor ? iconColor + '18' : '#f0f0f0';
   const displayName = item.meta?.displayName ?? formatFolderName(item.name);
 
@@ -27,6 +29,24 @@ export function FolderRow({ item, emoji, iconColor, onPress }: FolderRowProps) {
       <View style={styles.textContainer}>
         <Text style={styles.name}>{displayName}</Text>
       </View>
+      {deleteWarningAnim && (
+        <Animated.View
+          style={[
+            styles.deletePill,
+            {
+              opacity: deleteWarningAnim,
+              transform: [{
+                scale: deleteWarningAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.8, 1],
+                }),
+              }],
+            },
+          ]}
+        >
+          <Text style={styles.deletePillText}>delete multiple items?</Text>
+        </Animated.View>
+      )}
       <Text style={styles.chevron}>›</Text>
     </TouchableOpacity>
   );
@@ -68,6 +88,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#1a1a1a',
+  },
+  deletePill: {
+    backgroundColor: '#E57373',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginLeft: 4,
+  },
+  deletePillText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
   },
   chevron: {
     fontSize: 22,

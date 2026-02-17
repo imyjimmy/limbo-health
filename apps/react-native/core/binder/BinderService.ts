@@ -219,6 +219,63 @@ export class BinderService {
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
   }
 
+  // --- Delete ---
+
+  /**
+   * Delete a single entry (.json) and its .enc sidecar if one exists.
+   * Git rm, commit, push.
+   */
+  async deleteEntry(entryPath: string): Promise<void> {
+    const filesToRemove = [entryPath];
+    const encPath = sidecarPathFrom(entryPath);
+
+    // Check if sidecar exists
+    const allFiles = await GitEngine.listFiles(this.info.repoDir);
+    if (allFiles.includes(encPath)) {
+      filesToRemove.push(encPath);
+    }
+
+    await GitEngine.removeFiles(
+      this.info.repoDir,
+      filesToRemove,
+      `Delete ${entryPath.split('/').pop()}`,
+    );
+    try {
+      await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    } catch (err: any) {
+      console.warn('Push failed after delete, changes saved locally:', err?.message);
+    }
+  }
+
+  /**
+   * Delete a folder and all its tracked contents.
+   * Git rm all files under the folder, remove the directory, commit, push.
+   */
+  async deleteFolder(folderPath: string): Promise<void> {
+    const files = await GitEngine.listFilesUnder(this.info.repoDir, folderPath);
+    if (files.length === 0) return;
+
+    await GitEngine.removeFiles(
+      this.info.repoDir,
+      files,
+      `Delete folder ${folderPath.split('/').pop()}`,
+    );
+
+    // Try to remove the now-empty directory from disk
+    const fs = createFSAdapter(this.info.repoDir);
+    try {
+      await fs.promises.rmdir('/' + folderPath);
+    } catch {
+      // Directory may already be gone or not fully empty
+    }
+
+    try {
+      await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    } catch (err: any) {
+      console.warn('Push failed after delete, changes saved locally:', err?.message);
+    }
+  }
+
   // --- Update ---
 
   /**

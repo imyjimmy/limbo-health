@@ -32,6 +32,8 @@ export interface DirFolder {
   /** Path relative to repo root, e.g. 'conditions/back-acne' */
   relativePath: string;
   meta?: FolderMeta;
+  /** Number of visible children (excludes .meta.json, dotfiles, .enc sidecars) */
+  childCount: number;
 }
 
 export interface DirEntry {
@@ -96,6 +98,11 @@ export async function readDirectory(
         ? childPath.slice(1)
         : childPath;
 
+      // Count visible children (exclude dotfiles except .meta.json, exclude .enc sidecars)
+      const childCount = children.filter(
+        (c: string) => !c.startsWith('.') && !c.endsWith('.enc'),
+      ).length;
+
       // Try to read .meta.json for display metadata (icon, color, displayName)
       let meta: FolderMeta | undefined;
       if (children.includes('.meta.json')) {
@@ -111,6 +118,7 @@ export async function readDirectory(
         name,
         relativePath,
         meta,
+        childCount,
       });
     } else if (name.endsWith('.json')) {
       const relativePath = childPath.startsWith('/')

@@ -173,6 +173,49 @@ export class GitEngine {
   }
 
   /**
+   * List tracked files under a given path prefix.
+   * E.g., listFilesUnder(repoDir, 'conditions/back-acne') returns all files in that subtree.
+   */
+  static async listFilesUnder(repoDir: string, prefix: string): Promise<string[]> {
+    const all = await GitEngine.listFiles(repoDir);
+    const normalized = prefix.endsWith('/') ? prefix : prefix + '/';
+    return all.filter((f) => f.startsWith(normalized));
+  }
+
+  /**
+   * Remove files from git index and working tree, then commit.
+   * Counterpart to commitEntry — stages removals instead of additions.
+   */
+  static async removeFiles(
+    repoDir: string,
+    filePaths: string[],
+    message: string,
+  ): Promise<string> {
+    const fs = createFSAdapter(repoDir);
+    const dir = '/';
+
+    for (const filepath of filePaths) {
+      const relative = filepath.startsWith('/') ? filepath.slice(1) : filepath;
+      await git.remove({ fs, dir, filepath: relative });
+      // Also delete from working tree
+      try {
+        await fs.promises.unlink('/' + relative);
+      } catch {
+        // File may already be gone from disk
+      }
+    }
+
+    const oid = await git.commit({
+      fs,
+      dir,
+      message,
+      author: AUTHOR,
+    });
+
+    return oid;
+  }
+
+  /**
    * Stage all files in the working tree (like `git add .`).
    * Useful for the staging repo in the scan flow.
    */

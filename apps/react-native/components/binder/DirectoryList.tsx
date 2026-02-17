@@ -4,7 +4,7 @@
 // Tap folder -> onNavigateFolder callback.
 // Tap entry -> onOpenEntry callback.
 
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   FlatList,
   View,
@@ -13,9 +13,11 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import type Swipeable from 'react-native-gesture-handler/Swipeable';
 import type { DirItem, DirFolder, DirEntry } from '../../core/binder/DirectoryReader';
 import { FolderRow } from './FolderRow';
 import { EntryCard } from './EntryCard';
+import { SwipeableRow } from './SwipeableRow';
 
 interface DirectoryListProps {
   items: DirItem[];
@@ -31,6 +33,8 @@ interface DirectoryListProps {
   /** If provided, renders an inline "Add a new ..." row at the bottom */
   onAddSubfolder?: () => void;
   addSubfolderLabel?: string;
+  /** If provided, enables swipe-to-delete on each row */
+  onDeleteItem?: (item: DirItem) => void;
 }
 
 export function DirectoryList({
@@ -44,20 +48,77 @@ export function DirectoryList({
   getFolderIcon,
   onAddSubfolder,
   addSubfolderLabel,
+  onDeleteItem,
 }: DirectoryListProps) {
+  // Track the currently open swipeable so only one row is open at a time
+  const openSwipeableRef = useRef<Swipeable | null>(null);
+
+  const handleSwipeOpen = useCallback((ref: Swipeable) => {
+    if (openSwipeableRef.current && openSwipeableRef.current !== ref) {
+      openSwipeableRef.current.close();
+    }
+    openSwipeableRef.current = ref;
+  }, []);
+
   const renderItem = ({ item }: { item: DirItem }) => {
+    if (!onDeleteItem) {
+      // No delete support — render plain rows
+      if (item.kind === 'folder') {
+        const iconInfo = getFolderIcon?.(item);
+        return (
+          <FolderRow
+            item={item}
+            emoji={item.meta?.icon ?? iconInfo?.emoji}
+            iconColor={item.meta?.color ?? iconInfo?.color}
+            onPress={onNavigateFolder}
+          />
+        );
+      }
+      return <EntryCard item={item} onPress={onOpenEntry} />;
+    }
+
+    const isWarningFolder = item.kind === 'folder' && item.childCount > 0;
+
     if (item.kind === 'folder') {
       const iconInfo = getFolderIcon?.(item);
       return (
-        <FolderRow
-          item={item}
-          emoji={item.meta?.icon ?? iconInfo?.emoji}
-          iconColor={item.meta?.color ?? iconInfo?.color}
-          onPress={onNavigateFolder}
-        />
+        <SwipeableRow
+          showWarning={isWarningFolder}
+          onDelete={() => onDeleteItem(item)}
+          onSwipeOpen={handleSwipeOpen}
+        >
+          {isWarningFolder
+            ? (warningAnim) => (
+                <FolderRow
+                  item={item}
+                  emoji={item.meta?.icon ?? iconInfo?.emoji}
+                  iconColor={item.meta?.color ?? iconInfo?.color}
+                  onPress={onNavigateFolder}
+                  deleteWarningAnim={warningAnim}
+                />
+              )
+            : (
+                <FolderRow
+                  item={item}
+                  emoji={item.meta?.icon ?? iconInfo?.emoji}
+                  iconColor={item.meta?.color ?? iconInfo?.color}
+                  onPress={onNavigateFolder}
+                />
+              )
+          }
+        </SwipeableRow>
       );
     }
-    return <EntryCard item={item} onPress={onOpenEntry} />;
+
+    return (
+      <SwipeableRow
+        showWarning={false}
+        onDelete={() => onDeleteItem(item)}
+        onSwipeOpen={handleSwipeOpen}
+      >
+        <EntryCard item={item} onPress={onOpenEntry} />
+      </SwipeableRow>
+    );
   };
 
   if (loading && items.length === 0) {

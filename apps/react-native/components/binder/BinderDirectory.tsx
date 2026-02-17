@@ -18,7 +18,7 @@ import { useAuthContext } from '../../providers/AuthProvider';
 import { useCryptoContext } from '../../providers/CryptoProvider';
 import { BinderService } from '../../core/binder/BinderService';
 import { slugify } from '../../core/binder/FileNaming';
-import type { DirFolder, DirEntry } from '../../core/binder/DirectoryReader';
+import type { DirFolder, DirEntry, DirItem } from '../../core/binder/DirectoryReader';
 
 interface BinderDirectoryProps {
   binderId: string;
@@ -80,6 +80,34 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
       color: folder.meta?.color,
     }),
     [],
+  );
+
+  // --- Delete item ---
+  const handleDeleteItem = useCallback(
+    async (item: DirItem) => {
+      if (!binderService) return;
+      try {
+        if (item.kind === 'folder') {
+          await binderService.deleteFolder(item.relativePath);
+        } else {
+          await binderService.deleteEntry(item.relativePath);
+        }
+        refresh();
+      } catch (err: any) {
+        const message = err?.message ?? '';
+        const isPushError =
+          message.includes('push') ||
+          message.includes('network') ||
+          message.includes('401');
+        if (isPushError) {
+          console.warn('Push failed after delete, changes saved locally:', message);
+          refresh();
+        } else {
+          Alert.alert('Error', 'Failed to delete. Please try again.');
+        }
+      }
+    },
+    [binderService, refresh],
   );
 
   // --- Add folder ---
@@ -187,6 +215,7 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
         getFolderIcon={getFolderIcon}
         onAddSubfolder={() => setShowNewFolder(true)}
         addSubfolderLabel="Add a new folder..."
+        onDeleteItem={handleDeleteItem}
       />
       <NewFolderModal
         visible={showNewFolder}
