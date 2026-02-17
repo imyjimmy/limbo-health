@@ -85,22 +85,36 @@ export function NoteEditor({
     bridgeExtensions: [...TenTapStartKit, MarkdownBridge],
   });
 
-  // Load existing markdown content once the editor bridge is connected.
-  // The editor ref from useEditorBridge may update when the WebView connects,
-  // so we depend on it — but use a ref guard to only load content once.
-  const hasLoadedContent = useRef(false);
-  useEffect(() => {
-    if (hasLoadedContent.current) return;
-    if (!initialDoc?.value) return;
-    const bodyMarkdown = initialDoc.value.replace(/^#\s+.+\n*/, '').trim();
-    if (!bodyMarkdown) return;
+  // --- Load existing content into the editor after WebView is ready ---
+  // On iOS, RichText forces a WebView reload (key change workaround), so there
+  // are always TWO WebView loads. We track loads via the onLoad callback and
+  // call setMarkdown after the final load + a short delay for tiptap to init.
+  const loadCountRef = useRef(0);
+  const hasSetContent = useRef(false);
+  const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const timer = setTimeout(() => {
-      editor.setMarkdown(bodyMarkdown);
-      hasLoadedContent.current = true;
-      setEditorReady(true);
-    }, 300);
-    return () => clearTimeout(timer);
+  const handleEditorLoad = useCallback(() => {
+    loadCountRef.current += 1;
+    if (hasSetContent.current) return;
+    if (!initialDoc?.value) return;
+
+    const targetLoads = Platform.OS === 'ios' ? 2 : 1;
+    if (loadCountRef.current < targetLoads) return;
+
+    const bodyMarkdown = initialDoc.value.replace(/^#\s+.+\n*/, '').trim();
+    if (!bodyMarkdown) { setEditorReady(true); return; }
+
+    // Clear any prior timer (shouldn't happen, but be safe)
+    if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+
+    // Wait for tiptap to initialize after WebView finishes loading
+    contentTimerRef.current = setTimeout(() => {
+      if (!hasSetContent.current) {
+        editor.setMarkdown(bodyMarkdown);
+        hasSetContent.current = true;
+        setEditorReady(true);
+      }
+    }, 400);
   }, [editor, initialDoc]);
 
   const { capture } = useCamera();
@@ -218,7 +232,7 @@ export function NoteEditor({
 
       {/* Rich text editor */}
       <View style={styles.editorContainer}>
-        <RichText editor={editor} />
+        <RichText editor={editor} onLoad={handleEditorLoad} />
         {!editorReady && (
           <View style={styles.editorOverlay}>
             <ActivityIndicator size="small" color="#999" />
