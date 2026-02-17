@@ -53,6 +53,11 @@ export class BinderService {
     return this.dirCacheKey(parent);
   }
 
+  /** Synchronous cache peek — returns cached items or undefined. */
+  peekDirCache(dirPath: string): DirItem[] | undefined {
+    return dirGet(this.dirCacheKey(dirPath));
+  }
+
   // --- Create ---
 
   /**
