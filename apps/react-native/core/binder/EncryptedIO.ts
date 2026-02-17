@@ -20,6 +20,7 @@ import {
   serializeDEKFile,
   parseDEKFile,
 } from '../crypto/dek';
+import { ptGet, ptSet } from './BinderCache';
 import type { MedicalDocument } from '../../types/document';
 
 // --- FS interface (subset of fsAdapter) ---
@@ -43,10 +44,16 @@ export interface EncryptedFS {
 export class EncryptedIO {
   private fs: EncryptedFS;
   private masterConversationKey: Uint8Array;
+  private repoDir: string;
 
-  constructor(fs: EncryptedFS, masterConversationKey: Uint8Array) {
+  constructor(fs: EncryptedFS, masterConversationKey: Uint8Array, repoDir: string) {
     this.fs = fs;
     this.masterConversationKey = masterConversationKey;
+    this.repoDir = repoDir;
+  }
+
+  private cacheKey(path: string): string {
+    return `${this.repoDir}:${path}`;
   }
 
   // --- Master key operations ---
@@ -55,11 +62,17 @@ export class EncryptedIO {
    * Read and decrypt a .json medical document using the master key.
    */
   async readDocument(path: string): Promise<MedicalDocument> {
+    const key = this.cacheKey(path);
+    const cached = ptGet(key);
+    if (cached !== undefined) return cached as MedicalDocument;
+
     const ciphertext = (await this.fs.promises.readFile(path, {
       encoding: 'utf8',
     })) as string;
     const plaintext = decrypt(ciphertext, this.masterConversationKey);
-    return JSON.parse(plaintext) as MedicalDocument;
+    const doc = JSON.parse(plaintext) as MedicalDocument;
+    ptSet(key, doc);
+    return doc;
   }
 
   /**
@@ -69,6 +82,7 @@ export class EncryptedIO {
     const plaintext = JSON.stringify(doc);
     const ciphertext = encrypt(plaintext, this.masterConversationKey);
     await this.fs.promises.writeFile(path, ciphertext, { encoding: 'utf8' });
+    ptSet(this.cacheKey(path), doc);
   }
 
   /**
@@ -95,11 +109,17 @@ export class EncryptedIO {
    * Read and decrypt an arbitrary JSON file using the master key.
    */
   async readJSON<T = unknown>(path: string): Promise<T> {
+    const key = this.cacheKey(path);
+    const cached = ptGet(key);
+    if (cached !== undefined) return cached as T;
+
     const ciphertext = (await this.fs.promises.readFile(path, {
       encoding: 'utf8',
     })) as string;
     const plaintext = decrypt(ciphertext, this.masterConversationKey);
-    return JSON.parse(plaintext) as T;
+    const obj = JSON.parse(plaintext) as T;
+    ptSet(key, obj);
+    return obj;
   }
 
   /**
@@ -109,6 +129,7 @@ export class EncryptedIO {
     const plaintext = JSON.stringify(obj);
     const ciphertext = encrypt(plaintext, this.masterConversationKey);
     await this.fs.promises.writeFile(path, ciphertext, { encoding: 'utf8' });
+    ptSet(this.cacheKey(path), obj);
   }
 
   // --- Explicit key operations (scan re-encryption pipeline) ---

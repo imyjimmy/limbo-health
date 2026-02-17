@@ -39,10 +39,13 @@ export function useDirectoryContents(
     }
   }, [binderService, dirPath]);
 
-  // Load once on first focus. After that, mutations call refresh() explicitly.
+  // Reload on every focus. With the directory cache, hits are instant (<1ms).
+  // When cache was invalidated (e.g. note added from another screen), this
+  // picks up the change. Without this, navigating back after adding a note
+  // would show stale data.
   useFocusEffect(
     useCallback(() => {
-      if (!hasLoaded.current) load();
+      load();
     }, [load]),
   );
 

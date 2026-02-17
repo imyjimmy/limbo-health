@@ -12,6 +12,7 @@ import { DirectoryList } from './DirectoryList';
 import { NewFolderModal } from './NewFolderModal';
 import { DebugOverlay } from './DebugOverlay';
 import { QRDisplay } from '../QRDisplay';
+import { dirSize, ptSize } from '../../core/binder/BinderCache';
 import { useDirectoryContents } from '../../hooks/useDirectoryContents';
 import { useShareSession } from '../../hooks/useShareSession';
 import { useAuthContext } from '../../providers/AuthProvider';
@@ -224,7 +225,7 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
         onCancel={() => setShowNewFolder(false)}
       />
       <DebugOverlay
-        data={{ dirPath, items }}
+        data={{ dirPath, items, cache: { dir: dirSize(), pt: ptSize() } }}
         loadExtra={() =>
           binderService?.listAllFiles() ?? Promise.resolve([])
         }
