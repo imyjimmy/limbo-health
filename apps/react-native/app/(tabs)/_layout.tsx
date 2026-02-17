@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { CustomTabBar } from '../../components/navigation/CustomTabBar';
-import { getLastViewed } from '../../core/binder/LastViewedStore';
+import { getLastViewed, setPendingRestore } from '../../core/binder/LastViewedStore';
 
 import { useAuthContext } from '../../providers/AuthProvider';
 
@@ -35,16 +35,26 @@ export default function TabLayout() {
   const handleDocumentPress = () => {
     const last = getLastViewed();
     if (!last) {
-      // No directory visited yet — go to binder list
       router.navigate('/(tabs)/(home)');
       return;
     }
     const { binderId, dirPath } = last;
+
+    // Already viewing the target directory? Do nothing.
+    const targetPath = dirPath
+      ? `/binder/${binderId}/browse/${dirPath}`
+      : `/binder/${binderId}`;
+    if (pathname === targetPath) return;
+
     if (dirPath) {
-      router.push(`/binder/${binderId}/browse/${dirPath}`);
-    } else {
-      router.push(`/binder/${binderId}`);
+      setPendingRestore(dirPath);
     }
+    // Pop the (home) stack to root first (clears any stale binder),
+    // then push a fresh binder instance
+    router.navigate('/(tabs)/(home)');
+    setTimeout(() => {
+      router.push(`/binder/${binderId}`);
+    }, 0);
   };
 
   const handleCreateAction = (action: 'note' | 'audio' | 'photo') => {
