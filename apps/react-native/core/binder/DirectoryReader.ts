@@ -87,7 +87,9 @@ export async function readDirectory(
     if (stat.isDirectory()) {
       // Skip empty directories (e.g. left behind after git rm)
       const children = await fs.promises.readdir(childPath);
-      const hasVisibleChildren = children.some((c: string) => !c.startsWith('.'));
+      const hasVisibleChildren = children.some(
+        (c: string) => !c.startsWith('.') || c === '.meta.json',
+      );
       if (!hasVisibleChildren) continue;
 
       const relativePath = childPath.startsWith('/')

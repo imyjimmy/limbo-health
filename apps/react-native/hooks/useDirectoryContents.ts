@@ -1,7 +1,7 @@
 // hooks/useDirectoryContents.ts
 // Hook that loads and caches directory contents for the file browser.
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
 import type { DirItem } from '../core/binder/DirectoryReader';
 import type { BinderService } from '../core/binder/BinderService';
@@ -20,14 +20,18 @@ export function useDirectoryContents(
   const [items, setItems] = useState<DirItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async () => {
     if (!binderService) return;
-    setLoading(true);
+    // Only show loading spinner on initial load, not on re-focus.
+    // This prevents the visual "jump" when pressing Back.
+    if (!hasLoaded.current) setLoading(true);
     setError(null);
     try {
       const result = await binderService.readDir(dirPath);
       setItems(result);
+      hasLoaded.current = true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to read directory';
       setError(msg);

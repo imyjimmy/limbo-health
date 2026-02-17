@@ -448,6 +448,83 @@ Children inherit parent permissions - cannot be shared independently. To share a
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** 2024-02-09  
+**Document Version:** 1.0
+**Last Updated:** 2024-02-09
 **Status:** Draft for Review
+
+---
+
+## Appendix A: Implementation Divergences (2026-02-17)
+
+The following documents how the running implementation has diverged from the original spec above. These are intentional evolution, not bugs.
+
+### A.1 patient-info.json Uses Standard Envelope
+
+The spec defines `patient-info.json` as flat JSON (`{ name, dob, gender, ... }`). The implementation wraps it in the standard `{ value, metadata, children }` envelope with markdown in `value`:
+
+```json
+{
+  "value": "# John Doe\n\nDOB: 1980-05-15\n\nCreated: 2026-01-15T10:30:00Z",
+  "metadata": {
+    "type": "patient-info",
+    "created": "2026-01-15T10:30:00Z"
+  },
+  "children": []
+}
+```
+
+**Rationale:** One uniform document structure everywhere. The reader (`EncryptedIO.readDocument`) never needs to special-case patient-info. Every `.json` file in the repo decrypts to a `MedicalDocument`.
+
+### A.2 User-Created Folders Replace Fixed Top-Level Categories
+
+The spec prescribes a fixed set of top-level folders (`conditions/`, `visits/`, `labs/`, etc.). The implementation lets users create arbitrary folders at any depth via a "Add a new folder..." action. Each folder has a `.meta.json` file containing display metadata:
+
+```json
+{
+  "displayName": "Back Acne",
+  "icon": "🩹",
+  "color": "#e57373"
+}
+```
+
+**Rationale:** The directory renderer treats every level identically — it only knows parent, cwd, and children. No hardcoded category awareness. Users can organize however they want (by condition, by provider, by date, or any scheme that makes sense to them). The predefined categories from the spec can still be created as folders; they just aren't baked into the code.
+
+### A.3 Sidecar Files for Binary Data
+
+The spec puts binary data as base64-encoded strings inside `children` (e.g., a PDF attachment as a child with `"value": "base64_encoded_pdf_scan_of_original_report"`). The implementation uses separate encrypted sidecar files:
+
+- A photo produces two files: `photo.json` (metadata document of type `attachment_ref`) and `photo.enc` (encrypted binary)
+- The `.json` document's `value` field contains the sidecar filename, not the binary data itself
+- `EncryptedIO.writeSidecar` / `readSidecar` handle the binary encryption pipeline separately
+
+```
+conditions/back-acne/
+├── 2026-02-10-photo.json      # { value: "2026-02-10-photo.enc", metadata: { type: "attachment_ref", format: "jpeg", ... } }
+└── 2026-02-10-photo.enc       # NIP-44 encrypted JPEG bytes
+```
+
+**Rationale:** Embedding large base64 blobs inside JSON documents creates enormous diffs in Git, bloats commit objects, and makes the parent document unwieldy. Sidecar files keep the JSON documents small and diffable while storing binary data efficiently. The `DirectoryReader` skips `.enc` files in listings since they're always referenced by their parent `.json`.
+
+### A.4 .meta.json for Folder Display Metadata
+
+Not in the original spec. Each user-created folder can have a `.meta.json` file (note: starts with a dot, so Git treats it as hidden) containing:
+
+```json
+{
+  "displayName": "Visits",
+  "icon": "🏥",
+  "color": "#4a90d9"
+}
+```
+
+This is read by `DirectoryReader` to provide display names, icons, and colors in the folder listing. If `.meta.json` is absent or corrupt, the folder falls back to its filesystem name and a default 📁 icon.
+
+**Note:** `.meta.json` is encrypted like everything else — it goes through `EncryptedIO.readJSON`, not plain filesystem reads.
+
+### A.5 condition Field in Metadata
+
+The `DocumentMetadata` type includes an optional `condition` field (e.g., `createPhotoRef` stores `condition: "back-acne"`). This is redundant with the folder path — a photo at `conditions/back-acne/2026-02-10-photo.json` already encodes its condition via its location. The field exists in the current implementation but may be removed in a future cleanup since the folder hierarchy is the source of truth for organization.
+
+### A.6 Children Array Semantics Unchanged
+
+The `children` array semantics from the original spec remain correct and unchanged: addendums, follow-up notes, and doctor interpretations are children of their parent document. The only change is that binary attachments have moved to sidecar files (A.3 above) rather than living as base64 children.

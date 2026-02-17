@@ -14,7 +14,7 @@ export default function BinderLayout() {
         headerShown: true,
         headerBackTitle: 'Back',
         headerStatusBarHeight: insets.top,
-      }}
+      } as any}
     />
   );
 }

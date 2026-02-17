@@ -189,27 +189,31 @@ export class BinderService {
   // --- Folder metadata ---
 
   /**
-   * Create a new subfolder with .meta.json and an overview document.
-   * Used for creating condition subfolders (e.g., conditions/back-acne/).
-   * Writes .meta.json + overview.json, commits both, pushes.
+   * Create a new subfolder with .meta.json and an optional overview document.
+   * Writes .meta.json (+ overview.json if provided), commits, pushes.
    */
   async createSubfolder(
     folderPath: string,
     displayName: string,
-    overviewDoc: MedicalDocument,
+    overviewDoc?: MedicalDocument,
     meta?: { icon?: string; color?: string },
   ): Promise<void> {
     const metaPath = folderPath + '/.meta.json';
     const metaObj = { displayName, ...meta };
     await this.io.writeJSON('/' + metaPath, metaObj);
 
-    const slug = 'overview';
-    const docPath = await generateDocPath(this.info.repoDir, folderPath, slug);
-    await this.io.writeDocument('/' + docPath, overviewDoc);
+    const filesToCommit = [metaPath];
+
+    if (overviewDoc) {
+      const slug = 'overview';
+      const docPath = await generateDocPath(this.info.repoDir, folderPath, slug);
+      await this.io.writeDocument('/' + docPath, overviewDoc);
+      filesToCommit.push(docPath);
+    }
 
     await GitEngine.commitEntry(
       this.info.repoDir,
-      [metaPath, docPath],
+      filesToCommit,
       `Add ${displayName}`,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
@@ -232,6 +236,15 @@ export class BinderService {
       `Update ${doc.metadata.type} entry`,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+  }
+
+  // --- Debug ---
+
+  /**
+   * List all committed files in the binder repo (for debug views).
+   */
+  async listAllFiles(): Promise<string[]> {
+    return GitEngine.listFiles(this.info.repoDir);
   }
 
   // --- Sync ---

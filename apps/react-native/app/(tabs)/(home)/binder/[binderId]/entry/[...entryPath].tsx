@@ -8,12 +8,10 @@ import {
   Text,
   ActivityIndicator,
   TouchableOpacity,
-  Modal,
-  Platform,
   StyleSheet,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-router';
+import { DebugOverlay } from '../../../../../../components/binder/DebugOverlay';
 import type { MedicalDocument } from '../../../../../../types/document';
 import { extractTitle } from '../../../../../../core/binder/DocumentModel';
 import { BinderService } from '../../../../../../core/binder/BinderService';
@@ -34,7 +32,6 @@ export default function EntryDetailScreen() {
   const [doc, setDoc] = useState<MedicalDocument | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showRawJson, setShowRawJson] = useState(false);
 
   const { state: authState } = useAuthContext();
   const { masterConversationKey } = useCryptoContext();
@@ -167,43 +164,13 @@ export default function EntryDetailScreen() {
         )}
       </ScrollView>
 
-      {/* Debug: raw JSON viewer */}
-      {__DEV__ && (
-        <>
-          <TouchableOpacity
-            style={styles.debugFab}
-            onPress={() => setShowRawJson(true)}
-          >
-            <Text style={styles.debugFabText}>{'>_'}</Text>
-          </TouchableOpacity>
-          <Modal
-            visible={showRawJson}
-            animationType="slide"
-            presentationStyle="pageSheet"
-          >
-            <View style={styles.debugModal}>
-              <View style={styles.debugHeader}>
-                <Text style={styles.debugTitle}>Raw JSON</Text>
-                <View style={{ flexDirection: 'row', gap: 16 }}>
-                  <TouchableOpacity onPress={() => {
-                    Clipboard.setStringAsync(JSON.stringify(doc, null, 2));
-                  }}>
-                    <Text style={styles.debugClose}>Copy</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setShowRawJson(false)}>
-                    <Text style={styles.debugClose}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-              <ScrollView style={styles.debugScroll}>
-                <Text style={styles.debugJson} selectable>
-                  {JSON.stringify(doc, null, 2)}
-                </Text>
-              </ScrollView>
-            </View>
-          </Modal>
-        </>
-      )}
+      <DebugOverlay
+        data={doc}
+        loadExtra={() =>
+          binderService?.listAllFiles() ?? Promise.resolve([])
+        }
+        extraLabel="All Files"
+      />
     </>
   );
 }
@@ -318,61 +285,4 @@ const styles = StyleSheet.create({
   childLabel: { fontSize: 14, fontWeight: '500', color: '#333' },
   childMeta: { fontSize: 12, color: '#888', marginTop: 2 },
   childPreview: { fontSize: 13, color: '#666', marginTop: 4 },
-  debugFab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#1a1a1a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  debugFabText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4ade80',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  debugModal: {
-    flex: 1,
-    backgroundColor: '#1a1a1a',
-  },
-  debugHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#333',
-  },
-  debugTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4ade80',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  debugClose: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  debugScroll: {
-    flex: 1,
-    padding: 16,
-  },
-  debugJson: {
-    fontSize: 12,
-    lineHeight: 18,
-    color: '#e5e5e5',
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
 });
