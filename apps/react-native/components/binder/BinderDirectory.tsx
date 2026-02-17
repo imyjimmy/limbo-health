@@ -6,12 +6,14 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, Stack, useFocusEffect } from 'expo-router';
 import { IconShare3 } from '@tabler/icons-react-native';
 import { DirectoryList } from './DirectoryList';
 import { NewFolderModal } from './NewFolderModal';
 import { DebugOverlay } from './DebugOverlay';
 import { QRDisplay } from '../QRDisplay';
+import { dirSize, ptSize } from '../../core/binder/BinderCache';
+import { setLastViewed } from '../../core/binder/LastViewedStore';
 import { useDirectoryContents } from '../../hooks/useDirectoryContents';
 import { useShareSession } from '../../hooks/useShareSession';
 import { useAuthContext } from '../../providers/AuthProvider';
@@ -48,6 +50,13 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
   const { items, loading, error, refresh } = useDirectoryContents(
     binderService,
     dirPath,
+  );
+
+  // --- Track last viewed for Document tab (only when focused) ---
+  useFocusEffect(
+    useCallback(() => {
+      setLastViewed(binderId, dirPath);
+    }, [binderId, dirPath]),
   );
 
   // --- Share ---
@@ -218,7 +227,7 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
         onCancel={() => setShowNewFolder(false)}
       />
       <DebugOverlay
-        data={{ dirPath, items }}
+        data={{ dirPath, items, cache: { dir: dirSize(), pt: ptSize() } }}
         loadExtra={() =>
           binderService?.listAllFiles() ?? Promise.resolve([])
         }

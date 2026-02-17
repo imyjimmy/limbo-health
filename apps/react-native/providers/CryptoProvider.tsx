@@ -13,6 +13,7 @@ import React, {
 import { KeyManager } from '../core/crypto/KeyManager';
 import { EncryptedIO } from '../core/binder/EncryptedIO';
 import { createFSAdapter } from '../core/git/fsAdapter';
+import { clearAll as clearBinderCache } from '../core/binder/BinderCache';
 import { useAuthContext } from './AuthProvider';
 
 // --- Context ---
@@ -48,6 +49,7 @@ export function CryptoProvider({ children }: { children: React.ReactNode }) {
       setReady(false);
       setMasterConversationKey(null);
       setMasterPubkey(null);
+      clearBinderCache();
       return;
     }
 
@@ -74,7 +76,7 @@ export function CryptoProvider({ children }: { children: React.ReactNode }) {
         throw new Error('CryptoProvider not ready — no conversation key');
       }
       const fs = createFSAdapter(repoDir);
-      return new EncryptedIO(fs, masterConversationKey);
+      return new EncryptedIO(fs, masterConversationKey, repoDir);
     };
   }, [masterConversationKey]);
 

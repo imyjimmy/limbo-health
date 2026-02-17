@@ -132,14 +132,11 @@ export async function readDirectory(
 
   const items = results.filter((r): r is DirItem => r !== null);
 
-  // Sort: folders first (alphabetical), then entries (newest first by filename which is date-prefixed)
+  // Sort: folders first (alphabetical), then entries (oldest first / newest at bottom)
   items.sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1;
-    if (a.kind === 'folder' && b.kind === 'folder') {
-      return a.name.localeCompare(b.name);
-    }
-    // Entries: reverse alphabetical puts newest dates first (YYYY-MM-DD prefix)
-    return b.name.localeCompare(a.name);
+    // Both folders or both entries: alphabetical (for date-prefixed entries = chronological)
+    return a.name.localeCompare(b.name);
   });
 
   return items;

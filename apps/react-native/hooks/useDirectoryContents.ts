@@ -6,6 +6,7 @@ import { useFocusEffect } from 'expo-router';
 import type { DirItem } from '../core/binder/DirectoryReader';
 import type { BinderService } from '../core/binder/BinderService';
 
+
 export interface UseDirectoryContentsResult {
   items: DirItem[];
   loading: boolean;
@@ -17,10 +18,12 @@ export function useDirectoryContents(
   binderService: BinderService | null,
   dirPath: string,
 ): UseDirectoryContentsResult {
-  const [items, setItems] = useState<DirItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seed from cache synchronously to avoid "Decrypting..." flash on back-nav.
+  const cachedItems = binderService ? binderService.peekDirCache(dirPath) : undefined;
+  const [items, setItems] = useState<DirItem[]>(cachedItems ?? []);
+  const [loading, setLoading] = useState(!cachedItems);
   const [error, setError] = useState<string | null>(null);
-  const hasLoaded = useRef(false);
+  const hasLoaded = useRef(!!cachedItems);
 
   const load = useCallback(async () => {
     if (!binderService) return;
@@ -39,10 +42,13 @@ export function useDirectoryContents(
     }
   }, [binderService, dirPath]);
 
-  // Load once on first focus. After that, mutations call refresh() explicitly.
+  // Reload on every focus. With the directory cache, hits are instant (<1ms).
+  // When cache was invalidated (e.g. note added from another screen), this
+  // picks up the change. Without this, navigating back after adding a note
+  // would show stale data.
   useFocusEffect(
     useCallback(() => {
-      if (!hasLoaded.current) load();
+      load();
     }, [load]),
   );
 

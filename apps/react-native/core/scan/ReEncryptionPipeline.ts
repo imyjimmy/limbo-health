@@ -57,8 +57,8 @@ export async function reEncryptBinder(
   // Set up IO for both source (master key) and destination (ephemeral key)
   const sourceFS = createFSAdapter(binderRepoDir);
   const stagingFS = createFSAdapter(stagingRepoDir);
-  const sourceIO = new EncryptedIO(sourceFS, masterConversationKey);
-  const stagingIO = new EncryptedIO(stagingFS, ephemeralConversationKey);
+  const sourceIO = new EncryptedIO(sourceFS, masterConversationKey, binderRepoDir);
+  const stagingIO = new EncryptedIO(stagingFS, ephemeralConversationKey, stagingRepoDir);
 
   // List all tracked files in the binder
   const allFiles = await GitEngine.listFiles(binderRepoDir);

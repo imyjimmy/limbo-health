@@ -19,6 +19,7 @@ import { categoryFromPath } from './categories';
 import type { MedicalDocument } from '../../types/document';
 import type { EntryMetadata } from './DocumentModel';
 import type { AuthConfig } from '../git/httpTransport';
+import { dirGet, dirSet, dirEvict, dirEvictPrefix, ptEvict, ptEvictPrefix } from './BinderCache';
 import type { DirItem } from './DirectoryReader';
 
 // --- Types ---
@@ -38,7 +39,23 @@ export class BinderService {
   constructor(info: BinderInfo, masterConversationKey: Uint8Array) {
     this.info = info;
     const fs = createFSAdapter(info.repoDir);
-    this.io = new EncryptedIO(fs, masterConversationKey);
+    this.io = new EncryptedIO(fs, masterConversationKey, info.repoDir);
+  }
+
+  private dirCacheKey(dirPath: string): string {
+    const normalized = dirPath.startsWith('/') ? dirPath.slice(1) : dirPath;
+    return `${this.info.repoDir}:${normalized}`;
+  }
+
+  private parentDirCacheKey(path: string): string {
+    const lastSlash = path.lastIndexOf('/');
+    const parent = lastSlash <= 0 ? '' : path.substring(0, lastSlash);
+    return this.dirCacheKey(parent);
+  }
+
+  /** Synchronous cache peek — returns cached items or undefined. */
+  peekDirCache(dirPath: string): DirItem[] | undefined {
+    return dirGet(this.dirCacheKey(dirPath));
   }
 
   // --- Create ---
@@ -57,7 +74,7 @@ export class BinderService {
     await GitEngine.initBinder(repoDir);
 
     const fs = createFSAdapter(repoDir);
-    const io = new EncryptedIO(fs, masterConversationKey);
+    const io = new EncryptedIO(fs, masterConversationKey, repoDir);
 
     const doc = createPatientInfo(patientName, dateOfBirth);
     await io.writeDocument('/patient-info.json', doc);
@@ -119,9 +136,15 @@ export class BinderService {
    * Used by the DirectoryList component for file-browser navigation.
    */
   async readDir(dirPath: string): Promise<DirItem[]> {
+    const key = this.dirCacheKey(dirPath);
+    const cached = dirGet(key);
+    if (cached) return cached;
+
     const { readDirectory } = await import('./DirectoryReader');
     const fs = createFSAdapter(this.info.repoDir);
-    return readDirectory(dirPath, fs, this.io);
+    const items = await readDirectory(dirPath, fs, this.io);
+    dirSet(key, items);
+    return items;
   }
 
   /**
@@ -149,6 +172,7 @@ export class BinderService {
     await this.io.writeDocument('/' + docPath, doc);
     await GitEngine.commitEntry(this.info.repoDir, [docPath], `Add ${category} entry`);
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    dirEvict(this.dirCacheKey(category));
     return docPath;
   }
 
@@ -182,6 +206,7 @@ export class BinderService {
       `Add ${conditionSlug} photo`,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    dirEvict(this.dirCacheKey(folder));
 
     return docPath;
   }
@@ -217,6 +242,7 @@ export class BinderService {
       `Add ${displayName}`,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    dirEvict(this.parentDirCacheKey(folderPath));
   }
 
   // --- Delete ---
@@ -245,6 +271,8 @@ export class BinderService {
     } catch (err: any) {
       console.warn('Push failed after delete, changes saved locally:', err?.message);
     }
+    dirEvict(this.parentDirCacheKey(entryPath));
+    ptEvict(`${this.info.repoDir}:/${entryPath}`);
   }
 
   /**
@@ -274,6 +302,9 @@ export class BinderService {
     } catch (err: any) {
       console.warn('Push failed after delete, changes saved locally:', err?.message);
     }
+    dirEvict(this.dirCacheKey(folderPath));
+    dirEvict(this.parentDirCacheKey(folderPath));
+    ptEvictPrefix(`${this.info.repoDir}:/${folderPath}`);
   }
 
   // --- Update ---
@@ -293,6 +324,7 @@ export class BinderService {
       `Update ${doc.metadata.type} entry`,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    dirEvict(this.parentDirCacheKey(entryPath));
   }
 
   // --- Debug ---
@@ -315,6 +347,8 @@ export class BinderService {
       this.info.repoId,
       this.info.auth,
     );
+    dirEvictPrefix(`${this.info.repoDir}:`);
+    ptEvictPrefix(`${this.info.repoDir}:`);
   }
 
   /**

@@ -37,6 +37,7 @@ interface CustomTabBarProps extends BottomTabBarProps {
   profileInitials?: string;
   hasNotification?: boolean;
   onCreateAction?: (action: 'note' | 'audio' | 'photo') => void;
+  onDocumentPress?: () => void;
 }
 
 export function CustomTabBar({
@@ -46,6 +47,7 @@ export function CustomTabBar({
   profileInitials = 'ME',
   hasNotification = false,
   onCreateAction,
+  onDocumentPress,
 }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -71,6 +73,12 @@ export function CustomTabBar({
               // Center "create" tab opens menu instead of navigating
               if (route.name === 'create') {
                 setMenuVisible(true);
+                return;
+              }
+
+              // Document tab jumps to last viewed directory
+              if (route.name === 'page') {
+                onDocumentPress?.();
                 return;
               }
 
