@@ -12,8 +12,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import RNFS from 'react-native-fs';
+import * as SecureStore from 'expo-secure-store';
 import { useAuthContext } from '../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../providers/CryptoProvider';
 import { BinderService } from '../../../core/binder/BinderService';
@@ -120,32 +121,71 @@ export default function BinderListScreen() {
     }
   }, [jwt]);
 
+  const LAST_BINDER_KEY = 'limbo_last_binder';
+
   useEffect(() => {
     if (jwt && cryptoReady) fetchRepos();
   }, [jwt, cryptoReady, fetchRepos]);
 
-  // --- Open binder: clone if needed, list entries, decrypt ---
+  // --- Background pull last-opened binder when repo list loads ---
+
+  const hasPulledRef = useRef(false);
+
+  useEffect(() => {
+    if (screenState.phase !== 'repos-loaded') return;
+    if (hasPulledRef.current) return;
+    if (!jwt) return;
+    hasPulledRef.current = true;
+
+    (async () => {
+      try {
+        const lastId = await SecureStore.getItemAsync(LAST_BINDER_KEY);
+        if (!lastId) return;
+        const cloned = await isAlreadyCloned(lastId);
+        if (!cloned) return;
+        const { GitEngine } = await import('../../../core/git/GitEngine');
+        await GitEngine.pull(repoDir(lastId), lastId, authConfig());
+      } catch (err) {
+        // Background pull failure is non-fatal
+        console.warn('Background pull of last binder failed:', err);
+      }
+    })();
+  }, [screenState.phase, jwt]);
+
+  // --- Open binder: clone if needed, navigate immediately ---
+
+  const openingRef = useRef(false);
+
+  // Reset double-tap guard when screen regains focus (user navigated back)
+  useFocusEffect(
+    useCallback(() => {
+      openingRef.current = false;
+    }, []),
+  );
 
   const openBinder = useCallback(
     async (repo: RepoSummary) => {
       if (!jwt || !masterConversationKey) return;
+      if (openingRef.current) return;
+      openingRef.current = true;
 
       try {
-        const { GitEngine } = await import('../../../core/git/GitEngine');
         const cloned = await isAlreadyCloned(repo.id);
         if (!cloned) {
           setScreenState({ phase: 'cloning', repoId: repo.id });
+          const { GitEngine } = await import('../../../core/git/GitEngine');
           await GitEngine.cloneRepo(repoDir(repo.id), repo.id, authConfig());
           setScreenState({ phase: 'repos-loaded', repos: (screenState as any).repos ?? [] });
-        } else {
-          await GitEngine.pull(repoDir(repo.id), repo.id, authConfig());
         }
 
+        SecureStore.setItemAsync(LAST_BINDER_KEY, repo.id);
         router.push(`/binder/${repo.id}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         Alert.alert('Error', msg);
         fetchRepos();
+      } finally {
+        openingRef.current = false;
       }
     },
     [jwt, masterConversationKey, fetchRepos, router, screenState],

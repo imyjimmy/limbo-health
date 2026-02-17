@@ -149,15 +149,31 @@ export function DirectoryList({
         renderItem={renderItem}
         ListHeaderComponent={ListHeaderComponent}
         ListEmptyComponent={
-          <View style={styles.centered}>
-            <Text style={styles.emptyText}>No entries yet</Text>
-            <Text style={styles.emptySubtext}>
-              Tap + to add your first entry
-            </Text>
-          </View>
+          <>
+            {onAddSubfolder && (
+              <TouchableOpacity
+                style={styles.addSubfolderRow}
+                onPress={onAddSubfolder}
+                activeOpacity={0.6}
+              >
+                <View style={styles.addSubfolderIconContainer}>
+                  <Text style={styles.addSubfolderPlus}>+</Text>
+                </View>
+                <Text style={styles.addSubfolderText}>
+                  {addSubfolderLabel}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <View style={styles.centered}>
+              <Text style={styles.emptyText}>No entries yet</Text>
+              <Text style={styles.emptySubtext}>
+                Tap <Text style={styles.addSubfolderPlusInline}>[+]</Text> to add your first entry
+              </Text>
+            </View>
+          </>
         }
         ListFooterComponent={
-          onAddSubfolder ? (
+          items.length > 0 && onAddSubfolder ? (
             <TouchableOpacity
               style={styles.addSubfolderRow}
               onPress={onAddSubfolder}
@@ -167,7 +183,7 @@ export function DirectoryList({
                 <Text style={styles.addSubfolderPlus}>+</Text>
               </View>
               <Text style={styles.addSubfolderText}>
-                {addSubfolderLabel ?? 'Add new...'}
+                {addSubfolderLabel}
               </Text>
             </TouchableOpacity>
           ) : undefined
@@ -248,6 +264,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#999',
     fontWeight: '300',
+  },
+  addSubfolderPlusInline: {
+    fontSize: 14,
+    color: '#999',
+    fontWeight: '600',
   },
   addSubfolderText: {
     fontSize: 16,

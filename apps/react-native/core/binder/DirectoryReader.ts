@@ -70,76 +70,67 @@ export async function readDirectory(
     return [];
   }
 
-  const items: DirItem[] = [];
+  // Filter out names we can skip before any I/O
+  const candidates = names.filter((name) => {
+    if (name.startsWith('.')) return false;
+    if (name.endsWith('.enc')) return false;
+    if (name === 'patient-info.json' && normalizedDir === '/') return false;
+    return true;
+  });
 
-  for (const name of names) {
-    // Skip hidden files and git internals
-    if (name.startsWith('.')) continue;
-    // Skip .enc sidecar files -- they're referenced by their parent .json
-    if (name.endsWith('.enc')) continue;
-    // Skip patient-info.json -- shown separately in the binder detail header
-    if (name === 'patient-info.json' && normalizedDir === '/') continue;
+  // Process all children in parallel
+  const results = await Promise.all(
+    candidates.map(async (name): Promise<DirItem | null> => {
+      const childPath = normalizedDir === '/'
+        ? '/' + name
+        : normalizedDir + '/' + name;
 
-    const childPath = normalizedDir === '/'
-      ? '/' + name
-      : normalizedDir + '/' + name;
+      const stat = await fs.promises.stat(childPath);
 
-    const stat = await fs.promises.stat(childPath);
+      if (stat.isDirectory()) {
+        const children = await fs.promises.readdir(childPath);
+        const hasVisibleChildren = children.some(
+          (c: string) => !c.startsWith('.') || c === '.meta.json',
+        );
+        if (!hasVisibleChildren) return null;
 
-    if (stat.isDirectory()) {
-      // Skip empty directories (e.g. left behind after git rm)
-      const children = await fs.promises.readdir(childPath);
-      const hasVisibleChildren = children.some(
-        (c: string) => !c.startsWith('.') || c === '.meta.json',
-      );
-      if (!hasVisibleChildren) continue;
+        const relativePath = childPath.startsWith('/')
+          ? childPath.slice(1)
+          : childPath;
 
-      const relativePath = childPath.startsWith('/')
-        ? childPath.slice(1)
-        : childPath;
+        const childCount = children.filter(
+          (c: string) => !c.startsWith('.') && !c.endsWith('.enc'),
+        ).length;
 
-      // Count visible children (exclude dotfiles except .meta.json, exclude .enc sidecars)
-      const childCount = children.filter(
-        (c: string) => !c.startsWith('.') && !c.endsWith('.enc'),
-      ).length;
-
-      // Try to read .meta.json for display metadata (icon, color, displayName)
-      let meta: FolderMeta | undefined;
-      if (children.includes('.meta.json')) {
-        try {
-          meta = await io.readJSON<FolderMeta>(childPath + '/.meta.json');
-        } catch {
-          // .meta.json missing or corrupt — use defaults
+        let meta: FolderMeta | undefined;
+        if (children.includes('.meta.json')) {
+          try {
+            meta = await io.readJSON<FolderMeta>(childPath + '/.meta.json');
+          } catch {
+            // .meta.json missing or corrupt — use defaults
+          }
         }
+
+        return { kind: 'folder', name, relativePath, meta, childCount };
+      } else if (name.endsWith('.json')) {
+        const relativePath = childPath.startsWith('/')
+          ? childPath.slice(1)
+          : childPath;
+        let preview: EntryPreview | null = null;
+        try {
+          const doc = await io.readDocument(childPath);
+          preview = extractEntryPreview(relativePath, doc);
+        } catch (err) {
+          console.warn(`Failed to decrypt metadata for ${relativePath}:`, err);
+        }
+        return { kind: 'entry', name, relativePath, preview };
       }
 
-      items.push({
-        kind: 'folder',
-        name,
-        relativePath,
-        meta,
-        childCount,
-      });
-    } else if (name.endsWith('.json')) {
-      const relativePath = childPath.startsWith('/')
-        ? childPath.slice(1)
-        : childPath;
-      let preview: EntryPreview | null = null;
-      try {
-        const doc = await io.readDocument(childPath);
-        preview = extractEntryPreview(relativePath, doc);
-      } catch (err) {
-        console.warn(`Failed to decrypt metadata for ${relativePath}:`, err);
-      }
-      items.push({
-        kind: 'entry',
-        name,
-        relativePath,
-        preview,
-      });
-    }
-    // Any other file types are silently ignored
-  }
+      return null;
+    }),
+  );
+
+  const items = results.filter((r): r is DirItem => r !== null);
 
   // Sort: folders first (alphabetical), then entries (newest first by filename which is date-prefixed)
   items.sort((a, b) => {

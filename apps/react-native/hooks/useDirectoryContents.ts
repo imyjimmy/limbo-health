@@ -24,8 +24,6 @@ export function useDirectoryContents(
 
   const load = useCallback(async () => {
     if (!binderService) return;
-    // Only show loading spinner on initial load, not on re-focus.
-    // This prevents the visual "jump" when pressing Back.
     if (!hasLoaded.current) setLoading(true);
     setError(null);
     try {
@@ -41,10 +39,10 @@ export function useDirectoryContents(
     }
   }, [binderService, dirPath]);
 
-  // Re-load whenever this screen gains focus (e.g., after router.back() from entry/new)
+  // Load once on first focus. After that, mutations call refresh() explicitly.
   useFocusEffect(
     useCallback(() => {
-      load();
+      if (!hasLoaded.current) load();
     }, [load]),
   );
 
