@@ -4,7 +4,7 @@
 // Data drives rendering: items come from useDirectoryContents,
 // folder icons come from .meta.json on each item.
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { IconShare3 } from '@tabler/icons-react-native';
@@ -13,6 +13,7 @@ import { NewFolderModal } from './NewFolderModal';
 import { DebugOverlay } from './DebugOverlay';
 import { QRDisplay } from '../QRDisplay';
 import { dirSize, ptSize } from '../../core/binder/BinderCache';
+import { setLastViewed } from '../../core/binder/LastViewedStore';
 import { useDirectoryContents } from '../../hooks/useDirectoryContents';
 import { useShareSession } from '../../hooks/useShareSession';
 import { useAuthContext } from '../../providers/AuthProvider';
@@ -50,6 +51,11 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
     binderService,
     dirPath,
   );
+
+  // --- Track last viewed for Document tab ---
+  useEffect(() => {
+    setLastViewed(binderId, dirPath);
+  }, [binderId, dirPath]);
 
   // --- Share ---
   const binderRepoDir = `binders/${binderId}`;

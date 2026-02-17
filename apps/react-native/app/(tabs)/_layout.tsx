@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { CustomTabBar } from '../../components/navigation/CustomTabBar';
+import { getLastViewed } from '../../core/binder/LastViewedStore';
 
 import { useAuthContext } from '../../providers/AuthProvider';
 
@@ -31,6 +32,21 @@ export default function TabLayout() {
     return null;
   })();
 
+  const handleDocumentPress = () => {
+    const last = getLastViewed();
+    if (!last) {
+      // No directory visited yet — go to binder list
+      router.navigate('/(tabs)/(home)');
+      return;
+    }
+    const { binderId, dirPath } = last;
+    if (dirPath) {
+      router.push(`/binder/${binderId}/browse/${dirPath}`);
+    } else {
+      router.push(`/binder/${binderId}`);
+    }
+  };
+
   const handleCreateAction = (action: 'note' | 'audio' | 'photo') => {
     if (!binderContext) return; // not inside a binder, nothing to do
 
@@ -59,6 +75,7 @@ export default function TabLayout() {
           profileInitials={profileInitials}
           hasNotification={false}
           onCreateAction={handleCreateAction}
+          onDocumentPress={handleDocumentPress}
         />
       )}
       screenOptions={{
