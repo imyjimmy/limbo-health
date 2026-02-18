@@ -190,11 +190,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync(LOGIN_METHOD_KEY, 'google');
       await SecureStore.setItemAsync(GOOGLE_PROFILE_KEY, JSON.stringify(googleProfile));
 
-      // Backend tells us if this Google user already has a Nostr key linked.
-      // If not, auto-generate one on first login for encryption.
+      // Auto-generate a Nostr keypair only on truly first Google login
+      // (no key on backend AND no local key). If backend already has a pubkey
+      // but local Keychain is empty (e.g. after logout), the user must re-import.
       let pubkey: string | null = data.nostrPubkey || null;
+      const hasLocalKey = await keyManager.hasStoredKey();
 
-      if (!pubkey) {
+      if (!hasLocalKey && !data.nostrPubkey) {
         const privkey = secp256k1.utils.randomSecretKey();
         await keyManager.storeMasterPrivkey(privkey);
         setPrivkeyRef(privkey);

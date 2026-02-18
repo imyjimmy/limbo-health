@@ -11,7 +11,6 @@ export default function ProfileScreen() {
   const router = useRouter();
 
   const isGoogle = state.loginMethod === 'google';
-  const hasEncryptionKey = !!state.pubkey;
 
   const displayName = isGoogle
     ? (state.googleProfile?.name ?? state.googleProfile?.email ?? 'Google User')
@@ -30,19 +29,18 @@ export default function ProfileScreen() {
 
   const menuItems = [
     { label: 'Account', destructive: false },
-    // Show key setup prompt for Google users without encryption key
-    ...(isGoogle && !hasEncryptionKey
-      ? [{ label: 'Set Up Encryption Key', destructive: false }]
-      : [{ label: 'Security & Keys', destructive: false }]),
+    { label: 'Encryption Keys', destructive: false },
     { label: 'Notifications', destructive: false },
     { label: 'About', destructive: false },
     { label: 'Sign Out', destructive: true },
   ];
 
-  const handleMenuPress = (label: string) => {
-    if (label === 'Sign Out') logout?.();
-    if (label === 'Security & Keys') router.push('/key-management');
-    if (label === 'Set Up Encryption Key') router.push('/(auth)/setup-key');
+  const handleMenuPress = async (label: string) => {
+    if (label === 'Sign Out') {
+      await logout?.();
+      router.replace('/(auth)/welcome');
+    }
+    if (label === 'Encryption Keys') router.push('/encryption-keys');
   };
 
   return (
@@ -79,7 +77,6 @@ export default function ProfileScreen() {
               style={[
                 styles.menuItemText,
                 item.destructive && styles.menuItemDestructive,
-                item.label === 'Set Up Encryption Key' && styles.menuItemHighlight,
               ]}
             >
               {item.label}
@@ -151,11 +148,8 @@ const styles = StyleSheet.create({
   menuItemDestructive: {
     color: '#ef4444',
   },
-  menuItemHighlight: {
-    color: '#60a5fa',
-  },
   menuItemChevron: {
     color: 'rgba(255,255,255,0.2)',
-    fontSize: 18,
+    fontSize: 13,
   },
 });

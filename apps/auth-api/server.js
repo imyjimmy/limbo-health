@@ -363,8 +363,8 @@ app.post('/api/auth/link-nostr', async (req, res) => {
 
         // Transfer repository_access (handle unique constraint conflicts)
         await conn.query(
-          `INSERT INTO repository_access (user_id, repository_id, access_level, granted_at)
-           SELECT ?, repository_id, access_level, granted_at
+          `INSERT INTO repository_access (user_id, repo_id, access_level)
+           SELECT ?, repo_id, access_level
            FROM repository_access WHERE user_id = ?
            ON DUPLICATE KEY UPDATE access_level = VALUES(access_level)`,
           [googleUserId, oldUserId]

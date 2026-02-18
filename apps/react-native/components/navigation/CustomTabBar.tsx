@@ -66,7 +66,10 @@ export function CustomTabBar({
       >
          
         <View style={styles.tabRow}>
-          {state.routes.map((route, index) => {
+          {state.routes.filter((r) =>
+            ['(home)', 'page', 'create', 'search', 'profile'].includes(r.name)
+          ).map((route) => {
+            const index = state.routes.indexOf(route);
             const isActive = state.index === index;
 
             const onPress = () => {
