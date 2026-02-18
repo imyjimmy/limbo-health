@@ -7,8 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 // Needed for redirect after auth on iOS
 WebBrowser.maybeCompleteAuthSession();
 
-// TODO: Replace with your actual iOS client ID from Google Cloud Console
-const IOS_CLIENT_ID = 'YOUR_IOS_CLIENT_ID.apps.googleusercontent.com';
+const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID!;
 
 export function useGoogleAuth() {
   const [request, response, promptAsync] = Google.useAuthRequest({
