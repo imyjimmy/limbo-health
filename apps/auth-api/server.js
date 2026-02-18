@@ -77,14 +77,14 @@ app.post('/api/auth/nostr/verify', async (req, res) => {
       // Step 4: Existing user - verify role matches login type
       const user = users[0];
       const expectedRole = userType === 'patient' ? 3 : 2;
-      
+
       if (user.id_roles !== expectedRole) {
-        return res.status(400).json({ 
-          status: 'error', 
+        return res.status(400).json({
+          status: 'error',
           reason: `This account is registered as a ${user.id_roles === 2 ? 'provider' : 'patient'}. Please use the correct login page.`
         });
       }
-      
+
       userId = user.id;
       userRole = user.id_roles;
     }
@@ -199,7 +199,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
 // We verify it with Google, then issue a Limbo JWT.
 
 app.post('/api/auth/google/token', async (req, res) => {
-  const { accessToken } = req.body;
+  const { accessToken, userType = 'patient' } = req.body;
 
   if (!accessToken) {
     return res.status(400).json({ status: 'error', reason: 'Missing accessToken' });
@@ -221,9 +221,10 @@ app.post('/api/auth/google/token', async (req, res) => {
     let userRole;
     let nostrPubkey = null;
 
+    const roleId = userType === 'patient' ? 3 : 2;
+
     if (connections.length === 0) {
       // New Google user — create user + oauth_connection
-      const roleId = 2; // default to provider
       const [insertResult] = await db.query(
         'INSERT INTO users (email, id_roles, create_datetime) VALUES (?, ?, NOW())',
         [userInfo.email, roleId]

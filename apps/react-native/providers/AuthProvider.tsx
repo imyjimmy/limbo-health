@@ -152,6 +152,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, [keyManager]);
 
+  // --- Post-login biometric unlock for Google users with existing local key ---
+  // Face ID can't trigger during the Google OAuth callback (browser still dismissing).
+  // This effect fires after state is set and the app is foregrounded.
+
+  useEffect(() => {
+    if (state.status !== 'authenticated' || state.loginMethod !== 'google' || privkeyRef) return;
+
+    (async () => {
+      const hasKey = await keyManager.hasStoredKey();
+      if (!hasKey) return;
+
+      try {
+        const pk = await keyManager.getMasterPrivkey();
+        if (pk) {
+          setPrivkeyRef(pk);
+          setState(prev => ({ ...prev, pubkey: KeyManager.pubkeyFromPrivkey(pk) }));
+        }
+      } catch (err) {
+        console.warn('Post-login biometric unlock failed:', err);
+      }
+    })();
+  }, [state.status, state.loginMethod, privkeyRef, keyManager]);
+
   // --- Login with Nostr key: store key + authenticate ---
 
   const login = useCallback(
@@ -174,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const resp = await fetch(ENDPOINTS.googleToken, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken }),
+        body: JSON.stringify({ accessToken, userType: 'patient' }),
       });
       const data = await resp.json();
       if (data.status !== 'OK') throw new Error(data.reason || 'Google login failed');
@@ -269,17 +292,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [keyManager, state.loginMethod, state.jwt],
   );
 
-  // --- Logout: clear everything ---
+  // --- Logout: clear session but keep encryption key in Keychain ---
 
   const logout = useCallback(async () => {
-    await keyManager.deleteMasterPrivkey();
     await SecureStore.deleteItemAsync(JWT_STORAGE_KEY);
     await SecureStore.deleteItemAsync('limbo_metadata');
     await SecureStore.deleteItemAsync(LOGIN_METHOD_KEY);
     await SecureStore.deleteItemAsync(GOOGLE_PROFILE_KEY);
     setPrivkeyRef(null);
     setState(emptyState('onboarding'));
-  }, [keyManager]);
+  }, []);
 
   // --- Refresh: re-authenticate with stored key ---
 
