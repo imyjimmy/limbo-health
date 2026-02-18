@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backButtonText: {
-    color: '#8d45dd',
+    color: '#007AFF',
     fontSize: 16,
   },
   title: {
