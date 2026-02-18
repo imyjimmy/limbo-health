@@ -36,6 +36,9 @@ web-build/
 # local task specs
 tasks/
 
+# claude code
+.claude/
+
 # misc
 .DS_Store
 .env
