@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
  * Calls auth-api check-access to authorize.
  */
 async function authMiddleware(req, res, next) {
-  let pubkey = null;
+  let userId = null;
   let scanToken = null;
 
   // Step 1: Extract credentials
@@ -18,21 +18,21 @@ async function authMiddleware(req, res, next) {
     const token = authHeader.split(' ')[1];
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
-      pubkey = decoded.pubkey;
+      userId = decoded.userId;
     } catch (err) {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
   }
 
   // Check for scan token (query param takes priority if no JWT)
-  if (!pubkey) {
+  if (!userId) {
     scanToken = req.query.scan_token || null;
     if (authHeader && authHeader.startsWith('ScanToken ')) {
       scanToken = authHeader.split(' ')[1];
     }
   }
 
-  if (!pubkey && !scanToken) {
+  if (!userId && !scanToken) {
     return res.status(401).json({ error: 'No authentication provided' });
   }
 
@@ -45,7 +45,7 @@ async function authMiddleware(req, res, next) {
   const repoId = req.params.repoId;
   try {
     const result = await authApiClient.checkAccess({
-      pubkey,
+      userId,
       scanToken,
       repoId,
       operation
@@ -56,11 +56,11 @@ async function authMiddleware(req, res, next) {
       const isPushToCreate = !result.allowed
         && result.reason === 'Not authorized for this repository'
         && operation === 'write'
-        && pubkey;
+        && userId;
 
       if (isPushToCreate) {
         req.user = {
-          pubkey,
+          userId,
           authMethod: 'jwt',
           access: null,
           pushToCreate: true
@@ -71,7 +71,7 @@ async function authMiddleware(req, res, next) {
     }
 
     req.user = {
-      pubkey: pubkey || null,
+      userId: userId || null,
       authMethod: result.authMethod,
       access: result.access
     };
@@ -96,7 +96,7 @@ function jwtOnly(req, res, next) {
   try {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = { pubkey: decoded.pubkey };
+    req.user = { userId: decoded.userId };
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });

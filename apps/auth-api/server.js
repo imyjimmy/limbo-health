@@ -123,30 +123,71 @@ app.get('/api/auth/google/url', (req, res) => {
 
 app.post('/api/auth/google/callback', async (req, res) => {
   const { code, redirectUri } = req.body;
-  
+
   try {
     const tokens = await googleAuth.getTokensFromCode(code, redirectUri);
     const userInfo = await googleAuth.getUserInfo(tokens.accessToken);
-    
-    // Generate JWT
+
+    // Look up existing oauth_connection for this Google account
+    const [connections] = await db.query(
+      `SELECT oc.user_id, u.id_roles
+       FROM oauth_connections oc
+       JOIN users u ON u.id = oc.user_id
+       WHERE oc.provider = 'google' AND oc.provider_user_id = ?`,
+      [userInfo.googleId]
+    );
+
+    let userId;
+    let userRole;
+
+    if (connections.length === 0) {
+      // New Google user — create user + oauth_connection
+      const roleId = 2; // default to provider
+      const [insertResult] = await db.query(
+        'INSERT INTO users (email, id_roles, create_datetime) VALUES (?, ?, NOW())',
+        [userInfo.email, roleId]
+      );
+      userId = insertResult.insertId;
+      userRole = roleId;
+
+      await db.query(
+        `INSERT INTO oauth_connections (user_id, provider, provider_user_id, provider_email, access_token)
+         VALUES (?, 'google', ?, ?, ?)`,
+        [userId, userInfo.googleId, userInfo.email, tokens.accessToken]
+      );
+    } else {
+      userId = connections[0].user_id;
+      userRole = connections[0].id_roles;
+
+      // Update access token
+      await db.query(
+        `UPDATE oauth_connections SET access_token = ?, updated_at = NOW()
+         WHERE provider = 'google' AND provider_user_id = ?`,
+        [tokens.accessToken, userInfo.googleId]
+      );
+    }
+
+    // Generate JWT with DB userId (integer), not googleId
     const token = jwt.sign({
+      userId,
       oauthProvider: 'google',
-      userId: userInfo.googleId,
+      googleId: userInfo.googleId,
       email: userInfo.email,
-      authMethod: 'oauth',
+      role: userRole,
+      authMethod: 'google',
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24) // 24h
+      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
     }, JWT_SECRET);
-    
+
     console.log('Google login verified for:', userInfo.email);
-    
+
     res.json({
       status: 'OK',
       token,
       user: userInfo,
       googleTokens: tokens // In case they need refresh token for calendar
     });
-    
+
   } catch (error) {
     console.error('Google auth error:', error);
     res.status(500).json({ status: 'error', reason: error.message });

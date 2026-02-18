@@ -106,22 +106,24 @@ CREATE TABLE repositories (
   id VARCHAR(128) PRIMARY KEY,
   description TEXT,
   repo_type VARCHAR(64) DEFAULT 'medical-history',
-  owner_pubkey VARCHAR(128) NOT NULL,
+  owner_user_id INT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_owner (owner_pubkey)
+  INDEX idx_owner (owner_user_id),
+  FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Per-repo access grants (supports multi-user access in the future)
 CREATE TABLE repository_access (
   id INT AUTO_INCREMENT PRIMARY KEY,
   repo_id VARCHAR(128) NOT NULL,
-  pubkey VARCHAR(128) NOT NULL,
+  user_id INT NOT NULL,
   access_level ENUM('admin', 'read-write', 'read-only') NOT NULL DEFAULT 'read-only',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY idx_repo_pubkey (repo_id, pubkey),
-  INDEX idx_pubkey (pubkey),
-  FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE
+  UNIQUE KEY idx_repo_user (repo_id, user_id),
+  INDEX idx_user_id (user_id),
+  FOREIGN KEY (repo_id) REFERENCES repositories(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Scan sessions for doctor sharing
@@ -129,13 +131,14 @@ CREATE TABLE scan_sessions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   session_token VARCHAR(128) UNIQUE NOT NULL,
   staging_repo_id VARCHAR(128) NOT NULL,
-  patient_pubkey VARCHAR(128) NOT NULL,
+  patient_user_id INT NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   expires_at DATETIME NOT NULL,
   is_revoked BOOLEAN DEFAULT FALSE,
   INDEX idx_token (session_token),
   INDEX idx_expires (expires_at),
-  INDEX idx_staging_repo (staging_repo_id)
+  INDEX idx_staging_repo (staging_repo_id),
+  FOREIGN KEY (patient_user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ============================================================================

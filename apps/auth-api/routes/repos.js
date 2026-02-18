@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { normalizeToHex } from '../utils/pubkey.js';
 
 const router = Router();
 
@@ -20,13 +19,12 @@ function requireInternalAuth(req, res, next) {
  */
 router.post('/api/auth/register-repo', requireInternalAuth, async (req, res) => {
   try {
-    const { repoId, ownerPubkey, description, repoType } = req.body;
+    const { repoId, ownerUserId, description, repoType } = req.body;
 
-    if (!repoId || !ownerPubkey) {
-      return res.status(400).json({ error: 'repoId and ownerPubkey are required' });
+    if (!repoId || !ownerUserId) {
+      return res.status(400).json({ error: 'repoId and ownerUserId are required' });
     }
 
-    const hexPubkey = normalizeToHex(ownerPubkey);
     const db = req.app.get('db');
 
     const conn = await db.getConnection();
@@ -34,17 +32,17 @@ router.post('/api/auth/register-repo', requireInternalAuth, async (req, res) => 
       await conn.beginTransaction();
 
       await conn.execute(
-        `INSERT INTO repositories (id, description, repo_type, owner_pubkey)
+        `INSERT INTO repositories (id, description, repo_type, owner_user_id)
          VALUES (?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE updated_at = NOW()`,
-        [repoId, description || '', repoType || 'medical-history', hexPubkey]
+        [repoId, description || '', repoType || 'medical-history', ownerUserId]
       );
 
       await conn.execute(
-        `INSERT INTO repository_access (repo_id, pubkey, access_level)
+        `INSERT INTO repository_access (repo_id, user_id, access_level)
          VALUES (?, ?, 'admin')
          ON DUPLICATE KEY UPDATE access_level = 'admin'`,
-        [repoId, hexPubkey]
+        [repoId, ownerUserId]
       );
 
       await conn.commit();
@@ -68,7 +66,7 @@ router.post('/api/auth/register-repo', requireInternalAuth, async (req, res) => 
  */
 router.post('/api/auth/check-access', requireInternalAuth, async (req, res) => {
   try {
-    const { pubkey, scanToken, repoId, operation } = req.body;
+    const { userId, scanToken, repoId, operation } = req.body;
     const db = req.app.get('db');
 
     if (!repoId) {
@@ -101,14 +99,12 @@ router.post('/api/auth/check-access', requireInternalAuth, async (req, res) => {
       return res.json({ allowed: true, access: 'read-write', authMethod: 'scan_token' });
     }
 
-    // --- Pubkey path ---
-    if (pubkey) {
-      const hexPubkey = normalizeToHex(pubkey);
-
+    // --- UserId path ---
+    if (userId) {
       const [rows] = await db.execute(
         `SELECT access_level FROM repository_access
-         WHERE repo_id = ? AND pubkey = ?`,
-        [repoId, hexPubkey]
+         WHERE repo_id = ? AND user_id = ?`,
+        [repoId, userId]
       );
 
       if (rows.length === 0) {
@@ -133,18 +129,17 @@ router.post('/api/auth/check-access', requireInternalAuth, async (req, res) => {
 });
 
 /**
- * GET /api/auth/user/repositories?pubkey={pubkey}
- * Returns repos a pubkey has access to. Called by mgit-api's repo listing endpoint.
+ * GET /api/auth/user/repositories?userId={userId}
+ * Returns repos a user has access to. Called by mgit-api's repo listing endpoint.
  */
 router.get('/api/auth/user/repositories', requireInternalAuth, async (req, res) => {
   try {
-    const { pubkey } = req.query;
+    const { userId } = req.query;
 
-    if (!pubkey) {
-      return res.status(400).json({ error: 'pubkey query parameter is required' });
+    if (!userId) {
+      return res.status(400).json({ error: 'userId query parameter is required' });
     }
 
-    const hexPubkey = normalizeToHex(pubkey);
     const db = req.app.get('db');
 
     const [rows] = await db.execute(
@@ -152,9 +147,9 @@ router.get('/api/auth/user/repositories', requireInternalAuth, async (req, res) 
               ra.access_level AS access, r.created_at AS createdAt
        FROM repositories r
        JOIN repository_access ra ON r.id = ra.repo_id
-       WHERE ra.pubkey = ?
+       WHERE ra.user_id = ?
        ORDER BY r.created_at DESC`,
-      [hexPubkey]
+      [userId]
     );
 
     res.json(rows);

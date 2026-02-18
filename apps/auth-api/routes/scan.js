@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { generateScanToken } from '../utils/tokenGenerator.js';
-import { normalizeToHex } from '../utils/pubkey.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -49,16 +48,16 @@ router.post('/api/auth/scan/session', requireJWT, async (req, res) => {
       return res.status(400).json({ error: 'stagingRepoId must start with "scan-"' });
     }
 
-    const pubkey = normalizeToHex(req.user.pubkey);
+    const userId = req.user.userId;
     const sessionToken = generateScanToken();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
     const db = req.app.get('db');
 
     await db.execute(
-      `INSERT INTO scan_sessions (session_token, staging_repo_id, patient_pubkey, expires_at)
+      `INSERT INTO scan_sessions (session_token, staging_repo_id, patient_user_id, expires_at)
        VALUES (?, ?, ?, ?)`,
-      [sessionToken, stagingRepoId, pubkey, expiresAt]
+      [sessionToken, stagingRepoId, userId, expiresAt]
     );
 
     res.json({
@@ -84,13 +83,13 @@ router.post('/api/auth/scan/revoke', requireJWT, async (req, res) => {
       return res.status(400).json({ error: 'sessionToken is required' });
     }
 
-    const pubkey = normalizeToHex(req.user.pubkey);
+    const userId = req.user.userId;
     const db = req.app.get('db');
 
     const [result] = await db.execute(
       `UPDATE scan_sessions SET is_revoked = TRUE
-       WHERE session_token = ? AND patient_pubkey = ?`,
-      [sessionToken, pubkey]
+       WHERE session_token = ? AND patient_user_id = ?`,
+      [sessionToken, userId]
     );
 
     if (result.affectedRows === 0) {

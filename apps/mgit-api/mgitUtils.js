@@ -384,7 +384,7 @@ function getNostrPubkey(repoPath, gitHash) {
 }
 
 // Helper function to create a new git repository
-async function createRepository(repoName, userName, userEmail, ownerPubkey, description = '', reposPath) {
+async function createRepository(repoName, userName, userEmail, ownerUserId, description = '', reposPath) {
   console.log('reposPath: ', reposPath);
   const { spawn, exec } = require('child_process');
   const { promisify } = require('util');
@@ -425,7 +425,7 @@ async function createRepository(repoName, userName, userEmail, ownerPubkey, desc
     const initialContent = {
       patientInfo: {
         createdAt: new Date().toISOString(),
-        owner: ownerPubkey,
+        owner: ownerUserId,
         description: description || "Personal Medical History Repository"
       },
       medicalHistory: {
@@ -443,7 +443,7 @@ async function createRepository(repoName, userName, userEmail, ownerPubkey, desc
 
 This is a personal medical history repository.
 
-**Owner:** ${ownerPubkey.substring(0, 8)}...
+**Owner:** User #${ownerUserId}
 **Created:** ${new Date().toISOString()}
 
 ## Structure
@@ -497,9 +497,9 @@ This repository uses Nostr public key authentication and cryptographic verificat
       repoName: repoName,
       repoConfig: {
         authorized_keys: [
-        { 
-          pubkey: ownerPubkey, 
-          access: 'admin' 
+        {
+          userId: ownerUserId,
+          access: 'admin'
         }
         ],
         metadata: {

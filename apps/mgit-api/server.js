@@ -291,10 +291,10 @@ app.get('/api/auth/:type/status', (req, res) => {
 // Token validation endpoint
 app.get('/api/auth/validate', jwtOnly, (req, res) => {
   console.log('/api/auth/validate called with auth: ',  req.headers.authorization);
-  // If we get here, the token is valid (validateAuthToken middleware passed)
-  res.json({ 
+  // If we get here, the token is valid (jwtOnly middleware passed)
+  res.json({
     status: 'valid',
-    pubkey: req.user.pubkey 
+    userId: req.user.userId
   });
 });
 
@@ -802,7 +802,7 @@ app.get('/api/mgit/qr/clone/:repoId', authMiddleware, async (req, res) => {
 app.post('/api/mgit/repos/create-bare', jwtOnly, async (req, res) => {
   try {
     const { repoName } = req.body;
-    const { pubkey } = req.user;
+    const { userId } = req.user;
 
     if (!repoName) {
       return res.status(400).json({
@@ -831,7 +831,7 @@ app.post('/api/mgit/repos/create-bare', jwtOnly, async (req, res) => {
     try {
       await authApiClient.registerRepo({
         repoId: normalizedRepoName,
-        ownerPubkey: pubkey,
+        ownerUserId: userId,
         description: 'Encrypted medical repository',
         repoType: 'medical-history'
       });
@@ -861,7 +861,7 @@ app.post('/api/mgit/repos/create-bare', jwtOnly, async (req, res) => {
 
 app.post('/api/mgit/repos/create', jwtOnly, async (req, res) => {
   try {
-    const { pubkey } = req.user;
+    const { userId } = req.user;
     const { repoName, userName, userEmail, description } = req.body;
 
     if (!repoName || !userName || !userEmail) {
@@ -881,7 +881,7 @@ app.post('/api/mgit/repos/create', jwtOnly, async (req, res) => {
 
     // Create the repository on disk
     console.log('REPOS_PATH:', REPOS_PATH);
-    const repoResult = await mgitUtils.createRepository(repoName, userName, userEmail, pubkey, description, REPOS_PATH);
+    const repoResult = await mgitUtils.createRepository(repoName, userName, userEmail, userId, description, REPOS_PATH);
 
     if (!repoResult.success) {
       return res.status(500).json({
@@ -895,7 +895,7 @@ app.post('/api/mgit/repos/create', jwtOnly, async (req, res) => {
     try {
       await authApiClient.registerRepo({
         repoId: repoName,
-        ownerPubkey: pubkey,
+        ownerUserId: userId,
         description: description || 'Medical repository',
         repoType: 'medical-history'
       });
@@ -939,14 +939,14 @@ app.post('/api/mgit/repos/create', jwtOnly, async (req, res) => {
 // Sample endpoint for repository info - protected by token validation
 app.get('/api/mgit/repos/:repoId/info', authMiddleware, async (req, res) => {
   const { repoId } = req.params;
-  const { pubkey, access } = req.user; // From the general token
-  
+  const { userId, access } = req.user; // From the general token
+
   // Return repository info with user's access level
   res.json({
     id: repoId,
     name: `${repoId}`,
     access,
-    authorized_pubkey: pubkey
+    userId
   });
 });
 
@@ -990,7 +990,7 @@ app.get('/api/mgit/repos/:repoId/info/refs', authMiddleware, async (req, res) =>
     try {
       await authApiClient.registerRepo({
         repoId,
-        ownerPubkey: req.user.pubkey,
+        ownerUserId: req.user.userId,
         description: 'Auto-created on first push',
         repoType: 'medical-history'
       });
@@ -1181,9 +1181,9 @@ app.get('/api/mgit/repos/:repoId/metadata', authMiddleware, (req, res) => {
 app.get('/api/mgit/user/repositories', jwtOnly, async (req, res) => {
   try {
     console.log('USER REPOSITORIES LIST');
-    const userPubkey = req.user.pubkey;
+    const { userId } = req.user;
 
-    const repos = await authApiClient.getUserRepositories(userPubkey);
+    const repos = await authApiClient.getUserRepositories(userId);
 
     // Map to the shape the frontend expects
     const userRepositories = repos.map(r => ({
