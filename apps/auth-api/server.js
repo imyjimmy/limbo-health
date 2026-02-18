@@ -210,7 +210,7 @@ app.post('/api/auth/google/token', async (req, res) => {
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
-      `SELECT oc.user_id, u.id_roles
+      `SELECT oc.user_id, u.id_roles, u.nostr_pubkey
        FROM oauth_connections oc
        JOIN users u ON u.id = oc.user_id
        WHERE oc.provider = 'google' AND oc.provider_user_id = ?`,
@@ -219,6 +219,7 @@ app.post('/api/auth/google/token', async (req, res) => {
 
     let userId;
     let userRole;
+    let nostrPubkey = null;
 
     if (connections.length === 0) {
       // New Google user — create user + oauth_connection
@@ -238,6 +239,7 @@ app.post('/api/auth/google/token', async (req, res) => {
     } else {
       userId = connections[0].user_id;
       userRole = connections[0].id_roles;
+      nostrPubkey = connections[0].nostr_pubkey || null;
 
       // Update access token
       await db.query(
@@ -249,6 +251,7 @@ app.post('/api/auth/google/token', async (req, res) => {
 
     const token = jwt.sign({
       userId,
+      pubkey: nostrPubkey,
       oauthProvider: 'google',
       googleId: userInfo.googleId,
       email: userInfo.email,
@@ -263,7 +266,8 @@ app.post('/api/auth/google/token', async (req, res) => {
     res.json({
       status: 'OK',
       token,
-      user: userInfo
+      user: userInfo,
+      nostrPubkey
     });
   } catch (error) {
     console.error('Google token auth error:', error);
@@ -326,13 +330,17 @@ app.post('/api/auth/link-nostr', async (req, res) => {
       }
 
       const existingPubkey = currentUser[0].nostr_pubkey;
-      if (existingPubkey) {
+      if (existingPubkey === pubkey) {
+        // Idempotent — already linked to this exact key
         await conn.rollback();
-        if (existingPubkey === pubkey) {
-          // Idempotent — already linked to this key
-          return res.json({ status: 'OK', pubkey, merged: false, message: 'Already linked' });
-        }
-        return res.status(409).json({ status: 'error', reason: 'Account already linked to a different Nostr key' });
+        return res.json({ status: 'OK', pubkey, merged: false, message: 'Already linked' });
+      }
+      // If user had a different key (e.g. auto-generated), clear it so the new one can be set
+      if (existingPubkey) {
+        await conn.query(
+          'UPDATE users SET nostr_pubkey = NULL WHERE id = ?',
+          [googleUserId]
+        );
       }
 
       // Find old Nostr-only user by pubkey

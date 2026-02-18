@@ -190,24 +190,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync(LOGIN_METHOD_KEY, 'google');
       await SecureStore.setItemAsync(GOOGLE_PROFILE_KEY, JSON.stringify(googleProfile));
 
-      // Silently generate an encryption keypair for the new Google user
-      let pubkey: string | null = null;
-      const alreadyHasKey = await keyManager.hasStoredKey();
-      if (!alreadyHasKey) {
+      // Backend tells us if this Google user already has a Nostr key linked.
+      // If not, auto-generate one on first login for encryption.
+      let pubkey: string | null = data.nostrPubkey || null;
+
+      if (!pubkey) {
         const privkey = secp256k1.utils.randomSecretKey();
         await keyManager.storeMasterPrivkey(privkey);
         setPrivkeyRef(privkey);
         pubkey = KeyManager.pubkeyFromPrivkey(privkey);
-      } else {
-        // Existing key — try to load it (no biometric on write path)
+
+        // Link the new key to the Google account on the backend
         try {
-          const privkey = await keyManager.getMasterPrivkey();
-          if (privkey) {
-            setPrivkeyRef(privkey);
-            pubkey = KeyManager.pubkeyFromPrivkey(privkey);
-          }
-        } catch {
-          // Biometric declined — key exists but we can't read it yet
+          const signedEvent = signChallenge(privkey, `link-nostr:${Date.now()}`);
+          await fetch(ENDPOINTS.linkNostr, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${data.token}`,
+            },
+            body: JSON.stringify({ signedEvent }),
+          });
+        } catch (err) {
+          console.warn('Failed to link auto-generated key to backend:', err);
         }
       }
 
