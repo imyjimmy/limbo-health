@@ -61,7 +61,7 @@ async function isAlreadyCloned(repoId: string): Promise<boolean> {
 
 export default function BinderListScreen() {
   const { state: authState } = useAuthContext();
-  const { ready: cryptoReady, masterConversationKey } = useCryptoContext();
+  const { ready: cryptoReady, needsEncryptionKey, masterConversationKey } = useCryptoContext();
   const { capture } = useCamera();
   const router = useRouter();
 
@@ -250,7 +250,30 @@ export default function BinderListScreen() {
 
   // --- Render ---
 
-  if (!jwt || !cryptoReady) {
+  if (!jwt) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#111" />
+        <Text style={styles.loadingText}>Initializing...</Text>
+      </View>
+    );
+  }
+
+  if (needsEncryptionKey) {
+    return (
+      <View style={styles.centered}>
+        <Text style={[styles.screenTitle, { marginBottom: 12 }]}>Encryption Key Needed</Text>
+        <Text style={[styles.loadingText, { textAlign: 'center', marginBottom: 24 }]}>
+          To store and access encrypted medical records, you need to set up a cryptographic key.
+        </Text>
+        <Pressable style={styles.createButton} onPress={() => router.push('/(auth)/setup-key')}>
+          <Text style={styles.createButtonText}>Set Up Key</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!cryptoReady) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#111" />

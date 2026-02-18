@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { secp256k1 } from '@noble/curves/secp256k1';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { KeyManager } from '../../core/crypto/KeyManager';
@@ -19,7 +19,9 @@ import { useAuthContext } from '../../providers/AuthProvider';
 
 export default function GenerateKeyScreen() {
   const router = useRouter();
-  const { login } = useAuthContext();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { login, storeNostrKey } = useAuthContext();
+  const keyOnly = mode === 'keyOnly';
   const [loading, setLoading] = useState(false);
   const [backedUp, setBackedUp] = useState(false);
 
@@ -43,7 +45,11 @@ export default function GenerateKeyScreen() {
 
     setLoading(true);
     try {
-      await login(keypair.privkey);
+      if (keyOnly) {
+        await storeNostrKey(keypair.privkey);
+      } else {
+        await login(keypair.privkey);
+      }
       router.replace('/(tabs)');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';

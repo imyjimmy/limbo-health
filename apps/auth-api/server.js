@@ -153,6 +153,67 @@ app.post('/api/auth/google/callback', async (req, res) => {
   }
 });
 
+// ========== GOOGLE AUTH (MOBILE TOKEN EXCHANGE) ==========
+// Mobile app sends Google access token obtained via expo-auth-session.
+// We verify it with Google, then issue a Limbo JWT.
+
+app.post('/api/auth/google/token', async (req, res) => {
+  const { accessToken } = req.body;
+
+  if (!accessToken) {
+    return res.status(400).json({ status: 'error', reason: 'Missing accessToken' });
+  }
+
+  try {
+    const userInfo = await googleAuth.getUserInfo(accessToken);
+
+    // Look up or create user by google ID
+    const [users] = await db.query(
+      'SELECT id, id_roles FROM users WHERE google_id = ?',
+      [userInfo.googleId]
+    );
+
+    let userId;
+    let userRole;
+
+    if (users.length === 0) {
+      // New Google user — default to provider role (2)
+      const roleId = 2;
+      const [insertResult] = await db.query(
+        'INSERT INTO users (google_id, email, id_roles) VALUES (?, ?, ?)',
+        [userInfo.googleId, userInfo.email, roleId]
+      );
+      userId = insertResult.insertId;
+      userRole = roleId;
+    } else {
+      userId = users[0].id;
+      userRole = users[0].id_roles;
+    }
+
+    const token = jwt.sign({
+      userId,
+      oauthProvider: 'google',
+      googleId: userInfo.googleId,
+      email: userInfo.email,
+      role: userRole,
+      authMethod: 'google',
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
+    }, JWT_SECRET);
+
+    console.log('Google mobile login verified for:', userInfo.email);
+
+    res.json({
+      status: 'OK',
+      token,
+      user: userInfo
+    });
+  } catch (error) {
+    console.error('Google token auth error:', error);
+    res.status(500).json({ status: 'error', reason: error.message });
+  }
+});
+
 // ========== INTERNAL: JWT VALIDATION ==========
 // Called by other services (scheduler-api, mgit-api) to validate tokens
 

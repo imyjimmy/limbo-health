@@ -5,26 +5,45 @@ import { ProfileAvatar } from '../../components/navigation/ProfileAvatar';
 import { useAuthContext } from '../../providers/AuthProvider';
 import { useRouter } from 'expo-router';
 
-const MENU_ITEMS = [
-  { label: 'Account', destructive: false },
-  { label: 'Security & Keys', destructive: false },
-  { label: 'Notifications', destructive: false },
-  { label: 'About', destructive: false },
-  { label: 'Sign Out', destructive: true },
-];
-
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { state, logout } = useAuthContext();
   const router = useRouter();
 
-  const displayName = state.metadata?.name ?? 'User';
+  const isGoogle = state.loginMethod === 'google';
+  const hasEncryptionKey = !!state.pubkey;
+
+  const displayName = isGoogle
+    ? (state.googleProfile?.name ?? state.googleProfile?.email ?? 'Google User')
+    : (state.metadata?.name ?? 'User');
+
+  const avatarUrl = isGoogle
+    ? (state.googleProfile?.picture ?? null)
+    : (state.metadata?.picture ?? null);
+
   const initials = displayName
     .split(' ')
     .map((n: string) => n[0])
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+  const menuItems = [
+    { label: 'Account', destructive: false },
+    // Show key setup prompt for Google users without encryption key
+    ...(isGoogle && !hasEncryptionKey
+      ? [{ label: 'Set Up Encryption Key', destructive: false }]
+      : [{ label: 'Security & Keys', destructive: false }]),
+    { label: 'Notifications', destructive: false },
+    { label: 'About', destructive: false },
+    { label: 'Sign Out', destructive: true },
+  ];
+
+  const handleMenuPress = (label: string) => {
+    if (label === 'Sign Out') logout?.();
+    if (label === 'Security & Keys') router.push('/key-management');
+    if (label === 'Set Up Encryption Key') router.push('/(auth)/setup-key');
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
@@ -33,26 +52,26 @@ export default function ProfileScreen() {
       <View style={styles.avatarSection}>
         <ProfileAvatar
           isActive={false}
-          imageUrl={state.metadata?.picture ?? null}
+          imageUrl={avatarUrl}
           initials={initials}
           size={64}
           hasNotification={false}
         />
         <Text style={styles.displayName}>{displayName}</Text>
+        {isGoogle && state.googleProfile?.email && (
+          <Text style={styles.emailText}>{state.googleProfile.email}</Text>
+        )}
       </View>
 
       <View style={styles.menuContainer}>
-        {MENU_ITEMS.map((item, i) => (
+        {menuItems.map((item, i) => (
           <Pressable
             key={item.label}
-            onPress={() => {
-              if (item.label === 'Sign Out') logout?.();
-              if (item.label === 'Security & Keys') router.push('/key-management');
-            }}
+            onPress={() => handleMenuPress(item.label)}
             style={({ pressed }) => [
               styles.menuItem,
               i === 0 && styles.menuItemFirst,
-              i === MENU_ITEMS.length - 1 && styles.menuItemLast,
+              i === menuItems.length - 1 && styles.menuItemLast,
               pressed && styles.menuItemPressed,
             ]}
           >
@@ -60,6 +79,7 @@ export default function ProfileScreen() {
               style={[
                 styles.menuItemText,
                 item.destructive && styles.menuItemDestructive,
+                item.label === 'Set Up Encryption Key' && styles.menuItemHighlight,
               ]}
             >
               {item.label}
@@ -90,12 +110,17 @@ const styles = StyleSheet.create({
   avatarSection: {
     alignItems: 'center',
     marginBottom: 32,
-    gap: 12,
+    gap: 8,
   },
   displayName: {
     color: '#ffffff',
     fontSize: 18,
     fontWeight: '600',
+    marginTop: 4,
+  },
+  emailText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
   },
   menuContainer: {
     gap: 1,
@@ -125,6 +150,9 @@ const styles = StyleSheet.create({
   },
   menuItemDestructive: {
     color: '#ef4444',
+  },
+  menuItemHighlight: {
+    color: '#60a5fa',
   },
   menuItemChevron: {
     color: 'rgba(255,255,255,0.2)',

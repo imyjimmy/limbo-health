@@ -12,9 +12,10 @@ export default function TabLayout() {
   const pathname = usePathname();
   const { state } = useAuthContext();
 
-  const profileImageUrl = state.metadata?.picture ?? null;
-  const profileInitials = state.metadata?.name
-    ? state.metadata.name
+  const profileImageUrl = state.metadata?.picture ?? state.googleProfile?.picture ?? null;
+  const profileName = state.metadata?.name ?? state.googleProfile?.name;
+  const profileInitials = profileName
+    ? profileName
         .split(' ')
         .map((n: string) => n[0])
         .join('')

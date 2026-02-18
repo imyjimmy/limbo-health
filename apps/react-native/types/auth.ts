@@ -7,6 +7,8 @@ export type AuthStatus =
   | 'authenticated' // JWT valid, key available
   | 'expired';      // JWT expired, needs silent re-auth
 
+export type LoginMethod = 'nostr' | 'google';
+
 export interface NostrMetadata {
   name?: string;
   display_name?: string;
@@ -16,9 +18,18 @@ export interface NostrMetadata {
   [key: string]: any;  // relay may return extra fields
 }
 
+export interface GoogleProfile {
+  email: string;
+  name?: string;
+  picture?: string;
+  googleId: string;
+}
+
 export interface AuthState {
   status: AuthStatus;
   jwt: string | null;
-  pubkey: string | null;
+  pubkey: string | null;           // null for Google-only users without Nostr key
   metadata: NostrMetadata | null;
+  loginMethod: LoginMethod | null;
+  googleProfile: GoogleProfile | null;
 }

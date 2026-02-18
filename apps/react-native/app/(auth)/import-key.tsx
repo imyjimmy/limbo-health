@@ -15,14 +15,16 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import { bech32 } from '@scure/base';
 import { useAuthContext } from '../../providers/AuthProvider';
 
 export default function ImportKeyScreen() {
   const router = useRouter();
-  const { login } = useAuthContext();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { login, storeNostrKey } = useAuthContext();
+  const keyOnly = mode === 'keyOnly';
   const [keyInput, setKeyInput] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -59,7 +61,11 @@ export default function ImportKeyScreen() {
 
     setLoading(true);
     try {
-      await login(privkeyBytes);
+      if (keyOnly) {
+        await storeNostrKey(privkeyBytes);
+      } else {
+        await login(privkeyBytes);
+      }
       router.replace('/(tabs)');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';

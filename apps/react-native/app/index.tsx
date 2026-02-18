@@ -21,8 +21,11 @@ export default function Index() {
   }
 
   if (state.status === 'expired') {
-    // Could show a "reconnecting" screen, but for now just go to tabs
-    // and let refreshAuth handle it
+    // Google users need to re-login (no refresh token in v1)
+    if (state.loginMethod === 'google') {
+      return <Redirect href="/(auth)/welcome" />;
+    }
+    // Nostr users: go to tabs and let refreshAuth handle it
     return <Redirect href="/(tabs)" />;
   }
 

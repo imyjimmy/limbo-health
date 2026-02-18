@@ -20,6 +20,8 @@ import { useAuthContext } from './AuthProvider';
 
 interface CryptoContextValue {
   ready: boolean;
+  /** True when user is authenticated but has no Nostr key (Google-only users). */
+  needsEncryptionKey: boolean;
   masterPubkey: string | null;
   createEncryptedIO: (repoDir: string) => EncryptedIO;
   masterConversationKey: Uint8Array | null;
@@ -41,6 +43,8 @@ export function CryptoProvider({ children }: { children: React.ReactNode }) {
     useState<Uint8Array | null>(null);
   const [masterPubkey, setMasterPubkey] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+
+  const needsEncryptionKey = authState.status === 'authenticated' && !privkey;
 
   // --- Activate when authenticated + privkey available (no Keychain read) ---
 
@@ -83,8 +87,8 @@ export function CryptoProvider({ children }: { children: React.ReactNode }) {
   // --- Render ---
 
   const value = useMemo(
-    () => ({ ready, masterPubkey, createEncryptedIO, masterConversationKey }),
-    [ready, masterPubkey, createEncryptedIO, masterConversationKey],
+    () => ({ ready, needsEncryptionKey, masterPubkey, createEncryptedIO, masterConversationKey }),
+    [ready, needsEncryptionKey, masterPubkey, createEncryptedIO, masterConversationKey],
   );
 
   return (
