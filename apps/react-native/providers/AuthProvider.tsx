@@ -12,8 +12,9 @@ import React, {
   useMemo,
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
+import { secp256k1 } from '@noble/curves/secp256k1';
 import { KeyManager } from '../core/crypto/KeyManager';
-import { authenticateNostr } from '../core/crypto/nostrAuth';
+import { authenticateNostr, signChallenge } from '../core/crypto/nostrAuth';
 import { API_BASE_URL, ENDPOINTS } from '../constants/api';
 import type { AuthState, AuthStatus, LoginMethod, GoogleProfile } from '../types/auth';
 import { decode as base64Decode } from '../core/crypto/base64';
@@ -189,32 +190,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync(LOGIN_METHOD_KEY, 'google');
       await SecureStore.setItemAsync(GOOGLE_PROFILE_KEY, JSON.stringify(googleProfile));
 
+      // Silently generate an encryption keypair for the new Google user
+      let pubkey: string | null = null;
+      const alreadyHasKey = await keyManager.hasStoredKey();
+      if (!alreadyHasKey) {
+        const privkey = secp256k1.utils.randomSecretKey();
+        await keyManager.storeMasterPrivkey(privkey);
+        setPrivkeyRef(privkey);
+        pubkey = KeyManager.pubkeyFromPrivkey(privkey);
+      } else {
+        // Existing key — try to load it (no biometric on write path)
+        try {
+          const privkey = await keyManager.getMasterPrivkey();
+          if (privkey) {
+            setPrivkeyRef(privkey);
+            pubkey = KeyManager.pubkeyFromPrivkey(privkey);
+          }
+        } catch {
+          // Biometric declined — key exists but we can't read it yet
+        }
+      }
+
       setState({
         status: 'authenticated',
         jwt: data.token,
-        pubkey: null,
+        pubkey,
         metadata: null,
         loginMethod: 'google',
         googleProfile,
       });
     },
-    [],
+    [keyManager],
   );
 
   // --- Store Nostr key for Google user (for encryption) ---
 
   const storeNostrKey = useCallback(
     async (privkey: Uint8Array) => {
+      const pubkey = KeyManager.pubkeyFromPrivkey(privkey);
+
+      // If Google-authenticated, link Nostr key on the backend (merges accounts)
+      if (state.loginMethod === 'google' && state.jwt) {
+        const signedEvent = signChallenge(privkey, `link-nostr:${Date.now()}`);
+        const resp = await fetch(ENDPOINTS.linkNostr, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${state.jwt}`,
+          },
+          body: JSON.stringify({ signedEvent }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.reason || 'Failed to link Nostr key');
+
+        // Save fresh JWT that now includes pubkey claim
+        if (data.token) {
+          await SecureStore.setItemAsync(JWT_STORAGE_KEY, data.token);
+          setState(prev => ({ ...prev, jwt: data.token, pubkey }));
+        }
+      }
+
+      // Store key locally regardless
       await keyManager.storeMasterPrivkey(privkey);
       setPrivkeyRef(privkey);
-      const pubkey = KeyManager.pubkeyFromPrivkey(privkey);
 
       setState(prev => ({
         ...prev,
         pubkey,
       }));
     },
-    [keyManager],
+    [keyManager, state.loginMethod, state.jwt],
   );
 
   // --- Logout: clear everything ---

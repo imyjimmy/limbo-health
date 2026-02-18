@@ -271,6 +271,162 @@ app.post('/api/auth/google/token', async (req, res) => {
   }
 });
 
+// ========== LINK NOSTR KEY TO GOOGLE ACCOUNT ==========
+// Google-authenticated user proves ownership of a Nostr key.
+// If an old Nostr-only user exists with that pubkey, merge accounts.
+
+app.post('/api/auth/link-nostr', async (req, res) => {
+  // --- Inline JWT auth (same pattern as routes/scan.js) ---
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ status: 'error', reason: 'Missing or invalid Authorization header' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ status: 'error', reason: 'Invalid or expired token' });
+  }
+
+  if (decoded.authMethod !== 'google') {
+    return res.status(400).json({ status: 'error', reason: 'Only Google-authenticated users can link a Nostr key' });
+  }
+
+  const googleUserId = decoded.userId;
+  const { signedEvent } = req.body;
+
+  if (!signedEvent) {
+    return res.status(400).json({ status: 'error', reason: 'Missing signedEvent' });
+  }
+
+  // --- Verify Nostr signature to prove key ownership ---
+  try {
+    const result = await nostrAuth.verifySignedEvent(signedEvent);
+    if (!result.valid) {
+      return res.status(400).json({ status: 'error', reason: result.error });
+    }
+
+    const pubkey = result.pubkey;
+
+    // --- Single transaction for the merge ---
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Check if Google user already has a nostr_pubkey
+      const [currentUser] = await conn.query(
+        'SELECT nostr_pubkey FROM users WHERE id = ?',
+        [googleUserId]
+      );
+
+      if (currentUser.length === 0) {
+        await conn.rollback();
+        return res.status(404).json({ status: 'error', reason: 'User not found' });
+      }
+
+      const existingPubkey = currentUser[0].nostr_pubkey;
+      if (existingPubkey) {
+        await conn.rollback();
+        if (existingPubkey === pubkey) {
+          // Idempotent — already linked to this key
+          return res.json({ status: 'OK', pubkey, merged: false, message: 'Already linked' });
+        }
+        return res.status(409).json({ status: 'error', reason: 'Account already linked to a different Nostr key' });
+      }
+
+      // Find old Nostr-only user by pubkey
+      const [oldUsers] = await conn.query(
+        'SELECT id FROM users WHERE nostr_pubkey = ?',
+        [pubkey]
+      );
+
+      let merged = false;
+
+      if (oldUsers.length > 0) {
+        const oldUserId = oldUsers[0].id;
+        merged = true;
+
+        // Transfer repositories ownership
+        await conn.query(
+          'UPDATE repositories SET owner_user_id = ? WHERE owner_user_id = ?',
+          [googleUserId, oldUserId]
+        );
+
+        // Transfer repository_access (handle unique constraint conflicts)
+        await conn.query(
+          `INSERT INTO repository_access (user_id, repository_id, access_level, granted_at)
+           SELECT ?, repository_id, access_level, granted_at
+           FROM repository_access WHERE user_id = ?
+           ON DUPLICATE KEY UPDATE access_level = VALUES(access_level)`,
+          [googleUserId, oldUserId]
+        );
+        await conn.query(
+          'DELETE FROM repository_access WHERE user_id = ?',
+          [oldUserId]
+        );
+
+        // Transfer scan sessions
+        await conn.query(
+          'UPDATE scan_sessions SET patient_user_id = ? WHERE patient_user_id = ?',
+          [googleUserId, oldUserId]
+        );
+
+        // Transfer oauth connections (unlikely but safe)
+        await conn.query(
+          'UPDATE oauth_connections SET user_id = ? WHERE user_id = ?',
+          [googleUserId, oldUserId]
+        );
+
+        // Clear pubkey on old user (free UNIQUE constraint) then delete
+        await conn.query(
+          'UPDATE users SET nostr_pubkey = NULL WHERE id = ?',
+          [oldUserId]
+        );
+        await conn.query(
+          'DELETE FROM users WHERE id = ?',
+          [oldUserId]
+        );
+      }
+
+      // Set nostr_pubkey on the Google user
+      await conn.query(
+        'UPDATE users SET nostr_pubkey = ? WHERE id = ?',
+        [pubkey, googleUserId]
+      );
+
+      await conn.commit();
+
+      // Issue fresh JWT with pubkey claim
+      const token = jwt.sign({
+        userId: googleUserId,
+        pubkey,
+        oauthProvider: 'google',
+        googleId: decoded.googleId,
+        email: decoded.email,
+        role: decoded.role,
+        authMethod: 'google',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7)
+      }, JWT_SECRET);
+
+      console.log(`Nostr key linked for Google user ${googleUserId}, pubkey: ${pubkey}, merged: ${merged}`);
+
+      res.json({ status: 'OK', token, pubkey, merged });
+
+    } catch (txErr) {
+      await conn.rollback();
+      throw txErr;
+    } finally {
+      conn.release();
+    }
+
+  } catch (error) {
+    console.error('Link Nostr error:', error);
+    res.status(500).json({ status: 'error', reason: 'Failed to link Nostr key' });
+  }
+});
+
 // ========== INTERNAL: JWT VALIDATION ==========
 // Called by other services (scheduler-api, mgit-api) to validate tokens
 
