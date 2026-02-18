@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ProfileAvatar } from '../../components/navigation/ProfileAvatar';
-import { useAuthContext } from '../../providers/AuthProvider';
+import { ProfileAvatar } from '../../../components/navigation/ProfileAvatar';
+import { useAuthContext } from '../../../providers/AuthProvider';
 import { useRouter } from 'expo-router';
 
 export default function ProfileScreen() {
@@ -40,7 +40,7 @@ export default function ProfileScreen() {
       await logout?.();
       router.replace('/(auth)/welcome');
     }
-    if (label === 'Encryption Keys') router.push('/encryption-keys');
+    if (label === 'Encryption Keys') router.push('/(tabs)/profile/encryption-keys');
   };
 
   return (

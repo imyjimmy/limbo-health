@@ -1,4 +1,4 @@
-// app/encryption-keys.tsx
+// app/(tabs)/profile/encryption-keys.tsx
 // Encryption key management screen, pushed from profile.
 
 import React, { useState, useMemo } from 'react';
@@ -16,9 +16,9 @@ import * as Clipboard from 'expo-clipboard';
 import * as SecureStore from 'expo-secure-store';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { bech32 } from '@scure/base';
-import { useAuthContext } from '../providers/AuthProvider';
-import { KeyManager } from '../core/crypto/KeyManager';
-import ImportKeyForm from '../components/auth/ImportKeyForm';
+import { useAuthContext } from '../../../providers/AuthProvider';
+import { KeyManager } from '../../../core/crypto/KeyManager';
+import ImportKeyForm from '../../../components/auth/ImportKeyForm';
 
 function encodeBech32(prefix: string, hexStr: string): string {
   const bytes = hexToBytes(hexStr);
@@ -35,7 +35,6 @@ export default function EncryptionKeysRoute() {
   const navigation = useNavigation();
   const { state } = useAuthContext();
   const keyManager = useMemo(() => new KeyManager(SecureStore), []);
-  const canGoBack = navigation.canGoBack();
 
   const hasKey = !!state.pubkey;
   const npub = hasKey ? encodeBech32('npub', state.pubkey!) : null;
@@ -75,18 +74,19 @@ export default function EncryptionKeysRoute() {
   };
 
   if (showImport) {
-    return <ImportKeyForm mode="keyOnly" title="Import Existing Key" onBack={() => setShowImport(false)} onSuccess={() => setShowImport(false)} />;
+    navigation.setOptions({ headerShown: false });
+    return (
+      <ImportKeyForm
+        mode="keyOnly"
+        title="Import Existing Key"
+        onBack={() => { setShowImport(false); navigation.setOptions({ headerShown: true }); }}
+        onSuccess={() => { setShowImport(false); navigation.setOptions({ headerShown: true }); }}
+      />
+    );
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {canGoBack && (
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>{'< Back'}</Text>
-        </Pressable>
-      )}
-
-      <Text style={styles.title}>Encryption Keys</Text>
       <Text style={styles.description}>
         Your medical records are encrypted with a keypair stored on this device.
       </Text>
@@ -146,21 +146,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 40,
     paddingBottom: 48,
-  },
-  backButton: {
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-    marginBottom: 16,
-  },
-  backButtonText: {
-    color: '#8d45dd',
-    fontSize: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111',
-    marginBottom: 8,
   },
   description: {
     fontSize: 16,

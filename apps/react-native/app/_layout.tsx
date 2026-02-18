@@ -4,7 +4,7 @@
 import '../polyfills/setup';
 
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Stack } from 'expo-router/stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '../providers/AuthProvider';
 import { CryptoProvider } from '../providers/CryptoProvider';
@@ -17,7 +17,6 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="encryption-keys" />
             <Stack.Screen
               name="camera"
               options={{

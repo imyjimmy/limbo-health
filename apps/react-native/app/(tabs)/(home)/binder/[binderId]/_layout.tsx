@@ -2,7 +2,7 @@
 // Layout for binder detail screens. Provides a Stack navigator with headers.
 
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Stack } from 'expo-router/stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function BinderLayout() {
