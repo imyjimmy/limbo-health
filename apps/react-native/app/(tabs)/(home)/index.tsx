@@ -198,31 +198,43 @@ export default function BinderListScreen() {
     fetchRepos();
   }, [fetchRepos]);
 
-  // --- Create binder (hardcoded for Week 1 testing) ---
+  // --- Create binder ---
 
-  const createBinder = useCallback(async () => {
+  const createBinder = useCallback(() => {
     if (!jwt || !masterConversationKey) return;
 
-    const binderId = `binder-${Date.now()}`;
-    const dir = repoDir(binderId);
+    Alert.prompt(
+      'New Binder',
+      'Enter a name for this binder:',
+      async (name) => {
+        const trimmed = name?.trim();
+        if (!trimmed) return;
 
-    try {
-      setScreenState({ phase: 'cloning', repoId: binderId });
+        const binderId = `binder-${Date.now()}`;
+        const dir = repoDir(binderId);
 
-      await BinderService.create(
-        dir,
-        binderId,
-        authConfig(),
-        masterConversationKey,
-        'My Medical Binder',
-      );
+        try {
+          setScreenState({ phase: 'cloning', repoId: binderId });
 
-      await fetchRepos();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      Alert.alert('Create Failed', msg);
-      fetchRepos();
-    }
+          await BinderService.create(
+            dir,
+            binderId,
+            authConfig(),
+            masterConversationKey,
+            trimmed,
+          );
+
+          await fetchRepos();
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Unknown error';
+          Alert.alert('Create Failed', msg);
+          fetchRepos();
+        }
+      },
+      'plain-text',
+      '',
+      'e.g. John Doe Medical Records',
+    );
   }, [jwt, masterConversationKey, fetchRepos]);
 
   // --- Take photo and add to binder ---
