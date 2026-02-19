@@ -40,6 +40,7 @@ export default function ProfileScreen() {
       await logout?.();
       router.replace('/(auth)/welcome');
     }
+    if (label === 'Account') router.push('/(tabs)/profile/account');
     if (label === 'Encryption Keys') router.push('/(tabs)/profile/encryption-keys');
   };
 

@@ -5,6 +5,14 @@ export default function ProfileLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" options={{ title: 'Profile' }} />
       <Stack.Screen
+        name="account"
+        options={{
+          headerShown: true,
+          title: 'Account',
+          headerBackButtonDisplayMode: 'default',
+        }}
+      />
+      <Stack.Screen
         name="encryption-keys"
         options={{
           headerShown: true,

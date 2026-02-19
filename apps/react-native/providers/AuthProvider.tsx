@@ -36,6 +36,7 @@ interface AuthContextValue {
   /** Store a Nostr key for an already-authenticated Google user (for encryption). */
   storeNostrKey: (privkey: Uint8Array) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   refreshAuth: () => Promise<void>;
 }
 
@@ -303,6 +304,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState(emptyState('onboarding'));
   }, []);
 
+  // --- Delete account: server-side deletion + full local cleanup ---
+
+  const deleteAccount = useCallback(async () => {
+    if (!state.jwt) throw new Error('Not authenticated');
+
+    const resp = await fetch(ENDPOINTS.deleteAccount, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${state.jwt}` },
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.reason || 'Failed to delete account');
+
+    // Delete local encryption key
+    await keyManager.deleteMasterPrivkey();
+
+    // Clear all session data (same as logout)
+    await SecureStore.deleteItemAsync(JWT_STORAGE_KEY);
+    await SecureStore.deleteItemAsync('limbo_metadata');
+    await SecureStore.deleteItemAsync(LOGIN_METHOD_KEY);
+    await SecureStore.deleteItemAsync(GOOGLE_PROFILE_KEY);
+    setPrivkeyRef(null);
+    setState(emptyState('onboarding'));
+  }, [state.jwt, keyManager]);
+
   // --- Refresh: re-authenticate with stored key ---
 
   const refreshAuth = useCallback(async () => {
@@ -331,8 +356,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- Render ---
 
   const value = useMemo(
-    () => ({ state, privkey: privkeyRef, login, loginWithGoogle, storeNostrKey, logout, refreshAuth }),
-    [state, privkeyRef, login, loginWithGoogle, storeNostrKey, logout, refreshAuth],
+    () => ({ state, privkey: privkeyRef, login, loginWithGoogle, storeNostrKey, logout, deleteAccount, refreshAuth }),
+    [state, privkeyRef, login, loginWithGoogle, storeNostrKey, logout, deleteAccount, refreshAuth],
   );
 
   return (
