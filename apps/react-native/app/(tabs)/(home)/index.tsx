@@ -106,7 +106,7 @@ export default function BinderListScreen() {
       const data = await res.json();
 
       // Normalize response — may be an array or { repositories: [...] }
-      const repoList: RepoSummary[] = (Array.isArray(data)
+      const rawList: RepoSummary[] = (Array.isArray(data)
         ? data.map((r: any) => ({ id: r.id ?? r.repoId ?? r.name, name: r.name ?? r.id }))
         : (data.repositories ?? []).map((r: any) => ({
             id: r.id ?? r.repoId ?? r.name,
@@ -114,12 +114,35 @@ export default function BinderListScreen() {
           }))
       ).filter((r: RepoSummary) => !r.id.startsWith('scan-'));
 
-      setScreenState({ phase: 'repos-loaded', repos: repoList });
+      // Enrich with local binder names from encrypted patient-info.json
+      const enriched = await Promise.all(
+        rawList.map(async (repo) => {
+          if (!masterConversationKey) return repo;
+          try {
+            const cloned = await isAlreadyCloned(repo.id);
+            if (!cloned) return repo;
+            const dir = repoDir(repo.id);
+            const { createFSAdapter } = await import('../../../core/git/fsAdapter');
+            const { EncryptedIO } = await import('../../../core/binder/EncryptedIO');
+            const fs = createFSAdapter(dir);
+            const io = new EncryptedIO(fs, masterConversationKey, dir);
+            const doc = await io.readDocument('/patient-info.json');
+            // Name is stored as "# Name" on the first line of value
+            const firstLine = doc.value?.split('\n')[0] ?? '';
+            const name = firstLine.startsWith('# ') ? firstLine.slice(2).trim() : '';
+            return name ? { ...repo, name } : repo;
+          } catch {
+            return repo;
+          }
+        }),
+      );
+
+      setScreenState({ phase: 'repos-loaded', repos: enriched });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
       setScreenState({ phase: 'error', message: `Failed to load repos: ${msg}` });
     }
-  }, [jwt]);
+  }, [jwt, masterConversationKey]);
 
   const LAST_BINDER_KEY = 'limbo_last_binder';
 
@@ -203,8 +226,6 @@ export default function BinderListScreen() {
   const createBinder = useCallback(() => {
     if (!jwt || !masterConversationKey) return;
 
-    const defaultName = authState.metadata?.name || authState.googleProfile?.name || '';
-
     Alert.prompt(
       'New Binder',
       'Enter a name for your medical binder',
@@ -245,7 +266,6 @@ export default function BinderListScreen() {
         },
       ],
       'plain-text',
-      defaultName,
     );
   }, [jwt, masterConversationKey, fetchRepos, authState.metadata?.name, authState.googleProfile?.name, authState.googleProfile?.email]);
 
@@ -330,6 +350,9 @@ export default function BinderListScreen() {
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           <View style={styles.headerRow}>
             <Text style={styles.screenTitle}>Binders</Text>
+            <Pressable onPress={createBinder} hitSlop={8}>
+              <Text style={{ fontSize: 28, color: '#007AFF' }}>+</Text>
+            </Pressable>
           </View>
 
           {screenState.repos.length === 0 ? (

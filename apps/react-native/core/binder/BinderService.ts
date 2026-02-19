@@ -64,6 +64,18 @@ export class BinderService {
   /**
    * Initialize a new binder: git init, write encrypted patient-info.json, commit, push.
    */
+  /** Default top-level folders created with every new binder. */
+  private static readonly DEFAULT_FOLDERS: { folder: string; displayName: string; icon: string }[] = [
+    { folder: 'conditions',    displayName: 'Conditions',    icon: '❤️‍🩹' },
+    { folder: 'allergies',     displayName: 'Allergies',     icon: '🤧' },
+    { folder: 'medications',   displayName: 'Medications',   icon: '💊' },
+    { folder: 'visits',        displayName: 'Visits',        icon: '🩺' },
+    { folder: 'procedures',    displayName: 'Procedures',    icon: '🔪' },
+    { folder: 'labs-imaging',  displayName: 'Labs & Imaging',icon: '🔬' },
+    { folder: 'immunizations', displayName: 'Immunizations', icon: '💉' },
+    { folder: 'billing-insurance',displayName: 'Billing & Insurance',icon: '🪪' },
+  ];
+
   static async create(
     repoDir: string,
     repoId: string,
@@ -81,7 +93,16 @@ export class BinderService {
     const doc = createPatientInfo(patientName, dateOfBirth);
     await io.writeDocument('/patient-info.json', doc);
 
-    await GitEngine.commitEntry(repoDir, ['patient-info.json'], 'Initialize binder', author);
+    const filesToCommit = ['patient-info.json'];
+
+    // Create default top-level folders with .meta.json
+    for (const { folder, displayName, icon } of BinderService.DEFAULT_FOLDERS) {
+      const metaPath = `${folder}/.meta.json`;
+      await io.writeJSON('/' + metaPath, { displayName, icon, color: '#7F8C8D' });
+      filesToCommit.push(metaPath);
+    }
+
+    await GitEngine.commitEntry(repoDir, filesToCommit, 'Initialize binder', author);
     await GitEngine.push(repoDir, repoId, auth);
   }
 
