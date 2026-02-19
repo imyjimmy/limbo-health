@@ -58,6 +58,13 @@ export function useAudioRecorder() {
 
     await recording.startAsync();
     recordingRef.current = recording;
+    /*
+    ** @issue: setElapsedMs(0) runs after the status update listener (line 53)
+    ** is already attached and after startAsync() resolves. If the listener fires
+    ** before this line, the elapsed time would get reset back to 0. React's state
+    ** batching likely makes this invisible in practice, but proper sequencing would
+    ** be to set elapsedMs before startAsync() or before attaching the listener.
+    */
     setStatus('recording');
     setElapsedMs(0);
   }, []);
