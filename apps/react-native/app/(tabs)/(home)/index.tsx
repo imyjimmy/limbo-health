@@ -198,37 +198,56 @@ export default function BinderListScreen() {
     fetchRepos();
   }, [fetchRepos]);
 
-  // --- Create binder (hardcoded for Week 1 testing) ---
+  // --- Create binder ---
 
-  const createBinder = useCallback(async () => {
+  const createBinder = useCallback(() => {
     if (!jwt || !masterConversationKey) return;
 
-    const binderId = `binder-${Date.now()}`;
-    const dir = repoDir(binderId);
+    const defaultName = authState.metadata?.name || authState.googleProfile?.name || '';
 
-    try {
-      setScreenState({ phase: 'cloning', repoId: binderId });
-
-      await BinderService.create(
-        dir,
-        binderId,
-        authConfig(),
-        masterConversationKey,
-        'My Medical Binder',
-        undefined,
+    Alert.prompt(
+      'New Binder',
+      'Enter a name for your medical binder',
+      [
+        { text: 'Cancel', style: 'cancel' },
         {
-          name: authState.metadata?.name || authState.googleProfile?.name || 'Limbo Health',
-          email: authState.googleProfile?.email || 'app@limbo.health',
-        },
-      );
+          text: 'Create',
+          onPress: async (name?: string) => {
+            const binderName = name?.trim();
+            if (!binderName) return;
 
-      await fetchRepos();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      Alert.alert('Create Failed', msg);
-      fetchRepos();
-    }
-  }, [jwt, masterConversationKey, fetchRepos]);
+            const binderId = `binder-${Date.now()}`;
+            const dir = repoDir(binderId);
+
+            try {
+              setScreenState({ phase: 'cloning', repoId: binderId });
+
+              await BinderService.create(
+                dir,
+                binderId,
+                authConfig(),
+                masterConversationKey,
+                binderName,
+                undefined,
+                {
+                  name: authState.metadata?.name || authState.googleProfile?.name || 'Limbo Health',
+                  email: authState.googleProfile?.email || 'app@limbo.health',
+                },
+              );
+
+              await fetchRepos();
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : 'Unknown error';
+              Alert.alert('Create Failed', msg);
+              fetchRepos();
+            }
+          },
+        },
+      ],
+      'plain-text',
+      defaultName,
+    );
+  }, [jwt, masterConversationKey, fetchRepos, authState.metadata?.name, authState.googleProfile?.name, authState.googleProfile?.email]);
 
   // --- Take photo and add to binder ---
 
