@@ -23,6 +23,7 @@ import { useCamera } from '../../../hooks/useCamera';
 import type { MedicalDocument } from '../../../types/document';
 import { useShareSession } from '../../../hooks/useShareSession';
 import { QRDisplay } from '../../../components/QRDisplay';
+import { SwipeableRow } from '../../../components/binder/SwipeableRow';
 
 // --- Types ---
 
@@ -194,11 +195,18 @@ export default function BinderListScreen() {
 
       try {
         const cloned = await isAlreadyCloned(repo.id);
+        const { GitEngine } = await import('../../../core/git/GitEngine');
         if (!cloned) {
           setScreenState({ phase: 'cloning', repoId: repo.id });
-          const { GitEngine } = await import('../../../core/git/GitEngine');
           await GitEngine.cloneRepo(repoDir(repo.id), repo.id, authConfig());
           setScreenState({ phase: 'repos-loaded', repos: (screenState as any).repos ?? [] });
+        } else {
+          // Pull latest so local is up to date before navigating
+          try {
+            await GitEngine.pull(repoDir(repo.id), repo.id, authConfig());
+          } catch (err) {
+            console.warn('Pull before open failed:', err);
+          }
         }
 
         SecureStore.setItemAsync(LAST_BINDER_KEY, repo.id);
@@ -268,6 +276,26 @@ export default function BinderListScreen() {
       'plain-text',
     );
   }, [jwt, masterConversationKey, fetchRepos, authState.metadata?.name, authState.googleProfile?.name, authState.googleProfile?.email]);
+
+  // --- Delete binder (local clone) ---
+
+  const deleteBinder = useCallback(
+    async (repo: RepoSummary) => {
+      const localPath = `${BINDERS_ROOT}/${repo.id}`;
+      try {
+        const exists = await RNFS.exists(localPath);
+        if (exists) await RNFS.unlink(localPath);
+      } catch (err) {
+        console.warn('Failed to delete local binder:', err);
+      }
+      // Remove from displayed list immediately
+      setScreenState((prev) => {
+        if (prev.phase !== 'repos-loaded') return prev;
+        return { ...prev, repos: prev.repos.filter((r) => r.id !== repo.id) };
+      });
+    },
+    [],
+  );
 
   // --- Take photo and add to binder ---
 
@@ -351,7 +379,7 @@ export default function BinderListScreen() {
           <View style={styles.headerRow}>
             <Text style={styles.screenTitle}>Binders</Text>
             <Pressable onPress={createBinder} hitSlop={8}>
-              <Text style={{ fontSize: 28, color: '#007AFF' }}>+</Text>
+              <Text style={{ fontSize: 28, color: '#007AFF', marginTop: -6 }}>+</Text>
             </Pressable>
           </View>
 
@@ -359,15 +387,22 @@ export default function BinderListScreen() {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No binders yet.</Text>
               <Pressable style={styles.createButton} onPress={createBinder}>
-                <Text style={styles.createButtonText}>Create Binder</Text>
+                <Text style={styles.createButtonText}>Create a Binder</Text>
               </Pressable>
             </View>
           ) : (
             screenState.repos.map((repo) => (
-              <Pressable key={repo.id} style={styles.repoCard} onPress={() => openBinder(repo)}>
-                <Text style={styles.repoName}>{repo.name}</Text>
-                <Text style={styles.repoId}>{repo.id}</Text>
-              </Pressable>
+              <View key={repo.id} style={{ marginBottom: 12 }}>
+                <SwipeableRow
+                  showWarning={true}
+                  onDelete={() => deleteBinder(repo)}
+                >
+                  <Pressable style={styles.repoCard} onPress={() => openBinder(repo)}>
+                    <Text style={styles.repoName}>{repo.name}</Text>
+                    <Text style={styles.repoId}>{repo.id}</Text>
+                  </Pressable>
+                </SwipeableRow>
+              </View>
             ))
           )}
           {/* Header row */}
@@ -499,14 +534,18 @@ addPhotoButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 60,
+    paddingTop: 40,
     paddingBottom: 12,
     paddingHorizontal: 0,
+    // borderTopWidth: 2,
+    // borderTopColor: 'red',
+    // borderBottomWidth: 2,
+    // borderBottomColor: 'red',
   },
   loadingText: { fontSize: 15, color: '#666', marginTop: 12 },
   repoCard: {
     backgroundColor: '#f5f5f5', borderRadius: 12,
-    padding: 16, marginBottom: 12,
+    padding: 16,
   },
   repoId: { fontSize: 13, fontFamily: 'Courier', color: '#999' },
   repoName: { fontSize: 17, fontWeight: '600', color: '#111', marginBottom: 4 },

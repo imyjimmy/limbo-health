@@ -108,10 +108,11 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
         refresh();
       } catch (err: any) {
         const message = err?.message ?? '';
+        const lower = message.toLowerCase();
         const isPushError =
-          message.includes('push') ||
-          message.includes('network') ||
-          message.includes('401');
+          lower.includes('push') ||
+          lower.includes('network') ||
+          lower.includes('401');
         if (isPushError) {
           console.warn('Push failed after delete, changes saved locally:', message);
           refresh();
@@ -140,15 +141,16 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
         refresh();
       } catch (err: any) {
         const message = err?.message ?? '';
+        const lower = message.toLowerCase();
         const isPushError =
-          message.includes('push') ||
-          message.includes('network') ||
-          message.includes('401');
+          lower.includes('push') ||
+          lower.includes('network') ||
+          lower.includes('401');
         if (isPushError) {
           console.warn('Push failed, folder created locally:', message);
           refresh();
         } else {
-          Alert.alert('Error', 'Failed to create folder. Please try again.');
+          Alert.alert('Error', message || 'Failed to create folder. Please try again.');
         }
       }
     },
