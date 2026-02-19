@@ -436,6 +436,81 @@ app.post('/api/auth/link-nostr', async (req, res) => {
   }
 });
 
+// ========== DELETE ACCOUNT ==========
+// Permanently removes user and all associated data. CASCADE handles child records.
+
+app.delete('/api/auth/account', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ status: 'error', reason: 'Missing or invalid Authorization header' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ status: 'error', reason: 'Invalid or expired token' });
+  }
+
+  const userId = decoded.userId;
+  if (!userId) {
+    return res.status(400).json({ status: 'error', reason: 'Token does not contain userId' });
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Fetch repo IDs for the response (before cascade deletes them)
+    const [repos] = await conn.query(
+      'SELECT id FROM repositories WHERE owner_user_id = ?',
+      [userId]
+    );
+    const repoIds = repos.map(r => r.id);
+
+    // Count oauth connections for the response
+    const [oauthRows] = await conn.query(
+      'SELECT COUNT(*) AS cnt FROM oauth_connections WHERE user_id = ?',
+      [userId]
+    );
+    const oauthCount = oauthRows[0].cnt;
+
+    // Delete user — CASCADE handles oauth_connections, repositories,
+    // repository_access, scan_sessions, user_settings, provider_profiles
+    const [result] = await conn.query(
+      'DELETE FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (result.affectedRows === 0) {
+      await conn.rollback();
+      return res.status(404).json({ status: 'error', reason: 'User not found' });
+    }
+
+    await conn.commit();
+
+    console.log(`Account deleted: userId=${userId}, repos=${repoIds.join(',')}, oauthConns=${oauthCount}`);
+
+    // Filesystem cleanup of bare repos on mgit-api is deferred (v1).
+    // Orphaned repo directories will be cleaned up by a future periodic job.
+
+    res.json({
+      status: 'OK',
+      deleted: {
+        userId,
+        repositories: repoIds,
+        oauthConnections: oauthCount,
+      },
+    });
+  } catch (err) {
+    await conn.rollback();
+    console.error('Delete account error:', err);
+    res.status(500).json({ status: 'error', reason: 'Failed to delete account' });
+  } finally {
+    conn.release();
+  }
+});
+
 // ========== INTERNAL: JWT VALIDATION ==========
 // Called by other services (scheduler-api, mgit-api) to validate tokens
 

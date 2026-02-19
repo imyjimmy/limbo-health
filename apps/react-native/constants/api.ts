@@ -12,6 +12,7 @@ export const ENDPOINTS = {
   userRepositories: `${API_BASE_URL}/api/mgit/user/repositories`,
   googleToken: `${API_BASE_URL}/api/auth/google/token`,
   linkNostr: `${API_BASE_URL}/api/auth/link-nostr`,
+  deleteAccount: `${API_BASE_URL}/api/auth/account`,
 } as const;
 
 // Git remote URL builder (used by GitEngine)

@@ -16,7 +16,7 @@ import { secp256k1 } from '@noble/curves/secp256k1';
 import { KeyManager } from '../core/crypto/KeyManager';
 import { authenticateNostr, signChallenge } from '../core/crypto/nostrAuth';
 import { API_BASE_URL, ENDPOINTS } from '../constants/api';
-import type { AuthState, AuthStatus, LoginMethod, GoogleProfile } from '../types/auth';
+import type { AuthState, AuthStatus, LoginMethod, GoogleProfile, NostrMetadata } from '../types/auth';
 import { decode as base64Decode } from '../core/crypto/base64';
 
 // --- Constants ---
@@ -37,6 +37,8 @@ interface AuthContextValue {
   storeNostrKey: (privkey: Uint8Array) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  updateMetadata: (partial: Partial<NostrMetadata>) => Promise<void>;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -303,6 +305,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState(emptyState('onboarding'));
   }, []);
 
+  // --- Update metadata (display name, etc.) ---
+
+  const updateMetadata = useCallback(async (partial: Partial<NostrMetadata>) => {
+    const current = state.metadata || {};
+    const updated = { ...current, ...partial };
+    // If name was cleared to empty string, remove the key so fallbacks work
+    if ('name' in partial && !partial.name) {
+      delete updated.name;
+    }
+    await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(updated));
+    setState(prev => ({ ...prev, metadata: updated }));
+  }, [state.metadata]);
+
+  // --- Delete account: backend + local cleanup ---
+
+  const deleteAccount = useCallback(async () => {
+    if (!state.jwt) throw new Error('Not authenticated');
+
+    const resp = await fetch(ENDPOINTS.deleteAccount, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${state.jwt}` },
+    });
+    if (!resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      throw new Error(data.reason || 'Failed to delete account');
+    }
+
+    // Backend succeeded — safe to clean up locally
+    try {
+      await keyManager.deleteMasterPrivkey();
+    } catch (err) {
+      console.warn('Failed to delete master privkey from Keychain:', err);
+    }
+
+    await SecureStore.deleteItemAsync(JWT_STORAGE_KEY);
+    await SecureStore.deleteItemAsync('limbo_metadata');
+    await SecureStore.deleteItemAsync(LOGIN_METHOD_KEY);
+    await SecureStore.deleteItemAsync(GOOGLE_PROFILE_KEY);
+
+    setPrivkeyRef(null);
+    setState(emptyState('onboarding'));
+  }, [state.jwt, keyManager]);
+
   // --- Refresh: re-authenticate with stored key ---
 
   const refreshAuth = useCallback(async () => {
@@ -331,8 +376,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- Render ---
 
   const value = useMemo(
-    () => ({ state, privkey: privkeyRef, login, loginWithGoogle, storeNostrKey, logout, refreshAuth }),
-    [state, privkeyRef, login, loginWithGoogle, storeNostrKey, logout, refreshAuth],
+    () => ({ state, privkey: privkeyRef, login, loginWithGoogle, storeNostrKey, logout, refreshAuth, updateMetadata, deleteAccount }),
+    [state, privkeyRef, login, loginWithGoogle, storeNostrKey, logout, refreshAuth, updateMetadata, deleteAccount],
   );
 
   return (

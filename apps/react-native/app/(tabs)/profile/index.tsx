@@ -12,9 +12,8 @@ export default function ProfileScreen() {
 
   const isGoogle = state.loginMethod === 'google';
 
-  const displayName = isGoogle
-    ? (state.googleProfile?.name ?? state.googleProfile?.email ?? 'Google User')
-    : (state.metadata?.name ?? 'User');
+  const displayName = state.metadata?.name
+    || (isGoogle ? (state.googleProfile?.name ?? state.googleProfile?.email ?? 'Google User') : 'User');
 
   const avatarUrl = isGoogle
     ? (state.googleProfile?.picture ?? null)
@@ -40,6 +39,7 @@ export default function ProfileScreen() {
       await logout?.();
       router.replace('/(auth)/welcome');
     }
+    if (label === 'Account') router.push('/(tabs)/profile/account');
     if (label === 'Encryption Keys') router.push('/(tabs)/profile/encryption-keys');
   };
 
