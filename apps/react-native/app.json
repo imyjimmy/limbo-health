@@ -35,7 +35,13 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to record audio for medical notes."
+        }
+      ]
     ],
     "extra": {
       "eas": {

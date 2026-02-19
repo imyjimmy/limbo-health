@@ -11,6 +11,7 @@ export interface DocumentMetadata {
   format?: string;           // 'jpeg' | 'png' | 'pdf' | 'mp3' etc.
   encoding?: string;         // 'base64'
   originalSizeBytes?: number;
+  durationMs?: number;
   condition?: string;        // condition slug for photo entries
 }
 

@@ -2,15 +2,25 @@ import React from 'react';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { CustomTabBar } from '../../components/navigation/CustomTabBar';
 import { getLastViewed, setPendingRestore } from '../../core/binder/LastViewedStore';
+import { ToastProvider, useToast } from '../../components/Toast';
 
 import { useAuthContext } from '../../providers/AuthProvider';
 
 export default function TabLayout() {
+  return (
+    <ToastProvider>
+      <TabLayoutInner />
+    </ToastProvider>
+  );
+}
+
+function TabLayoutInner() {
   // Pull profile info from your auth context
   // Adjust these to match your actual AuthProvider shape
   const router = useRouter();
   const pathname = usePathname();
   const { state } = useAuthContext();
+  const { showToast } = useToast();
 
   const profileImageUrl = state.metadata?.picture ?? state.googleProfile?.picture ?? null;
   const profileName = state.metadata?.name ?? state.googleProfile?.name;
@@ -59,20 +69,29 @@ export default function TabLayout() {
   };
 
   const handleCreateAction = (action: 'note' | 'audio' | 'photo') => {
-    if (!binderContext) return; // not inside a binder, nothing to do
+    if (!binderContext) {
+      showToast('Open a binder first');
+      return;
+    }
 
     switch (action) {
       case 'note':
         router.push({
           pathname: `/binder/${binderContext.binderId}/entry/new`,
-          params: { dirPath: binderContext.dirPath },
+          params: { dirPath: binderContext.dirPath, categoryType: 'note' },
         });
         break;
       case 'audio':
-        router.push(`/binder/${binderContext.binderId}/quick-capture?mode=audio`);
+        router.push({
+          pathname: `/binder/${binderContext.binderId}/quick-capture`,
+          params: { mode: 'audio', dirPath: binderContext.dirPath },
+        });
         break;
       case 'photo':
-        router.push(`/binder/${binderContext.binderId}/quick-capture?mode=photo`);
+        router.push({
+          pathname: `/binder/${binderContext.binderId}/quick-capture`,
+          params: { mode: 'photo', dirPath: binderContext.dirPath },
+        });
         break;
     }
   };

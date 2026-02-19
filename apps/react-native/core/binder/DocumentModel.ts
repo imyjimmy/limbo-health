@@ -88,13 +88,24 @@ export function createConditionOverview(
 export function createPhotoRef(
   sidecarFilename: string,
   sizeBytes: number,
-  conditionSlug?: string,
 ): MedicalDocument {
   return createDocument(sidecarFilename, 'attachment_ref', {
     format: 'jpeg',
     encoding: 'base64',
     originalSizeBytes: sizeBytes,
-    condition: conditionSlug,
+  });
+}
+
+export function createAudioRef(
+  sidecarFilename: string,
+  sizeBytes: number,
+  durationMs: number,
+): MedicalDocument {
+  return createDocument(sidecarFilename, 'attachment_ref', {
+    format: 'm4a',
+    encoding: 'binary',
+    originalSizeBytes: sizeBytes,
+    durationMs,
   });
 }
 

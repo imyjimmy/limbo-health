@@ -8,11 +8,11 @@ import { createFSAdapter } from '../git/fsAdapter';
 import {
   generateDocPath,
   sidecarPathFrom,
-  conditionFolder,
 } from './FileNaming';
 import {
   createPatientInfo,
   createPhotoRef,
+  createAudioRef,
   extractEntryMetadata,
 } from './DocumentModel';
 import { categoryFromPath } from './categories';
@@ -180,33 +180,53 @@ export class BinderService {
    * Add a photo with sidecar. Generates both .json and .enc paths, encrypts both, commits, pushes.
    */
   async addPhoto(
-    conditionSlug: string,
+    dirPath: string,
     binaryData: Uint8Array,
     sizeBytes: number,
   ): Promise<string> {
-    const folder = conditionFolder(conditionSlug);
-    const docPath = await generateDocPath(this.info.repoDir, folder, 'photo');
+    const docPath = await generateDocPath(this.info.repoDir, dirPath, 'photo');
     const encPath = sidecarPathFrom(docPath);
 
     // Write encrypted sidecar
     await this.io.writeSidecar('/' + encPath, binaryData);
 
     // Write metadata document pointing to sidecar
-    const doc = createPhotoRef(
-      encPath.split('/').pop()!,
-      sizeBytes,
-      conditionSlug,
-    );
+    const doc = createPhotoRef(encPath.split('/').pop()!, sizeBytes);
     await this.io.writeDocument('/' + docPath, doc);
 
     // Commit both and push
     await GitEngine.commitEntry(
       this.info.repoDir,
       [docPath, encPath],
-      `Add ${conditionSlug} photo`,
+      `Add photo`,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
-    dirEvict(this.dirCacheKey(folder));
+    dirEvict(this.dirCacheKey(dirPath));
+
+    return docPath;
+  }
+
+  async addAudio(
+    dirPath: string,
+    binaryData: Uint8Array,
+    sizeBytes: number,
+    durationMs: number,
+  ): Promise<string> {
+    const docPath = await generateDocPath(this.info.repoDir, dirPath, 'recording');
+    const encPath = sidecarPathFrom(docPath);
+
+    await this.io.writeSidecar('/' + encPath, binaryData);
+
+    const doc = createAudioRef(encPath.split('/').pop()!, sizeBytes, durationMs);
+    await this.io.writeDocument('/' + docPath, doc);
+
+    await GitEngine.commitEntry(
+      this.info.repoDir,
+      [docPath, encPath],
+      `Add audio recording`,
+    );
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    dirEvict(this.dirCacheKey(dirPath));
 
     return docPath;
   }
@@ -243,6 +263,24 @@ export class BinderService {
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.parentDirCacheKey(folderPath));
+  }
+
+  /**
+   * Ensure a folder exists, creating it via createSubfolder if needed.
+   * Returns the folderPath whether it was created or already existed.
+   */
+  async ensureFolder(
+    folderPath: string,
+    displayName: string,
+    icon: string,
+  ): Promise<string> {
+    const fs = createFSAdapter(this.info.repoDir);
+    try {
+      await fs.promises.readdir('/' + folderPath);
+    } catch {
+      await this.createSubfolder(folderPath, displayName, undefined, { icon });
+    }
+    return folderPath;
   }
 
   // --- Delete ---
