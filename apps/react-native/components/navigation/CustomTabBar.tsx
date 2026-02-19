@@ -112,6 +112,7 @@ export function CustomTabBar({
                   accessibilityRole="button"
                   accessibilityState={isActive ? { selected: true } : {}}
                   accessibilityLabel={route.name}
+                  testID={`tab-${route.name}`}
                   style={styles.tabButton}
                 >
                   {renderTabIcon(route.name, isActive, {
@@ -142,6 +143,7 @@ export function CustomTabBar({
               <Pressable
                 key={item.key}
                 onPress={() => handleCreatePress(item.key)}
+                testID={`create-menu-${item.key}`}
                 style={({ pressed }) => [
                   styles.menuItem,
                   pressed && styles.menuItemPressed,

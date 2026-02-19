@@ -22,6 +22,7 @@ export function EntryCard({ item, onPress }: EntryCardProps) {
       style={styles.container}
       onPress={() => onPress(item)}
       activeOpacity={0.6}
+      testID={`entry-card-${item.name}`}
     >
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={1}>

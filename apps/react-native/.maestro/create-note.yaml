@@ -1,0 +1,72 @@
+# create-note.yaml
+# Smoke test: open binder -> tap [+] -> Add Note -> fill title -> save -> verify entry appears
+#
+# Prerequisites:
+#   - App is built and running on iOS Simulator
+#   - User is logged in (manual step -- Maestro doesn't handle Google OAuth)
+#   - At least one binder exists
+#
+# Run: maestro test .maestro/create-note.yaml
+
+appId: com.limbohealth.mobile
+---
+
+# 0. Start clean — relaunch the app and navigate to home
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-\\(home\\)"
+    timeout: 10000
+- tapOn:
+    id: "tab-\\(home\\)"
+
+# 1. Tap the first binder from home screen
+- extendedWaitUntil:
+    visible:
+      id: "binder-list-item-0"
+    timeout: 5000
+- tapOn:
+    id: "binder-list-item-0"
+
+# 2. Wait for the binder directory to load
+- extendedWaitUntil:
+    visible:
+      id: "directory-list"
+    timeout: 10000
+
+# 3. Tap the [+] tab to open the create menu
+- tapOn:
+    id: "tab-create"
+
+# 4. Tap "Add Note" from the create menu
+#    Modal testIDs aren't accessible to Maestro, so tap by coordinates.
+#    The note icon is the middle of 3 icons in the menu bar near the bottom.
+- tapOn:
+    point: "50%, 87%"
+
+# 5. Wait for NoteEditor to appear (title input)
+- extendedWaitUntil:
+    visible:
+      id: "editor-title"
+    timeout: 5000
+
+# 6. Type a note title
+- tapOn:
+    id: "editor-title"
+- inputText: "Maestro Test Note"
+
+# 7. Save the note
+- tapOn:
+    id: "editor-save"
+
+# 8. Should navigate back to directory list after save
+- extendedWaitUntil:
+    visible:
+      id: "directory-list"
+    timeout: 10000
+
+# 9. Verify the new entry appears in the list
+#    The entry card testID will be "entry-card-YYYY-MM-DD-maestro-test-note.json"
+#    Use a regex to match the date prefix
+- assertVisible:
+    id: "entry-card-.*maestro-test-note.*"

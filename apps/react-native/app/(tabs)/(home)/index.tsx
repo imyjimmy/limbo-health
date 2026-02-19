@@ -316,8 +316,8 @@ export default function BinderListScreen() {
               </Pressable>
             </View>
           ) : (
-            screenState.repos.map((repo) => (
-              <Pressable key={repo.id} style={styles.repoCard} onPress={() => openBinder(repo)}>
+            screenState.repos.map((repo, index) => (
+              <Pressable key={repo.id} style={styles.repoCard} onPress={() => openBinder(repo)} testID={`binder-list-item-${index}`}>
                 <Text style={styles.repoName}>{repo.name}</Text>
                 <Text style={styles.repoId}>{repo.id}</Text>
               </Pressable>

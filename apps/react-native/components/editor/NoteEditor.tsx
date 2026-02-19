@@ -204,13 +204,13 @@ export function NoteEditor({
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={confirmCancel} disabled={saving}>
+        <TouchableOpacity onPress={confirmCancel} disabled={saving} testID="editor-cancel">
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.headerPath} numberOfLines={1}>
           {dirPath}
         </Text>
-        <TouchableOpacity onPress={handleSave} disabled={saving}>
+        <TouchableOpacity onPress={handleSave} disabled={saving} testID="editor-save">
           {saving ? (
             <ActivityIndicator size="small" color="#007AFF" />
           ) : (
@@ -228,6 +228,7 @@ export function NoteEditor({
         onChangeText={setTitle}
         returnKeyType="next"
         editable={!saving}
+        testID="editor-title"
       />
 
       {/* Rich text editor */}

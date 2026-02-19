@@ -142,7 +142,7 @@ export function DirectoryList({
   }
 
   return (
-    <View style={styles.wrapper}>
+    <View style={styles.wrapper} testID="directory-list">
       <FlatList
         data={items}
         keyExtractor={(item) => item.relativePath}
