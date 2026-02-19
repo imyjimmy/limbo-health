@@ -50,6 +50,19 @@ export class GitEngine {
   }
 
   /**
+   * Register the "origin" remote so pull/fetch can resolve refspecs.
+   */
+  static async addRemote(repoDir: string, repoId: string): Promise<void> {
+    const fs = createFSAdapter(repoDir);
+    await git.addRemote({
+      fs,
+      dir: '/',
+      remote: 'origin',
+      url: gitRepoUrl(repoId),
+    });
+  }
+
+  /**
    * Clone a repository from limbo.health into a local binder directory.
    */
   static async cloneRepo(

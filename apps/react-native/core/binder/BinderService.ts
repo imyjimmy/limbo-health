@@ -69,10 +69,10 @@ export class BinderService {
     { folder: 'conditions',    displayName: 'Conditions',    icon: '❤️‍🩹' },
     { folder: 'allergies',     displayName: 'Allergies',     icon: '🤧' },
     { folder: 'medications',   displayName: 'Medications',   icon: '💊' },
+    { folder: 'immunizations', displayName: 'Immunizations', icon: '💉' },
     { folder: 'visits',        displayName: 'Visits',        icon: '🩺' },
     { folder: 'procedures',    displayName: 'Procedures',    icon: '🔪' },
     { folder: 'labs-imaging',  displayName: 'Labs & Imaging',icon: '🔬' },
-    { folder: 'immunizations', displayName: 'Immunizations', icon: '💉' },
     { folder: 'billing-insurance',displayName: 'Billing & Insurance',icon: '🪪' },
   ];
 
@@ -86,6 +86,7 @@ export class BinderService {
     author?: GitAuthor,
   ): Promise<void> {
     await GitEngine.initBinder(repoDir, author);
+    await GitEngine.addRemote(repoDir, repoId);
 
     const fs = createFSAdapter(repoDir);
     const io = new EncryptedIO(fs, masterConversationKey, repoDir);
@@ -194,8 +195,8 @@ export class BinderService {
     const docPath = await generateDocPath(this.info.repoDir, category, slug);
     await this.io.writeDocument('/' + docPath, doc);
     await GitEngine.commitEntry(this.info.repoDir, [docPath], `Add ${category} entry`, this.info.author);
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.dirCacheKey(category));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     return docPath;
   }
 
@@ -229,8 +230,8 @@ export class BinderService {
       `Add ${conditionSlug} photo`,
       this.info.author,
     );
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.dirCacheKey(folder));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
 
     return docPath;
   }
@@ -266,8 +267,8 @@ export class BinderService {
       `Add ${displayName}`,
       this.info.author,
     );
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.parentDirCacheKey(folderPath));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
   }
 
   // --- Delete ---
@@ -292,13 +293,13 @@ export class BinderService {
       `Delete ${entryPath.split('/').pop()}`,
       this.info.author,
     );
+    dirEvict(this.parentDirCacheKey(entryPath));
+    ptEvict(`${this.info.repoDir}:/${entryPath}`);
     try {
       await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     } catch (err: any) {
       console.warn('Push failed after delete, changes saved locally:', err?.message);
     }
-    dirEvict(this.parentDirCacheKey(entryPath));
-    ptEvict(`${this.info.repoDir}:/${entryPath}`);
   }
 
   /**
@@ -324,14 +325,14 @@ export class BinderService {
       // Directory may already be gone or not fully empty
     }
 
+    dirEvict(this.dirCacheKey(folderPath));
+    dirEvict(this.parentDirCacheKey(folderPath));
+    ptEvictPrefix(`${this.info.repoDir}:/${folderPath}`);
     try {
       await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     } catch (err: any) {
       console.warn('Push failed after delete, changes saved locally:', err?.message);
     }
-    dirEvict(this.dirCacheKey(folderPath));
-    dirEvict(this.parentDirCacheKey(folderPath));
-    ptEvictPrefix(`${this.info.repoDir}:/${folderPath}`);
   }
 
   // --- Update ---
@@ -351,8 +352,8 @@ export class BinderService {
       `Update ${doc.metadata.type} entry`,
       this.info.author,
     );
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.parentDirCacheKey(entryPath));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
   }
 
   // --- Debug ---
