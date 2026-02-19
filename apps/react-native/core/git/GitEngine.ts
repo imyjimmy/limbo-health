@@ -19,9 +19,14 @@ export interface CommitInfo {
   };
 }
 
-// --- Constants ---
+// --- Author ---
 
-const AUTHOR = { name: 'Limbo Health', email: 'app@limbo.health' };
+export interface GitAuthor {
+  name: string;
+  email: string;
+}
+
+const DEFAULT_AUTHOR: GitAuthor = { name: 'Limbo Health', email: 'app@limbo.health' };
 
 // --- GitEngine ---
 
@@ -29,7 +34,7 @@ export class GitEngine {
   /**
    * Initialize a new binder as a git repo with an initial empty commit.
    */
-  static async initBinder(repoDir: string): Promise<void> {
+  static async initBinder(repoDir: string, author?: GitAuthor): Promise<void> {
     const fs = createFSAdapter(repoDir);
     const dir = '/';
 
@@ -40,7 +45,7 @@ export class GitEngine {
       fs,
       dir,
       message: 'Initialize binder',
-      author: AUTHOR,
+      author: author || DEFAULT_AUTHOR,
     });
   }
 
@@ -72,6 +77,7 @@ export class GitEngine {
     repoDir: string,
     repoId: string,
     auth: AuthConfig,
+    author?: GitAuthor,
   ): Promise<void> {
     const fs = createFSAdapter(repoDir);
     const http = createHttpTransport(auth);
@@ -82,7 +88,7 @@ export class GitEngine {
       dir: '/',
       url: gitRepoUrl(repoId),
       singleBranch: true,
-      author: AUTHOR,
+      author: author || DEFAULT_AUTHOR,
     });
   }
 
@@ -112,6 +118,7 @@ export class GitEngine {
     repoDir: string,
     filePaths: string[],
     message: string,
+    author?: GitAuthor,
   ): Promise<string> {
     const fs = createFSAdapter(repoDir);
     const dir = '/';
@@ -126,7 +133,7 @@ export class GitEngine {
       fs,
       dir,
       message,
-      author: AUTHOR,
+      author: author || DEFAULT_AUTHOR,
     });
 
     return oid;
@@ -190,6 +197,7 @@ export class GitEngine {
     repoDir: string,
     filePaths: string[],
     message: string,
+    author?: GitAuthor,
   ): Promise<string> {
     const fs = createFSAdapter(repoDir);
     const dir = '/';
@@ -209,7 +217,7 @@ export class GitEngine {
       fs,
       dir,
       message,
-      author: AUTHOR,
+      author: author || DEFAULT_AUTHOR,
     });
 
     return oid;

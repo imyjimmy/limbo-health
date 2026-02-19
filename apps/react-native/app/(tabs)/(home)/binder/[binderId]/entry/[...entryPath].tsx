@@ -44,10 +44,14 @@ export default function EntryDetailScreen() {
         repoId: binderId,
         repoDir: `binders/${binderId}`,
         auth: { type: 'jwt' as const, token: jwt },
+        author: {
+          name: authState.metadata?.name || authState.googleProfile?.name || 'Limbo Health',
+          email: authState.googleProfile?.email || 'app@limbo.health',
+        },
       },
       masterConversationKey,
     );
-  }, [binderId, masterConversationKey, jwt]);
+  }, [binderId, masterConversationKey, jwt, authState.metadata?.name, authState.googleProfile?.name, authState.googleProfile?.email]);
 
   const router = useRouter();
 

@@ -2,7 +2,7 @@
 // High-level CRUD for binders. Composes EncryptedIO, FileNaming, and GitEngine.
 // This is the API that hooks call — screens never touch EncryptedIO or GitEngine directly.
 
-import { GitEngine } from '../git/GitEngine';
+import { GitEngine, type GitAuthor } from '../git/GitEngine';
 import { EncryptedIO } from './EncryptedIO';
 import { createFSAdapter } from '../git/fsAdapter';
 import {
@@ -28,6 +28,7 @@ export interface BinderInfo {
   repoId: string;
   repoDir: string;
   auth: AuthConfig;
+  author?: GitAuthor;
 }
 
 // --- BinderService ---
@@ -70,8 +71,9 @@ export class BinderService {
     masterConversationKey: Uint8Array,
     patientName: string,
     dateOfBirth?: string,
+    author?: GitAuthor,
   ): Promise<void> {
-    await GitEngine.initBinder(repoDir);
+    await GitEngine.initBinder(repoDir, author);
 
     const fs = createFSAdapter(repoDir);
     const io = new EncryptedIO(fs, masterConversationKey, repoDir);
@@ -79,7 +81,7 @@ export class BinderService {
     const doc = createPatientInfo(patientName, dateOfBirth);
     await io.writeDocument('/patient-info.json', doc);
 
-    await GitEngine.commitEntry(repoDir, ['patient-info.json'], 'Initialize binder');
+    await GitEngine.commitEntry(repoDir, ['patient-info.json'], 'Initialize binder', author);
     await GitEngine.push(repoDir, repoId, auth);
   }
 
@@ -170,7 +172,7 @@ export class BinderService {
   ): Promise<string> {
     const docPath = await generateDocPath(this.info.repoDir, category, slug);
     await this.io.writeDocument('/' + docPath, doc);
-    await GitEngine.commitEntry(this.info.repoDir, [docPath], `Add ${category} entry`);
+    await GitEngine.commitEntry(this.info.repoDir, [docPath], `Add ${category} entry`, this.info.author);
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.dirCacheKey(category));
     return docPath;
@@ -204,6 +206,7 @@ export class BinderService {
       this.info.repoDir,
       [docPath, encPath],
       `Add ${conditionSlug} photo`,
+      this.info.author,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.dirCacheKey(folder));
@@ -240,6 +243,7 @@ export class BinderService {
       this.info.repoDir,
       filesToCommit,
       `Add ${displayName}`,
+      this.info.author,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.parentDirCacheKey(folderPath));
@@ -265,6 +269,7 @@ export class BinderService {
       this.info.repoDir,
       filesToRemove,
       `Delete ${entryPath.split('/').pop()}`,
+      this.info.author,
     );
     try {
       await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
@@ -287,6 +292,7 @@ export class BinderService {
       this.info.repoDir,
       files,
       `Delete folder ${folderPath.split('/').pop()}`,
+      this.info.author,
     );
 
     // Try to remove the now-empty directory from disk
@@ -322,6 +328,7 @@ export class BinderService {
       this.info.repoDir,
       [entryPath],
       `Update ${doc.metadata.type} entry`,
+      this.info.author,
     );
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.parentDirCacheKey(entryPath));
@@ -346,6 +353,7 @@ export class BinderService {
       this.info.repoDir,
       this.info.repoId,
       this.info.auth,
+      this.info.author,
     );
     dirEvictPrefix(`${this.info.repoDir}:`);
     ptEvictPrefix(`${this.info.repoDir}:`);

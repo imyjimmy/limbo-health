@@ -215,6 +215,11 @@ export default function BinderListScreen() {
         authConfig(),
         masterConversationKey,
         'My Medical Binder',
+        undefined,
+        {
+          name: authState.metadata?.name || authState.googleProfile?.name || 'Limbo Health',
+          email: authState.googleProfile?.email || 'app@limbo.health',
+        },
       );
 
       await fetchRepos();
