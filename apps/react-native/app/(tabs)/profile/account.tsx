@@ -31,8 +31,16 @@ export default function AccountScreen() {
   const router = useRouter();
   const { state, updateMetadata, deleteAccount } = useAuthContext();
 
-  const initialName = state.metadata?.name || state.googleProfile?.name || '';
-  const [displayName, setDisplayName] = useState(initialName);
+  const fallbackName = state.googleProfile?.name || '';
+  const [firstName, setFirstName] = useState(
+    state.metadata?.first_name ?? fallbackName.split(' ')[0] ?? '',
+  );
+  const [lastName, setLastName] = useState(
+    state.metadata?.last_name ?? fallbackName.split(' ').slice(1).join(' ') ?? '',
+  );
+  const [displayName, setDisplayName] = useState(
+    state.metadata?.display_name || state.metadata?.name || fallbackName,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Derived state
@@ -42,11 +50,22 @@ export default function AccountScreen() {
   const npub = hasNostrKey ? encodeBech32('npub', state.pubkey!) : null;
 
   const handleNameSave = useCallback(async () => {
-    const trimmed = displayName.trim();
-    const currentName = state.metadata?.name || '';
-    if (trimmed === currentName) return;
-    await updateMetadata({ name: trimmed || undefined });
-  }, [displayName, state.metadata?.name, updateMetadata]);
+    const first = firstName.trim();
+    const last = lastName.trim();
+    const display = displayName.trim();
+    const updates: Record<string, string | undefined> = {
+      first_name: first || undefined,
+      last_name: last || undefined,
+      display_name: display || undefined,
+      name: display || [first, last].filter(Boolean).join(' ') || undefined,
+    };
+    // Skip save if nothing changed
+    if (first === (state.metadata?.first_name || '')
+      && last === (state.metadata?.last_name || '')
+      && display === (state.metadata?.display_name || '')
+    ) return;
+    await updateMetadata(updates);
+  }, [firstName, lastName, displayName, state.metadata?.first_name, state.metadata?.last_name, state.metadata?.display_name, updateMetadata]);
 
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
@@ -79,16 +98,52 @@ export default function AccountScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
+      {/* NAME */}
+      <Text style={styles.sectionLabel}>NAME</Text>
+      <View style={styles.card}>
+        <View style={styles.nameRow}>
+          <Text style={styles.nameLabel}>First</Text>
+          <TextInput
+            style={styles.nameInput}
+            value={firstName}
+            onChangeText={setFirstName}
+            onBlur={handleNameSave}
+            onSubmitEditing={handleNameSave}
+            placeholder="First name"
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            returnKeyType="next"
+            maxLength={50}
+            autoCorrect={false}
+          />
+        </View>
+        <View style={styles.rowSeparator} />
+        <View style={styles.nameRow}>
+          <Text style={styles.nameLabel}>Last</Text>
+          <TextInput
+            style={styles.nameInput}
+            value={lastName}
+            onChangeText={setLastName}
+            onBlur={handleNameSave}
+            onSubmitEditing={handleNameSave}
+            placeholder="Last name"
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            returnKeyType="done"
+            maxLength={50}
+            autoCorrect={false}
+          />
+        </View>
+      </View>
+
       {/* DISPLAY NAME */}
       <Text style={styles.sectionLabel}>DISPLAY NAME</Text>
       <View style={styles.card}>
         <TextInput
-          style={styles.textInput}
+          style={styles.displayNameInput}
           value={displayName}
           onChangeText={setDisplayName}
           onBlur={handleNameSave}
           onSubmitEditing={handleNameSave}
-          placeholder="Your name"
+          placeholder="How others see you"
           placeholderTextColor="rgba(255,255,255,0.3)"
           returnKeyType="done"
           maxLength={100}
@@ -182,11 +237,32 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 12,
   },
-  textInput: {
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  nameLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    width: 50,
+  },
+  nameInput: {
+    color: '#ffffff',
+    fontSize: 16,
+    flex: 1,
+  },
+  displayNameInput: {
     color: '#ffffff',
     fontSize: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
+  },
+  rowSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginLeft: 16,
   },
   connectionRow: {
     flexDirection: 'row',
