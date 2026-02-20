@@ -1,51 +1,216 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
+// app/(tabs)/profile/account.tsx
+// Account settings: display name, connected identities, account deletion.
+
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { bech32 } from '@scure/base';
+import { hexToBytes } from '@noble/hashes/utils.js';
 import { useAuthContext } from '../../../providers/AuthProvider';
+
+function encodeBech32(prefix: string, hexStr: string): string {
+  const bytes = hexToBytes(hexStr);
+  return bech32.encode(prefix, bech32.toWords(bytes), 1500);
+}
+
+function truncateNpub(npub: string): string {
+  if (npub.length <= 20) return npub;
+  return `${npub.slice(0, 12)}...${npub.slice(-6)}`;
+}
 
 export default function AccountScreen() {
   const router = useRouter();
-  const { deleteAccount } = useAuthContext();
+  const { state, updateMetadata, deleteAccount } = useAuthContext();
 
-  const handleDeleteAccount = () => {
+  const fallbackName = state.googleProfile?.name || '';
+  const [firstName, setFirstName] = useState(
+    state.metadata?.first_name ?? fallbackName.split(' ')[0] ?? '',
+  );
+  const [lastName, setLastName] = useState(
+    state.metadata?.last_name ?? fallbackName.split(' ').slice(1).join(' ') ?? '',
+  );
+  const [displayName, setDisplayName] = useState(
+    state.metadata?.display_name || state.metadata?.name || fallbackName,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Derived state
+  const isGoogleConnected = state.loginMethod === 'google' || !!state.googleProfile;
+  const googleEmail = state.googleProfile?.email || null;
+  const hasNostrKey = !!state.pubkey;
+  const npub = hasNostrKey ? encodeBech32('npub', state.pubkey!) : null;
+
+  const handleNameSave = useCallback(async () => {
+    const first = firstName.trim();
+    const last = lastName.trim();
+    const display = displayName.trim();
+    const updates: Record<string, string | undefined> = {
+      first_name: first || undefined,
+      last_name: last || undefined,
+      display_name: display || undefined,
+      name: display || [first, last].filter(Boolean).join(' ') || undefined,
+    };
+    // Skip save if nothing changed
+    if (first === (state.metadata?.first_name || '')
+      && last === (state.metadata?.last_name || '')
+      && display === (state.metadata?.display_name || '')
+    ) return;
+    await updateMetadata(updates);
+  }, [firstName, lastName, displayName, state.metadata?.first_name, state.metadata?.last_name, state.metadata?.display_name, updateMetadata]);
+
+  const handleDeleteAccount = useCallback(() => {
     Alert.alert(
-      'Delete Account?',
-      'This permanently deletes your account and all data. This cannot be undone.',
+      'Delete Account',
+      'This action is irreversible. Your encryption key will be destroyed and all server-side data will be permanently deleted. Local binder files will remain on this device but will be unreadable without the key.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Delete Everything',
           style: 'destructive',
           onPress: async () => {
+            setIsDeleting(true);
             try {
               await deleteAccount();
               router.replace('/(auth)/welcome');
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete account');
+              Alert.alert(
+                'Could Not Delete Account',
+                err.message || 'Something went wrong. Please try again later.',
+              );
+            } finally {
+              setIsDeleting(false);
             }
           },
         },
       ],
     );
-  };
+  }, [deleteAccount, router]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.spacer} />
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
 
-      <View style={styles.dangerZone}>
-        <Text style={styles.dangerLabel}>Danger Zone</Text>
-        <Pressable
-          onPress={handleDeleteAccount}
-          style={({ pressed }) => [
-            styles.deleteButton,
-            pressed && styles.deleteButtonPressed,
-          ]}
-        >
-          <Text style={styles.deleteButtonText}>Delete Account</Text>
-        </Pressable>
+      {/* NAME */}
+      <Text style={styles.sectionLabel}>NAME</Text>
+      <View style={styles.card}>
+        <View style={styles.nameRow}>
+          <Text style={styles.nameLabel}>First</Text>
+          <TextInput
+            style={styles.nameInput}
+            value={firstName}
+            onChangeText={setFirstName}
+            onBlur={handleNameSave}
+            onSubmitEditing={handleNameSave}
+            placeholder="First name"
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            returnKeyType="next"
+            maxLength={50}
+            autoCorrect={false}
+          />
+        </View>
+        <View style={styles.rowSeparator} />
+        <View style={styles.nameRow}>
+          <Text style={styles.nameLabel}>Last</Text>
+          <TextInput
+            style={styles.nameInput}
+            value={lastName}
+            onChangeText={setLastName}
+            onBlur={handleNameSave}
+            onSubmitEditing={handleNameSave}
+            placeholder="Last name"
+            placeholderTextColor="rgba(255,255,255,0.3)"
+            returnKeyType="done"
+            maxLength={50}
+            autoCorrect={false}
+          />
+        </View>
       </View>
-    </View>
+
+      {/* DISPLAY NAME */}
+      <Text style={styles.sectionLabel}>DISPLAY NAME</Text>
+      <View style={styles.card}>
+        <TextInput
+          style={styles.displayNameInput}
+          value={displayName}
+          onChangeText={setDisplayName}
+          onBlur={handleNameSave}
+          onSubmitEditing={handleNameSave}
+          placeholder="How others see you"
+          placeholderTextColor="rgba(255,255,255,0.3)"
+          returnKeyType="done"
+          maxLength={100}
+          autoCorrect={false}
+        />
+      </View>
+
+      {/* OAUTH CONNECTIONS */}
+      <Text style={styles.sectionLabel}>OAUTH CONNECTIONS</Text>
+      <View style={styles.card}>
+        <View style={styles.connectionRow}>
+          <Text style={styles.providerName}>Google</Text>
+          <View style={styles.connectionRight}>
+            {isGoogleConnected && googleEmail ? (
+              <>
+                <Text style={styles.connectionDetail} numberOfLines={1}>{googleEmail}</Text>
+                <Text style={styles.connectedBadge}>✓</Text>
+              </>
+            ) : (
+              <Text style={styles.notConnected}>Not connected</Text>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* SOVEREIGN ID CONNECTIONS */}
+      <Text style={styles.sectionLabel}>SOVEREIGN ID CONNECTIONS</Text>
+      <View style={styles.card}>
+        <View style={[styles.connectionRow, styles.connectionRowBorder]}>
+          <Text style={styles.providerName}>Nostr</Text>
+          <View style={styles.connectionRight}>
+            {hasNostrKey && npub ? (
+              <>
+                <Text style={styles.connectionDetail}>{truncateNpub(npub)}</Text>
+                <Text style={styles.connectedBadge}>✓</Text>
+              </>
+            ) : (
+              <Text style={styles.notConnected}>Not connected</Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.connectionRow}>
+          <Text style={styles.providerName}>PGP</Text>
+          <View style={styles.connectionRight}>
+            <Text style={styles.comingSoon}>Coming soon</Text>
+            <Text style={styles.disabledIndicator}>---</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* DELETE ACCOUNT */}
+      <Pressable
+        style={({ pressed }) => [
+          styles.deleteCard,
+          pressed && styles.deleteCardPressed,
+        ]}
+        onPress={handleDeleteAccount}
+        disabled={isDeleting}
+      >
+        {isDeleting ? (
+          <ActivityIndicator color="#ef4444" />
+        ) : (
+          <Text style={styles.deleteText}>Delete Account</Text>
+        )}
+      </Pressable>
+
+    </ScrollView>
   );
 }
 
@@ -53,36 +218,110 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f1923',
+  },
+  content: {
     paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 48,
   },
-  spacer: {
-    flex: 1,
-  },
-  dangerZone: {
-    marginBottom: 48,
-    gap: 12,
-  },
-  dangerLabel: {
+  sectionLabel: {
     color: 'rgba(255,255,255,0.4)',
     fontSize: 13,
     fontWeight: '600',
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
+    marginBottom: 8,
+    marginTop: 24,
+    marginLeft: 4,
   },
-  deleteButton: {
-    backgroundColor: 'rgba(239,68,68,0.12)',
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  nameLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 15,
+    width: 50,
+  },
+  nameInput: {
+    color: '#ffffff',
+    fontSize: 16,
+    flex: 1,
+  },
+  displayNameInput: {
+    color: '#ffffff',
+    fontSize: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  rowSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginLeft: 16,
+  },
+  connectionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  connectionRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  providerName: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  connectionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+  },
+  connectionDetail: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  connectedBadge: {
+    color: '#34d399',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  notConnected: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 14,
+  },
+  comingSoon: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  disabledIndicator: {
+    color: 'rgba(255,255,255,0.2)',
+    fontSize: 14,
+  },
+  deleteCard: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.3)',
+    marginTop: 32,
   },
-  deleteButtonPressed: {
-    backgroundColor: 'rgba(239,68,68,0.2)',
+  deleteCardPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
-  deleteButtonText: {
+  deleteText: {
     color: '#ef4444',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
   },
 });

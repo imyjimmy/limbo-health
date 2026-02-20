@@ -110,8 +110,8 @@ export default function WelcomeScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Pressable onPress={() => router.push('/(auth)/import-key')}>
-          <Text style={styles.nostrLink}>I have a Nostr key --&gt;</Text>
+        <Pressable style={styles.nostrPill} onPress={() => router.push('/(auth)/import-key')}>
+          <Text style={styles.nostrPillText}>I have a Nostr key &gt;&gt;</Text>
         </Pressable>
       </View>
     </View>
@@ -173,8 +173,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 48,
   },
-  nostrLink: {
-    color: '#8d45dd',
-    fontSize: 16,
+  nostrPill: {
+    backgroundColor: '#8e45e6',
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+  },
+  nostrPillText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

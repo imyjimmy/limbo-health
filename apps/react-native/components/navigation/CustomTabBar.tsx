@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255,255,255,0.08)',
     paddingTop: 4,
-    paddingBottom: 12,
+    paddingBottom: 18,
     // borderBottomWidth: 2,
     // borderBottomColor: 'red',
   },

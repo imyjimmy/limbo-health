@@ -10,6 +10,9 @@ export default function ProfileLayout() {
           headerShown: true,
           title: 'Account',
           headerBackButtonDisplayMode: 'default',
+          headerStyle: { backgroundColor: '#0f1923' },
+          headerTintColor: '#007AFF',
+          headerTitleStyle: { color: '#ffffff' },
         }}
       />
       <Stack.Screen

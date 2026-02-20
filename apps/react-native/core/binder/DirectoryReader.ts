@@ -14,7 +14,7 @@ import { extractEntryPreview, type EntryPreview } from './DocumentModel';
 export interface DirFS {
   promises: {
     readdir(path: string): Promise<string[]>;
-    stat(path: string): Promise<{ isDirectory(): boolean }>;
+    stat(path: string): Promise<{ isDirectory(): boolean; mtimeMs?: number }>;
   };
 }
 
@@ -34,6 +34,8 @@ export interface DirFolder {
   meta?: FolderMeta;
   /** Number of visible children (excludes .meta.json, dotfiles, .enc sidecars) */
   childCount: number;
+  /** Filesystem mtime (ms) — used for creation-order sorting */
+  mtime?: number;
 }
 
 export interface DirEntry {
@@ -111,7 +113,16 @@ export async function readDirectory(
           }
         }
 
-        return { kind: 'folder', name, relativePath, meta, childCount };
+        // Use .meta.json mtime as folder creation proxy
+        let mtime = stat.mtimeMs ?? 0;
+        if (children.includes('.meta.json')) {
+          try {
+            const metaStat = await fs.promises.stat(childPath + '/.meta.json');
+            mtime = metaStat.mtimeMs ?? mtime;
+          } catch { /* use dir mtime */ }
+        }
+
+        return { kind: 'folder', name, relativePath, meta, childCount, mtime };
       } else if (name.endsWith('.json')) {
         const relativePath = childPath.startsWith('/')
           ? childPath.slice(1)
@@ -132,10 +143,12 @@ export async function readDirectory(
 
   const items = results.filter((r): r is DirItem => r !== null);
 
-  // Sort: folders first (alphabetical), then entries (oldest first / newest at bottom)
+  // Sort: folders first (by creation time), then entries (alphabetical = chronological for date-prefixed)
   items.sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1;
-    // Both folders or both entries: alphabetical (for date-prefixed entries = chronological)
+    if (a.kind === 'folder' && b.kind === 'folder') {
+      return (a.mtime ?? 0) - (b.mtime ?? 0);
+    }
     return a.name.localeCompare(b.name);
   });
 

@@ -12,9 +12,8 @@ export default function ProfileScreen() {
 
   const isGoogle = state.loginMethod === 'google';
 
-  const displayName = isGoogle
-    ? (state.googleProfile?.name ?? state.googleProfile?.email ?? 'Google User')
-    : (state.metadata?.name ?? 'User');
+  const displayName = state.metadata?.name
+    || (isGoogle ? (state.googleProfile?.name ?? state.googleProfile?.email ?? 'Google User') : 'User');
 
   const avatarUrl = isGoogle
     ? (state.googleProfile?.picture ?? null)

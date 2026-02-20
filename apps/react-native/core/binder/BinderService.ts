@@ -2,7 +2,7 @@
 // High-level CRUD for binders. Composes EncryptedIO, FileNaming, and GitEngine.
 // This is the API that hooks call — screens never touch EncryptedIO or GitEngine directly.
 
-import { GitEngine } from '../git/GitEngine';
+import { GitEngine, type GitAuthor } from '../git/GitEngine';
 import { EncryptedIO } from './EncryptedIO';
 import { createFSAdapter } from '../git/fsAdapter';
 import {
@@ -28,6 +28,7 @@ export interface BinderInfo {
   repoId: string;
   repoDir: string;
   auth: AuthConfig;
+  author?: GitAuthor;
 }
 
 // --- BinderService ---
@@ -63,6 +64,18 @@ export class BinderService {
   /**
    * Initialize a new binder: git init, write encrypted patient-info.json, commit, push.
    */
+  /** Default top-level folders created with every new binder. */
+  private static readonly DEFAULT_FOLDERS: { folder: string; displayName: string; icon: string }[] = [
+    { folder: 'conditions',    displayName: 'Conditions',    icon: '❤️‍🩹' },
+    { folder: 'allergies',     displayName: 'Allergies',     icon: '🤧' },
+    { folder: 'medications',   displayName: 'Medications',   icon: '💊' },
+    { folder: 'immunizations', displayName: 'Immunizations', icon: '💉' },
+    { folder: 'visits',        displayName: 'Visits',        icon: '🩺' },
+    { folder: 'procedures',    displayName: 'Procedures',    icon: '🔪' },
+    { folder: 'labs-imaging',  displayName: 'Labs & Imaging',icon: '🔬' },
+    { folder: 'billing-insurance',displayName: 'Billing & Insurance',icon: '🪪' },
+  ];
+
   static async create(
     repoDir: string,
     repoId: string,
@@ -70,8 +83,10 @@ export class BinderService {
     masterConversationKey: Uint8Array,
     patientName: string,
     dateOfBirth?: string,
+    author?: GitAuthor,
   ): Promise<void> {
-    await GitEngine.initBinder(repoDir);
+    await GitEngine.initBinder(repoDir, author);
+    await GitEngine.addRemote(repoDir, repoId);
 
     const fs = createFSAdapter(repoDir);
     const io = new EncryptedIO(fs, masterConversationKey, repoDir);
@@ -79,7 +94,16 @@ export class BinderService {
     const doc = createPatientInfo(patientName, dateOfBirth);
     await io.writeDocument('/patient-info.json', doc);
 
-    await GitEngine.commitEntry(repoDir, ['patient-info.json'], 'Initialize binder');
+    const filesToCommit = ['patient-info.json'];
+
+    // Create default top-level folders with .meta.json
+    for (const { folder, displayName, icon } of BinderService.DEFAULT_FOLDERS) {
+      const metaPath = `${folder}/.meta.json`;
+      await io.writeJSON('/' + metaPath, { displayName, icon, color: '#7F8C8D' });
+      filesToCommit.push(metaPath);
+    }
+
+    await GitEngine.commitEntry(repoDir, filesToCommit, 'Initialize binder', author);
     await GitEngine.push(repoDir, repoId, auth);
   }
 
@@ -170,9 +194,9 @@ export class BinderService {
   ): Promise<string> {
     const docPath = await generateDocPath(this.info.repoDir, category, slug);
     await this.io.writeDocument('/' + docPath, doc);
-    await GitEngine.commitEntry(this.info.repoDir, [docPath], `Add ${category} entry`);
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    await GitEngine.commitEntry(this.info.repoDir, [docPath], `Add ${category} entry`, this.info.author);
     dirEvict(this.dirCacheKey(category));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     return docPath;
   }
 
@@ -204,9 +228,10 @@ export class BinderService {
       this.info.repoDir,
       [docPath, encPath],
       `Add ${conditionSlug} photo`,
+      this.info.author,
     );
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.dirCacheKey(folder));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
 
     return docPath;
   }
@@ -240,9 +265,10 @@ export class BinderService {
       this.info.repoDir,
       filesToCommit,
       `Add ${displayName}`,
+      this.info.author,
     );
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.parentDirCacheKey(folderPath));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
   }
 
   // --- Delete ---
@@ -265,14 +291,15 @@ export class BinderService {
       this.info.repoDir,
       filesToRemove,
       `Delete ${entryPath.split('/').pop()}`,
+      this.info.author,
     );
+    dirEvict(this.parentDirCacheKey(entryPath));
+    ptEvict(`${this.info.repoDir}:/${entryPath}`);
     try {
       await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     } catch (err: any) {
       console.warn('Push failed after delete, changes saved locally:', err?.message);
     }
-    dirEvict(this.parentDirCacheKey(entryPath));
-    ptEvict(`${this.info.repoDir}:/${entryPath}`);
   }
 
   /**
@@ -287,6 +314,7 @@ export class BinderService {
       this.info.repoDir,
       files,
       `Delete folder ${folderPath.split('/').pop()}`,
+      this.info.author,
     );
 
     // Try to remove the now-empty directory from disk
@@ -297,14 +325,14 @@ export class BinderService {
       // Directory may already be gone or not fully empty
     }
 
+    dirEvict(this.dirCacheKey(folderPath));
+    dirEvict(this.parentDirCacheKey(folderPath));
+    ptEvictPrefix(`${this.info.repoDir}:/${folderPath}`);
     try {
       await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     } catch (err: any) {
       console.warn('Push failed after delete, changes saved locally:', err?.message);
     }
-    dirEvict(this.dirCacheKey(folderPath));
-    dirEvict(this.parentDirCacheKey(folderPath));
-    ptEvictPrefix(`${this.info.repoDir}:/${folderPath}`);
   }
 
   // --- Update ---
@@ -322,9 +350,10 @@ export class BinderService {
       this.info.repoDir,
       [entryPath],
       `Update ${doc.metadata.type} entry`,
+      this.info.author,
     );
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     dirEvict(this.parentDirCacheKey(entryPath));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
   }
 
   // --- Debug ---
@@ -346,6 +375,7 @@ export class BinderService {
       this.info.repoDir,
       this.info.repoId,
       this.info.auth,
+      this.info.author,
     );
     dirEvictPrefix(`${this.info.repoDir}:`);
     ptEvictPrefix(`${this.info.repoDir}:`);
