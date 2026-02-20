@@ -72,9 +72,11 @@ function ExpirationTimer({ expiresAt }: { expiresAt: number }) {
 }
 
 export function MedicalTimeline({ entries, patientName, expiresAt }: MedicalTimelineProps) {
-  const sorted = [...entries].sort((a, b) =>
-    new Date(b.doc.metadata.created).getTime() - new Date(a.doc.metadata.created).getTime()
-  );
+  const sorted = [...entries]
+    .filter((e) => e.doc.metadata?.created)
+    .sort((a, b) =>
+      new Date(b.doc.metadata.created).getTime() - new Date(a.doc.metadata.created).getTime()
+    );
 
   return (
     <div className="max-w-3xl mx-auto">

@@ -10,6 +10,7 @@ import {
   getEphemeralConversationKey,
   decrypt,
   decryptLarge,
+  decryptDEKSidecar,
   encrypt,
 } from '../lib/scanCrypto';
 import { QRScanner, type ScanQRPayload } from '../components/scan/QRScanner';
@@ -95,7 +96,7 @@ export function ScanPage() {
       const files = await git.listFiles({ fs, dir, ref: 'HEAD' });
       console.log('Files found:', files);
 
-      const jsonFiles = files.filter((f: string) => f.endsWith('.json'));
+      const jsonFiles = files.filter((f: string) => f.endsWith('.json') && !f.endsWith('.meta.json'));
       const encFiles = new Set(files.filter((f: string) => f.endsWith('.enc')));
       console.log('JSON files:', jsonFiles);
       console.log('ENC files:', [...encFiles]);
@@ -123,14 +124,26 @@ export function ScanPage() {
 
             if (encFiles.has(sidecarPath)) {
               try {
-                const encContent = await fs.promises.readFile(
+                // Read as binary — sidecars may be DEK-wrapped (binary) or legacy (base64 string)
+                const fileData = await fs.promises.readFile(
                   `${dir}/${sidecarPath}`,
-                  { encoding: 'utf8' },
-                ) as string;
+                ) as Uint8Array;
 
-                const decryptedBase64 = decryptLarge(encContent, conversationKey);
+                let decryptedBase64: string;
+                if (fileData.length > 0 && fileData[0] === 0x02) {
+                  // DEK-wrapped binary format
+                  decryptedBase64 = decryptDEKSidecar(fileData, conversationKey);
+                } else {
+                  // Legacy NIP-44 base64 string format
+                  const encContent = new TextDecoder().decode(fileData);
+                  decryptedBase64 = decryptLarge(encContent, conversationKey);
+                }
+
                 const format = doc.metadata?.format || 'jpeg';
-                entry.imageDataUrl = `data:image/${format};base64,${decryptedBase64}`;
+                const mimeType = ['m4a', 'mp3', 'wav', 'aac', 'ogg'].includes(format)
+                  ? `audio/${format === 'm4a' ? 'mp4' : format}`
+                  : `image/${format}`;
+                entry.imageDataUrl = `data:${mimeType};base64,${decryptedBase64}`;
               } catch (encErr) {
                 console.error(`Failed to decrypt sidecar ${sidecarPath}:`, encErr);
               }

@@ -10,7 +10,7 @@ import { hkdf } from '@noble/hashes/hkdf';
 import { extract as hkdfExtract } from '@noble/hashes/hkdf';
 import { sha256 } from '@noble/hashes/sha2';
 import { hmac } from '@noble/hashes/hmac';
-import { chacha20 } from '@noble/ciphers/chacha.js';
+import { chacha20, chacha20poly1305 } from '@noble/ciphers/chacha.js';
 import { concatBytes, hexToBytes, bytesToHex } from '@noble/hashes/utils';
 
 // --- Base64 (browser-native) ---
@@ -224,4 +224,40 @@ export function decryptLarge(payload: string, conversationKey: Uint8Array): stri
 
   const plainBytes = chacha20(chachaKey, chachaNonce, ciphertext);
   return new TextDecoder().decode(plainBytes);
+}
+
+// --- DEK-wrapped sidecar decrypt (version 0x02 binary format) ---
+
+const DEK_VERSION = 0x02;
+const CHACHA_NONCE_LENGTH = 12;
+
+/**
+ * Decrypt a DEK-wrapped sidecar file.
+ * Binary format: [0x02][2-byte length][NIP-44 wrapped DEK][12-byte nonce][ciphertext+tag]
+ * Returns the decrypted base64 string of the binary content.
+ */
+export function decryptDEKSidecar(fileData: Uint8Array, conversationKey: Uint8Array): string {
+  if (fileData.length < 1 || fileData[0] !== DEK_VERSION) {
+    throw new Error('not a DEK-wrapped file (version: ' + (fileData[0] ?? 'empty') + ')');
+  }
+
+  const wrappedDekLength = (fileData[1] << 8) | fileData[2];
+  const wrappedDekStart = 3;
+  const wrappedDekEnd = wrappedDekStart + wrappedDekLength;
+  const nonceStart = wrappedDekEnd;
+  const nonceEnd = nonceStart + CHACHA_NONCE_LENGTH;
+
+  // Unwrap the DEK: it's a hex string encrypted with NIP-44
+  const wrappedDekStr = new TextDecoder().decode(fileData.slice(wrappedDekStart, wrappedDekEnd));
+  const dekHex = decrypt(wrappedDekStr, conversationKey);
+  const dek = hexToBytes(dekHex);
+
+  // Decrypt bulk content with ChaCha20-Poly1305
+  const nonce = fileData.slice(nonceStart, nonceEnd);
+  const ciphertextWithTag = fileData.slice(nonceEnd);
+  const cipher = chacha20poly1305(dek, nonce);
+  const plaintext = cipher.decrypt(ciphertextWithTag);
+
+  // Plaintext is the base64-encoded binary (image/audio)
+  return new TextDecoder().decode(plaintext);
 }
