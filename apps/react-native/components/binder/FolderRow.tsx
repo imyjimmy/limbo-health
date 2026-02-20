@@ -22,6 +22,7 @@ export function FolderRow({ item, emoji, iconColor, onPress, deleteWarningAnim }
       style={styles.container}
       onPress={() => onPress(item)}
       activeOpacity={0.6}
+      testID={`folder-row-${item.name}`}
     >
       <View style={[styles.iconContainer, { backgroundColor: bgTint }]}>
         <Text style={styles.emoji}>{emoji ?? '📁'}</Text>

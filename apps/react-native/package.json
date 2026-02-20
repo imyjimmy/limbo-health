@@ -9,7 +9,23 @@
     "web": "expo start --web",
     "editor:dev": "npx vite --config ./editor-web/vite.config.ts -w build",
     "editor:build": "npx vite --config ./editor-web/vite.config.ts build && npm run editor:post-build",
-    "editor:post-build": "node ./node_modules/@10play/tentap-editor/scripts/buildEditor.js ./editor-web/build/index.html"
+    "editor:post-build": "node ./node_modules/@10play/tentap-editor/scripts/buildEditor.js ./editor-web/build/index.html",
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "<rootDir>/node_modules/",
+      "<rootDir>/__tests__/spike-validation.test.tsx",
+      "<rootDir>/__tests__/helpers/",
+      "<rootDir>/polyfills/"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@noble/.*|@scure/.*)"
+    ],
+    "moduleNameMapper": {
+      "^@noble/(curves|hashes|ciphers)/([^.]+)$": "@noble/$1/$2.js"
+    }
   },
   "overrides": {
     "react-dom": "19.1.0"
@@ -58,7 +74,10 @@
     "web-streams-polyfill": "^4.2.0"
   },
   "devDependencies": {
+    "@types/jest": "29.5.14",
     "@types/react": "~19.1.0",
+    "jest": "~29.7.0",
+    "jest-expo": "~54.0.17",
     "@vitejs/plugin-react": "^5.1.4",
     "react-dom": "19.1.0",
     "typescript": "~5.9.2",

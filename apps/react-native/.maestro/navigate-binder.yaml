@@ -1,0 +1,48 @@
+# navigate-binder.yaml
+# Smoke test: launch app -> tap first binder -> see directory list -> tap a folder -> go back
+#
+# Prerequisites:
+#   - App is built and running on iOS Simulator
+#   - User is logged in (manual step -- Maestro doesn't handle Google OAuth)
+#   - At least one binder exists with at least one folder inside it
+#
+# Run: maestro test .maestro/navigate-binder.yaml
+
+appId: com.limbohealth.mobile
+---
+
+# 1. Assert we're on the home screen with at least one binder
+- assertVisible:
+    id: "binder-list-item-0"
+
+# 2. Tap the first binder to open it
+- tapOn:
+    id: "binder-list-item-0"
+
+# 3. Wait for directory list to appear (decryption may take a moment)
+- extendedWaitUntil:
+    visible:
+      id: "directory-list"
+    timeout: 10000
+
+# 4. Tap the first visible folder (if one exists)
+- tapOn:
+    id: "folder-row-.*"
+    optional: true
+
+# 5. If we navigated into a subfolder, assert directory list is still visible
+- extendedWaitUntil:
+    visible:
+      id: "directory-list"
+    timeout: 5000
+
+# 6. Navigate back via iOS swipe-from-left-edge gesture
+- swipe:
+    start: "1%, 50%"
+    end: "80%, 50%"
+
+# 7. Assert directory list is still showing (binder root)
+- extendedWaitUntil:
+    visible:
+      id: "directory-list"
+    timeout: 5000
