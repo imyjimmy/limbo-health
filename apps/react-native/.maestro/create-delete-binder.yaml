@@ -1,0 +1,120 @@
+# create-delete-binder.yaml
+# E2E test: Create a binder, verify it appears, delete it, verify server-side deletion.
+#
+# Verifies:
+#   - Tapping "+" opens the name prompt
+#   - After entering a name and confirming, the binder appears in the list
+#     (server: push-to-create bare repo + auth-api registration)
+#   - Swiping left and tapping trash removes the binder from the list
+#     (server: DELETE /api/mgit/repos/:repoId removes DB + bare repo)
+#   - After app relaunch, the binder does NOT reappear
+#     (proves server-side deletion persisted — not just a local removal)
+#
+# Server assumptions (cannot be verified in Maestro):
+#   - POST /api/mgit/repos/create-bare or push-to-create returns 200 OK
+#   - DELETE /api/mgit/repos/:repoId returns { status: "OK" }
+#   - GET /api/mgit/user/repositories reflects the deletion
+#
+# Prerequisites:
+#   - App is built and running on iOS Simulator
+#   - User is logged in with valid JWT (manual step)
+#   - Network access to limbo.health server
+#
+# Run: maestro test .maestro/create-delete-binder.yaml
+
+appId: com.limbohealth.mobile
+---
+
+# ============================================
+# PHASE 1: CREATE BINDER
+# ============================================
+
+# 0. Launch app and navigate to home tab
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-\\(home\\)"
+    timeout: 10000
+- tapOn:
+    id: "tab-\\(home\\)"
+
+# 1. Wait for binder list to finish loading (create button is only in repos-loaded phase)
+- extendedWaitUntil:
+    visible:
+      id: "create-binder-button"
+    timeout: 10000
+
+# 2. Tap "+" to open the new binder prompt
+- tapOn:
+    id: "create-binder-button"
+
+# 3. Alert.prompt appears with a text field — type the binder name
+- waitForAnimationToEnd
+- inputText: "Maestro Test Binder"
+
+# 4. Tap the "Create" button on the native alert
+- tapOn: "Create"
+
+# 5. Wait for creation to complete.
+#    Flow: setScreenState(cloning) → BinderService.create() → git push → fetchRepos()
+#    This can take 10-20s on a slow connection.
+- extendedWaitUntil:
+    visible:
+      text: "Maestro Test Binder"
+    timeout: 30000
+
+# 6. Assert the new binder is visible in the list
+- assertVisible:
+    text: "Maestro Test Binder"
+
+
+# ============================================
+# PHASE 2: DELETE BINDER
+# ============================================
+
+# 7. Swipe left on the newly created binder to reveal the trash action.
+#    Server returns repos sorted by created_at DESC, so the new binder is at
+#    the top of the list. First card center is at roughly 25% from screen top
+#    (safe area + padding + header + first card).
+- swipe:
+    start: "80%, 25%"
+    end: "20%, 25%"
+    duration: 400
+
+# 8. Wait for the swipe animation to settle, then tap the trash icon
+- extendedWaitUntil:
+    visible:
+      id: "swipe-delete-action"
+    timeout: 3000
+- tapOn:
+    id: "swipe-delete-action"
+
+# 9. Verify the binder is immediately removed from the list
+- waitForAnimationToEnd
+- assertNotVisible:
+    text: "Maestro Test Binder"
+
+
+# ============================================
+# PHASE 3: VERIFY SERVER-SIDE DELETION
+# ============================================
+
+# 10. Relaunch the app to force a fresh repo list from the server.
+#     If the server DELETE worked, the binder won't come back.
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "tab-\\(home\\)"
+    timeout: 10000
+- tapOn:
+    id: "tab-\\(home\\)"
+
+# 11. Wait for the binder list to load
+- extendedWaitUntil:
+    visible:
+      id: "create-binder-button"
+    timeout: 10000
+
+# 12. The deleted binder must NOT reappear
+- assertNotVisible:
+    text: "Maestro Test Binder"

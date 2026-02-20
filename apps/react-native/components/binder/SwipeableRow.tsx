@@ -40,7 +40,7 @@ export function SwipeableRow({
       });
 
       return (
-        <RectButton style={styles.deleteAction} onPress={handleDelete}>
+        <RectButton style={styles.deleteAction} onPress={handleDelete} testID="swipe-delete-action">
           <Animated.View style={{ transform: [{ scale }] }}>
             <IconTrash size={22} color="#fff" strokeWidth={2} />
           </Animated.View>

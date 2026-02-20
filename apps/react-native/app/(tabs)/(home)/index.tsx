@@ -396,7 +396,7 @@ export default function BinderListScreen() {
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           <View style={styles.headerRow}>
             <Text style={styles.screenTitle}>Binders</Text>
-            <Pressable onPress={createBinder} hitSlop={8}>
+            <Pressable onPress={createBinder} hitSlop={8} testID="create-binder-button">
               <Text style={{ fontSize: 28, color: '#007AFF', marginTop: -6 }}>+</Text>
             </Pressable>
           </View>
