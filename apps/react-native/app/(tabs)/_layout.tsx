@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { CustomTabBar } from '../../components/navigation/CustomTabBar';
 import { getLastViewed, setPendingRestore } from '../../core/binder/LastViewedStore';
@@ -68,7 +69,7 @@ function TabLayoutInner() {
     }, 0);
   };
 
-  const handleCreateAction = (action: 'note' | 'audio' | 'photo') => {
+  const handleCreateAction = async (action: 'note' | 'audio' | 'photo') => {
     if (!binderContext) {
       showToast('Open a binder first');
       return;
@@ -81,12 +82,19 @@ function TabLayoutInner() {
           params: { dirPath: binderContext.dirPath, categoryType: 'note' },
         });
         break;
-      case 'audio':
+      case 'audio': {
+        const { Audio } = await import('expo-av');
+        const { granted } = await Audio.requestPermissionsAsync();
+        if (!granted) {
+          Alert.alert('Microphone Access', 'Microphone permission is required to record audio.');
+          return;
+        }
         router.push({
           pathname: `/binder/${binderContext.binderId}/quick-capture`,
           params: { mode: 'audio', dirPath: binderContext.dirPath },
         });
         break;
+      }
       case 'photo':
         router.push({
           pathname: `/binder/${binderContext.binderId}/quick-capture`,

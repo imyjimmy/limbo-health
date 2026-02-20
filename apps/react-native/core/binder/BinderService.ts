@@ -185,7 +185,7 @@ export class BinderService {
     sizeBytes: number,
   ): Promise<string> {
     const docPath = await generateDocPath(this.info.repoDir, dirPath, 'photo');
-    const encPath = sidecarPathFrom(docPath);
+    const encPath = sidecarPathFrom(docPath, 'jpg');
 
     // Write encrypted sidecar
     await this.io.writeSidecar('/' + encPath, binaryData);
@@ -213,7 +213,7 @@ export class BinderService {
     durationMs: number,
   ): Promise<string> {
     const docPath = await generateDocPath(this.info.repoDir, dirPath, 'recording');
-    const encPath = sidecarPathFrom(docPath);
+    const encPath = sidecarPathFrom(docPath, 'm4a');
 
     await this.io.writeSidecar('/' + encPath, binaryData);
 
@@ -291,12 +291,14 @@ export class BinderService {
    */
   async deleteEntry(entryPath: string): Promise<void> {
     const filesToRemove = [entryPath];
-    const encPath = sidecarPathFrom(entryPath);
+    const basePath = entryPath.replace(/\.json$/, '');
 
-    // Check if sidecar exists
+    // Check for sidecar files (.enc, .jpg.enc, .m4a.enc, etc.)
     const allFiles = await GitEngine.listFiles(this.info.repoDir);
-    if (allFiles.includes(encPath)) {
-      filesToRemove.push(encPath);
+    for (const f of allFiles) {
+      if (f.startsWith(basePath) && f.endsWith('.enc')) {
+        filesToRemove.push(f);
+      }
     }
 
     await GitEngine.removeFiles(

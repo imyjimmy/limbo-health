@@ -15,7 +15,7 @@ export function EntryCard({ item, onPress }: EntryCardProps) {
   const dateStr = preview?.created
     ? formatDate(preview.created)
     : extractDateFromFilename(item.name);
-  const typeLabel = preview?.type ? formatType(preview.type) : '';
+  const typeLabel = preview?.type ? formatType(preview.type, preview.format) : '';
 
   return (
     <TouchableOpacity
@@ -69,13 +69,17 @@ function extractDateFromFilename(name: string): string {
   return match ? formatDate(match[1]) : '';
 }
 
-function formatType(type: string): string {
+function formatType(type: string, format?: string): string {
+  if (type === 'attachment_ref') {
+    const audioFormats = ['m4a', 'mp3', 'wav', 'aac', 'ogg'];
+    if (format && audioFormats.includes(format)) return 'Recording';
+    return 'Photo';
+  }
   const map: Record<string, string> = {
     visit: 'Visit',
     lab: 'Lab',
     condition: 'Condition',
     medication: 'Medication',
-    attachment_ref: 'Photo',
     immunization: 'Immunization',
     allergy: 'Allergy',
     procedure: 'Procedure',

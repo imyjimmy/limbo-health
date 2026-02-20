@@ -39,10 +39,13 @@ export async function generateDocPath(
 
 /**
  * Derive the sidecar .enc path from a document path.
- * 'conditions/back-acne/2026-02-13-photo.json' → 'conditions/back-acne/2026-02-13-photo.enc'
+ * Without format: 'conditions/.../photo.json' → 'conditions/.../photo.enc'
+ * With format:    'conditions/.../photo.json' + 'jpg' → 'conditions/.../photo.jpg.enc'
+ *                 'recordings/.../recording.json' + 'm4a' → 'recordings/.../recording.m4a.enc'
  */
-export function sidecarPathFrom(docPath: string): string {
-  return docPath.replace(/\.json$/, '.enc');
+export function sidecarPathFrom(docPath: string, format?: string): string {
+  const base = docPath.replace(/\.json$/, '');
+  return format ? `${base}.${format}.enc` : `${base}.enc`;
 }
 
 /**

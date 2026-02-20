@@ -181,6 +181,7 @@ export interface EntryPreview extends EntryMetadata {
   title: string;
   provider?: string;
   tags?: string[];
+  format?: string;
   hasChildren: boolean;
 }
 
@@ -193,6 +194,7 @@ export function extractEntryPreview(
     title: extractTitle(doc),
     provider: doc.metadata.provider,
     tags: doc.metadata.tags,
+    format: doc.metadata.format,
     hasChildren: doc.children.length > 0,
   };
 }
