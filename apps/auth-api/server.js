@@ -436,6 +436,45 @@ app.post('/api/auth/link-nostr', async (req, res) => {
   }
 });
 
+// ========== DELETE ACCOUNT ==========
+
+app.delete('/api/auth/account', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ status: 'error', reason: 'Missing or invalid Authorization header' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ status: 'error', reason: 'Invalid or expired token' });
+  }
+
+  const userId = decoded.userId;
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await conn.query('DELETE FROM repository_access WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM oauth_connections WHERE user_id = ?', [userId]);
+    await conn.query('DELETE FROM scan_sessions WHERE patient_user_id = ?', [userId]);
+    await conn.query('DELETE FROM repositories WHERE owner_user_id = ?', [userId]);
+    await conn.query('DELETE FROM users WHERE id = ?', [userId]);
+
+    await conn.commit();
+    console.log(`Account deleted for userId: ${userId}`);
+    res.json({ status: 'OK' });
+  } catch (err) {
+    await conn.rollback();
+    console.error('Delete account error:', err);
+    res.status(500).json({ status: 'error', reason: 'Failed to delete account' });
+  } finally {
+    conn.release();
+  }
+});
+
 // ========== INTERNAL: JWT VALIDATION ==========
 // Called by other services (scheduler-api, mgit-api) to validate tokens
 
