@@ -108,7 +108,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // --- Nostr startup path (existing flow) ---
+        // --- Nostr startup path: only auto-login if last session was Nostr ---
+        if (loginMethod !== 'nostr') {
+          setState(emptyState('onboarding'));
+          return;
+        }
+
         const hasKey = await keyManager.hasStoredKey();
         if (!hasKey) {
           setState(emptyState('onboarding'));
@@ -167,12 +172,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const pk = await keyManager.getMasterPrivkey();
-        if (pk) {
-          setPrivkeyRef(pk);
-          setState(prev => ({ ...prev, pubkey: KeyManager.pubkeyFromPrivkey(pk) }));
+        if (!pk) return;
+
+        setPrivkeyRef(pk);
+        const pubkey = KeyManager.pubkeyFromPrivkey(pk);
+        setState(prev => ({ ...prev, pubkey }));
+
+        // Link the Nostr key to the Google account on the backend (merges accounts + repos)
+        if (state.jwt) {
+          const signedEvent = signChallenge(pk, `link-nostr:${Date.now()}`);
+          const resp = await fetch(ENDPOINTS.linkNostr, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${state.jwt}`,
+            },
+            body: JSON.stringify({ signedEvent }),
+          });
+          const data = await resp.json();
+          if (resp.ok && data.token) {
+            await SecureStore.setItemAsync(JWT_STORAGE_KEY, data.token);
+            setState(prev => ({ ...prev, jwt: data.token, pubkey }));
+          }
         }
       } catch (err) {
-        console.warn('Post-login biometric unlock failed:', err);
+        console.warn('Post-login biometric unlock / link-nostr failed:', err);
       }
     })();
   }, [state.status, state.loginMethod, privkeyRef, keyManager]);

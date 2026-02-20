@@ -88,13 +88,24 @@ export function createConditionOverview(
 export function createPhotoRef(
   sidecarFilename: string,
   sizeBytes: number,
-  conditionSlug?: string,
 ): MedicalDocument {
   return createDocument(sidecarFilename, 'attachment_ref', {
     format: 'jpeg',
     encoding: 'base64',
     originalSizeBytes: sizeBytes,
-    condition: conditionSlug,
+  });
+}
+
+export function createAudioRef(
+  sidecarFilename: string,
+  sizeBytes: number,
+  durationMs: number,
+): MedicalDocument {
+  return createDocument(sidecarFilename, 'attachment_ref', {
+    format: 'm4a',
+    encoding: 'binary',
+    originalSizeBytes: sizeBytes,
+    durationMs,
   });
 }
 
@@ -170,6 +181,7 @@ export interface EntryPreview extends EntryMetadata {
   title: string;
   provider?: string;
   tags?: string[];
+  format?: string;
   hasChildren: boolean;
 }
 
@@ -182,6 +194,7 @@ export function extractEntryPreview(
     title: extractTitle(doc),
     provider: doc.metadata.provider,
     tags: doc.metadata.tags,
+    format: doc.metadata.format,
     hasChildren: doc.children.length > 0,
   };
 }

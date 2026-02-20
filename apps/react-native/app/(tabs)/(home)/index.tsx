@@ -308,7 +308,7 @@ export default function BinderListScreen() {
         const result = await capture();
         if (!result) return;
 
-        await service.addPhoto('back-acne', result.binaryData, result.sizeBytes);
+        await service.addPhoto('photos', result.binaryData, result.sizeBytes);
 
         // Refresh entry list
         await openBinder({ id: repoId, name: repoId });
