@@ -1177,6 +1177,46 @@ app.get('/api/mgit/repos/:repoId/metadata', authMiddleware, (req, res) => {
   }
 });
 
+// delete a binder repo (JWT owner only)
+app.delete('/api/mgit/repos/:repoId', jwtOnly, async (req, res) => {
+  const { repoId } = req.params;
+  const { userId } = req.user;
+
+  try {
+    // Verify caller owns this repo via auth-api
+    const access = await authApiClient.checkAccess({
+      userId,
+      repoId,
+      operation: 'write'
+    });
+
+    if (!access.allowed || access.access !== 'admin') {
+      return res.status(403).json({ status: 'error', reason: 'Not authorized to delete this repository' });
+    }
+
+    // Delete auth config from DB (CASCADE removes repository_access rows)
+    try {
+      await authApiClient.deleteRepoConfig(repoId);
+    } catch (err) {
+      console.error(`Failed to delete auth config for ${repoId}:`, err.message);
+      return res.status(500).json({ status: 'error', reason: 'Failed to delete repository config' });
+    }
+
+    // Delete bare repo from disk
+    const repoPath = path.join(REPOS_PATH, repoId);
+    if (fs.existsSync(repoPath)) {
+      fs.rmSync(repoPath, { recursive: true, force: true });
+      console.log(`Deleted bare repo directory: ${repoPath}`);
+    }
+
+    console.log(`Binder deleted: repoId=${repoId}, userId=${userId}`);
+    res.json({ status: 'OK', repoId });
+  } catch (error) {
+    console.error('Delete repo error:', error);
+    res.status(500).json({ status: 'error', reason: 'Failed to delete repository' });
+  }
+});
+
 // show repos of a user
 app.get('/api/mgit/user/repositories', jwtOnly, async (req, res) => {
   try {
