@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useCamera } from '../../../../../hooks/useCamera';
 import { BinderService } from '../../../../../core/binder/BinderService';
@@ -48,6 +48,8 @@ export default function QuickCaptureScreen() {
           router.back();
           return;
         }
+
+        setSaving(true);
 
         const targetDir = dirPath
           ? dirPath
@@ -104,7 +106,14 @@ export default function QuickCaptureScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View />
+      {saving ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+          <ActivityIndicator size="large" color="#111" />
+          <Text style={{ fontSize: 15, color: '#666', marginTop: 12 }}>Encrypting...</Text>
+        </View>
+      ) : (
+        <View />
+      )}
     </>
   );
 }
