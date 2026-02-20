@@ -16,7 +16,7 @@ import { secp256k1 } from '@noble/curves/secp256k1';
 import { KeyManager } from '../core/crypto/KeyManager';
 import { authenticateNostr, signChallenge } from '../core/crypto/nostrAuth';
 import { API_BASE_URL, ENDPOINTS } from '../constants/api';
-import type { AuthState, AuthStatus, LoginMethod, GoogleProfile, NostrMetadata } from '../types/auth';
+import type { AuthState, AuthStatus, LoginMethod, GoogleProfile, NostrMetadata, OAuthConnection } from '../types/auth';
 import { decode as base64Decode } from '../core/crypto/base64';
 
 // --- Constants ---
@@ -52,7 +52,21 @@ export function useAuthContext(): AuthContextValue {
 // --- Helper: default empty state ---
 
 function emptyState(status: AuthStatus): AuthState {
-  return { status, jwt: null, pubkey: null, metadata: null, loginMethod: null, googleProfile: null };
+  return { status, jwt: null, pubkey: null, metadata: null, loginMethod: null, googleProfile: null, connections: [] };
+}
+
+/** Best-effort fetch of OAuth connections from /api/auth/me. Returns [] on failure. */
+async function fetchProfile(jwt: string): Promise<OAuthConnection[]> {
+  try {
+    const resp = await fetch(ENDPOINTS.me, {
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return data.connections ?? [];
+  } catch {
+    return [];
+  }
 }
 
 // --- Provider ---
@@ -100,7 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               metadata,
               loginMethod: 'google',
               googleProfile,
+              connections: [],
             });
+            fetchProfile(storedJwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
           } else {
             // JWT expired — need to re-login with Google (no refresh token in v1)
             setState({ ...emptyState('expired'), loginMethod: 'google', googleProfile });
@@ -134,7 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (storedJwt && !isJwtExpired(storedJwt)) {
           const cachedMeta = await SecureStore.getItemAsync('limbo_metadata');
           const metadata = cachedMeta ? JSON.parse(cachedMeta) : null;
-          setState({ status: 'authenticated', jwt: storedJwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null });
+          setState({ status: 'authenticated', jwt: storedJwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
+          fetchProfile(storedJwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
           return;
         }
 
@@ -142,7 +159,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const auth = await authenticateNostr(privkey, API_BASE_URL);
         await SecureStore.setItemAsync(JWT_STORAGE_KEY, auth.jwt);
         if (auth.metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(auth.metadata));
-        setState({ status: 'authenticated', jwt: auth.jwt, pubkey: auth.pubkey, metadata: auth.metadata, loginMethod: 'nostr', googleProfile: null });
+        setState({ status: 'authenticated', jwt: auth.jwt, pubkey: auth.pubkey, metadata: auth.metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
+        fetchProfile(auth.jwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
       } catch (err) {
         console.error('Auth startup failed:', err);
         const hasKey = await keyManager.hasStoredKey().catch(() => false);
@@ -154,6 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           metadata: null,
           loginMethod,
           googleProfile: null,
+          connections: [],
         });
       }
     })();
@@ -211,7 +230,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
       await SecureStore.setItemAsync(LOGIN_METHOD_KEY, 'nostr');
       if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
-      setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null });
+      setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
+      fetchProfile(jwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
     },
     [keyManager],
   );
@@ -274,7 +294,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         metadata: null,
         loginMethod: 'google',
         googleProfile,
+        connections: [],
       });
+      fetchProfile(data.token).then(conns => setState(prev => ({ ...prev, connections: conns })));
     },
     [keyManager],
   );
@@ -394,7 +416,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
     await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
     if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
-    setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null });
+    setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
+    fetchProfile(jwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
   }, [keyManager, privkeyRef, state.loginMethod]);
 
   // --- Render ---

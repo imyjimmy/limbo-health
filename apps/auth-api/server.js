@@ -436,6 +436,67 @@ app.post('/api/auth/link-nostr', async (req, res) => {
   }
 });
 
+// ========== GET PROFILE ==========
+// Returns user profile + OAuth connections for the authenticated user.
+// Called by mobile app after login to populate Account screen.
+
+app.get('/api/auth/me', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ status: 'error', reason: 'Missing or invalid Authorization header' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ status: 'error', reason: 'Invalid or expired token' });
+  }
+
+  const userId = decoded.userId;
+  if (!userId) {
+    return res.status(400).json({ status: 'error', reason: 'Token does not contain userId' });
+  }
+
+  try {
+    const [users] = await db.query(
+      'SELECT id, first_name, last_name, email, nostr_pubkey, id_roles FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ status: 'error', reason: 'User not found' });
+    }
+
+    const user = users[0];
+
+    const [connections] = await db.query(
+      'SELECT provider, provider_email, provider_user_id FROM oauth_connections WHERE user_id = ?',
+      [userId]
+    );
+
+    res.json({
+      status: 'OK',
+      user: {
+        id: user.id,
+        firstName: user.first_name || null,
+        lastName: user.last_name || null,
+        email: user.email || null,
+        nostrPubkey: user.nostr_pubkey || null,
+        role: user.id_roles,
+      },
+      connections: connections.map(c => ({
+        provider: c.provider,
+        email: c.provider_email || null,
+        providerId: c.provider_user_id,
+      })),
+    });
+  } catch (error) {
+    console.error('GET /api/auth/me error:', error);
+    res.status(500).json({ status: 'error', reason: 'Failed to fetch profile' });
+  }
+});
+
 // ========== DELETE ACCOUNT ==========
 // Permanently removes user and all associated data. CASCADE handles child records.
 

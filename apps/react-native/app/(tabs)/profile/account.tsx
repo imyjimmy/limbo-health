@@ -43,9 +43,10 @@ export default function AccountScreen() {
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Derived state
-  const isGoogleConnected = state.loginMethod === 'google' || !!state.googleProfile;
-  const googleEmail = state.googleProfile?.email || null;
+  // Derived state — prefer server connections, fallback to local googleProfile
+  const googleConn = state.connections.find(c => c.provider === 'google');
+  const isGoogleConnected = !!googleConn || state.loginMethod === 'google' || !!state.googleProfile;
+  const googleEmail = googleConn?.email ?? state.googleProfile?.email ?? null;
   const hasNostrKey = !!state.pubkey;
   const npub = hasNostrKey ? encodeBech32('npub', state.pubkey!) : null;
 
