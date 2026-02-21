@@ -39,6 +39,10 @@ tasks/
 # claude code
 .claude/
 
+# agent skills
+.agents/
+**/.agents/
+
 # misc
 .DS_Store
 .env
