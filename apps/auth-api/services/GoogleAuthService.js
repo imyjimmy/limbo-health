@@ -95,6 +95,8 @@ export class GoogleAuthService {
         googleId: data.id,
         email: data.email,
         name: data.name,
+        givenName: data.given_name,
+        familyName: data.family_name,
         picture: data.picture,
         verifiedEmail: data.verified_email
       };

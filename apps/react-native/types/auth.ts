@@ -25,6 +25,12 @@ export interface GoogleProfile {
   googleId: string;
 }
 
+export interface OAuthConnection {
+  provider: string;       // 'google', 'github', etc.
+  email: string | null;
+  providerId: string;
+}
+
 export interface AuthState {
   status: AuthStatus;
   jwt: string | null;
@@ -32,4 +38,5 @@ export interface AuthState {
   metadata: NostrMetadata | null;
   loginMethod: LoginMethod | null;
   googleProfile: GoogleProfile | null;
+  connections: OAuthConnection[];  // populated by GET /api/auth/me after login
 }

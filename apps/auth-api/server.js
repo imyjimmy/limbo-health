@@ -30,6 +30,56 @@ app.use(express.json());
 const nostrAuth = new NostrAuthService();
 const googleAuth = new GoogleAuthService();
 
+function asCleanString(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
+
+function splitHumanName(fullName) {
+  const cleaned = asCleanString(fullName);
+  if (!cleaned) return { firstName: null, lastName: null };
+
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: null };
+  }
+
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  };
+}
+
+function resolveGoogleNameParts(userInfo) {
+  const givenName = asCleanString(userInfo?.givenName);
+  const familyName = asCleanString(userInfo?.familyName);
+  if (givenName || familyName) {
+    return { firstName: givenName, lastName: familyName };
+  }
+  return splitHumanName(userInfo?.name);
+}
+
+async function backfillUserNameFromGoogle(userId, userInfo) {
+  const { firstName, lastName } = resolveGoogleNameParts(userInfo);
+  const email = asCleanString(userInfo?.email);
+
+  await db.query(
+    `UPDATE users
+     SET email = COALESCE(NULLIF(?, ''), email),
+         first_name = CASE
+           WHEN (first_name IS NULL OR first_name = '') AND ? IS NOT NULL THEN ?
+           ELSE first_name
+         END,
+         last_name = CASE
+           WHEN (last_name IS NULL OR last_name = '') AND ? IS NOT NULL THEN ?
+           ELSE last_name
+         END
+     WHERE id = ?`,
+    [email, firstName, firstName, lastName, lastName, userId]
+  );
+}
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'auth-api' });
@@ -127,6 +177,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
   try {
     const tokens = await googleAuth.getTokensFromCode(code, redirectUri);
     const userInfo = await googleAuth.getUserInfo(tokens.accessToken);
+    const { firstName, lastName } = resolveGoogleNameParts(userInfo);
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
@@ -144,8 +195,8 @@ app.post('/api/auth/google/callback', async (req, res) => {
       // New Google user — create user + oauth_connection
       const roleId = 2; // default to provider
       const [insertResult] = await db.query(
-        'INSERT INTO users (email, id_roles, create_datetime) VALUES (?, ?, NOW())',
-        [userInfo.email, roleId]
+        'INSERT INTO users (email, first_name, last_name, id_roles, create_datetime) VALUES (?, ?, ?, ?, NOW())',
+        [userInfo.email, firstName, lastName, roleId]
       );
       userId = insertResult.insertId;
       userRole = roleId;
@@ -165,6 +216,8 @@ app.post('/api/auth/google/callback', async (req, res) => {
          WHERE provider = 'google' AND provider_user_id = ?`,
         [tokens.accessToken, userInfo.googleId]
       );
+
+      await backfillUserNameFromGoogle(userId, userInfo);
     }
 
     // Generate JWT with DB userId (integer), not googleId
@@ -207,6 +260,7 @@ app.post('/api/auth/google/token', async (req, res) => {
 
   try {
     const userInfo = await googleAuth.getUserInfo(accessToken);
+    const { firstName, lastName } = resolveGoogleNameParts(userInfo);
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
@@ -226,8 +280,8 @@ app.post('/api/auth/google/token', async (req, res) => {
     if (connections.length === 0) {
       // New Google user — create user + oauth_connection
       const [insertResult] = await db.query(
-        'INSERT INTO users (email, id_roles, create_datetime) VALUES (?, ?, NOW())',
-        [userInfo.email, roleId]
+        'INSERT INTO users (email, first_name, last_name, id_roles, create_datetime) VALUES (?, ?, ?, ?, NOW())',
+        [userInfo.email, firstName, lastName, roleId]
       );
       userId = insertResult.insertId;
       userRole = roleId;
@@ -248,6 +302,8 @@ app.post('/api/auth/google/token', async (req, res) => {
          WHERE provider = 'google' AND provider_user_id = ?`,
         [accessToken, userInfo.googleId]
       );
+
+      await backfillUserNameFromGoogle(userId, userInfo);
     }
 
     const token = jwt.sign({
@@ -433,6 +489,67 @@ app.post('/api/auth/link-nostr', async (req, res) => {
   } catch (error) {
     console.error('Link Nostr error:', error);
     res.status(500).json({ status: 'error', reason: 'Failed to link Nostr key' });
+  }
+});
+
+// ========== GET PROFILE ==========
+// Returns user profile + OAuth connections for the authenticated user.
+// Called by mobile app after login to populate Account screen.
+
+app.get('/api/auth/me', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ status: 'error', reason: 'Missing or invalid Authorization header' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+  } catch (err) {
+    return res.status(401).json({ status: 'error', reason: 'Invalid or expired token' });
+  }
+
+  const userId = decoded.userId;
+  if (!userId) {
+    return res.status(400).json({ status: 'error', reason: 'Token does not contain userId' });
+  }
+
+  try {
+    const [users] = await db.query(
+      'SELECT id, first_name, last_name, email, nostr_pubkey, id_roles FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({ status: 'error', reason: 'User not found' });
+    }
+
+    const user = users[0];
+
+    const [connections] = await db.query(
+      'SELECT provider, provider_email, provider_user_id FROM oauth_connections WHERE user_id = ?',
+      [userId]
+    );
+
+    res.json({
+      status: 'OK',
+      user: {
+        id: user.id,
+        firstName: user.first_name || null,
+        lastName: user.last_name || null,
+        email: user.email || null,
+        nostrPubkey: user.nostr_pubkey || null,
+        role: user.id_roles,
+      },
+      connections: connections.map(c => ({
+        provider: c.provider,
+        email: c.provider_email || null,
+        providerId: c.provider_user_id,
+      })),
+    });
+  } catch (error) {
+    console.error('GET /api/auth/me error:', error);
+    res.status(500).json({ status: 'error', reason: 'Failed to fetch profile' });
   }
 });
 
