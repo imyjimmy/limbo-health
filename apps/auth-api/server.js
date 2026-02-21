@@ -51,8 +51,17 @@ function splitHumanName(fullName) {
   };
 }
 
+function resolveGoogleNameParts(userInfo) {
+  const givenName = asCleanString(userInfo?.givenName);
+  const familyName = asCleanString(userInfo?.familyName);
+  if (givenName || familyName) {
+    return { firstName: givenName, lastName: familyName };
+  }
+  return splitHumanName(userInfo?.name);
+}
+
 async function backfillUserNameFromGoogle(userId, userInfo) {
-  const { firstName, lastName } = splitHumanName(userInfo?.name);
+  const { firstName, lastName } = resolveGoogleNameParts(userInfo);
   const email = asCleanString(userInfo?.email);
 
   await db.query(
@@ -168,7 +177,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
   try {
     const tokens = await googleAuth.getTokensFromCode(code, redirectUri);
     const userInfo = await googleAuth.getUserInfo(tokens.accessToken);
-    const { firstName, lastName } = splitHumanName(userInfo.name);
+    const { firstName, lastName } = resolveGoogleNameParts(userInfo);
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
@@ -251,7 +260,7 @@ app.post('/api/auth/google/token', async (req, res) => {
 
   try {
     const userInfo = await googleAuth.getUserInfo(accessToken);
-    const { firstName, lastName } = splitHumanName(userInfo.name);
+    const { firstName, lastName } = resolveGoogleNameParts(userInfo);
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
