@@ -10,7 +10,10 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 15000,
     setupFiles: ['./tests/setup/globalSetup.ts'],
-    include: ['tests/**/*.test.ts'],
+    include: [
+      'tests/**/*.test.ts',
+      'apps/*-api/__tests__/**/*.test.ts',
+    ],
     fileParallelism: false,
   },
 });
