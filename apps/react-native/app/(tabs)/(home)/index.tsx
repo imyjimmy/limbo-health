@@ -277,10 +277,33 @@ export default function BinderListScreen() {
     );
   }, [jwt, masterConversationKey, fetchRepos, authState.metadata?.name, authState.googleProfile?.name, authState.googleProfile?.email]);
 
-  // --- Delete binder (local clone) ---
+  // --- Delete binder (server + local) ---
 
   const deleteBinder = useCallback(
     async (repo: RepoSummary) => {
+      // Remove from displayed list immediately for responsiveness
+      setScreenState((prev) => {
+        if (prev.phase !== 'repos-loaded') return prev;
+        return { ...prev, repos: prev.repos.filter((r) => r.id !== repo.id) };
+      });
+
+      // Delete from server
+      if (jwt) {
+        try {
+          const resp = await fetch(`${API_BASE_URL}/api/mgit/repos/${repo.id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${jwt}` },
+          });
+          if (!resp.ok) {
+            const data = await resp.json().catch(() => ({}));
+            console.warn('Server delete failed:', data.reason || resp.status);
+          }
+        } catch (err) {
+          console.warn('Server delete request failed:', err);
+        }
+      }
+
+      // Delete local clone
       const localPath = `${BINDERS_ROOT}/${repo.id}`;
       try {
         const exists = await RNFS.exists(localPath);
@@ -288,13 +311,8 @@ export default function BinderListScreen() {
       } catch (err) {
         console.warn('Failed to delete local binder:', err);
       }
-      // Remove from displayed list immediately
-      setScreenState((prev) => {
-        if (prev.phase !== 'repos-loaded') return prev;
-        return { ...prev, repos: prev.repos.filter((r) => r.id !== repo.id) };
-      });
     },
-    [],
+    [jwt],
   );
 
   // --- Take photo and add to binder ---
@@ -378,7 +396,7 @@ export default function BinderListScreen() {
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           <View style={styles.headerRow}>
             <Text style={styles.screenTitle}>Binders</Text>
-            <Pressable onPress={createBinder} hitSlop={8}>
+            <Pressable onPress={createBinder} hitSlop={8} testID="create-binder-button">
               <Text style={{ fontSize: 28, color: '#007AFF', marginTop: -6 }}>+</Text>
             </Pressable>
           </View>

@@ -5,7 +5,7 @@
  * Matches the frontend's auth.ts behaviour (kind:1 events with challenge in content + tags).
  */
 import { finalizeEvent, type UnsignedEvent } from 'nostr-tools/pure';
-import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { request } from './testClient';
 import { schnorr } from '@noble/curves/secp256k1.js';
 import { TEST_PRIVKEY, TEST_PUBKEY, TEST_PRIVKEY_2, TEST_PUBKEY_2 } from './globalSetup';
