@@ -5,8 +5,8 @@
  * Repo is set up in beforeAll using create-bare + push.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { authenticate } from '../setup/nostrHelpers';
-import { request } from '../setup/testClient';
+import { authenticate } from './setup/nostrHelpers';
+import { request } from './setup/testClient';
 import {
   initLocalRepo,
   createTestFile,
@@ -14,9 +14,9 @@ import {
   cloneRepo,
   readFile,
   uniqueRepoId,
-} from '../setup/gitHelpers';
-import { registerRepoForCleanup } from '../setup/globalSetup';
-import { cleanupAllTestRepos } from '../setup/cleanup';
+} from './setup/gitHelpers';
+import { registerRepoForCleanup } from './setup/globalSetup';
+import { cleanupAllTestRepos } from './setup/cleanup';
 
 describe('Clone & Pull', () => {
   let jwt: string;

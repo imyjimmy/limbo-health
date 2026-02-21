@@ -22,8 +22,8 @@
     "test:integration": "vitest run",
     "test:integration:watch": "vitest watch",
     "test:integration:verbose": "vitest run --reporter=verbose",
-    "test:auth": "vitest run tests/auth/",
-    "test:mgit": "vitest run tests/mgit/"
+    "test:auth": "vitest run apps/auth-api/__tests__/",
+    "test:mgit": "vitest run apps/mgit-api/__tests__/"
   },
   "devDependencies": {
     "@isomorphic-git/lightning-fs": "^4.6.0",

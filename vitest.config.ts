@@ -9,8 +9,7 @@ export default defineConfig({
     },
     testTimeout: 30000,
     hookTimeout: 15000,
-    setupFiles: ['./tests/setup/globalSetup.ts'],
-    include: ['tests/**/*.test.ts'],
+    include: ['apps/**/__tests__/**/*.test.ts'],
     fileParallelism: false,
   },
 });
