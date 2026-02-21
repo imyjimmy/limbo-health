@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Audio } from 'expo-av';
 import RNFS from 'react-native-fs';
 import { decode as b64decode } from '../core/crypto/base64';
+import { shouldUseMockMedia } from '../core/platform/mockMedia';
 
 export interface AudioRecordingResult {
   binaryData: Uint8Array;
@@ -10,18 +11,52 @@ export interface AudioRecordingResult {
 }
 
 export type RecorderStatus = 'idle' | 'recording' | 'stopped';
+const MOCK_AUDIO_BASE64 = 'TU9DS19NNEE='; // "MOCK_M4A"
 
 export function useAudioRecorder() {
   const recordingRef = useRef<Audio.Recording | null>(null);
   const [status, setStatus] = useState<RecorderStatus>('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
   const resultRef = useRef<AudioRecordingResult | null>(null);
+  const mockStartedAtRef = useRef<number | null>(null);
+  const mockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopMockTimer = useCallback(() => {
+    if (mockTimerRef.current) {
+      clearInterval(mockTimerRef.current);
+      mockTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopMockTimer();
+    };
+  }, [stopMockTimer]);
 
   const start = useCallback(async () => {
-    // Permission is often requested before showing recorder UI.
-    // Verify it's granted here as a safety check.
+    if (shouldUseMockMedia()) {
+      stopMockTimer();
+      mockStartedAtRef.current = Date.now();
+      setElapsedMs(0);
+      setStatus('recording');
+      mockTimerRef.current = setInterval(() => {
+        if (mockStartedAtRef.current) {
+          setElapsedMs(Date.now() - mockStartedAtRef.current);
+        }
+      }, 250);
+      return;
+    }
+
+    // First-run path: request permission inline so the recorder doesn't
+    // immediately cancel after the system prompt returns.
     const permission = await Audio.getPermissionsAsync();
-    if (!permission.granted) {
+    let granted = permission.granted;
+    if (!granted) {
+      const requested = await Audio.requestPermissionsAsync();
+      granted = requested.granted;
+    }
+    if (!granted) {
       throw new Error('Microphone permission denied');
     }
 
@@ -52,6 +87,7 @@ export function useAudioRecorder() {
       web: {},
     });
 
+    setElapsedMs(0);
     recording.setOnRecordingStatusUpdate((s) => {
       if (s.isRecording) {
         setElapsedMs(s.durationMillis);
@@ -60,18 +96,29 @@ export function useAudioRecorder() {
 
     await recording.startAsync();
     recordingRef.current = recording;
-    /*
-    ** @issue: setElapsedMs(0) runs after the status update listener (line 53)
-    ** is already attached and after startAsync() resolves. If the listener fires
-    ** before this line, the elapsed time would get reset back to 0. React's state
-    ** batching likely makes this invisible in practice, but proper sequencing would
-    ** be to set elapsedMs before startAsync() or before attaching the listener.
-    */
     setStatus('recording');
-    setElapsedMs(0);
-  }, []);
+  }, [stopMockTimer]);
 
   const stop = useCallback(async (): Promise<AudioRecordingResult> => {
+    if (shouldUseMockMedia()) {
+      const startedAt = mockStartedAtRef.current ?? Date.now();
+      const durationMs = Math.max(0, Date.now() - startedAt);
+      const binaryData = b64decode(MOCK_AUDIO_BASE64);
+
+      stopMockTimer();
+      mockStartedAtRef.current = null;
+      setStatus('stopped');
+      setElapsedMs(durationMs);
+
+      const result: AudioRecordingResult = {
+        binaryData,
+        sizeBytes: binaryData.byteLength,
+        durationMs,
+      };
+      resultRef.current = result;
+      return result;
+    }
+
     const recording = recordingRef.current;
     if (!recording) throw new Error('No active recording');
 
@@ -98,9 +145,18 @@ export function useAudioRecorder() {
     const result: AudioRecordingResult = { binaryData, sizeBytes, durationMs };
     resultRef.current = result;
     return result;
-  }, []);
+  }, [stopMockTimer]);
 
   const cancel = useCallback(async () => {
+    if (shouldUseMockMedia()) {
+      stopMockTimer();
+      mockStartedAtRef.current = null;
+      setStatus('idle');
+      setElapsedMs(0);
+      resultRef.current = null;
+      return;
+    }
+
     const recording = recordingRef.current;
     if (!recording) return;
 
@@ -119,7 +175,7 @@ export function useAudioRecorder() {
     setStatus('idle');
     setElapsedMs(0);
     resultRef.current = null;
-  }, []);
+  }, [stopMockTimer]);
 
   return { status, elapsedMs, start, stop, cancel };
 }

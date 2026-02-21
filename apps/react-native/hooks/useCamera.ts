@@ -8,6 +8,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import RNFS from 'react-native-fs';
 import { decode as b64decode } from '../core/crypto/base64';
 import { createPending } from '../core/camera/cameraResult';
+import { shouldUseMockMedia } from '../core/platform/mockMedia';
 
 export interface CaptureResult {
   binaryData: Uint8Array;
@@ -21,11 +22,25 @@ export interface CaptureResult {
 
 const MAX_WIDTH = 1920;
 const JPEG_QUALITY = 0.7;
+const MOCK_IMAGE_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2pQwAAAABJRU5ErkJggg==';
 
 export function useCamera() {
   const router = useRouter();
 
   const capture = useCallback(async (): Promise<CaptureResult | null> => {
+    if (shouldUseMockMedia()) {
+      const binaryData = b64decode(MOCK_IMAGE_BASE64);
+      return {
+        binaryData,
+        base64Data: MOCK_IMAGE_BASE64,
+        sizeBytes: binaryData.byteLength,
+        width: 1,
+        height: 1,
+        uri: `data:image/png;base64,${MOCK_IMAGE_BASE64}`,
+      };
+    }
+
     // Create a pending promise, navigate to camera screen
     const pendingResult = createPending();
     router.push('/camera');

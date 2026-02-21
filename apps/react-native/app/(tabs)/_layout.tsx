@@ -11,6 +11,7 @@ import { InlineRecorderBar } from '../../components/audio/InlineRecorderBar';
 import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
 import { BinderService } from '../../core/binder/BinderService';
 import { emitDirectoryChanged } from '../../core/binder/DirectoryEvents';
+import { shouldUseMockMedia } from '../../core/platform/mockMedia';
 
 export default function TabLayout() {
   return (
@@ -96,11 +97,13 @@ function TabLayoutInner() {
         });
         break;
       case 'audio': {
-        const { Audio } = await import('expo-av');
-        const { granted } = await Audio.requestPermissionsAsync();
-        if (!granted) {
-          Alert.alert('Microphone Access', 'Microphone permission is required to record audio.');
-          return;
+        if (!shouldUseMockMedia()) {
+          const { Audio } = await import('expo-av');
+          const { granted } = await Audio.requestPermissionsAsync();
+          if (!granted) {
+            Alert.alert('Microphone Access', 'Microphone permission is required to record audio.');
+            return;
+          }
         }
         setActiveAudioContext({
           binderId: binderContext.binderId,

@@ -23,7 +23,11 @@
     "test:integration:watch": "vitest watch",
     "test:integration:verbose": "vitest run --reporter=verbose",
     "test:auth": "vitest run apps/auth-api/__tests__ --reporter=verbose",
-    "test:mgit": "vitest run apps/mgit-api/__tests__ --reporter=verbose"
+    "test:mgit": "vitest run apps/mgit-api/__tests__ --reporter=verbose",
+    "test:prepush": "npm run test:integration && npm --prefix apps/react-native test -- --watchAll=false",
+    "hooks:precommit": "bash scripts/hooks/pre-commit.sh",
+    "hooks:prepush": "bash scripts/hooks/pre-push.sh",
+    "hooks:install": "bash scripts/hooks/install.sh"
   },
   "devDependencies": {
     "@isomorphic-git/lightning-fs": "^4.6.0",
