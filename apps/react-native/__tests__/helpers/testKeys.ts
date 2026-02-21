@@ -2,8 +2,8 @@
 // Deterministic test keys for crypto tests.
 // Uses a fixed seed so tests are reproducible.
 
-import { secp256k1 } from '@noble/curves/secp256k1';
-import { bytesToHex } from '@noble/hashes/utils';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { getConversationKey } from '../../core/crypto/nip44';
 
 // Fixed test private key (32 bytes). DO NOT use in production.

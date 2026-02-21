@@ -2,8 +2,8 @@
 // Nostr kind:22242 challenge/verify flow for JWT acquisition.
 // Core layer: no Expo imports. Privkey and base URL are injected by callers.
 
-import { schnorr } from '@noble/curves/secp256k1';
-import { sha256 } from '@noble/hashes/sha2';
+import { schnorr } from '@noble/curves/secp256k1.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { KeyManager } from './KeyManager';
 import type { NostrMetadata } from '../../types/auth';

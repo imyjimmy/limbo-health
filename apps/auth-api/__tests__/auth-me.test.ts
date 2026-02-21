@@ -6,8 +6,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { execSync } from 'child_process';
-import { authenticate } from '../../../tests/setup/nostrHelpers';
-import { request } from '../../../tests/setup/testClient';
+import { authenticate } from './setup/nostrHelpers';
+import { request } from './setup/testClient';
 
 interface MeResponse {
   status: string;

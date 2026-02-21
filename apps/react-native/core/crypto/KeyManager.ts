@@ -4,7 +4,7 @@
 //
 // Core layer rule: no direct Expo imports. SecureStore is injected.
 
-import { secp256k1, schnorr } from '@noble/curves/secp256k1';
+import { secp256k1, schnorr } from '@noble/curves/secp256k1.js';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 import { getConversationKey } from './nip44';
 

@@ -12,7 +12,7 @@ import React, {
   useMemo,
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { secp256k1 } from '@noble/curves/secp256k1';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { KeyManager } from '../core/crypto/KeyManager';
 import { authenticateNostr, signChallenge } from '../core/crypto/nostrAuth';
 import { API_BASE_URL, ENDPOINTS } from '../constants/api';

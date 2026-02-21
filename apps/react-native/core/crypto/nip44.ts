@@ -3,11 +3,11 @@
 // Uses @noble primitives proven working on Hermes by the spike.
 // Spec: https://github.com/nostr-protocol/nips/blob/master/44.md
 
-import { secp256k1 } from '@noble/curves/secp256k1';
-import { hkdf } from '@noble/hashes/hkdf';
-import { extract as hkdfExtract } from '@noble/hashes/hkdf';
-import { sha256 } from '@noble/hashes/sha2';
-import { hmac } from '@noble/hashes/hmac';
+import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { extract as hkdfExtract } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { hmac } from '@noble/hashes/hmac.js';
 import { chacha20 } from '@noble/ciphers/chacha.js';
 import { concatBytes, hexToBytes } from '@noble/hashes/utils.js';
 import { encode as b64encode, decode as b64decode } from './base64';

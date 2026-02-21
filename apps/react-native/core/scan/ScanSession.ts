@@ -3,7 +3,7 @@
 // The QR payload contains everything the doctor's browser needs:
 // ephemeral private key, session token, staging repo ID, and server endpoint.
 
-import { bytesToHex } from '@noble/hashes/utils';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { API_BASE_URL } from '../../constants/api';
 
 // --- Types ---

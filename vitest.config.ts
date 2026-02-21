@@ -9,7 +9,7 @@ export default defineConfig({
     },
     testTimeout: 30000,
     hookTimeout: 15000,
-    include: ['apps/*-api/__tests__/**/*.test.ts'],
+    include: ['apps/**/__tests__/**/*.test.ts'],
     fileParallelism: false,
   },
 });
