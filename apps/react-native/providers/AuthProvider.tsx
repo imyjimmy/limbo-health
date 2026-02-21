@@ -293,9 +293,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // --- Login with Nostr key: store key + authenticate ---
 
-  const login = useCallback(
+  const completeNostrLogin = useCallback(
     async (privkey: Uint8Array) => {
-      await keyManager.storeMasterPrivkey(privkey);
       setPrivkeyRef(privkey);
       const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
       await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
@@ -305,7 +304,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
       fetchProfile(jwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
     },
-    [keyManager],
+    [],
+  );
+
+  const login = useCallback(
+    async (privkey: Uint8Array) => {
+      await keyManager.storeMasterPrivkey(privkey);
+      await completeNostrLogin(privkey);
+    },
+    [completeNostrLogin, keyManager],
   );
 
   const loginWithStoredNostr = useCallback(async () => {
@@ -313,8 +320,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!privkey) {
       throw new Error('No stored Nostr key found on this device');
     }
-    await login(privkey);
-  }, [keyManager, login]);
+    // Avoid re-writing the same key with requireAuthentication,
+    // which can trigger a second biometric prompt.
+    await completeNostrLogin(privkey);
+  }, [completeNostrLogin, keyManager]);
 
   // --- Login with Google: exchange access token for Limbo JWT ---
 
