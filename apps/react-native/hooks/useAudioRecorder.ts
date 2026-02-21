@@ -18,8 +18,8 @@ export function useAudioRecorder() {
   const resultRef = useRef<AudioRecordingResult | null>(null);
 
   const start = useCallback(async () => {
-    // Permission is requested before navigating to the recording screen
-    // (see _layout.tsx handleCreateAction). Verify it's granted as a safety check.
+    // Permission is often requested before showing recorder UI.
+    // Verify it's granted here as a safety check.
     const permission = await Audio.getPermissionsAsync();
     if (!permission.granted) {
       throw new Error('Microphone permission denied');

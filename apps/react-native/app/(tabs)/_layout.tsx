@@ -1,11 +1,16 @@
-import React from 'react';
-import { Alert } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 import { Tabs, useRouter, usePathname } from 'expo-router';
 import { CustomTabBar } from '../../components/navigation/CustomTabBar';
 import { getLastViewed, setPendingRestore } from '../../core/binder/LastViewedStore';
 import { ToastProvider, useToast } from '../../components/Toast';
 
 import { useAuthContext } from '../../providers/AuthProvider';
+import { useCryptoContext } from '../../providers/CryptoProvider';
+import { InlineRecorderBar } from '../../components/audio/InlineRecorderBar';
+import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
+import { BinderService } from '../../core/binder/BinderService';
+import { emitDirectoryChanged } from '../../core/binder/DirectoryEvents';
 
 export default function TabLayout() {
   return (
@@ -21,7 +26,12 @@ function TabLayoutInner() {
   const router = useRouter();
   const pathname = usePathname();
   const { state } = useAuthContext();
+  const { masterConversationKey } = useCryptoContext();
   const { showToast } = useToast();
+  const [activeAudioContext, setActiveAudioContext] = useState<{
+    binderId: string;
+    dirPath: string;
+  } | null>(null);
 
   const profileImageUrl = state.metadata?.picture ?? state.googleProfile?.picture ?? null;
   const profileName = state.metadata?.name ?? state.googleProfile?.name;
@@ -89,9 +99,9 @@ function TabLayoutInner() {
           Alert.alert('Microphone Access', 'Microphone permission is required to record audio.');
           return;
         }
-        router.push({
-          pathname: `/binder/${binderContext.binderId}/quick-capture`,
-          params: { mode: 'audio', dirPath: binderContext.dirPath },
+        setActiveAudioContext({
+          binderId: binderContext.binderId,
+          dirPath: binderContext.dirPath,
         });
         break;
       }
@@ -104,27 +114,111 @@ function TabLayoutInner() {
     }
   };
 
+  const recordingBinderService = useMemo(() => {
+    if (!activeAudioContext || !masterConversationKey) return null;
+    const jwt = state.status === 'authenticated' ? state.jwt : null;
+    if (!jwt) return null;
+    return new BinderService(
+      {
+        repoId: activeAudioContext.binderId,
+        repoDir: `binders/${activeAudioContext.binderId}`,
+        auth: { type: 'jwt' as const, token: jwt },
+        author: {
+          name: state.metadata?.name || state.googleProfile?.name || 'Limbo Health',
+          email: state.googleProfile?.email || 'app@limbo.health',
+        },
+      },
+      masterConversationKey,
+    );
+  }, [
+    activeAudioContext,
+    masterConversationKey,
+    state.status,
+    state.jwt,
+    state.metadata?.name,
+    state.googleProfile?.name,
+    state.googleProfile?.email,
+  ]);
+
+  const handleInlineAudioComplete = async (result: AudioRecordingResult) => {
+    if (!activeAudioContext || !recordingBinderService) {
+      showToast('Unable to save recording');
+      setActiveAudioContext(null);
+      return;
+    }
+
+    try {
+      const targetDir = activeAudioContext.dirPath
+        ? activeAudioContext.dirPath
+        : await recordingBinderService.ensureFolder('recordings', 'Recordings', '🎙️');
+
+      await recordingBinderService.addAudio(
+        targetDir,
+        result.binaryData,
+        result.sizeBytes,
+        result.durationMs,
+      );
+      emitDirectoryChanged({
+        binderId: activeAudioContext.binderId,
+        dirPath: targetDir,
+      });
+      showToast('Recording saved');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      Alert.alert('Recording Failed', msg);
+    } finally {
+      setActiveAudioContext(null);
+    }
+  };
+
+  const handleInlineAudioCancel = async () => {
+    setActiveAudioContext(null);
+  };
+
   return (
-    <Tabs
-      tabBar={(props) => (
-        <CustomTabBar
-          {...props}
-          profileImageUrl={profileImageUrl}
-          profileInitials={profileInitials}
-          hasNotification={false}
-          onCreateAction={handleCreateAction}
-          onDocumentPress={handleDocumentPress}
-        />
+    <View style={styles.screen}>
+      <Tabs
+        tabBar={(props) => (
+          <CustomTabBar
+            {...props}
+            profileImageUrl={profileImageUrl}
+            profileInitials={profileInitials}
+            hasNotification={false}
+            onCreateAction={handleCreateAction}
+            onDocumentPress={handleDocumentPress}
+          />
+        )}
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Tabs.Screen name="(home)" options={{ title: 'Home' }} />
+        <Tabs.Screen name="page" options={{ title: 'Page' }} />
+        <Tabs.Screen name="create" options={{ title: 'Create' }} />
+        <Tabs.Screen name="search" options={{ title: 'Search' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      </Tabs>
+
+      {activeAudioContext && (
+        <View style={styles.inlineRecorderWrap}>
+          <InlineRecorderBar
+            onComplete={handleInlineAudioComplete}
+            onCancel={handleInlineAudioCancel}
+          />
+        </View>
       )}
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen name="(home)" options={{ title: 'Home' }} />
-      <Tabs.Screen name="page" options={{ title: 'Page' }} />
-      <Tabs.Screen name="create" options={{ title: 'Create' }} />
-      <Tabs.Screen name="search" options={{ title: 'Search' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
-    </Tabs>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  inlineRecorderWrap: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 74,
+  },
+});

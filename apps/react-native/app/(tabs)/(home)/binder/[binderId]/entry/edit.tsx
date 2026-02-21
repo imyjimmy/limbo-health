@@ -80,11 +80,12 @@ export default function EditEntryScreen() {
         return;
       }
 
-      // TODO: sidecar writing for new attachments added during edit.
-      // Same as new.tsx -- not yet wired.
-
       try {
-        await binderService.updateEntry(entryPath, updatedDoc);
+        if (sidecars.length > 0) {
+          await binderService.updateEntryWithSidecars(entryPath, updatedDoc, sidecars);
+        } else {
+          await binderService.updateEntry(entryPath, updatedDoc);
+        }
         console.log('Entry updated at:', entryPath);
       } catch (err: any) {
         const message = err?.message ?? '';

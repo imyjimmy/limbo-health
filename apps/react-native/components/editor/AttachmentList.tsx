@@ -55,9 +55,19 @@ interface AttachmentListProps {
   onRemoveExisting?: (index: number) => void;
   /** Capture a photo via camera — provided by parent (hook-based) */
   onCapturePhoto?: () => Promise<PendingSidecar | null>;
+  /** Start inline audio recording flow */
+  onRecordAudio?: () => void;
 }
 
-export function AttachmentList({ attachments, existingAttachments = [], onAdd, onRemove, onRemoveExisting, onCapturePhoto }: AttachmentListProps) {
+export function AttachmentList({
+  attachments,
+  existingAttachments = [],
+  onAdd,
+  onRemove,
+  onRemoveExisting,
+  onCapturePhoto,
+  onRecordAudio,
+}: AttachmentListProps) {
   const handleAddPhoto = async () => {
     if (!onCapturePhoto) return;
     const result = await onCapturePhoto();
@@ -70,8 +80,11 @@ export function AttachmentList({ attachments, existingAttachments = [], onAdd, o
   };
 
   const handleAddAudio = async () => {
-    // TODO: invoke expo-av recording → compress → base64 → create PendingSidecar
-    Alert.alert('Record Audio', 'Audio recorder will be wired here');
+    if (!onRecordAudio) {
+      Alert.alert('Record Audio', 'Audio recorder is unavailable here.');
+      return;
+    }
+    onRecordAudio();
   };
 
   const confirmRemove = (id: string, filename: string) => {

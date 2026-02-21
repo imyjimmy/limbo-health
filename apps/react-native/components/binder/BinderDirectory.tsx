@@ -4,7 +4,7 @@
 // Data drives rendering: items come from useDirectoryContents,
 // folder icons come from .meta.json on each item.
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useRouter, Stack, useFocusEffect } from 'expo-router';
 import { IconShare3 } from '@tabler/icons-react-native';
@@ -21,6 +21,7 @@ import { useCryptoContext } from '../../providers/CryptoProvider';
 import { BinderService } from '../../core/binder/BinderService';
 import { slugify } from '../../core/binder/FileNaming';
 import type { DirFolder, DirEntry, DirItem } from '../../core/binder/DirectoryReader';
+import { subscribeDirectoryChanged } from '../../core/binder/DirectoryEvents';
 
 interface BinderDirectoryProps {
   binderId: string;
@@ -56,6 +57,19 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
     dirPath,
   );
 
+  useEffect(() => {
+    const unsubscribe = subscribeDirectoryChanged((event) => {
+      if (event.binderId !== binderId) return;
+      const current = dirPath.replace(/^\/+|\/+$/g, '');
+      const changed = event.dirPath.replace(/^\/+|\/+$/g, '');
+      const changedParent = changed.includes('/') ? changed.slice(0, changed.lastIndexOf('/')) : '';
+      if (changed === current || changedParent === current) {
+        refresh();
+      }
+    });
+    return unsubscribe;
+  }, [binderId, dirPath, refresh]);
+
   // --- Track last viewed for Document tab (only when focused) ---
   useFocusEffect(
     useCallback(() => {
@@ -88,10 +102,14 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
 
   // --- Folder icons: from item metadata only ---
   const getFolderIcon = useCallback(
-    (folder: DirFolder) => ({
-      emoji: folder.meta?.icon ?? '📁',
-      color: folder.meta?.color,
-    }),
+    (folder: DirFolder) => {
+      const raw = folder.meta?.icon;
+      const emoji = raw === 'mic' ? '🎙️' : (raw ?? '📁');
+      return {
+        emoji,
+        color: folder.meta?.color,
+      };
+    },
     [],
   );
 
