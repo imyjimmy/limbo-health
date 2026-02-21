@@ -47,9 +47,10 @@ function GitHubLogo({ size = 20 }: { size?: number }) {
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const { loginWithGoogle } = useAuthContext();
+  const { loginWithGoogle, loginWithStoredNostr, hasStoredNostrKey } = useAuthContext();
   const { request, response, promptAsync } = useGoogleAuth();
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [nostrLoading, setNostrLoading] = useState(false);
 
   useEffect(() => {
     if (response?.type === 'success' && response.authentication?.accessToken) {
@@ -61,7 +62,20 @@ export default function WelcomeScreen() {
         })
         .finally(() => setGoogleLoading(false));
     }
-  }, [response]);
+  }, [response, loginWithGoogle, router]);
+
+  const handleNostrLogin = async () => {
+    setNostrLoading(true);
+    try {
+      await loginWithStoredNostr();
+      router.replace('/(tabs)');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to sign in with your stored key.';
+      Alert.alert('Nostr Login Failed', message);
+    } finally {
+      setNostrLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -110,9 +124,23 @@ export default function WelcomeScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Pressable style={styles.nostrPill} onPress={() => router.push('/(auth)/import-key')}>
-          <Text style={styles.nostrPillText}>I have a Nostr key &gt;&gt;</Text>
-        </Pressable>
+        {hasStoredNostrKey ? (
+          <Pressable
+            style={[styles.nostrPill, nostrLoading && styles.buttonDisabled]}
+            onPress={handleNostrLogin}
+            disabled={nostrLoading}
+          >
+            {nostrLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.nostrPillText}>Continue with Nostr</Text>
+            )}
+          </Pressable>
+        ) : (
+          <Pressable style={styles.nostrPill} onPress={() => router.push('/(auth)/import-key')}>
+            <Text style={styles.nostrPillText}>I have a Nostr key &gt;&gt;</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );

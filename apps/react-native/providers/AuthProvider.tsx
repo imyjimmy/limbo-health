@@ -31,8 +31,12 @@ interface AuthContextValue {
   state: AuthState;
   /** Master privkey held in memory after biometric unlock. Never persisted in plaintext. */
   privkey: Uint8Array | null;
+  /** True if a Nostr key already exists in local secure storage. */
+  hasStoredNostrKey: boolean;
   login: (privkey: Uint8Array) => Promise<void>;
   loginWithGoogle: (accessToken: string) => Promise<void>;
+  /** Authenticate using an already stored Nostr key (biometric-gated read). */
+  loginWithStoredNostr: () => Promise<void>;
   /** Store a Nostr key for an already-authenticated Google user (for encryption). */
   storeNostrKey: (privkey: Uint8Array) => Promise<void>;
   logout: () => Promise<void>;
@@ -55,17 +59,80 @@ function emptyState(status: AuthStatus): AuthState {
   return { status, jwt: null, pubkey: null, metadata: null, loginMethod: null, googleProfile: null, connections: [] };
 }
 
-/** Best-effort fetch of OAuth connections from /api/auth/me. Returns [] on failure. */
-async function fetchProfile(jwt: string): Promise<OAuthConnection[]> {
+interface ProfileSnapshot {
+  connections: OAuthConnection[];
+  nostrPubkey: string | null;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+function asNonEmptyString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function splitDisplayName(name?: string): { firstName: string | null; lastName: string | null } {
+  const cleaned = asNonEmptyString(name);
+  if (!cleaned) return { firstName: null, lastName: null };
+
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return { firstName: parts[0], lastName: null };
+
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  };
+}
+
+function buildMetadataWithNames(
+  existing: NostrMetadata | null,
+  firstName: string | null,
+  lastName: string | null,
+): NostrMetadata | null {
+  if (!firstName && !lastName) return existing;
+
+  const metadata: NostrMetadata = { ...(existing ?? {}) };
+  if (firstName) metadata.first_name = firstName;
+  if (lastName) metadata.last_name = lastName;
+
+  if (!metadata.display_name && !metadata.name) {
+    const fullName = [metadata.first_name, metadata.last_name].filter(Boolean).join(' ').trim();
+    if (fullName) metadata.name = fullName;
+  }
+
+  return metadata;
+}
+
+function applyProfileSnapshot(prev: AuthState, profile: ProfileSnapshot): AuthState {
+  const metadata = buildMetadataWithNames(prev.metadata, profile.firstName, profile.lastName);
+
+  return {
+    ...prev,
+    connections: profile.connections,
+    pubkey: profile.nostrPubkey || prev.pubkey,
+    metadata,
+  };
+}
+
+/** Best-effort fetch of profile data from /api/auth/me. Returns empty payload on failure. */
+async function fetchProfile(jwt: string): Promise<ProfileSnapshot> {
   try {
     const resp = await fetch(ENDPOINTS.me, {
       headers: { Authorization: `Bearer ${jwt}` },
     });
-    if (!resp.ok) return [];
+    if (!resp.ok) return { connections: [], nostrPubkey: null, firstName: null, lastName: null };
     const data = await resp.json();
-    return data.connections ?? [];
+    const firstName = asNonEmptyString(data?.user?.firstName);
+    const lastName = asNonEmptyString(data?.user?.lastName);
+    return {
+      connections: Array.isArray(data.connections) ? data.connections : [],
+      nostrPubkey: typeof data?.user?.nostrPubkey === 'string' ? data.user.nostrPubkey : null,
+      firstName,
+      lastName,
+    };
   } catch {
-    return [];
+    return { connections: [], nostrPubkey: null, firstName: null, lastName: null };
   }
 }
 
@@ -74,6 +141,7 @@ async function fetchProfile(jwt: string): Promise<OAuthConnection[]> {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(emptyState('loading'));
   const [privkeyRef, setPrivkeyRef] = useState<Uint8Array | null>(null);
+  const [hasStoredNostrKey, setHasStoredNostrKey] = useState(false);
 
   const keyManager = useMemo(
     () => new KeyManager(SecureStore),
@@ -92,10 +160,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const storedJwt = await SecureStore.getItemAsync(JWT_STORAGE_KEY);
           const cachedProfile = await SecureStore.getItemAsync(GOOGLE_PROFILE_KEY);
           const googleProfile: GoogleProfile | null = cachedProfile ? JSON.parse(cachedProfile) : null;
+          const hasNostrKey = await keyManager.hasStoredKey();
+          setHasStoredNostrKey(hasNostrKey);
 
           if (storedJwt && !isJwtExpired(storedJwt)) {
             // Check if user also has a Nostr key stored (added after Google login)
-            const hasNostrKey = await keyManager.hasStoredKey();
             let pubkey: string | null = null;
             if (hasNostrKey) {
               const privkey = await keyManager.getMasterPrivkey();
@@ -116,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               googleProfile,
               connections: [],
             });
-            fetchProfile(storedJwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
+            fetchProfile(storedJwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
           } else {
             // JWT expired — need to re-login with Google (no refresh token in v1)
             setState({ ...emptyState('expired'), loginMethod: 'google', googleProfile });
@@ -131,6 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const hasKey = await keyManager.hasStoredKey();
+        setHasStoredNostrKey(hasKey);
         if (!hasKey) {
           setState(emptyState('onboarding'));
           return;
@@ -151,7 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const cachedMeta = await SecureStore.getItemAsync('limbo_metadata');
           const metadata = cachedMeta ? JSON.parse(cachedMeta) : null;
           setState({ status: 'authenticated', jwt: storedJwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
-          fetchProfile(storedJwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
+          fetchProfile(storedJwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
           return;
         }
 
@@ -160,11 +230,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await SecureStore.setItemAsync(JWT_STORAGE_KEY, auth.jwt);
         if (auth.metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(auth.metadata));
         setState({ status: 'authenticated', jwt: auth.jwt, pubkey: auth.pubkey, metadata: auth.metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
-        fetchProfile(auth.jwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
+        fetchProfile(auth.jwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
       } catch (err) {
         console.error('Auth startup failed:', err);
         const hasKey = await keyManager.hasStoredKey().catch(() => false);
         const loginMethod = await SecureStore.getItemAsync(LOGIN_METHOD_KEY) as LoginMethod | null;
+        setHasStoredNostrKey(hasKey);
         setState({
           status: hasKey ? 'expired' : 'onboarding',
           jwt: null,
@@ -230,11 +301,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
       await SecureStore.setItemAsync(LOGIN_METHOD_KEY, 'nostr');
       if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
+      setHasStoredNostrKey(true);
       setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
-      fetchProfile(jwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
+      fetchProfile(jwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
     },
     [keyManager],
   );
+
+  const loginWithStoredNostr = useCallback(async () => {
+    const privkey = await keyManager.getMasterPrivkey();
+    if (!privkey) {
+      throw new Error('No stored Nostr key found on this device');
+    }
+    await login(privkey);
+  }, [keyManager, login]);
 
   // --- Login with Google: exchange access token for Limbo JWT ---
 
@@ -254,10 +334,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         picture: data.user.picture,
         googleId: data.user.googleId,
       };
+      const { firstName, lastName } = splitDisplayName(googleProfile.name);
+      const seededMetadata = buildMetadataWithNames(null, firstName, lastName);
 
       await SecureStore.setItemAsync(JWT_STORAGE_KEY, data.token);
       await SecureStore.setItemAsync(LOGIN_METHOD_KEY, 'google');
       await SecureStore.setItemAsync(GOOGLE_PROFILE_KEY, JSON.stringify(googleProfile));
+      if (seededMetadata) {
+        await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(seededMetadata));
+      }
 
       // Auto-generate a Nostr keypair only on truly first Google login
       // (no key on backend AND no local key). If backend already has a pubkey
@@ -291,12 +376,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         status: 'authenticated',
         jwt: data.token,
         pubkey,
-        metadata: null,
+        metadata: seededMetadata,
         loginMethod: 'google',
         googleProfile,
         connections: [],
       });
-      fetchProfile(data.token).then(conns => setState(prev => ({ ...prev, connections: conns })));
+      fetchProfile(data.token).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
     },
     [keyManager],
   );
@@ -331,6 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Store key locally regardless
       await keyManager.storeMasterPrivkey(privkey);
       setPrivkeyRef(privkey);
+      setHasStoredNostrKey(true);
 
       setState(prev => ({
         ...prev,
@@ -389,6 +475,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await SecureStore.deleteItemAsync('limbo_metadata');
     await SecureStore.deleteItemAsync(LOGIN_METHOD_KEY);
     await SecureStore.deleteItemAsync(GOOGLE_PROFILE_KEY);
+    setHasStoredNostrKey(false);
 
     setPrivkeyRef(null);
     setState(emptyState('onboarding'));
@@ -417,14 +504,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
     if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
     setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
-    fetchProfile(jwt).then(conns => setState(prev => ({ ...prev, connections: conns })));
+    fetchProfile(jwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
   }, [keyManager, privkeyRef, state.loginMethod]);
 
   // --- Render ---
 
   const value = useMemo(
-    () => ({ state, privkey: privkeyRef, login, loginWithGoogle, storeNostrKey, logout, refreshAuth, updateMetadata, deleteAccount }),
-    [state, privkeyRef, login, loginWithGoogle, storeNostrKey, logout, refreshAuth, updateMetadata, deleteAccount],
+    () => ({
+      state,
+      privkey: privkeyRef,
+      hasStoredNostrKey,
+      login,
+      loginWithGoogle,
+      loginWithStoredNostr,
+      storeNostrKey,
+      logout,
+      refreshAuth,
+      updateMetadata,
+      deleteAccount,
+    }),
+    [state, privkeyRef, hasStoredNostrKey, login, loginWithGoogle, loginWithStoredNostr, storeNostrKey, logout, refreshAuth, updateMetadata, deleteAccount],
   );
 
   return (

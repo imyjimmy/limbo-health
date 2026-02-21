@@ -30,6 +30,47 @@ app.use(express.json());
 const nostrAuth = new NostrAuthService();
 const googleAuth = new GoogleAuthService();
 
+function asCleanString(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
+
+function splitHumanName(fullName) {
+  const cleaned = asCleanString(fullName);
+  if (!cleaned) return { firstName: null, lastName: null };
+
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) {
+    return { firstName: parts[0], lastName: null };
+  }
+
+  return {
+    firstName: parts[0],
+    lastName: parts.slice(1).join(' '),
+  };
+}
+
+async function backfillUserNameFromGoogle(userId, userInfo) {
+  const { firstName, lastName } = splitHumanName(userInfo?.name);
+  const email = asCleanString(userInfo?.email);
+
+  await db.query(
+    `UPDATE users
+     SET email = COALESCE(NULLIF(?, ''), email),
+         first_name = CASE
+           WHEN (first_name IS NULL OR first_name = '') AND ? IS NOT NULL THEN ?
+           ELSE first_name
+         END,
+         last_name = CASE
+           WHEN (last_name IS NULL OR last_name = '') AND ? IS NOT NULL THEN ?
+           ELSE last_name
+         END
+     WHERE id = ?`,
+    [email, firstName, firstName, lastName, lastName, userId]
+  );
+}
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'auth-api' });
@@ -127,6 +168,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
   try {
     const tokens = await googleAuth.getTokensFromCode(code, redirectUri);
     const userInfo = await googleAuth.getUserInfo(tokens.accessToken);
+    const { firstName, lastName } = splitHumanName(userInfo.name);
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
@@ -144,8 +186,8 @@ app.post('/api/auth/google/callback', async (req, res) => {
       // New Google user — create user + oauth_connection
       const roleId = 2; // default to provider
       const [insertResult] = await db.query(
-        'INSERT INTO users (email, id_roles, create_datetime) VALUES (?, ?, NOW())',
-        [userInfo.email, roleId]
+        'INSERT INTO users (email, first_name, last_name, id_roles, create_datetime) VALUES (?, ?, ?, ?, NOW())',
+        [userInfo.email, firstName, lastName, roleId]
       );
       userId = insertResult.insertId;
       userRole = roleId;
@@ -165,6 +207,8 @@ app.post('/api/auth/google/callback', async (req, res) => {
          WHERE provider = 'google' AND provider_user_id = ?`,
         [tokens.accessToken, userInfo.googleId]
       );
+
+      await backfillUserNameFromGoogle(userId, userInfo);
     }
 
     // Generate JWT with DB userId (integer), not googleId
@@ -207,6 +251,7 @@ app.post('/api/auth/google/token', async (req, res) => {
 
   try {
     const userInfo = await googleAuth.getUserInfo(accessToken);
+    const { firstName, lastName } = splitHumanName(userInfo.name);
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
@@ -226,8 +271,8 @@ app.post('/api/auth/google/token', async (req, res) => {
     if (connections.length === 0) {
       // New Google user — create user + oauth_connection
       const [insertResult] = await db.query(
-        'INSERT INTO users (email, id_roles, create_datetime) VALUES (?, ?, NOW())',
-        [userInfo.email, roleId]
+        'INSERT INTO users (email, first_name, last_name, id_roles, create_datetime) VALUES (?, ?, ?, ?, NOW())',
+        [userInfo.email, firstName, lastName, roleId]
       );
       userId = insertResult.insertId;
       userRole = roleId;
@@ -248,6 +293,8 @@ app.post('/api/auth/google/token', async (req, res) => {
          WHERE provider = 'google' AND provider_user_id = ?`,
         [accessToken, userInfo.googleId]
       );
+
+      await backfillUserNameFromGoogle(userId, userInfo);
     }
 
     const token = jwt.sign({
