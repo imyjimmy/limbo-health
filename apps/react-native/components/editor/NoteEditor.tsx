@@ -29,6 +29,9 @@ import {
 } from './AttachmentList';
 import type { MedicalDocument } from '../../types/document';
 import { useCamera } from '../../hooks/useCamera';
+import { InlineRecorderBar } from '../audio/InlineRecorderBar';
+import { encode as b64encode } from '../../core/crypto/base64';
+import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
 
 interface NoteEditorProps {
   /** Directory path where the note will be saved, e.g. "visits/" or "conditions/back-acne/" */
@@ -67,6 +70,7 @@ export function NoteEditor({
     ),
   );
   const [saving, setSaving] = useState(false);
+  const [recordingAudio, setRecordingAudio] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   // When editing, hide the editor until existing content is loaded to avoid "Write something..." flash
   const isEditing = !!initialDoc?.value;
@@ -136,6 +140,28 @@ export function NoteEditor({
 
   const handleAddAttachment = useCallback((attachment: PendingSidecar) => {
     setAttachments((prev) => [...prev, attachment]);
+  }, []);
+
+  const handleRecordAudio = useCallback(() => {
+    setRecordingAudio(true);
+  }, []);
+
+  const handleAudioComplete = useCallback(async (result: AudioRecordingResult) => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const id = `audio-${Date.now()}`;
+    const pending: PendingSidecar = {
+      id,
+      base64Data: b64encode(result.binaryData),
+      sizeBytes: result.sizeBytes,
+      format: 'm4a',
+      sidecarFilename: `${stamp}-recording.m4a.enc`,
+    };
+    setAttachments((prev) => [...prev, pending]);
+    setRecordingAudio(false);
+  }, []);
+
+  const handleAudioCancel = useCallback(async () => {
+    setRecordingAudio(false);
   }, []);
 
   const handleRemoveAttachment = useCallback((id: string) => {
@@ -250,6 +276,7 @@ export function NoteEditor({
           onRemove={handleRemoveAttachment}
           onRemoveExisting={handleRemoveExisting}
           onCapturePhoto={handleCapturePhoto}
+          onRecordAudio={handleRecordAudio}
         />
       )}
 
@@ -265,7 +292,16 @@ export function NoteEditor({
             onAdd={handleAddAttachment}
             onRemove={handleRemoveAttachment}
             onCapturePhoto={handleCapturePhoto}
+            onRecordAudio={handleRecordAudio}
           />
+        )}
+        {recordingAudio && (
+          <View style={styles.recorderRow}>
+            <InlineRecorderBar
+              onComplete={handleAudioComplete}
+              onCancel={handleAudioCancel}
+            />
+          </View>
         )}
         <Toolbar editor={editor} />
       </KeyboardAvoidingView>
@@ -326,5 +362,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: '100%',
     bottom: 0,
+  },
+  recorderRow: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    backgroundColor: '#fff',
   },
 });

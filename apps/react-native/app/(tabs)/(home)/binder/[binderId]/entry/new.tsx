@@ -59,17 +59,14 @@ export default function NewEntryScreen() {
       // Strip trailing slash if present: "conditions/" -> "conditions"
       const category = (dirPath ?? '').replace(/\/+$/, '');
 
-      // TODO: sidecar writing -- when attachment pickers are wired,
-      // each PendingSidecar needs to be written via EncryptedIO.writeSidecar
-      // before the main document is committed. For now, sidecars array
-      // will be empty since pickers are not yet implemented.
-
       // Save the document: encrypt -> write -> git add -> commit -> push
       // addEntry handles the full chain. If push fails (network), the entry
       // is still committed locally. We catch push errors separately so the
       // user is not stuck on the editor with already-saved data.
       try {
-        const savedPath = await binderService.addEntry(category, slug, doc);
+        const savedPath = sidecars.length > 0
+          ? await binderService.addEntryWithSidecars(category, slug, doc, sidecars)
+          : await binderService.addEntry(category, slug, doc);
         console.log('Entry saved at:', savedPath);
       } catch (err: any) {
         // If the error is from push (entry is committed locally), warn but

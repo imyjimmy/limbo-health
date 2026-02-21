@@ -22,7 +22,10 @@ export async function generateDocPath(
   date?: Date,
 ): Promise<string> {
   const prefix = datePrefix(date);
-  const base = `${category}/${prefix}-${slug}`;
+  const normalizedCategory = category.replace(/^\/+|\/+$/g, '');
+  const base = normalizedCategory
+    ? `${normalizedCategory}/${prefix}-${slug}`
+    : `${prefix}-${slug}`;
   const fullBase = `${BINDERS_ROOT}/${repoDir}/${base}`;
 
   // Check for collisions

@@ -21,6 +21,7 @@ import type { EntryMetadata } from './DocumentModel';
 import type { AuthConfig } from '../git/httpTransport';
 import { dirGet, dirSet, dirEvict, dirEvictPrefix, ptEvict, ptEvictPrefix } from './BinderCache';
 import type { DirItem } from './DirectoryReader';
+import { decode as b64decode } from '../crypto/base64';
 
 // --- Types ---
 
@@ -29,6 +30,11 @@ export interface BinderInfo {
   repoDir: string;
   auth: AuthConfig;
   author?: GitAuthor;
+}
+
+export interface PendingSidecarWrite {
+  sidecarFilename: string;
+  base64Data: string;
 }
 
 // --- BinderService ---
@@ -200,6 +206,58 @@ export class BinderService {
     return docPath;
   }
 
+  private async resolveUniqueSidecarPath(dirPath: string, sidecarFilename: string): Promise<string> {
+    const fs = createFSAdapter(this.info.repoDir);
+    const slash = sidecarFilename.lastIndexOf('/');
+    const normalizedName = slash >= 0 ? sidecarFilename.slice(slash + 1) : sidecarFilename;
+    const dot = normalizedName.indexOf('.');
+    const stem = dot >= 0 ? normalizedName.slice(0, dot) : normalizedName;
+    const ext = dot >= 0 ? normalizedName.slice(dot) : '';
+
+    const baseDir = dirPath.replace(/^\/+|\/+$/g, '');
+    let candidate = baseDir ? `${baseDir}/${normalizedName}` : normalizedName;
+    let counter = 2;
+    while (true) {
+      try {
+        await fs.promises.stat('/' + candidate);
+        candidate = baseDir ? `${baseDir}/${stem}-${counter}${ext}` : `${stem}-${counter}${ext}`;
+        counter += 1;
+      } catch {
+        return candidate;
+      }
+    }
+  }
+
+  async addEntryWithSidecars(
+    category: string,
+    slug: string,
+    doc: MedicalDocument,
+    sidecars: PendingSidecarWrite[],
+  ): Promise<string> {
+    const docPath = await generateDocPath(this.info.repoDir, category, slug);
+    const slash = docPath.lastIndexOf('/');
+    const dirPath = slash >= 0 ? docPath.slice(0, slash) : category;
+    const filesToCommit = [docPath];
+
+    for (const sidecar of sidecars) {
+      const sidecarPath = await this.resolveUniqueSidecarPath(dirPath, sidecar.sidecarFilename);
+      const binaryData = b64decode(sidecar.base64Data);
+      await this.io.writeSidecar('/' + sidecarPath, binaryData);
+      filesToCommit.push(sidecarPath);
+    }
+
+    await this.io.writeDocument('/' + docPath, doc);
+    await GitEngine.commitEntry(
+      this.info.repoDir,
+      filesToCommit,
+      `Add ${category} entry`,
+      this.info.author,
+    );
+    dirEvict(this.dirCacheKey(category));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    return docPath;
+  }
+
   /**
    * Add a photo with sidecar. Generates both .json and .enc paths, encrypts both, commits, pushes.
    */
@@ -222,10 +280,10 @@ export class BinderService {
     await GitEngine.commitEntry(
       this.info.repoDir,
       [docPath, encPath],
-      `Add ${conditionSlug} photo`,
+      `Add photo`,
       this.info.author,
     );
-    dirEvict(this.dirCacheKey(folder));
+    dirEvict(this.dirCacheKey(dirPath));
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
 
     return docPath;
@@ -390,6 +448,33 @@ export class BinderService {
     await GitEngine.commitEntry(
       this.info.repoDir,
       [entryPath],
+      `Update ${doc.metadata.type} entry`,
+      this.info.author,
+    );
+    dirEvict(this.parentDirCacheKey(entryPath));
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+  }
+
+  async updateEntryWithSidecars(
+    entryPath: string,
+    doc: MedicalDocument,
+    sidecars: PendingSidecarWrite[],
+  ): Promise<void> {
+    const lastSlash = entryPath.lastIndexOf('/');
+    const dirPath = lastSlash > 0 ? entryPath.slice(0, lastSlash) : '';
+    const filesToCommit = [entryPath];
+
+    for (const sidecar of sidecars) {
+      const sidecarPath = await this.resolveUniqueSidecarPath(dirPath, sidecar.sidecarFilename);
+      const binaryData = b64decode(sidecar.base64Data);
+      await this.io.writeSidecar('/' + sidecarPath, binaryData);
+      filesToCommit.push(sidecarPath);
+    }
+
+    await this.io.writeDocument('/' + entryPath, doc);
+    await GitEngine.commitEntry(
+      this.info.repoDir,
+      filesToCommit,
       `Update ${doc.metadata.type} entry`,
       this.info.author,
     );

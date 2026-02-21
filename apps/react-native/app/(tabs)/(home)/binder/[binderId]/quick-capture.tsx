@@ -73,7 +73,7 @@ export default function QuickCaptureScreen() {
     try {
       const targetDir = dirPath
         ? dirPath
-        : await binderService.ensureFolder('recordings', 'Recordings', 'mic');
+        : await binderService.ensureFolder('recordings', 'Recordings', '🎙️');
 
       await binderService.addAudio(
         targetDir,
