@@ -131,7 +131,7 @@ export default function WelcomeScreen() {
             disabled={nostrLoading}
           >
             {nostrLoading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color="#8e45e6" />
             ) : (
               <Text style={styles.nostrPillText}>Continue with Nostr</Text>
             )}
@@ -202,13 +202,15 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   nostrPill: {
-    backgroundColor: '#8e45e6',
+    backgroundColor: '#fff',
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: '#8e45e6',
   },
   nostrPillText: {
-    color: '#fff',
+    color: '#8e45e6',
     fontSize: 15,
     fontWeight: '600',
   },
