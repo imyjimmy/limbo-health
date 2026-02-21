@@ -57,7 +57,7 @@ function TabLayoutInner() {
   const handleDocumentPress = () => {
     const last = getLastViewed();
     if (!last) {
-      router.navigate('/(tabs)/(home)');
+      showToast('Open a binder');
       return;
     }
     const { binderId, dirPath } = last;
@@ -66,7 +66,10 @@ function TabLayoutInner() {
     const targetPath = dirPath
       ? `/binder/${binderId}/browse/${dirPath}`
       : `/binder/${binderId}`;
-    if (pathname === targetPath) return;
+    if (pathname === targetPath) {
+      showToast('Already on current view');
+      return;
+    }
 
     if (dirPath) {
       setPendingRestore(dirPath);
@@ -175,6 +178,10 @@ function TabLayoutInner() {
     setActiveAudioContext(null);
   };
 
+  const handleSearchPress = () => {
+    showToast('Search coming soon');
+  };
+
   return (
     <View style={styles.screen}>
       <Tabs
@@ -186,6 +193,7 @@ function TabLayoutInner() {
             hasNotification={false}
             onCreateAction={handleCreateAction}
             onDocumentPress={handleDocumentPress}
+            onSearchPress={handleSearchPress}
           />
         )}
         screenOptions={{

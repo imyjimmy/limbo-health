@@ -38,6 +38,7 @@ interface CustomTabBarProps extends BottomTabBarProps {
   hasNotification?: boolean;
   onCreateAction?: (action: 'note' | 'audio' | 'photo') => void;
   onDocumentPress?: () => void;
+  onSearchPress?: () => void;
 }
 
 export function CustomTabBar({
@@ -48,6 +49,7 @@ export function CustomTabBar({
   hasNotification = false,
   onCreateAction,
   onDocumentPress,
+  onSearchPress,
 }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -82,6 +84,11 @@ export function CustomTabBar({
               // Document tab jumps to last viewed directory
               if (route.name === 'page') {
                 onDocumentPress?.();
+                return;
+              }
+
+              if (route.name === 'search') {
+                onSearchPress?.();
                 return;
               }
 
