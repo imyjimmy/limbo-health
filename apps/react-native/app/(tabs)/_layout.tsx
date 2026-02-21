@@ -55,6 +55,26 @@ function TabLayoutInner() {
     return null;
   })();
 
+  const contextualCreateAction = useMemo(() => {
+    if (!binderContext) return null;
+    const normalized = binderContext.dirPath
+      .replace(/^\/+|\/+$/g, '')
+      .toLowerCase();
+    const isMedicationFolder =
+      normalized === 'medications' ||
+      normalized.startsWith('medications/') ||
+      normalized.endsWith('/medications');
+
+    if (isMedicationFolder) {
+      return {
+        action: 'medication' as const,
+        label: 'Add Medication',
+      };
+    }
+
+    return null;
+  }, [binderContext?.dirPath]);
+
   const handleDocumentPress = () => {
     const last = getLastViewed();
     if (!last) {
@@ -83,7 +103,7 @@ function TabLayoutInner() {
     }, 0);
   };
 
-  const handleCreateAction = async (action: 'note' | 'audio' | 'photo') => {
+  const handleCreateAction = async (action: 'note' | 'audio' | 'photo' | 'medication') => {
     if (!binderContext) {
       showToast('Open a binder first');
       return;
@@ -115,6 +135,12 @@ function TabLayoutInner() {
         router.push({
           pathname: `/binder/${binderContext.binderId}/quick-capture`,
           params: { mode: 'photo', dirPath: binderContext.dirPath },
+        });
+        break;
+      case 'medication':
+        router.push({
+          pathname: `/binder/${binderContext.binderId}/entry/new`,
+          params: { dirPath: binderContext.dirPath, categoryType: 'medication' },
         });
         break;
     }
@@ -195,6 +221,7 @@ function TabLayoutInner() {
             profileInitials={profileInitials}
             hasNotification={false}
             onCreateAction={handleCreateAction}
+            contextualCreateAction={contextualCreateAction}
             onDocumentPress={handleDocumentPress}
             onSearchPress={handleSearchPress}
           />

@@ -8,6 +8,7 @@ import React, { useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { NoteEditor } from '../../../../../../components/editor/NoteEditor';
+import { MedicationEntryForm } from '../../../../../../components/editor/MedicationEntryForm';
 import { BinderService } from '../../../../../../core/binder/BinderService';
 import { slugify } from '../../../../../../core/binder/FileNaming';
 import { useAuthContext } from '../../../../../../providers/AuthProvider';
@@ -91,15 +92,62 @@ export default function NewEntryScreen() {
     router.back();
   }, [router]);
 
+  const isMedicationFolder = useMemo(() => {
+    const normalized = (dirPath ?? '')
+      .replace(/^\/+|\/+$/g, '')
+      .toLowerCase();
+    return (
+      normalized === 'medications' ||
+      normalized.startsWith('medications/') ||
+      normalized.endsWith('/medications')
+    );
+  }, [dirPath]);
+
+  const useMedicationComposer = useMemo(() => {
+    const normalizedCategoryType = (categoryType ?? '').toLowerCase();
+    if (normalizedCategoryType === 'medication') return true;
+    // Backward-compatible fallback: if no explicit category type is passed,
+    // infer medication composer from folder context.
+    if (!normalizedCategoryType) return isMedicationFolder;
+    return false;
+  }, [categoryType, isMedicationFolder]);
+
+  const handleSaveMedication = useCallback(
+    async (payload: { name: string; dosage: string; frequency: string }) => {
+      const timestamp = new Date().toISOString();
+      const doc: MedicalDocument = {
+        value: `# ${payload.name}\n\n- Dosage: ${payload.dosage}\n- Frequency: ${payload.frequency}\n`,
+        metadata: {
+          type: 'medication',
+          created: timestamp,
+          updated: timestamp,
+          tags: ['medication'],
+        },
+        children: [],
+      };
+
+      await handleSave(doc, []);
+    },
+    [handleSave],
+  );
+
   return (
     <>
-    <Stack.Screen options={{ headerShown: false }} />
-    <NoteEditor
-      dirPath={dirPath ?? '/'}
-      categoryType={categoryType ?? 'note'}
-      onSave={handleSave}
-      onCancel={handleCancel}
-    />
+      <Stack.Screen options={{ headerShown: false }} />
+      {useMedicationComposer ? (
+        <MedicationEntryForm
+          dirPath={dirPath ?? '/'}
+          onSave={handleSaveMedication}
+          onCancel={handleCancel}
+        />
+      ) : (
+        <NoteEditor
+          dirPath={dirPath ?? '/'}
+          categoryType={categoryType ?? 'note'}
+          onSave={handleSave}
+          onCancel={handleCancel}
+        />
+      )}
     </>
   );
 }

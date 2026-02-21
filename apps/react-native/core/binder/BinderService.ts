@@ -70,16 +70,17 @@ export class BinderService {
   /**
    * Initialize a new binder: git init, write encrypted patient-info.json, commit, push.
    */
-  /** Default top-level folders created with every new binder. */
+  /** Default folder structure created with every new binder. */
   private static readonly DEFAULT_FOLDERS: { folder: string; displayName: string; icon: string }[] = [
+    { folder: 'my-info',       displayName: 'My Info',       icon: '👤' },
+    { folder: 'my-info/allergies',     displayName: 'Allergies',     icon: '🤧' },
+    { folder: 'my-info/immunizations', displayName: 'Immunizations', icon: '💉' },
+    { folder: 'my-info/billing-insurance',displayName: 'Billing & Insurance',icon: '🪪' },
     { folder: 'conditions',    displayName: 'Conditions',    icon: '❤️‍🩹' },
-    { folder: 'allergies',     displayName: 'Allergies',     icon: '🤧' },
     { folder: 'medications',   displayName: 'Medications',   icon: '💊' },
-    { folder: 'immunizations', displayName: 'Immunizations', icon: '💉' },
     { folder: 'visits',        displayName: 'Visits',        icon: '🩺' },
     { folder: 'procedures',    displayName: 'Procedures',    icon: '🔪' },
     { folder: 'labs-imaging',  displayName: 'Labs & Imaging',icon: '🔬' },
-    { folder: 'billing-insurance',displayName: 'Billing & Insurance',icon: '🪪' },
   ];
 
   static async create(
@@ -102,7 +103,7 @@ export class BinderService {
 
     const filesToCommit = ['patient-info.json'];
 
-    // Create default top-level folders with .meta.json
+    // Create default folder hierarchy with .meta.json
     for (const { folder, displayName, icon } of BinderService.DEFAULT_FOLDERS) {
       const metaPath = `${folder}/.meta.json`;
       await io.writeJSON('/' + metaPath, { displayName, icon, color: '#7F8C8D' });

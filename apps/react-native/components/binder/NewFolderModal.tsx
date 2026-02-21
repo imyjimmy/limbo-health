@@ -101,11 +101,10 @@ export function NewFolderModal({
           <Text style={styles.sectionLabel}>Name</Text>
           <TextInput
             style={styles.nameInput}
-            placeholder="e.g. Back Acne"
+            placeholder="Folder name"
             placeholderTextColor="#999"
             value={name}
             onChangeText={setName}
-            autoFocus
             returnKeyType="done"
           />
 

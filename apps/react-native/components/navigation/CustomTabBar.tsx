@@ -8,15 +8,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  IconHome,
-  IconHomeFilled,
-  IconFile,
-  IconFileFilled,
+  IconBook2,
+  IconBook,
+  IconBookFilled,
   IconPlus,
   IconSearch,
-  IconNote,
+  IconContract,
   IconMicrophone,
   IconCamera,
+  IconLogs,
 } from '@tabler/icons-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ProfileAvatar } from './ProfileAvatar';
@@ -26,9 +26,11 @@ const PLUS_SIZE = 34;
 const INACTIVE_COLOR = '#cecece';
 const ACTIVE_COLOR = '#ffffff';
 
+type CreateAction = 'note' | 'audio' | 'photo' | 'medication';
+
 const CREATE_MENU_ITEMS = [
   { key: 'audio', label: 'Record Audio', Icon: IconMicrophone },
-  { key: 'note', label: 'Add Note', Icon: IconNote },
+  { key: 'note', label: 'Add Note', Icon: IconContract },
   { key: 'photo', label: 'Take Photo', Icon: IconCamera },
 ] as const;
 
@@ -36,7 +38,11 @@ interface CustomTabBarProps extends BottomTabBarProps {
   profileImageUrl?: string | null;
   profileInitials?: string;
   hasNotification?: boolean;
-  onCreateAction?: (action: 'note' | 'audio' | 'photo') => void;
+  onCreateAction?: (action: CreateAction) => void;
+  contextualCreateAction?: {
+    action: CreateAction;
+    label: string;
+  } | null;
   onDocumentPress?: () => void;
   onSearchPress?: () => void;
 }
@@ -48,13 +54,14 @@ export function CustomTabBar({
   profileInitials = 'ME',
   hasNotification = false,
   onCreateAction,
+  contextualCreateAction = null,
   onDocumentPress,
   onSearchPress,
 }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
 
-  const handleCreatePress = (action: 'note' | 'audio' | 'photo') => {
+  const handleCreatePress = (action: CreateAction) => {
     setMenuVisible(false);
     onCreateAction?.(action);
   };
@@ -146,24 +153,40 @@ export function CustomTabBar({
           onPress={() => setMenuVisible(false)}
         >
           <View style={styles.menuContainer}>
-            {CREATE_MENU_ITEMS.map((item) => (
+            {contextualCreateAction && (
               <Pressable
-                key={item.key}
-                onPress={() => handleCreatePress(item.key)}
-                testID={`create-menu-${item.key}`}
+                onPress={() => handleCreatePress(contextualCreateAction.action)}
+                testID={`create-menu-${contextualCreateAction.action}`}
                 style={({ pressed }) => [
-                  styles.menuItem,
+                  styles.contextualMenuItem,
                   pressed && styles.menuItemPressed,
                 ]}
               >
-                <item.Icon
-                  size={24}
-                  color={ACTIVE_COLOR}
-                  strokeWidth={1.5}
-                />
-                {/* <Text style={styles.menuItemLabel}>{item.label}</Text> */}
+                <ContextualCreateIcon action={contextualCreateAction.action} />
+                <Text style={styles.contextualMenuItemLabel}>
+                  {contextualCreateAction.label}
+                </Text>
               </Pressable>
-            ))}
+            )}
+            <View style={styles.menuRow}>
+              {CREATE_MENU_ITEMS.map((item) => (
+                <Pressable
+                  key={item.key}
+                  onPress={() => handleCreatePress(item.key)}
+                  testID={`create-menu-${item.key}`}
+                  style={({ pressed }) => [
+                    styles.menuItem,
+                    pressed && styles.menuItemPressed,
+                  ]}
+                >
+                  <item.Icon
+                    size={24}
+                    color={ACTIVE_COLOR}
+                    strokeWidth={1.5}
+                  />
+                </Pressable>
+              ))}
+            </View>
           </View>
         </Pressable>
       </Modal>
@@ -184,17 +207,15 @@ function renderTabIcon(
 
   switch (routeName) {
     case '(home)':
-      return isActive ? (
-        <IconHomeFilled size={ICON_SIZE} color={color} />
-      ) : (
-        <IconHome size={ICON_SIZE} color={color} strokeWidth={2} />
+      return (
+        <IconBook2 size={ICON_SIZE} color={color} strokeWidth={2} />
       );
 
     case 'page':
       return isActive ? (
-        <IconFileFilled size={ICON_SIZE} color={color} />
+        <IconBookFilled size={ICON_SIZE} color={color} />
       ) : (
-        <IconFile size={ICON_SIZE} color={color} strokeWidth={2} />
+        <IconBook size={ICON_SIZE} color={color} strokeWidth={2} />
       );
 
     case 'create':
@@ -221,6 +242,17 @@ function renderTabIcon(
 
     default:
       return null;
+  }
+}
+
+function ContextualCreateIcon({ action }: { action: CreateAction }) {
+  switch (action) {
+    case 'medication':
+      return <IconLogs size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
+    case 'note':
+      return <IconContract size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
+    default:
+      return <IconPlus size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
   }
 }
 
@@ -273,6 +305,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.1)',
+  },
+  menuRow: {
     flexDirection: 'row',
   },
   menuItem: {
@@ -290,5 +324,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '500',
+  },
+  contextualMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.12)',
+  },
+  contextualMenuItemLabel: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
