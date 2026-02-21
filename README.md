@@ -214,6 +214,67 @@ docker-compose -f docker-compose.yml -f docker-compose.development.yml up -d --b
 docker-compose down
 ```
 
+## Mobile App (Expo / EAS)
+
+The React Native app lives in `apps/react-native/` and is built and distributed via [EAS Build](https://docs.expo.dev/build/introduction/).
+
+### Prerequisites
+
+```bash
+npm install -g eas-cli
+cd apps/react-native
+eas login
+```
+
+### Environment Variables
+
+Local `.env` is gitignored. EAS cloud builds use their own env store. Before building, verify parity:
+
+```bash
+# Check that all local .env keys exist in EAS production environment
+./apps/react-native/scripts/check-eas-env.sh production
+
+# List what EAS currently has
+eas env:list --environment production
+
+# Add a missing variable
+eas env:create --name EXPO_PUBLIC_EXAMPLE --value "value" --environment production --visibility plaintext
+```
+
+### Build
+
+```bash
+cd apps/react-native
+
+# Production build (App Store / TestFlight)
+eas build --platform ios --profile production
+
+# Simulator build (for local QA on iPad/iPhone simulators)
+eas build --platform ios --profile production-simulator
+
+# Development client (for Expo Go-like dev workflow)
+eas build --platform ios --profile development
+```
+
+### Submit to App Store
+
+```bash
+cd apps/react-native
+
+# Upload the latest production build to App Store Connect
+eas submit --platform ios --latest
+```
+
+This requires interactive Apple ID login. After upload, go to [App Store Connect](https://appstoreconnect.apple.com) to add the build to a submission and submit for review.
+
+### EAS Profiles (eas.json)
+
+| Profile | Purpose | Distribution |
+|---|---|---|
+| `production` | App Store / TestFlight | App Store (auto-increment) |
+| `production-simulator` | Local simulator testing of release builds | Simulator |
+| `development` | Dev client with Expo DevTools | Internal |
+
 ## Troubleshooting
 
 ### Port 5173 Shows Nothing

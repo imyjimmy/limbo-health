@@ -11,6 +11,11 @@
       "autoIncrement": true,
       "developmentClient": true,
       "distribution": "internal"
+    },
+    "production-simulator": {
+      "ios": {
+        "simulator": true
+      }
     }
   },
   "submit": {
