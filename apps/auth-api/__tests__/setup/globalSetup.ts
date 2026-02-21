@@ -4,7 +4,7 @@
  * Runs once before all test suites via vitest setupFiles.
  * Generates secp256k1 keypairs for two test users and exports them.
  */
-import { schnorr } from '@noble/curves/secp256k1';
+import { schnorr } from '@noble/curves/secp256k1.js';
 import { bytesToHex, randomBytes } from '@noble/hashes/utils';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';

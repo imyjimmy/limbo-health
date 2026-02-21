@@ -12,8 +12,8 @@
  */
 import git from 'isomorphic-git';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { request } from '../setup/testClient';
-import { authenticate } from '../setup/nostrHelpers';
+import { request } from './setup/testClient';
+import { authenticate } from './setup/nostrHelpers';
 import {
   initLocalRepo,
   createTestFile,
@@ -22,9 +22,9 @@ import {
   readFile,
   getCommitLog,
   uniqueRepoId,
-} from '../setup/gitHelpers';
-import { registerRepoForCleanup } from '../setup/globalSetup';
-import { cleanupAllTestRepos } from '../setup/cleanup';
+} from './setup/gitHelpers';
+import { registerRepoForCleanup } from './setup/globalSetup';
+import { cleanupAllTestRepos } from './setup/cleanup';
 
 describe('Git Round-Trip Lifecycle', () => {
   let jwt: string;

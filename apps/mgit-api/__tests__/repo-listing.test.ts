@@ -4,8 +4,8 @@
  * Tests GET /api/mgit/user/repositories
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { request } from '../setup/testClient';
-import { authenticate } from '../setup/nostrHelpers';
+import { request } from './setup/testClient';
+import { authenticate } from './setup/nostrHelpers';
 
 describe('Repository Listing', () => {
   let jwt: string;

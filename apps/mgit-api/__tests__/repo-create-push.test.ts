@@ -10,16 +10,16 @@
  * safety net.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { request } from '../setup/testClient';
-import { authenticate } from '../setup/nostrHelpers';
+import { request } from './setup/testClient';
+import { authenticate } from './setup/nostrHelpers';
 import {
   initLocalRepo,
   createTestFile,
   pushRepo,
   uniqueRepoId,
-} from '../setup/gitHelpers';
-import { registerRepoForCleanup } from '../setup/globalSetup';
-import { cleanupAllTestRepos } from '../setup/cleanup';
+} from './setup/gitHelpers';
+import { registerRepoForCleanup } from './setup/globalSetup';
+import { cleanupAllTestRepos } from './setup/cleanup';
 
 describe('Create & Push', () => {
   let jwt: string;

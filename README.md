@@ -214,6 +214,31 @@ docker-compose -f docker-compose.yml -f docker-compose.development.yml up -d --b
 docker-compose down
 ```
 
+## Testing
+
+Integration tests now live under each service:
+- `apps/auth-api/__tests__`
+- `apps/mgit-api/__tests__`
+
+Run from repo root:
+
+```bash
+# All integration tests
+npm run test:integration
+
+# Watch mode
+npm run test:integration:watch
+
+# All integration tests with verbose reporter
+npm run test:integration:verbose
+
+# Auth API tests only (verbose)
+npm run test:auth
+
+# MGit API tests only (verbose)
+npm run test:mgit
+```
+
 ## Mobile App (Expo / EAS)
 
 The React Native app lives in `apps/react-native/` and is built and distributed via [EAS Build](https://docs.expo.dev/build/introduction/).

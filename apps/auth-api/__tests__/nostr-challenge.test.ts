@@ -7,14 +7,14 @@
 import { describe, it, expect } from 'vitest';
 import { finalizeEvent, type UnsignedEvent } from 'nostr-tools/pure';
 import { hexToBytes } from '@noble/hashes/utils';
-import { request } from '../setup/testClient';
+import { request } from './setup/testClient';
 import {
   getChallenge,
   signChallenge,
   authenticate,
   decodeJwtPayload,
-} from '../setup/nostrHelpers';
-import { TEST_PRIVKEY, TEST_PUBKEY } from '../setup/globalSetup';
+} from './setup/nostrHelpers';
+import { TEST_PRIVKEY, TEST_PUBKEY } from './setup/globalSetup';
 
 describe('Nostr Auth Flow', () => {
   // ─── Challenge endpoint ──────────────────────────────────────────

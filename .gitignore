@@ -40,6 +40,7 @@ tasks/
 .claude/
 
 # agent skills
+.agents
 .agents/
 **/.agents/
 
