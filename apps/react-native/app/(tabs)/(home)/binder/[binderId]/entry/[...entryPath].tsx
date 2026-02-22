@@ -11,6 +11,9 @@ import {
   TextInput,
   StyleSheet,
   Alert,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack, useFocusEffect } from 'expo-router';
 import { DebugOverlay } from '../../../../../../components/binder/DebugOverlay';
@@ -28,6 +31,10 @@ import { DOSAGE_PRESETS, FREQUENCY_PRESETS } from '../../../../../../core/medica
 
 function isDosagePreset(value: string) {
   return DOSAGE_PRESETS.includes(value as (typeof DOSAGE_PRESETS)[number]);
+}
+
+function runMedicationTransitionAnimation() {
+  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 }
 
 export default function EntryDetailScreen() {
@@ -85,6 +92,12 @@ export default function EntryDetailScreen() {
       setRefreshCounter((c) => c + 1);
     }, [])
   );
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!binderService || !rawPath) {
@@ -156,6 +169,7 @@ export default function EntryDetailScreen() {
       });
       setShowCustomDosageInput(nextDosage.length > 0 && !isDosagePreset(nextDosage));
       setDosageMenuOpen(false);
+      runMedicationTransitionAnimation();
       setEditingMedication(true);
       return;
     }
@@ -178,6 +192,7 @@ export default function EntryDetailScreen() {
   ]);
 
   const handleCancelMedicationEdit = useCallback(() => {
+    runMedicationTransitionAnimation();
     setEditingMedication(false);
     setDosageMenuOpen(false);
     const nextDosage = medicationFields?.dosage || '';
@@ -233,6 +248,7 @@ export default function EntryDetailScreen() {
     setSavingMedication(true);
     try {
       await binderService.updateEntry(rawPath, updatedDoc);
+      runMedicationTransitionAnimation();
       setDoc(updatedDoc);
       setDosageMenuOpen(false);
       setEditingMedication(false);
@@ -330,9 +346,11 @@ export default function EntryDetailScreen() {
                   autoCapitalize="words"
                 />
               ) : (
-                <Text style={styles.medicationName}>
-                  {medicationFields?.name || title}
-                </Text>
+                <View style={styles.medicationNameShell}>
+                  <Text style={styles.medicationName}>
+                    {medicationFields?.name || title}
+                  </Text>
+                </View>
               )}
               <View style={styles.medicationRow}>
                 <Text style={styles.medicationLabel}>Dosage</Text>
@@ -409,9 +427,11 @@ export default function EntryDetailScreen() {
                     ) : null}
                   </>
                 ) : (
-                  <Text style={styles.medicationValue}>
-                    {medicationFields?.dosage || '—'}
-                  </Text>
+                  <View style={styles.medicationValueShell}>
+                    <Text style={styles.medicationValue}>
+                      {medicationFields?.dosage || '—'}
+                    </Text>
+                  </View>
                 )}
               </View>
               <View style={styles.medicationRow}>
@@ -445,9 +465,11 @@ export default function EntryDetailScreen() {
                     />
                   </>
                 ) : (
-                  <Text style={styles.medicationValue}>
-                    {medicationFields?.frequency || '—'}
-                  </Text>
+                  <View style={styles.medicationValueShell}>
+                    <Text style={styles.medicationValue}>
+                      {medicationFields?.frequency || '—'}
+                    </Text>
+                  </View>
                 )}
               </View>
               <View style={styles.medicationRow}>
@@ -463,9 +485,11 @@ export default function EntryDetailScreen() {
                     keyboardType="numbers-and-punctuation"
                   />
                 ) : (
-                  <Text style={styles.medicationValue}>
-                    {medicationFields?.startDate || '—'}
-                  </Text>
+                  <View style={styles.medicationValueShell}>
+                    <Text style={styles.medicationValue}>
+                      {medicationFields?.startDate || '—'}
+                    </Text>
+                  </View>
                 )}
               </View>
               <View style={styles.medicationRow}>
@@ -481,9 +505,11 @@ export default function EntryDetailScreen() {
                     keyboardType="numbers-and-punctuation"
                   />
                 ) : (
-                  <Text style={styles.medicationValue}>
-                    {medicationFields?.stopDate || '—'}
-                  </Text>
+                  <View style={styles.medicationValueShell}>
+                    <Text style={styles.medicationValue}>
+                      {medicationFields?.stopDate || '—'}
+                    </Text>
+                  </View>
                 )}
               </View>
             </View>
@@ -620,6 +646,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1b2635',
   },
+  medicationNameShell: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#d6deea',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#ffffff',
+  },
   medicationNameInput: {
     fontSize: 22,
     fontWeight: '700',
@@ -650,6 +684,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#14243a',
+  },
+  medicationValueShell: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#d3dce9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    minHeight: 40,
+    justifyContent: 'center',
   },
   medicationInput: {
     fontSize: 16,
