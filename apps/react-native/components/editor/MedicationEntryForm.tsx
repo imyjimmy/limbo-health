@@ -11,29 +11,58 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { DOSAGE_PRESETS, FREQUENCY_PRESETS } from '../../core/medication/options';
 
 interface MedicationEntryFormProps {
   dirPath: string;
-  onSave: (payload: { name: string; dosage: string; frequency: string }) => Promise<void>;
+  onSave: (payload: {
+    name: string;
+    dosage: string;
+    frequency: string;
+    startDate: string;
+    stopDate?: string;
+  }) => Promise<void>;
   onCancel: () => void;
+  initialValues?: Partial<{
+    name: string;
+    dosage: string;
+    frequency: string;
+    startDate: string;
+    stopDate: string;
+  }>;
+  mode?: 'create' | 'edit';
 }
 
-const FREQUENCY_PRESETS = [
-  'Once daily',
-  'Twice daily',
-  'Every 6 hours',
-  'As needed',
-] as const;
+function isDosagePreset(value: string) {
+  return DOSAGE_PRESETS.includes(value as (typeof DOSAGE_PRESETS)[number]);
+}
 
-export function MedicationEntryForm({ dirPath, onSave, onCancel }: MedicationEntryFormProps) {
-  const [name, setName] = useState('');
-  const [dosage, setDosage] = useState('');
-  const [frequency, setFrequency] = useState('');
+export function MedicationEntryForm({
+  dirPath,
+  onSave,
+  onCancel,
+  initialValues,
+  mode = 'create',
+}: MedicationEntryFormProps) {
+  const [name, setName] = useState(() => initialValues?.name ?? '');
+  const [dosage, setDosage] = useState(() => initialValues?.dosage ?? '');
+  const [frequency, setFrequency] = useState(() => initialValues?.frequency ?? '');
+  const [startDate, setStartDate] = useState(() => initialValues?.startDate ?? '');
+  const [stopDate, setStopDate] = useState(() => initialValues?.stopDate ?? '');
   const [saving, setSaving] = useState(false);
+  const [dosageMenuOpen, setDosageMenuOpen] = useState(false);
+  const [showCustomDosageInput, setShowCustomDosageInput] = useState(() => {
+    const initialDosage = initialValues?.dosage?.trim() ?? '';
+    return initialDosage.length > 0 && !isDosagePreset(initialDosage);
+  });
 
   const canSave = useMemo(
-    () => name.trim().length > 0 && dosage.trim().length > 0 && frequency.trim().length > 0,
-    [name, dosage, frequency],
+    () =>
+      name.trim().length > 0 &&
+      dosage.trim().length > 0 &&
+      frequency.trim().length > 0 &&
+      startDate.trim().length > 0,
+    [name, dosage, frequency, startDate],
   );
 
   const confirmCancel = () => {
@@ -49,7 +78,7 @@ export function MedicationEntryForm({ dirPath, onSave, onCancel }: MedicationEnt
 
   const handleSave = async () => {
     if (!canSave) {
-      Alert.alert('Missing Fields', 'Please fill out name, dosage, and frequency.');
+      Alert.alert('Missing Fields', 'Please fill out name, dosage, frequency, and start date.');
       return;
     }
 
@@ -59,6 +88,8 @@ export function MedicationEntryForm({ dirPath, onSave, onCancel }: MedicationEnt
         name: name.trim(),
         dosage: dosage.trim(),
         frequency: frequency.trim(),
+        startDate: startDate.trim(),
+        stopDate: stopDate.trim() || undefined,
       });
     } catch (error) {
       console.error('Medication save failed:', error);
@@ -87,7 +118,9 @@ export function MedicationEntryForm({ dirPath, onSave, onCancel }: MedicationEnt
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.body}>
-        <Text style={styles.title}>Add Medication</Text>
+        <Text style={styles.title}>
+          {mode === 'edit' ? 'Edit Medication' : 'Add Medication'}
+        </Text>
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Medication Name</Text>
@@ -105,16 +138,77 @@ export function MedicationEntryForm({ dirPath, onSave, onCancel }: MedicationEnt
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Dosage</Text>
-          <TextInput
-            style={styles.input}
-            value={dosage}
-            onChangeText={setDosage}
-            placeholder="500 mg"
-            placeholderTextColor="#9AA0A6"
-            autoCapitalize="none"
-            returnKeyType="next"
-            testID="medication-dosage-input"
-          />
+          <TouchableOpacity
+            style={styles.selectInput}
+            onPress={() => setDosageMenuOpen((open) => !open)}
+            activeOpacity={0.7}
+            testID="medication-dosage-select"
+          >
+            <Text
+              style={[
+                styles.selectInputText,
+                !dosage && !showCustomDosageInput && styles.selectInputPlaceholder,
+              ]}
+            >
+              {dosage || (showCustomDosageInput ? 'Custom dosage' : 'Select dosage')}
+            </Text>
+            <Text style={styles.selectChevron}>▾</Text>
+          </TouchableOpacity>
+          {dosageMenuOpen ? (
+            <View style={styles.inlinePicker}>
+              {DOSAGE_PRESETS.map((preset) => {
+                const selected = dosage === preset;
+                return (
+                  <TouchableOpacity
+                    key={preset}
+                    style={[styles.pickerRow, selected && styles.pickerRowSelected]}
+                    onPress={() => {
+                      setDosage(preset);
+                      setShowCustomDosageInput(false);
+                      setDosageMenuOpen(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.pickerRowText, selected && styles.pickerRowTextSelected]}>
+                      {preset}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity
+                style={[styles.pickerRow, showCustomDosageInput && styles.pickerRowSelected]}
+                onPress={() => {
+                  setShowCustomDosageInput(true);
+                  setDosageMenuOpen(false);
+                  if (isDosagePreset(dosage)) {
+                    setDosage('');
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.pickerRowText,
+                    showCustomDosageInput && styles.pickerRowTextSelected,
+                  ]}
+                >
+                  Custom dosage...
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          {showCustomDosageInput ? (
+            <TextInput
+              style={styles.input}
+              value={dosage}
+              onChangeText={setDosage}
+              placeholder="Type custom dosage"
+              placeholderTextColor="#9AA0A6"
+              autoCapitalize="none"
+              returnKeyType="next"
+              testID="medication-dosage-input"
+            />
+          ) : null}
         </View>
 
         <View style={styles.fieldGroup}>
@@ -144,11 +238,42 @@ export function MedicationEntryForm({ dirPath, onSave, onCancel }: MedicationEnt
             placeholder="Every 6 hours as needed"
             placeholderTextColor="#9AA0A6"
             autoCapitalize="none"
-            returnKeyType="done"
+            returnKeyType="next"
             testID="medication-frequency-input"
           />
         </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Started</Text>
+          <TextInput
+            style={styles.input}
+            value={startDate}
+            onChangeText={setStartDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#9AA0A6"
+            autoCapitalize="none"
+            keyboardType="numbers-and-punctuation"
+            returnKeyType="next"
+            testID="medication-start-date-input"
+          />
+        </View>
+
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Stopped (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={stopDate}
+            onChangeText={setStopDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor="#9AA0A6"
+            autoCapitalize="none"
+            keyboardType="numbers-and-punctuation"
+            returnKeyType="done"
+            testID="medication-stop-date-input"
+          />
+        </View>
       </KeyboardAvoidingView>
+
     </SafeAreaView>
   );
 }
@@ -218,6 +343,39 @@ const styles = StyleSheet.create({
     color: '#111',
     backgroundColor: '#FFF',
   },
+  selectInput: {
+    borderWidth: 1,
+    borderColor: '#D8DDE3',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    backgroundColor: '#FFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  inlinePicker: {
+    borderWidth: 1,
+    borderColor: '#D8DDE3',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 8,
+    backgroundColor: '#FFF',
+  },
+  selectInputText: {
+    fontSize: 16,
+    color: '#111',
+    fontWeight: '500',
+  },
+  selectInputPlaceholder: {
+    color: '#9AA0A6',
+    fontWeight: '400',
+  },
+  selectChevron: {
+    color: '#7f8792',
+    fontSize: 16,
+  },
   frequencyRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -242,6 +400,23 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   presetTextSelected: {
+    color: '#0B63CE',
+    fontWeight: '600',
+  },
+  pickerRow: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e8e8e8',
+  },
+  pickerRowSelected: {
+    backgroundColor: '#EAF3FF',
+  },
+  pickerRowText: {
+    fontSize: 15,
+    color: '#222',
+  },
+  pickerRowTextSelected: {
     color: '#0B63CE',
     fontWeight: '600',
   },

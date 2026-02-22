@@ -19,6 +19,8 @@ export interface MedicalDocument {
   value: string;
   metadata: DocumentMetadata;
   children: MedicalDocument[];
+  renderer?: string;
+  editor?: string;
 }
 
 /**
@@ -30,4 +32,3 @@ Read document:   disk → ciphertext string → nip44.decrypt → JSON.parse →
 Write sidecar:   JPEG bytes → base64.encode → nip44.encryptLarge → ciphertext string → disk
 Read sidecar:    disk → ciphertext string → nip44.decryptLarge → base64.decode → JPEG bytes
  */
-

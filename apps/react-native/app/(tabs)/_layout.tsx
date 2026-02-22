@@ -57,18 +57,37 @@ function TabLayoutInner() {
 
   const contextualCreateAction = useMemo(() => {
     if (!binderContext) return null;
-    const normalized = binderContext.dirPath
-      .replace(/^\/+|\/+$/g, '')
-      .toLowerCase();
+    const normalizeFolderKeyword = (value: string) =>
+      decodeURIComponent(value)
+        .toLowerCase()
+        .replace(/[-_]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const normalized = binderContext.dirPath.replace(/^\/+|\/+$/g, '').toLowerCase();
+    const segments = normalized.split('/').filter(Boolean);
+    const currentFolderKeyword = segments.length > 0
+      ? normalizeFolderKeyword(segments[segments.length - 1])
+      : '';
+    const isBioFolder = currentFolderKeyword === 'bio' || currentFolderKeyword === 'my info';
     const isMedicationFolder =
       normalized === 'medications' ||
       normalized.startsWith('medications/') ||
       normalized.endsWith('/medications');
 
+    if (isBioFolder) {
+      return {
+        action: 'note' as const,
+        label: 'Fill in Bio',
+        icon: 'bio' as const,
+      };
+    }
+
     if (isMedicationFolder) {
       return {
         action: 'medication' as const,
         label: 'Add Medication',
+        icon: 'medication' as const,
       };
     }
 

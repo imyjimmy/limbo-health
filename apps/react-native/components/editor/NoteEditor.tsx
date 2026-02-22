@@ -32,6 +32,7 @@ import { useCamera } from '../../hooks/useCamera';
 import { InlineRecorderBar } from '../audio/InlineRecorderBar';
 import { encode as b64encode } from '../../core/crypto/base64';
 import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
+import { parseMarkdownFrontMatter } from '../../core/markdown/frontmatter';
 
 interface NoteEditorProps {
   /** Directory path where the note will be saved, e.g. "visits/" or "conditions/back-acne/" */
@@ -53,9 +54,17 @@ export function NoteEditor({
   onSave,
   onCancel,
 }: NoteEditorProps) {
+  const parsedInitialValue = parseMarkdownFrontMatter(initialDoc?.value ?? '');
+  const initialFrontMatterRaw = parsedInitialValue.hasFrontMatter
+    ? parsedInitialValue.raw
+    : null;
+  const initialMarkdownBody = parsedInitialValue.hasFrontMatter
+    ? parsedInitialValue.body
+    : (initialDoc?.value ?? '');
+
   const [title, setTitle] = useState(() => {
-    if (initialDoc?.value) {
-      const match = initialDoc.value.match(/^#\s+(.+)$/m);
+    if (initialMarkdownBody) {
+      const match = initialMarkdownBody.match(/^#\s+(.+)$/m);
       return match ? match[1] : '';
     }
     return '';
@@ -100,12 +109,12 @@ export function NoteEditor({
   const handleEditorLoad = useCallback(() => {
     loadCountRef.current += 1;
     if (hasSetContent.current) return;
-    if (!initialDoc?.value) return;
+    if (!initialMarkdownBody) return;
 
     const targetLoads = Platform.OS === 'ios' ? 2 : 1;
     if (loadCountRef.current < targetLoads) return;
 
-    const bodyMarkdown = initialDoc.value.replace(/^#\s+.+\n*/, '').trim();
+    const bodyMarkdown = initialMarkdownBody.replace(/^#\s+.+\n*/, '').trim();
     if (!bodyMarkdown) { setEditorReady(true); return; }
 
     // Clear any prior timer (shouldn't happen, but be safe)
@@ -119,7 +128,7 @@ export function NoteEditor({
         setEditorReady(true);
       }
     }, 400);
-  }, [editor, initialDoc]);
+  }, [editor, initialMarkdownBody]);
 
   const { capture } = useCamera();
 
@@ -182,7 +191,10 @@ export function NoteEditor({
     try {
       // Get markdown directly from the editor — no HTML conversion
       const bodyMarkdown = await editor.getMarkdown();
-      const fullMarkdown = `# ${title.trim()}\n\n${bodyMarkdown}`;
+      const fullMarkdownWithoutFrontMatter = `# ${title.trim()}\n\n${bodyMarkdown}`;
+      const fullMarkdown = initialFrontMatterRaw
+        ? `${initialFrontMatterRaw}\n\n${fullMarkdownWithoutFrontMatter}`
+        : fullMarkdownWithoutFrontMatter;
 
       const existingNonAttachmentChildren = (initialDoc?.children ?? []).filter(
         (c) =>
@@ -204,6 +216,8 @@ export function NoteEditor({
           ...existingAttachments,
           ...newAttachmentChildren,
         ],
+        renderer: initialDoc?.renderer,
+        editor: initialDoc?.editor,
       };
 
       await onSave(doc, attachments);

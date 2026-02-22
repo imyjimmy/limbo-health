@@ -15,6 +15,7 @@ import { useAuthContext } from '../../../../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../../../../providers/CryptoProvider';
 import type { MedicalDocument } from '../../../../../../types/document';
 import type { PendingSidecar } from '../../../../../../components/editor/AttachmentList';
+import { buildMedicationMarkdown } from '../../../../../../core/markdown/medicationEntry';
 
 export default function NewEntryScreen() {
   const router = useRouter();
@@ -113,10 +114,16 @@ export default function NewEntryScreen() {
   }, [categoryType, isMedicationFolder]);
 
   const handleSaveMedication = useCallback(
-    async (payload: { name: string; dosage: string; frequency: string }) => {
+    async (payload: {
+      name: string;
+      dosage: string;
+      frequency: string;
+      startDate: string;
+      stopDate?: string;
+    }) => {
       const timestamp = new Date().toISOString();
       const doc: MedicalDocument = {
-        value: `# ${payload.name}\n\n- Dosage: ${payload.dosage}\n- Frequency: ${payload.frequency}\n`,
+        value: buildMedicationMarkdown(payload),
         metadata: {
           type: 'medication',
           created: timestamp,
@@ -124,6 +131,8 @@ export default function NewEntryScreen() {
           tags: ['medication'],
         },
         children: [],
+        renderer: 'medication',
+        editor: 'medication',
       };
 
       await handleSave(doc, []);

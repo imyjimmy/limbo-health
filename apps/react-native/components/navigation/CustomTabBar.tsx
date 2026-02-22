@@ -14,6 +14,7 @@ import {
   IconPlus,
   IconSearch,
   IconContract,
+  IconId,
   IconMicrophone,
   IconCamera,
   IconLogs,
@@ -27,6 +28,7 @@ const INACTIVE_COLOR = '#cecece';
 const ACTIVE_COLOR = '#ffffff';
 
 type CreateAction = 'note' | 'audio' | 'photo' | 'medication';
+type ContextualCreateIconKey = 'medication' | 'bio' | 'note';
 
 const CREATE_MENU_ITEMS = [
   { key: 'audio', label: 'Record Audio', Icon: IconMicrophone },
@@ -42,6 +44,7 @@ interface CustomTabBarProps extends BottomTabBarProps {
   contextualCreateAction?: {
     action: CreateAction;
     label: string;
+    icon?: ContextualCreateIconKey;
   } | null;
   onDocumentPress?: () => void;
   onSearchPress?: () => void;
@@ -162,7 +165,10 @@ export function CustomTabBar({
                   pressed && styles.menuItemPressed,
                 ]}
               >
-                <ContextualCreateIcon action={contextualCreateAction.action} />
+                <ContextualCreateIcon
+                  action={contextualCreateAction.action}
+                  icon={contextualCreateAction.icon}
+                />
                 <Text style={styles.contextualMenuItemLabel}>
                   {contextualCreateAction.label}
                 </Text>
@@ -245,10 +251,20 @@ function renderTabIcon(
   }
 }
 
-function ContextualCreateIcon({ action }: { action: CreateAction }) {
-  switch (action) {
+function ContextualCreateIcon({
+  action,
+  icon,
+}: {
+  action: CreateAction;
+  icon?: ContextualCreateIconKey;
+}) {
+  const resolvedIcon = icon ?? action;
+
+  switch (resolvedIcon) {
     case 'medication':
       return <IconLogs size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
+    case 'bio':
+      return <IconId size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
     case 'note':
       return <IconContract size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
     default:

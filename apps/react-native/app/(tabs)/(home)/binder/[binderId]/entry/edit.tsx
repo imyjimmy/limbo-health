@@ -9,11 +9,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { NoteEditor } from '../../../../../../components/editor/NoteEditor';
+import { MedicationEntryForm } from '../../../../../../components/editor/MedicationEntryForm';
 import { BinderService } from '../../../../../../core/binder/BinderService';
 import { useAuthContext } from '../../../../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../../../../providers/CryptoProvider';
 import type { MedicalDocument } from '../../../../../../types/document';
 import type { PendingSidecar } from '../../../../../../components/editor/AttachmentList';
+import {
+  buildMedicationMarkdown,
+  parseMedicationEntry,
+} from '../../../../../../core/markdown/medicationEntry';
 
 export default function EditEntryScreen() {
   const router = useRouter();
@@ -73,7 +78,7 @@ export default function EditEntryScreen() {
     return () => { cancelled = true; };
   }, [binderService, entryPath]);
 
-  const handleSave = useCallback(
+  const saveUpdatedDoc = useCallback(
     async (updatedDoc: MedicalDocument, sidecars: PendingSidecar[]) => {
       if (!binderService || !entryPath) {
         Alert.alert('Not Ready', 'Authentication is not available. Please sign in and try again.');
@@ -100,6 +105,43 @@ export default function EditEntryScreen() {
       router.back();
     },
     [binderService, entryPath, router],
+  );
+
+  const handleSaveNote = useCallback(
+    async (updatedDoc: MedicalDocument, sidecars: PendingSidecar[]) => {
+      const mergedDoc: MedicalDocument = {
+        ...updatedDoc,
+        renderer: updatedDoc.renderer ?? doc?.renderer,
+        editor: updatedDoc.editor ?? doc?.editor,
+      };
+      await saveUpdatedDoc(mergedDoc, sidecars);
+    },
+    [doc?.editor, doc?.renderer, saveUpdatedDoc],
+  );
+
+  const handleSaveMedication = useCallback(
+    async (payload: {
+      name: string;
+      dosage: string;
+      frequency: string;
+      startDate: string;
+      stopDate?: string;
+    }) => {
+      if (!doc) return;
+      const updatedDoc: MedicalDocument = {
+        ...doc,
+        value: buildMedicationMarkdown(payload),
+        metadata: {
+          ...doc.metadata,
+          type: 'medication',
+          updated: new Date().toISOString(),
+        },
+        renderer: 'medication',
+        editor: 'medication',
+      };
+      await saveUpdatedDoc(updatedDoc, []);
+    },
+    [doc, saveUpdatedDoc],
   );
 
   const handleCancel = useCallback(() => {
@@ -129,6 +171,11 @@ export default function EditEntryScreen() {
     );
   }
 
+  const medicationEntry = parseMedicationEntry(doc.value);
+  const useMedicationComposer =
+    doc.editor === 'medication' ||
+    (doc.metadata.type === 'medication' && medicationEntry.isMedicationEntry);
+
   // Derive dirPath and categoryType from the existing document for NoteEditor
   const dirPath = entryPath.substring(0, entryPath.lastIndexOf('/') + 1) || '/';
   const categoryType = doc.metadata.type;
@@ -136,13 +183,29 @@ export default function EditEntryScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <NoteEditor
-        dirPath={dirPath}
-        categoryType={categoryType}
-        initialDoc={doc}
-        onSave={handleSave}
-        onCancel={handleCancel}
-      />
+      {useMedicationComposer ? (
+        <MedicationEntryForm
+          dirPath={dirPath}
+          mode="edit"
+          initialValues={{
+            name: medicationEntry.fields?.name ?? '',
+            dosage: medicationEntry.fields?.dosage ?? '',
+            frequency: medicationEntry.fields?.frequency ?? '',
+            startDate: medicationEntry.fields?.startDate ?? '',
+            stopDate: medicationEntry.fields?.stopDate ?? '',
+          }}
+          onSave={handleSaveMedication}
+          onCancel={handleCancel}
+        />
+      ) : (
+        <NoteEditor
+          dirPath={dirPath}
+          categoryType={categoryType}
+          initialDoc={doc}
+          onSave={handleSaveNote}
+          onCancel={handleCancel}
+        />
+      )}
     </>
   );
 }

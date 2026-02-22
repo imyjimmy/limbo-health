@@ -12,6 +12,10 @@ interface EntryCardProps {
 export function EntryCard({ item, onPress }: EntryCardProps) {
   const preview = item.preview;
   const title = preview?.title ?? item.name.replace('.json', '');
+  const medicationName = preview?.medicationName ?? title;
+  const isMedicationSummary =
+    preview?.renderer === 'medication' ||
+    (preview?.type === 'medication' && !!preview?.medicationName);
   const dateStr = preview?.created
     ? formatDate(preview.created)
     : extractDateFromFilename(item.name);
@@ -26,7 +30,7 @@ export function EntryCard({ item, onPress }: EntryCardProps) {
     >
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={1}>
-          {title}
+          {isMedicationSummary ? medicationName : title}
         </Text>
         {preview?.hasChildren && (
           <View style={styles.attachmentBadge}>
@@ -36,7 +40,20 @@ export function EntryCard({ item, onPress }: EntryCardProps) {
       </View>
 
       <View style={styles.metaRow}>
-        {typeLabel ? (
+        {isMedicationSummary ? (
+          <>
+            {preview?.medicationDosage ? (
+              <View style={styles.medicationPill}>
+                <Text style={styles.medicationPillText}>{preview.medicationDosage}</Text>
+              </View>
+            ) : null}
+            {preview?.medicationFrequency ? (
+              <Text style={styles.medicationFrequency} numberOfLines={1}>
+                {preview.medicationFrequency}
+              </Text>
+            ) : null}
+          </>
+        ) : typeLabel ? (
           <View style={styles.typePill}>
             <Text style={styles.typeText}>{typeLabel}</Text>
           </View>
@@ -129,6 +146,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     fontWeight: '500',
+  },
+  medicationPill: {
+    backgroundColor: '#eaf2ff',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  medicationPillText: {
+    fontSize: 12,
+    color: '#0f4fa8',
+    fontWeight: '600',
+  },
+  medicationFrequency: {
+    fontSize: 13,
+    color: '#3b4b5e',
+    flexShrink: 1,
   },
   date: {
     fontSize: 13,

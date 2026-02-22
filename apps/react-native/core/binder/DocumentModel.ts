@@ -4,6 +4,8 @@
 // provides runtime validation and convenience constructors.
 
 import type { MedicalDocument, DocumentMetadata } from '../../types/document';
+import { parseMarkdownFrontMatter } from '../markdown/frontmatter';
+import { parseMedicationEntry } from '../markdown/medicationEntry';
 
 // --- Validation ---
 
@@ -18,6 +20,8 @@ export function isValidDocument(obj: unknown): obj is MedicalDocument {
   const meta = doc.metadata as Record<string, unknown>;
   if (typeof meta.type !== 'string') return false;
   if (typeof meta.created !== 'string') return false;
+  if (doc.renderer !== undefined && typeof doc.renderer !== 'string') return false;
+  if (doc.editor !== undefined && typeof doc.editor !== 'string') return false;
 
   return true;
 }
@@ -161,7 +165,8 @@ export function extractEntryMetadata(
  * Looks for the first H1 heading. Falls back to first line, then type.
  */
 export function extractTitle(doc: MedicalDocument): string {
-  const val = doc.value;
+  const parsed = parseMarkdownFrontMatter(doc.value);
+  const val = parsed.body;
   // Match first # heading
   const h1Match = val.match(/^#\s+(.+)$/m);
   if (h1Match) return h1Match[1].trim();
@@ -183,12 +188,21 @@ export interface EntryPreview extends EntryMetadata {
   tags?: string[];
   format?: string;
   hasChildren: boolean;
+  renderer?: string;
+  medicationName?: string;
+  medicationDosage?: string;
+  medicationFrequency?: string;
 }
 
 export function extractEntryPreview(
   path: string,
   doc: MedicalDocument,
 ): EntryPreview {
+  const medication = parseMedicationEntry(doc.value);
+  const isMedicationEntry =
+    doc.renderer === 'medication' ||
+    (doc.metadata.type === 'medication' && medication.isMedicationEntry);
+
   return {
     ...extractEntryMetadata(path, doc),
     title: extractTitle(doc),
@@ -196,5 +210,9 @@ export function extractEntryPreview(
     tags: doc.metadata.tags,
     format: doc.metadata.format,
     hasChildren: doc.children.length > 0,
+    renderer: doc.renderer,
+    medicationName: isMedicationEntry ? (medication.fields?.name ?? undefined) : undefined,
+    medicationDosage: isMedicationEntry ? (medication.fields?.dosage ?? undefined) : undefined,
+    medicationFrequency: isMedicationEntry ? (medication.fields?.frequency ?? undefined) : undefined,
   };
 }
