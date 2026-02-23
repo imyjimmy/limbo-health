@@ -22,9 +22,6 @@ const { verifyEvent, validateEvent } = require('nostr-tools');
 // Import security configuration
 const configureSecurity = require('./security');
 
-const mgitUtils = require('./mgitUtils');
-const utils = require('./utils');
-
 const execAsync = promisify(exec);
 
 const app = express();
@@ -71,6 +68,9 @@ const pendingChallenges = new Map();
 // Path to repositories storage - secure path verified by security module
 const REPOS_PATH = security.ensureSecurePath();
 const GIT_PATH = 'git';
+const ENFORCE_ENCRYPTED_PUSHES = process.env.MGIT_ENFORCE_ENCRYPTED_PUSHES !== 'false';
+const HOOKS_PATH = path.join(__dirname, 'hooks');
+const PRE_RECEIVE_HOOK_PATH = path.join(HOOKS_PATH, 'pre-receive');
 
 // Get base URL from environment or construct from request
 const getBaseUrl = (req) => {
@@ -92,6 +92,17 @@ async function initializeServer() {
       fs.mkdirSync(REPOS_PATH, { recursive: true });
     }
     console.log(`✅ Repositories directory: ${REPOS_PATH}`);
+
+    if (ENFORCE_ENCRYPTED_PUSHES) {
+      if (!fs.existsSync(PRE_RECEIVE_HOOK_PATH)) {
+        throw new Error(`Missing required hook: ${PRE_RECEIVE_HOOK_PATH}`);
+      }
+
+      fs.chmodSync(PRE_RECEIVE_HOOK_PATH, 0o755);
+      console.log(`🔐 Encrypted push policy enabled via hooks path: ${HOOKS_PATH}`);
+    } else {
+      console.warn('⚠ Encrypted push policy is disabled (MGIT_ENFORCE_ENCRYPTED_PUSHES=false)');
+    }
   } catch (error) {
     console.error('❌ Failed to initialize server:', error);
     throw error;
@@ -859,77 +870,11 @@ app.post('/api/mgit/repos/create-bare', jwtOnly, async (req, res) => {
   }
 });
 
-app.post('/api/mgit/repos/create', jwtOnly, async (req, res) => {
-  try {
-    const { userId } = req.user;
-    const { repoName, userName, userEmail, description } = req.body;
-
-    if (!repoName || !userName || !userEmail) {
-      return res.status(400).json({
-        status: 'error',
-        reason: 'Display name, user name, and email are required'
-      });
-    }
-
-    const repoPath = path.join(REPOS_PATH, repoName);
-    if (fs.existsSync(repoPath)) {
-      return res.status(409).json({
-        status: 'error',
-        reason: 'Repository already exists'
-      });
-    }
-
-    // Create the repository on disk
-    console.log('REPOS_PATH:', REPOS_PATH);
-    const repoResult = await mgitUtils.createRepository(repoName, userName, userEmail, userId, description, REPOS_PATH);
-
-    if (!repoResult.success) {
-      return res.status(500).json({
-        status: 'error',
-        reason: 'Failed to create repository',
-        details: repoResult.error
-      });
-    }
-
-    // Register in auth-api
-    try {
-      await authApiClient.registerRepo({
-        repoId: repoName,
-        ownerUserId: userId,
-        description: description || 'Medical repository',
-        repoType: 'medical-history'
-      });
-    } catch (err) {
-      // Rollback: delete the repo directory
-      fs.rmSync(repoPath, { recursive: true, force: true });
-      throw err;
-    }
-
-    console.log(`✅ Registered auth config for '${repoName}'`);
-
-    res.json({
-      status: 'OK',
-      repoId: repoName,
-      repoPath: repoResult.repoPath,
-      cloneUrl: `http://localhost:3003/${repoName}`,
-      message: 'Repository created successfully'
-    });
-
-  } catch (error) {
-    console.error('Repository creation error:', error);
-
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        status: 'error',
-        reason: 'Token expired'
-      });
-    }
-
-    return res.status(500).json({
-      status: 'error',
-      reason: 'Repository creation failed: ' + error.message
-    });
-  }
+app.post('/api/mgit/repos/create', jwtOnly, async (_req, res) => {
+  return res.status(410).json({
+    status: 'error',
+    reason: 'Deprecated endpoint. Use /api/mgit/repos/create-bare and push encrypted commits from client.',
+  });
 });
 
 /* 
@@ -1082,7 +1027,10 @@ app.post('/api/mgit/repos/:repoId/git-receive-pack', authMiddleware, async (req,
   res.setHeader('Content-Type', 'application/x-git-receive-pack-result');
 
   const { spawn } = require('child_process');
-  const proc = spawn('git', ['receive-pack', '--stateless-rpc', repoPath]);
+  const receivePackArgs = ENFORCE_ENCRYPTED_PUSHES
+    ? ['-c', `core.hooksPath=${HOOKS_PATH}`, 'receive-pack', '--stateless-rpc', repoPath]
+    : ['receive-pack', '--stateless-rpc', repoPath];
+  const proc = spawn('git', receivePackArgs);
 
   req.pipe(proc.stdin);
   proc.stdout.pipe(res);

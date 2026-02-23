@@ -14,6 +14,7 @@ import {
   cloneRepo,
   readFile,
   uniqueRepoId,
+  makeEncryptedEnvelope,
 } from './setup/gitHelpers';
 import { registerRepoForCleanup } from './setup/globalSetup';
 import { cleanupAllTestRepos } from './setup/cleanup';
@@ -22,7 +23,7 @@ describe('Clone & Pull', () => {
   let jwt: string;
   let jwt2: string;
   const repoId = uniqueRepoId('clone');
-  const FILE_CONTENT = JSON.stringify({ type: 'test', data: 'initial' });
+  const FILE_CONTENT = makeEncryptedEnvelope('type:test,data:initial');
 
   beforeAll(async () => {
     jwt = await authenticate(1, 'patient');
@@ -91,7 +92,7 @@ describe('Clone & Pull', () => {
   it('should pull new commits after a second push', async () => {
     // Push a second file
     const { fs: pushFs, dir: pushDir } = await cloneRepo(repoId, jwt);
-    const secondContent = JSON.stringify({ type: 'lab', test: 'CBC' });
+    const secondContent = makeEncryptedEnvelope('type:lab,test:CBC');
     await createTestFile(pushFs, pushDir, 'labs/blood-test.json', secondContent);
     await pushRepo(repoId, pushFs, pushDir, jwt);
 

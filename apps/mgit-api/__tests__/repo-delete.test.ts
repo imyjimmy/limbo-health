@@ -17,6 +17,7 @@ import {
   pushRepo,
   cloneRepo,
   uniqueRepoId,
+  makeEncryptedEnvelope,
 } from './setup/gitHelpers';
 import { registerRepoForCleanup } from './setup/globalSetup';
 import { cleanupAllTestRepos } from './setup/cleanup';
@@ -68,7 +69,7 @@ describe('Repository Delete Endpoint', () => {
       fs,
       dir,
       'patient-info.json',
-      JSON.stringify({ type: 'patient-info', name: 'Delete Test Patient' }),
+      makeEncryptedEnvelope('patient-info:Delete Test Patient'),
     );
     const pushResult = await pushRepo(repoId, fs, dir, ownerJwt);
     expect(pushResult.ok).toBe(true);
@@ -121,4 +122,3 @@ describe('Repository Delete Endpoint', () => {
     }
   });
 });
-

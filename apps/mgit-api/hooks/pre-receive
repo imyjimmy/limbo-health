@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ZERO_OID='0000000000000000000000000000000000000000'
+MAX_BLOB_BYTES="${MGIT_POLICY_MAX_BLOB_BYTES:-10485760}"
+
+is_base64_envelope() {
+  local value="$1"
+  local min_len="$2"
+
+  [[ -n "$value" ]] || return 1
+  [[ ${#value} -ge "$min_len" ]] || return 1
+  [[ $(( ${#value} % 4 )) -eq 0 ]] || return 1
+  [[ "$value" =~ ^[A-Za-z0-9+/=]+$ ]] || return 1
+  [[ "$value" =~ ^A ]] || return 1
+  return 0
+}
+
+commit_message_is_encrypted() {
+  local commit_oid="$1"
+  local compact
+
+  compact="$(git log -1 --format=%B "$commit_oid" | tr -d '\r\n')"
+  is_base64_envelope "$compact" 48
+}
+
+blob_is_encrypted() {
+  local blob_oid="$1"
+  local blob_size
+  local compact_len
+  local first_char
+  local first_byte
+
+  blob_size="$(git cat-file -s "$blob_oid")"
+  if [[ "$blob_size" -gt "$MAX_BLOB_BYTES" ]]; then
+    return 1
+  fi
+
+  # Text envelope: base64-like NIP-44 payload.
+  if [[ "$(git cat-file blob "$blob_oid" | LC_ALL=C tr -d 'A-Za-z0-9+/=\r\n' | wc -c | tr -d ' ')" == "0" ]]; then
+    compact_len="$(git cat-file blob "$blob_oid" | tr -d '\r\n' | wc -c | tr -d ' ')"
+    first_char="$(git cat-file blob "$blob_oid" | tr -d '\r\n' | head -c 1)"
+    if [[ "$compact_len" -ge 48 ]] && [[ $(( compact_len % 4 )) -eq 0 ]] && [[ "$first_char" == "A" ]]; then
+      return 0
+    fi
+  fi
+
+  # Binary envelope: versioned payload (0x02...) used by large encrypted sidecars.
+  first_byte="$(git cat-file blob "$blob_oid" | head -c 1 | od -An -tx1 | tr -d ' \n')"
+  [[ "$first_byte" == "02" ]]
+}
+
+die() {
+  echo "MGIT_POLICY_REJECT: $1" >&2
+  exit 1
+}
+
+ranges_file="$(mktemp)"
+commits_file="$(mktemp)"
+objects_file="$(mktemp)"
+trap 'rm -f "$ranges_file" "$commits_file" "$objects_file"' EXIT
+
+while read -r old_oid new_oid _refname; do
+  if [[ "$new_oid" == "$ZERO_OID" ]]; then
+    continue
+  fi
+
+  if [[ "$old_oid" == "$ZERO_OID" ]]; then
+    echo "$new_oid" >> "$ranges_file"
+  else
+    echo "${old_oid}..${new_oid}" >> "$ranges_file"
+  fi
+done
+
+if [[ ! -s "$ranges_file" ]]; then
+  exit 0
+fi
+
+while read -r range; do
+  git rev-list "$range"
+done < "$ranges_file" | sort -u > "$commits_file"
+
+while read -r commit_oid; do
+  if ! commit_message_is_encrypted "$commit_oid"; then
+    die "commit message is not an encrypted envelope (commit=$commit_oid)"
+  fi
+done < "$commits_file"
+
+while read -r range; do
+  git rev-list --objects "$range"
+done < "$ranges_file" \
+  | awk '{ oid=$1; $1=""; sub(/^ /, ""); print oid "\t" $0 }' \
+  | awk -F'\t' '!seen[$1]++ { print }' > "$objects_file"
+
+while IFS=$'\t' read -r object_oid object_path; do
+  object_type="$(git cat-file -t "$object_oid" 2>/dev/null || true)"
+  if [[ "$object_type" != "blob" ]]; then
+    continue
+  fi
+
+  if ! blob_is_encrypted "$object_oid"; then
+    die "blob is not an encrypted envelope (blob=$object_oid path=$object_path)"
+  fi
+done < "$objects_file"
+
+exit 0

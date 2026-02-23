@@ -22,6 +22,7 @@ import {
   readFile,
   getCommitLog,
   uniqueRepoId,
+  makeEncryptedEnvelope,
 } from './setup/gitHelpers';
 import { registerRepoForCleanup } from './setup/globalSetup';
 import { cleanupAllTestRepos } from './setup/cleanup';
@@ -31,23 +32,9 @@ describe('Git Round-Trip Lifecycle', () => {
   const repoId = uniqueRepoId('roundtrip');
 
   // Canned test data
-  const visitData = JSON.stringify({
-    type: 'visit',
-    date: '2025-01-15',
-    provider: 'Dr. Test',
-    notes: 'Annual checkup — all clear.',
-  });
-  const labData = JSON.stringify({
-    type: 'lab',
-    date: '2025-01-15',
-    test: 'CBC',
-    result: 'normal',
-  });
-  const patientInfo = JSON.stringify({
-    type: 'patient-info',
-    name: 'Test Patient',
-    dob: '1990-01-01',
-  });
+  const visitData = makeEncryptedEnvelope('visit:2025-01-15:Dr. Test');
+  const labData = makeEncryptedEnvelope('lab:2025-01-15:CBC:normal');
+  const patientInfo = makeEncryptedEnvelope('patient-info:Test Patient:1990-01-01');
 
   beforeAll(async () => {
     jwt = await authenticate(1, 'patient');
@@ -108,12 +95,9 @@ describe('Git Round-Trip Lifecycle', () => {
 
     // ── 5. Modify one file ─────────────────────────────────────────
 
-    const updatedPatientInfo = JSON.stringify({
-      type: 'patient-info',
-      name: 'Test Patient',
-      dob: '1990-01-01',
-      phone: '555-0123',
-    });
+    const updatedPatientInfo = makeEncryptedEnvelope(
+      'patient-info:Test Patient:1990-01-01:555-0123',
+    );
 
     await cloneFs.promises.writeFile(
       `${cloneDir}/patient-info.json`,
@@ -124,18 +108,13 @@ describe('Git Round-Trip Lifecycle', () => {
     await git.commit({
       fs: cloneFs,
       dir: cloneDir,
-      message: 'Update patient info with phone',
+      message: makeEncryptedEnvelope('Update patient info with phone'),
       author: { name: 'Test User', email: 'test@limbo.health' },
     });
 
     // ── 6. Add a fourth file ───────────────────────────────────────
 
-    const imagingData = JSON.stringify({
-      type: 'imaging',
-      date: '2025-01-16',
-      modality: 'X-ray',
-      region: 'chest',
-    });
+    const imagingData = makeEncryptedEnvelope('imaging:2025-01-16:X-ray:chest');
 
     await createTestFile(
       cloneFs, cloneDir,
@@ -171,8 +150,8 @@ describe('Git Round-Trip Lifecycle', () => {
     // 5 commits: visit, lab, patient-info, update patient-info, imaging
     expect(log).toHaveLength(5);
 
-    // Most recent first
-    expect(log[0].message).toBe('Add chest X-ray report');
-    expect(log[log.length - 1].message).toBe('Add visit record');
+    // Most recent first; commit messages must remain encrypted envelopes at rest.
+    expect(log[0].message).toMatch(/^A[A-Za-z0-9+/=]{47,}$/);
+    expect(log[log.length - 1].message).toMatch(/^A[A-Za-z0-9+/=]{47,}$/);
   });
 });

@@ -31,6 +31,24 @@ function authHeaders(jwt: string): Record<string, string> {
   return jwt ? { Authorization: `Bearer ${jwt}` } : {};
 }
 
+/**
+ * Test-only encrypted envelope fixture.
+ * Produces a deterministic base64-like payload that matches server policy checks.
+ */
+export function makeEncryptedEnvelope(seed: string): string {
+  const encoded = Buffer.from(seed, 'utf8').toString('base64');
+  let envelope = `A${encoded}`;
+
+  while (envelope.length < 64) {
+    envelope += 'A';
+  }
+  while (envelope.length % 4 !== 0) {
+    envelope += '=';
+  }
+
+  return envelope;
+}
+
 // ─── Init ──────────────────────────────────────────────────────────
 
 /**
@@ -160,10 +178,14 @@ export async function createTestFile(
   await fs.promises.writeFile(fullPath, content, 'utf8');
   await git.add({ fs, dir, filepath });
 
+  const encryptedCommitMessage = makeEncryptedEnvelope(
+    commitMessage || `Add ${filepath}`,
+  );
+
   return git.commit({
     fs,
     dir,
-    message: commitMessage || `Add ${filepath}`,
+    message: encryptedCommitMessage,
     author: { name: 'Test User', email: 'test@limbo.health' },
   });
 }

@@ -17,6 +17,7 @@ import {
   createTestFile,
   pushRepo,
   uniqueRepoId,
+  makeEncryptedEnvelope,
 } from './setup/gitHelpers';
 import { registerRepoForCleanup } from './setup/globalSetup';
 import { cleanupAllTestRepos } from './setup/cleanup';
@@ -49,7 +50,7 @@ describe('Create & Push', () => {
       fs,
       dir,
       'patient-info.json',
-      JSON.stringify({ type: 'patient-info', name: 'Test Patient' }),
+      makeEncryptedEnvelope('patient-info:Test Patient'),
     );
 
     // Step 3 — push
