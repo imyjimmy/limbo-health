@@ -303,7 +303,8 @@ eas env:create --name EXPO_PUBLIC_EXAMPLE --value "value" --environment producti
 cd apps/react-native
 
 # Production build (App Store / TestFlight)
-eas build --platform ios --profile production
+# This bumps expo.version patch (x.y.z -> x.y.z+1) before running EAS build.
+npm run build:ios:production
 
 # Simulator build (for local QA on iPad/iPhone simulators)
 eas build --platform ios --profile production-simulator
@@ -327,7 +328,7 @@ This requires interactive Apple ID login. After upload, go to [App Store Connect
 
 | Profile | Purpose | Distribution |
 |---|---|---|
-| `production` | App Store / TestFlight | App Store (auto-increment) |
+| `production` | App Store / TestFlight | App Store (auto-increment iOS build number) |
 | `production-simulator` | Local simulator testing of release builds | Simulator |
 | `development` | Dev client with Expo DevTools | Internal |
 
