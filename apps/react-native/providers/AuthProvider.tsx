@@ -24,6 +24,7 @@ import { decode as base64Decode } from '../core/crypto/base64';
 const JWT_STORAGE_KEY = 'limbo_jwt';
 const LOGIN_METHOD_KEY = 'limbo_login_method';
 const GOOGLE_PROFILE_KEY = 'limbo_google_profile';
+const STARTUP_SECURE_STORE_DELAY_MS = 350;
 
 // --- Context ---
 
@@ -115,6 +116,39 @@ function applyProfileSnapshot(prev: AuthState, profile: ProfileSnapshot): AuthSt
   };
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function secureStoreGetSafe(key: string): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(key);
+  } catch (err) {
+    console.warn(`[AuthProvider] SecureStore get failed for "${key}"`, err);
+    return null;
+  }
+}
+
+async function secureStoreSetSafe(key: string, value: string): Promise<boolean> {
+  try {
+    await SecureStore.setItemAsync(key, value);
+    return true;
+  } catch (err) {
+    console.warn(`[AuthProvider] SecureStore set failed for "${key}"`, err);
+    return false;
+  }
+}
+
+function parseJsonSafe<T>(raw: string | null, label: string): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    console.warn(`[AuthProvider] Failed to parse "${label}" JSON`, err);
+    return null;
+  }
+}
+
 /** Best-effort fetch of profile data from /api/auth/me. Returns empty payload on failure. */
 async function fetchProfile(jwt: string): Promise<ProfileSnapshot> {
   try {
@@ -151,32 +185,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- Startup: check for stored credentials ---
 
   useEffect(() => {
-    (async () => {
-      try {
-        const loginMethod = await SecureStore.getItemAsync(LOGIN_METHOD_KEY) as LoginMethod | null;
+    let cancelled = false;
 
-        if (loginMethod === 'google') {
+    const setStateSafe = (next: AuthState): void => {
+      if (!cancelled) setState(next);
+    };
+
+    const setPrivkeySafe = (next: Uint8Array | null): void => {
+      if (!cancelled) setPrivkeyRef(next);
+    };
+
+    const setHasStoredNostrKeySafe = (next: boolean): void => {
+      if (!cancelled) setHasStoredNostrKey(next);
+    };
+
+    const hasStoredKeySafe = async (): Promise<boolean> => {
+      try {
+        return await keyManager.hasStoredKey();
+      } catch (err) {
+        console.warn('[AuthProvider] hasStoredKey failed during startup', err);
+        return false;
+      }
+    };
+
+    const getMasterPrivkeySafe = async (): Promise<Uint8Array | null> => {
+      try {
+        return await keyManager.getMasterPrivkey();
+      } catch (err) {
+        console.warn('[AuthProvider] getMasterPrivkey failed during startup', err);
+        return null;
+      }
+    };
+
+    (async () => {
+      let startupLoginMethod: LoginMethod | null = null;
+
+      try {
+        // Delay first SecureStore access slightly to avoid launch-window crashes
+        // seen on specific iOS patch builds with TurboModule startup pressure.
+        await sleep(STARTUP_SECURE_STORE_DELAY_MS);
+        if (cancelled) return;
+
+        const storedLoginMethod = await secureStoreGetSafe(LOGIN_METHOD_KEY);
+        startupLoginMethod = storedLoginMethod === 'google' || storedLoginMethod === 'nostr'
+          ? storedLoginMethod
+          : null;
+
+        if (startupLoginMethod === 'google') {
           // --- Google startup path ---
-          const storedJwt = await SecureStore.getItemAsync(JWT_STORAGE_KEY);
-          const cachedProfile = await SecureStore.getItemAsync(GOOGLE_PROFILE_KEY);
-          const googleProfile: GoogleProfile | null = cachedProfile ? JSON.parse(cachedProfile) : null;
-          const hasNostrKey = await keyManager.hasStoredKey();
-          setHasStoredNostrKey(hasNostrKey);
+          const storedJwt = await secureStoreGetSafe(JWT_STORAGE_KEY);
+          const cachedProfile = await secureStoreGetSafe(GOOGLE_PROFILE_KEY);
+          const googleProfile = parseJsonSafe<GoogleProfile>(cachedProfile, GOOGLE_PROFILE_KEY);
+          const hasNostrKey = await hasStoredKeySafe();
+          setHasStoredNostrKeySafe(hasNostrKey);
 
           if (storedJwt && !isJwtExpired(storedJwt)) {
             // Check if user also has a Nostr key stored (added after Google login)
             let pubkey: string | null = null;
             if (hasNostrKey) {
-              const privkey = await keyManager.getMasterPrivkey();
+              const privkey = await getMasterPrivkeySafe();
               if (privkey) {
-                setPrivkeyRef(privkey);
+                setPrivkeySafe(privkey);
                 pubkey = KeyManager.pubkeyFromPrivkey(privkey);
               }
             }
 
-            const cachedMeta = await SecureStore.getItemAsync('limbo_metadata');
-            const metadata = cachedMeta ? JSON.parse(cachedMeta) : null;
-            setState({
+            const cachedMeta = await secureStoreGetSafe('limbo_metadata');
+            const metadata = parseJsonSafe<NostrMetadata>(cachedMeta, 'limbo_metadata');
+            setStateSafe({
               status: 'authenticated',
               jwt: storedJwt,
               pubkey,
@@ -185,68 +261,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               googleProfile,
               connections: [],
             });
-            fetchProfile(storedJwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
+            fetchProfile(storedJwt).then((profile) => {
+              if (cancelled) return;
+              setState(prev => applyProfileSnapshot(prev, profile));
+            });
           } else {
             // JWT expired — need to re-login with Google (no refresh token in v1)
-            setState({ ...emptyState('expired'), loginMethod: 'google', googleProfile });
+            setStateSafe({ ...emptyState('expired'), loginMethod: 'google', googleProfile });
           }
           return;
         }
 
         // --- Nostr startup path: only auto-login if last session was Nostr ---
-        if (loginMethod !== 'nostr') {
-          setState(emptyState('onboarding'));
+        if (startupLoginMethod !== 'nostr') {
+          setHasStoredNostrKeySafe(false);
+          setStateSafe(emptyState('onboarding'));
           return;
         }
 
-        const hasKey = await keyManager.hasStoredKey();
-        setHasStoredNostrKey(hasKey);
+        const hasKey = await hasStoredKeySafe();
+        setHasStoredNostrKeySafe(hasKey);
         if (!hasKey) {
-          setState(emptyState('onboarding'));
+          setStateSafe(emptyState('onboarding'));
           return;
         }
 
         // Key exists — single biometric unlock to get privkey
-        const privkey = await keyManager.getMasterPrivkey();
+        const privkey = await getMasterPrivkeySafe();
         if (!privkey) {
-          setState(emptyState('onboarding'));
+          setStateSafe(emptyState('onboarding'));
           return;
         }
-        setPrivkeyRef(privkey);
+        setPrivkeySafe(privkey);
         const pubkey = KeyManager.pubkeyFromPrivkey(privkey);
 
         // Check for stored JWT
-        const storedJwt = await SecureStore.getItemAsync(JWT_STORAGE_KEY);
+        const storedJwt = await secureStoreGetSafe(JWT_STORAGE_KEY);
         if (storedJwt && !isJwtExpired(storedJwt)) {
-          const cachedMeta = await SecureStore.getItemAsync('limbo_metadata');
-          const metadata = cachedMeta ? JSON.parse(cachedMeta) : null;
-          setState({ status: 'authenticated', jwt: storedJwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
-          fetchProfile(storedJwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
+          const cachedMeta = await secureStoreGetSafe('limbo_metadata');
+          const metadata = parseJsonSafe<NostrMetadata>(cachedMeta, 'limbo_metadata');
+          setStateSafe({ status: 'authenticated', jwt: storedJwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
+          fetchProfile(storedJwt).then((profile) => {
+            if (cancelled) return;
+            setState(prev => applyProfileSnapshot(prev, profile));
+          });
           return;
         }
 
         // JWT missing or expired — silent re-auth (no additional biometric)
         const auth = await authenticateNostr(privkey, API_BASE_URL);
-        await SecureStore.setItemAsync(JWT_STORAGE_KEY, auth.jwt);
-        if (auth.metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(auth.metadata));
-        setState({ status: 'authenticated', jwt: auth.jwt, pubkey: auth.pubkey, metadata: auth.metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
-        fetchProfile(auth.jwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
+        await secureStoreSetSafe(JWT_STORAGE_KEY, auth.jwt);
+        if (auth.metadata) await secureStoreSetSafe('limbo_metadata', JSON.stringify(auth.metadata));
+        setStateSafe({ status: 'authenticated', jwt: auth.jwt, pubkey: auth.pubkey, metadata: auth.metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
+        fetchProfile(auth.jwt).then((profile) => {
+          if (cancelled) return;
+          setState(prev => applyProfileSnapshot(prev, profile));
+        });
       } catch (err) {
         console.error('Auth startup failed:', err);
-        const hasKey = await keyManager.hasStoredKey().catch(() => false);
-        const loginMethod = await SecureStore.getItemAsync(LOGIN_METHOD_KEY) as LoginMethod | null;
-        setHasStoredNostrKey(hasKey);
-        setState({
-          status: hasKey ? 'expired' : 'onboarding',
-          jwt: null,
-          pubkey: null,
-          metadata: null,
-          loginMethod,
-          googleProfile: null,
-          connections: [],
-        });
+        setHasStoredNostrKeySafe(false);
+        if (startupLoginMethod === 'google') {
+          setStateSafe({ ...emptyState('expired'), loginMethod: 'google' });
+          return;
+        }
+        setStateSafe(emptyState('onboarding'));
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [keyManager]);
 
   // --- Post-login biometric unlock for Google users with existing local key ---

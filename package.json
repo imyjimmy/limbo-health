@@ -16,6 +16,7 @@
     "mgit:start": "cd apps/mgit-api && npm start",
     "admin:dev": "cd apps/admin-frontend && npm run dev",
     "patient:dev": "cd apps/patient-frontend && npm run dev",
+    "mobile:build:ios:production": "npm --prefix apps/react-native run build:ios:production",
     "restart": "docker-compose -f docker-compose.yml -f docker-compose.development.yml restart",
     "down": "docker-compose -f docker-compose.yml -f docker-compose.development.yml down",
     "up": "docker-compose -f docker-compose.yml -f docker-compose.development.yml up -d",
