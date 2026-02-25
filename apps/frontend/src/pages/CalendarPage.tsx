@@ -1,5 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ArrowPathIcon, Squares2X2Icon, XMarkIcon } from '@heroicons/react/24/outline';
+import {
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconLayoutGrid,
+  IconRefresh,
+  IconX,
+} from '@tabler/icons-react';
 
 interface TimeSlot {
   time: string;
@@ -39,7 +46,7 @@ const AddEventModal: React.FC<AddEventModalProps> = ({ isOpen, onClose }) => {
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            <XMarkIcon className="w-6 h-8" />
+            <IconX className="w-6 h-8" />
           </button>
         </div>
 
@@ -398,13 +405,13 @@ export const CalendarPage: React.FC<ApptProps> = ({ token }) => {
           {/* View Options */}
           <div className="flex items-center space-x-2">
             <button className="p-2 text-muted-foreground hover:text-foreground bg-muted rounded">
-              <CalendarIcon className="w-4 h-8" />
+              <IconCalendar className="w-4 h-8" />
             </button>
             <button className="p-2 text-muted-foreground hover:text-foreground bg-muted rounded">
-              <ArrowPathIcon className="w-4 h-8" />
+              <IconRefresh className="w-4 h-8" />
             </button>
             <button className="p-2 text-muted-foreground hover:text-foreground bg-muted rounded">
-              <Squares2X2Icon className="w-4 h-8" />
+              <IconLayoutGrid className="w-4 h-8" />
             </button>
           </div>
         </div>
@@ -416,13 +423,13 @@ export const CalendarPage: React.FC<ApptProps> = ({ token }) => {
               onClick={goToPreviousWeek}
               className="p-2 text-muted-foreground hover:text-foreground"
             >
-              <ChevronLeftIcon className="w-5 h-5" />
+              <IconChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={goToNextWeek}
               className="p-2 text-muted-foreground hover:text-foreground"
             >
-              <ChevronRightIcon className="w-5 h-5" />
+              <IconChevronRight className="w-5 h-5" />
             </button>
             <button
               onClick={goToToday}

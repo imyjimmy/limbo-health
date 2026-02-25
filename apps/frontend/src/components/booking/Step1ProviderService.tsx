@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Combobox, ComboboxButton, ComboboxInput, ComboboxOption, ComboboxOptions, Label } from '@headlessui/react';
-import { ChevronDownIcon } from '@heroicons/react/20/solid';
+import { IconChevronDown } from '@tabler/icons-react';
 import { BookingData } from './BookingWorkflow';
 
 interface Step1Props {
@@ -192,7 +192,7 @@ export function Step1ProviderService({ data, onNext, onUpdate, providerId }: Ste
               disabled={isProviderLocked}
             />
             <ComboboxButton className="absolute inset-y-0 right-0 flex items-center rounded-r-md px-2 focus:outline-none">
-              <ChevronDownIcon className="size-5 text-gray-400" aria-hidden="true" />
+              <IconChevronDown className="size-5 text-gray-400" aria-hidden="true" />
             </ComboboxButton>
 
             {!isProviderLocked && (
@@ -240,7 +240,7 @@ export function Step1ProviderService({ data, onNext, onUpdate, providerId }: Ste
                 {loadingServices ? (
                   <div className="animate-spin h-5 w-5 border-2 border-gray-300 border-t-indigo-600 rounded-full"></div>
                 ) : (
-                  <ChevronDownIcon className="size-5 text-gray-400" aria-hidden="true" />
+                  <IconChevronDown className="size-5 text-gray-400" aria-hidden="true" />
                 )}
               </ComboboxButton>
 

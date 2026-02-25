@@ -1,21 +1,21 @@
-import { CloudArrowUpIcon, LockClosedIcon, ServerIcon } from '@heroicons/react/20/solid'
+import { IconCloudUpload, IconLock, IconServer2 } from '@tabler/icons-react'
 
 const features = [
   {
     name: 'Doctors: Reach Patients Worldwide',
     description:
       'Connect with a global community of health-conscious patients and receive instant, borderless payments for your expertise.',
-    icon: CloudArrowUpIcon,
+    icon: IconCloudUpload,
   },
   {
     name: 'Patients: Talk to a BVSD Doc',
     description: 'Connect with a doctor who escaped the fiat healthcare system. Experience pre-1950s healthcare with 2025 technology.',
-    icon: LockClosedIcon,
+    icon: IconLock,
   },
   {
     name: 'Minimum Bureaucracy',
     description: 'We hate filling out forms as much as anyone. Our promise to both patients and doctors--we ask for the bare minimum in busywork. Just whatever we have to do to avoid jail.',
-    icon: ServerIcon,
+    icon: IconServer2,
   },
 ]
 

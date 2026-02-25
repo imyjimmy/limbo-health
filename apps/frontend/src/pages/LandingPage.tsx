@@ -1,11 +1,11 @@
 import type { ElementType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowRightIcon,
-  CpuChipIcon,
-  GlobeAmericasIcon,
-  MegaphoneIcon,
-} from '@heroicons/react/24/outline';
+  IconArrowRight,
+  IconCpu,
+  IconSpeakerphone,
+  IconWorld,
+} from '@tabler/icons-react';
 
 type Feature = {
   icon: ElementType;
@@ -16,21 +16,21 @@ type Feature = {
 
 const features: Feature[] = [
   {
-    icon: MegaphoneIcon,
+    icon: IconSpeakerphone,
     title: 'A Medical Advocate at the Palm of Your Hands',
     description:
       'Bring timestamps, symptom history, meds, and outcomes into every visit so your concerns are harder to dismiss.',
     // terminal: 'git log --oneline medical-history',
   },
   {
-    icon: GlobeAmericasIcon,
+    icon: IconWorld,
     title: 'A Personal Medical Record That Moves with You.',
     description:
       'Carry your complete medical record everywhere. Instant access during emergencies, travel, or new doctor visits.',
     // terminal: 'git pull --all records',
   },
   {
-    icon: CpuChipIcon,
+    icon: IconCpu,
     title: 'The Missing Foundation for AI Medicine',
     description:
       'Portable personal medical records unlock AI medicine: richer context, earlier insights, and safer, personalized care.',
@@ -40,6 +40,7 @@ const features: Feature[] = [
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const appIconSrc = '/medrepo-icon.png';
 
   const handleNavigateToLogin = () => {
     navigate('/login');
@@ -54,7 +55,7 @@ export function LandingPage() {
       <nav className="fixed top-0 z-50 w-full border-b border-[rgba(255,255,255,0.08)] bg-[rgba(12,15,21,0.72)] backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-[1060px] items-center justify-between px-4 py-4 sm:px-6 md:px-8 lg:px-0">
           <div className="flex items-center gap-3">
-            <img src="/public/medrepo-icon.png" alt="MedRepo icon" className="h-9 w-9 rounded-lg" />
+            <img src={appIconSrc} alt="MedRepo icon" className="h-9 w-9 rounded-lg" />
             <span className="font-berkeley text-lg tracking-[0.03em]">
               Limbo<span className="text-[#ff7d66]">Health</span>
             </span>
@@ -76,7 +77,7 @@ export function LandingPage() {
         <div className="relative mx-auto flex w-full max-w-[1060px] flex-col items-center text-center">
           <div className="mb-8 flex justify-center">
             <img
-              src="/public/medrepo-icon.png"
+              src={appIconSrc}
               alt="MedRepo"
               className="h-24 w-24 rounded-3xl shadow-[0_4px_10px_rgba(217,82,55,0.14)] sm:h-28 sm:w-28"
             />
@@ -101,7 +102,7 @@ export function LandingPage() {
               onClick={handleNavigateToLogin}
               className="flex items-center gap-2 rounded-xl bg-[#ff725a] px-8 py-3.5 text-base font-semibold text-[#fff5ec] shadow-[0_8px_18px_rgba(169,56,34,0.28)] transition-opacity hover:opacity-90"
             >
-              Get the App <ArrowRightIcon className="h-4 w-4" />
+              Get the App <IconArrowRight className="h-4 w-4" />
             </button>
             <button
               onClick={handleScrollToFeatures}
@@ -145,7 +146,7 @@ export function LandingPage() {
             onClick={handleNavigateToLogin}
             className="mx-auto flex items-center gap-2 rounded-xl bg-[#ff725a] px-8 py-3.5 font-semibold text-[#fff5ec] transition-opacity hover:opacity-90"
           >
-            Enter Doctor Portal <ArrowRightIcon className="h-4 w-4" />
+            Enter Doctor Portal <IconArrowRight className="h-4 w-4" />
           </button>
         </div>
       </section>
@@ -153,7 +154,7 @@ export function LandingPage() {
       <footer className="border-t border-[rgba(255,255,255,0.10)] px-4 py-8 sm:px-6 md:px-8 lg:px-0">
         <div className="mx-auto flex w-full max-w-[1060px] items-center justify-between text-sm text-[rgba(246,239,231,0.62)]">
           <div className="flex items-center gap-2">
-            <img src="/public/medrepo-icon.png" alt="MedRepo" className="h-5 w-5 rounded" />
+            <img src={appIconSrc} alt="MedRepo" className="h-5 w-5 rounded" />
             <span>Limbo Health</span>
           </div>
           <span>© {new Date().getFullYear()} All rights reserved.</span>

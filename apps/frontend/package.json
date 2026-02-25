@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.7",
-    "@heroicons/react": "^2.2.0",
     "@isomorphic-git/lightning-fs": "^4.6.2",
     "@noble/ciphers": "^2.1.1",
     "@noble/curves": "^2.0.1",
