@@ -214,37 +214,6 @@ docker-compose -f docker-compose.yml -f docker-compose.development.yml up -d --b
 docker-compose down
 ```
 
-## Git Hooks And Test Gates
-
-Tiered local gates are configured:
-
-- `pre-commit` (fast): staged whitespace/conflict checks, optional lint if a root `lint` script exists.
-- `pre-push` (heavier): root integration tests + React Native Jest tests.
-
-Install hooks once per clone:
-
-```bash
-npm run hooks:install
-```
-
-Run gates manually:
-
-```bash
-npm run hooks:precommit
-npm run hooks:prepush
-```
-
-Optional pre-push skip flags:
-
-```bash
-# One push only
-SKIP_PREPUSH_TESTS=1 git push
-
-# Persistent local toggle (until unset)
-git config hooks.skipPrePushTests true
-git config --unset hooks.skipPrePushTests
-```
-
 ## Testing
 
 Integration tests now live under each service:
