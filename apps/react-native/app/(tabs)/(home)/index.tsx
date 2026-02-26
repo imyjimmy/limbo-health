@@ -24,12 +24,28 @@ import type { MedicalDocument } from '../../../types/document';
 import { useShareSession } from '../../../hooks/useShareSession';
 import { QRDisplay } from '../../../components/QRDisplay';
 import { SwipeableRow } from '../../../components/binder/SwipeableRow';
+import {
+  BINDER_TEXTURE_OPTIONS,
+  BinderTextureBackground,
+  DEFAULT_BINDER_TEXTURE_ID,
+  isBinderTextureId,
+  type BinderTextureId,
+} from '../../../components/binder/BinderTextureBackground';
 
 // --- Types ---
 
 interface RepoSummary {
   id: string;
   name: string;
+  isCloned?: boolean;
+  authorName?: string;
+  authorEmail?: string;
+  lastUpdatedAt?: string;
+  lastCommitMessage?: string;
+  patientCreatedAt?: string;
+  folderCount?: number;
+  entryCount?: number;
+  attachmentCount?: number;
 }
 
 type ScreenState =
@@ -48,6 +64,8 @@ interface DecryptedEntry {
 // --- Helpers ---
 
 const BINDERS_ROOT = `${RNFS.DocumentDirectoryPath}/binders`;
+const LAST_BINDER_KEY = 'limbo_last_binder';
+const BINDER_TEXTURES_KEY = 'limbo_binder_card_textures_v1';
 
 function repoDir(repoId: string): string {
   return `binders/${repoId}`;
@@ -56,6 +74,19 @@ function repoDir(repoId: string): string {
 async function isAlreadyCloned(repoId: string): Promise<boolean> {
   const gitDir = `${BINDERS_ROOT}/${repoId}/.git`;
   return RNFS.exists(gitDir);
+}
+
+function extractPatientCreatedAt(docValue: string): string | undefined {
+  const createdLine = docValue
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.startsWith('Created:'));
+
+  if (!createdLine) return undefined;
+
+  const createdAtRaw = createdLine.slice('Created:'.length).trim();
+  const parsed = new Date(createdAtRaw);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
 // --- Screen ---
@@ -69,6 +100,8 @@ export default function BinderListScreen() {
   const [screenState, setScreenState] = useState<ScreenState>({
     phase: 'loading-repos',
   });
+  const [binderTextures, setBinderTextures] = useState<Record<string, BinderTextureId>>({});
+  const [expandedTextureCards, setExpandedTextureCards] = useState<Record<string, boolean>>({});
 
   const binderRef = useRef<BinderService | null>(null);
 
@@ -115,25 +148,81 @@ export default function BinderListScreen() {
           }))
       ).filter((r: RepoSummary) => !r.id.startsWith('scan-'));
 
-      // Enrich with local binder names from encrypted patient-info.json
+      // Enrich binder cards with local metadata from git + patient-info.
       const enriched = await Promise.all(
         rawList.map(async (repo) => {
-          if (!masterConversationKey) return repo;
+          const cloned = await isAlreadyCloned(repo.id);
+          const dir = repoDir(repo.id);
+          let result: RepoSummary = { ...repo, isCloned: cloned };
+          if (!cloned) return result;
+
+          const { GitEngine } = await import('../../../core/git/GitEngine');
+
           try {
-            const cloned = await isAlreadyCloned(repo.id);
-            if (!cloned) return repo;
-            const dir = repoDir(repo.id);
+            const files = await GitEngine.listFiles(dir);
+            const folderSet = new Set<string>();
+            let entryCount = 0;
+            let attachmentCount = 0;
+
+            for (const file of files) {
+              if (file.endsWith('/.meta.json')) {
+                folderSet.add(file.slice(0, -'/.meta.json'.length));
+                continue;
+              }
+
+              if (file.endsWith('.enc')) {
+                attachmentCount += 1;
+                continue;
+              }
+
+              if (file.endsWith('.json') && file !== 'patient-info.json') {
+                entryCount += 1;
+              }
+            }
+
+            result = {
+              ...result,
+              folderCount: folderSet.size,
+              entryCount,
+              attachmentCount,
+            };
+          } catch {
+            // File metrics are non-blocking in binder list UI.
+          }
+
+          try {
+            const [latestCommit] = await GitEngine.log(dir, 1);
+            if (latestCommit) {
+              result = {
+                ...result,
+                authorName: latestCommit.author.name,
+                authorEmail: latestCommit.author.email,
+                lastUpdatedAt: new Date(latestCommit.author.timestamp * 1000).toISOString(),
+                lastCommitMessage: latestCommit.message.trim(),
+              };
+            }
+          } catch {
+            // Commit metadata is optional in list UI; ignore failures.
+          }
+
+          if (!masterConversationKey) return result;
+
+          try {
             const { createFSAdapter } = await import('../../../core/git/fsAdapter');
             const { EncryptedIO } = await import('../../../core/binder/EncryptedIO');
             const fs = createFSAdapter(dir);
             const io = new EncryptedIO(fs, masterConversationKey, dir);
             const doc = await io.readDocument('/patient-info.json');
-            // Name is stored as "# Name" on the first line of value
             const firstLine = doc.value?.split('\n')[0] ?? '';
             const name = firstLine.startsWith('# ') ? firstLine.slice(2).trim() : '';
-            return name ? { ...repo, name } : repo;
+
+            return {
+              ...result,
+              name: name || result.name,
+              patientCreatedAt: extractPatientCreatedAt(doc.value),
+            };
           } catch {
-            return repo;
+            return result;
           }
         }),
       );
@@ -145,7 +234,60 @@ export default function BinderListScreen() {
     }
   }, [jwt, masterConversationKey]);
 
-  const LAST_BINDER_KEY = 'limbo_last_binder';
+  useEffect(() => {
+    let isMounted = true;
+
+    (async () => {
+      try {
+        const storedTextures = await SecureStore.getItemAsync(BINDER_TEXTURES_KEY);
+        if (!isMounted || !storedTextures) return;
+
+        const parsedUnknown = JSON.parse(storedTextures) as unknown;
+        if (!parsedUnknown || typeof parsedUnknown !== 'object' || Array.isArray(parsedUnknown)) {
+          return;
+        }
+        const parsed = parsedUnknown as Record<string, unknown>;
+        const nextTextures: Record<string, BinderTextureId> = {};
+        for (const [repoId, maybeTexture] of Object.entries(parsed ?? {})) {
+          if (typeof maybeTexture === 'string' && isBinderTextureId(maybeTexture)) {
+            nextTextures[repoId] = maybeTexture;
+          }
+        }
+        setBinderTextures(nextTextures);
+      } catch (err) {
+        console.warn('Failed to read binder texture preferences:', err);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const persistTextureMap = useCallback((next: Record<string, BinderTextureId>) => {
+    SecureStore.setItemAsync(BINDER_TEXTURES_KEY, JSON.stringify(next)).catch((err) => {
+      console.warn('Failed to save binder texture preferences:', err);
+    });
+  }, []);
+
+  const selectTextureForRepo = useCallback(
+    (repoId: string, textureId: BinderTextureId) => {
+      setBinderTextures((prev) => {
+        if (prev[repoId] === textureId) return prev;
+        const next = { ...prev, [repoId]: textureId };
+        persistTextureMap(next);
+        return next;
+      });
+    },
+    [persistTextureMap],
+  );
+
+  const toggleTextureSectionForRepo = useCallback((repoId: string) => {
+    setExpandedTextureCards((prev) => ({
+      ...prev,
+      [repoId]: !(prev[repoId] ?? false),
+    }));
+  }, []);
 
   useEffect(() => {
     if (jwt && cryptoReady) fetchRepos();
@@ -286,6 +428,13 @@ export default function BinderListScreen() {
         if (prev.phase !== 'repos-loaded') return prev;
         return { ...prev, repos: prev.repos.filter((r) => r.id !== repo.id) };
       });
+      setBinderTextures((prev) => {
+        if (!(repo.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[repo.id];
+        persistTextureMap(next);
+        return next;
+      });
 
       // Delete from server
       if (jwt) {
@@ -312,7 +461,7 @@ export default function BinderListScreen() {
         console.warn('Failed to delete local binder:', err);
       }
     },
-    [jwt],
+    [jwt, persistTextureMap],
   );
 
   // --- Take photo and add to binder ---
@@ -409,22 +558,160 @@ export default function BinderListScreen() {
               </Pressable>
             </View>
           ) : (
-            screenState.repos.map((repo, index) => (
-              <View key={repo.id} style={{ marginBottom: 12 }}>
-                <SwipeableRow
-                  showWarning={true}
-                  onDelete={() => deleteBinder(repo)}
-                >
-                  <Pressable style={styles.repoCard} onPress={() => openBinder(repo)} testID={`binder-list-item-${index}`}>
-                    <Text style={styles.repoName}>{repo.name}</Text>
-                    <Text style={styles.repoId}>{repo.id}</Text>
-                  </Pressable>
-                </SwipeableRow>
-              </View>
-            ))
+            screenState.repos.map((repo, index) => {
+              const selectedTexture = binderTextures[repo.id] ?? DEFAULT_BINDER_TEXTURE_ID;
+              const isTextureExpanded = expandedTextureCards[repo.id] ?? false;
+              const updatedLabel = repo.lastUpdatedAt
+                ? new Date(repo.lastUpdatedAt).toLocaleString(undefined, {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                  })
+                : 'Not available';
+              const createdLabel = repo.patientCreatedAt
+                ? new Date(repo.patientCreatedAt).toLocaleDateString(undefined, {
+                    dateStyle: 'medium',
+                  })
+                : 'Not available';
+
+              return (
+                <View key={repo.id} style={styles.repoCardWrap}>
+                  <SwipeableRow
+                    showWarning={true}
+                    onDelete={() => deleteBinder(repo)}
+                  >
+                    <View style={styles.repoCard}>
+                      <BinderTextureBackground textureId={selectedTexture} />
+                      <View style={styles.repoCardOverlay} />
+                      <View style={styles.repoCardContent}>
+                        <Pressable
+                          style={styles.repoOpenArea}
+                          onPress={() => openBinder(repo)}
+                          testID={`binder-list-item-${index}`}
+                        >
+                          <Text style={styles.repoName} numberOfLines={1}>{repo.name}</Text>
+                          <Text style={styles.repoId} numberOfLines={1}>{repo.id}</Text>
+
+                          <View style={styles.repoMetaSection}>
+                            <View style={styles.repoMetaRow}>
+                              <Text style={styles.repoMetaLabel}>Author</Text>
+                              <Text style={styles.repoMetaValue} numberOfLines={1}>
+                                {repo.authorName ?? 'Not available'}
+                              </Text>
+                            </View>
+                            <View style={styles.repoMetaRow}>
+                              <Text style={styles.repoMetaLabel}>Updated</Text>
+                              <Text style={styles.repoMetaValue} numberOfLines={1}>
+                                {updatedLabel}
+                              </Text>
+                            </View>
+                            <View style={styles.repoMetaRow}>
+                              <Text style={styles.repoMetaLabel}>Created</Text>
+                              <Text style={styles.repoMetaValue} numberOfLines={1}>
+                                {createdLabel}
+                              </Text>
+                            </View>
+                            <View style={styles.repoMetaRow}>
+                              <Text style={styles.repoMetaLabel}>Entries</Text>
+                              <Text style={styles.repoMetaValue}>
+                                {repo.entryCount ?? 'Not available'}
+                              </Text>
+                            </View>
+                            <View style={styles.repoMetaRow}>
+                              <Text style={styles.repoMetaLabel}>Folders</Text>
+                              <Text style={styles.repoMetaValue}>
+                                {repo.folderCount ?? 'Not available'}
+                              </Text>
+                            </View>
+                            <View style={styles.repoMetaRow}>
+                              <Text style={styles.repoMetaLabel}>Attachments</Text>
+                              <Text style={styles.repoMetaValue}>
+                                {repo.attachmentCount ?? 'Not available'}
+                              </Text>
+                            </View>
+                            <View style={styles.repoMetaRow}>
+                              <Text style={styles.repoMetaLabel}>Local</Text>
+                              <Text style={styles.repoMetaValue}>
+                                {repo.isCloned ? 'Cloned' : 'Cloud only'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.repoCommitSection}>
+                            <Text style={styles.repoCommitLabel}>Last Commit</Text>
+                            <Text style={styles.repoCommitMessage} numberOfLines={2}>
+                              {repo.lastCommitMessage ?? 'No recent commit message'}
+                            </Text>
+                          </View>
+                        </Pressable>
+
+                        <View
+                          style={[
+                            styles.repoTextureSection,
+                            isTextureExpanded && styles.repoTextureSectionExpanded,
+                            !isTextureExpanded && styles.repoTextureSectionCollapsed,
+                          ]}
+                        >
+                          <Pressable
+                            style={[
+                              styles.repoTextureToggle,
+                              isTextureExpanded && styles.repoTextureToggleExpanded,
+                              !isTextureExpanded && styles.repoTextureToggleCollapsed,
+                            ]}
+                            onPress={() => toggleTextureSectionForRepo(repo.id)}
+                            testID={`binder-texture-toggle-${repo.id}`}
+                          >
+                            <Text style={styles.repoTextureChevron}>
+                              {isTextureExpanded ? '▾' : '▸'}
+                            </Text>
+                          </Pressable>
+
+                          {isTextureExpanded && (
+                            <View style={styles.repoTextureExpandedContent}>
+                              <Text style={styles.repoTextureTitle}>Card Texture</Text>
+                              <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.repoTextureContent}
+                              >
+                                {BINDER_TEXTURE_OPTIONS.map((texture) => {
+                                  const isSelected = texture.id === selectedTexture;
+                                  return (
+                                    <Pressable
+                                      key={texture.id}
+                                      style={styles.repoTextureOption}
+                                      onPress={() => selectTextureForRepo(repo.id, texture.id)}
+                                      testID={`binder-texture-${repo.id}-${texture.id}`}
+                                    >
+                                      <View
+                                        style={[
+                                          styles.repoTextureSwatch,
+                                          isSelected && styles.repoTextureSwatchSelected,
+                                        ]}
+                                      >
+                                        <BinderTextureBackground textureId={texture.id} />
+                                      </View>
+                                      <Text
+                                        style={[
+                                          styles.repoTextureLabel,
+                                          isSelected && styles.repoTextureLabelSelected,
+                                        ]}
+                                      >
+                                        {texture.label}
+                                      </Text>
+                                    </Pressable>
+                                  );
+                                })}
+                              </ScrollView>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  </SwipeableRow>
+                </View>
+              );
+            })
           )}
-          {/* Header row */}
-          
         </ScrollView>
       );
 
@@ -561,12 +848,137 @@ addPhotoButton: {
     // borderBottomColor: 'red',
   },
   loadingText: { fontSize: 15, color: '#666', marginTop: 12 },
+  repoCardWrap: {
+    marginBottom: 18,
+  },
   repoCard: {
-    backgroundColor: '#f5f5f5', borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#ffffff',
+    borderColor: 'rgba(17, 17, 17, 0.08)',
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  repoCardContent: {
+    position: 'relative',
+    zIndex: 2,
+  },
+  repoCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+  },
+  repoOpenArea: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 12,
   },
   repoId: { fontSize: 13, fontFamily: 'Courier', color: '#999' },
   repoName: { fontSize: 17, fontWeight: '600', color: '#111', marginBottom: 4 },
+  repoCommitLabel: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  repoCommitMessage: {
+    color: '#334155',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  repoCommitSection: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(17, 17, 17, 0.06)',
+    paddingTop: 8,
+  },
+  repoMetaLabel: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  repoMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 3,
+  },
+  repoMetaSection: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(17, 17, 17, 0.06)',
+  },
+  repoMetaValue: {
+    color: '#334155',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 12,
+    flex: 1,
+    textAlign: 'right',
+  },
+  repoTextureContent: {
+    paddingTop: 8,
+    paddingRight: 6,
+  },
+  repoTextureLabel: {
+    marginTop: 6,
+    fontSize: 11,
+    color: '#475569',
+  },
+  repoTextureLabelSelected: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  repoTextureOption: {
+    width: 70,
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  repoTextureSection: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(17, 17, 17, 0.06)',
+    paddingHorizontal: 16,
+  },
+  repoTextureSectionCollapsed: {
+    height: 24,
+  },
+  repoTextureSectionExpanded: {
+    paddingBottom: 16,
+  },
+  repoTextureToggle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  repoTextureToggleExpanded: {
+    minHeight: 24,
+  },
+  repoTextureToggleCollapsed: {
+    flex: 1,
+  },
+  repoTextureChevron: {
+    fontSize: 18,
+    color: '#334155',
+  },
+  repoTextureExpandedContent: {
+    paddingTop: 12,
+  },
+  repoTextureSwatch: {
+    width: 54,
+    height: 54,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(17, 17, 17, 0.14)',
+  },
+  repoTextureSwatchSelected: {
+    borderColor: '#007AFF',
+    borderWidth: 2,
+  },
+  repoTextureTitle: {
+    color: '#4B5563',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
   retryButton: {
     backgroundColor: '#111', borderRadius: 10,
     paddingVertical: 12, paddingHorizontal: 32,
