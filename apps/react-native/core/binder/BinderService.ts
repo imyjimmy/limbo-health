@@ -42,6 +42,7 @@ export interface PendingSidecarWrite {
 export class BinderService {
   private io: EncryptedIO;
   private info: BinderInfo;
+  private static writeQueues = new Map<string, Promise<void>>();
 
   constructor(info: BinderInfo, masterConversationKey: Uint8Array) {
     this.info = info;
@@ -162,6 +163,62 @@ export class BinderService {
     }
 
     return doc;
+  }
+
+  private async runSerializedWrite<T>(operation: () => Promise<T>): Promise<T> {
+    const key = this.info.repoDir;
+    const previous = BinderService.writeQueues.get(key) ?? Promise.resolve();
+    const result = previous.catch(() => undefined).then(operation);
+    const tail = result.then(() => undefined, () => undefined);
+    BinderService.writeQueues.set(key, tail);
+
+    try {
+      return await result;
+    } finally {
+      if (BinderService.writeQueues.get(key) === tail) {
+        BinderService.writeQueues.delete(key);
+      }
+    }
+  }
+
+  private evictAllCaches(): void {
+    dirEvictPrefix(`${this.info.repoDir}:`);
+    ptEvictPrefix(`${this.info.repoDir}:`);
+  }
+
+  private async pullLatest(): Promise<void> {
+    await GitEngine.pull(
+      this.info.repoDir,
+      this.info.repoId,
+      this.info.auth,
+      this.info.author,
+    );
+    this.evictAllCaches();
+  }
+
+  private isNonFastForwardPushError(err: unknown): boolean {
+    const message = err instanceof Error ? err.message : String(err ?? '');
+    const lower = message.toLowerCase();
+    return (
+      lower.includes('non-fast-forward')
+      || lower.includes('not a simple fast-forward')
+      || lower.includes('fetch first')
+      || (lower.includes('failed to push') && lower.includes('refs'))
+      || (lower.includes('push rejected') && lower.includes('fast-forward'))
+    );
+  }
+
+  private async pushWithPullRetry(): Promise<void> {
+    try {
+      await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+      return;
+    } catch (err) {
+      if (!this.isNonFastForwardPushError(err)) throw err;
+      console.warn('Push rejected (non-fast-forward). Pulling latest and retrying once.');
+    }
+
+    await this.pullLatest();
+    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
   }
 
   /** Synchronous cache peek — returns cached items or undefined. */
@@ -322,19 +379,21 @@ export class BinderService {
     slug: string,
     doc: MedicalDocument,
   ): Promise<string> {
-    const docPath = await generateDocPath(this.info.repoDir, category, slug);
-    const orderedDoc = await this.ensureEntryDisplayOrder(category, doc);
-    await this.io.writeDocument('/' + docPath, orderedDoc);
+    return this.runSerializedWrite(async () => {
+      const docPath = await generateDocPath(this.info.repoDir, category, slug);
+      const orderedDoc = await this.ensureEntryDisplayOrder(category, doc);
+      await this.io.writeDocument('/' + docPath, orderedDoc);
 
-    await GitEngine.commitEntry(
-      this.info.repoDir,
-      [docPath],
-      `Add ${category} entry`,
-      this.info.author,
-    );
-    dirEvict(this.dirCacheKey(category));
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
-    return docPath;
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        [docPath],
+        `Add ${category} entry`,
+        this.info.author,
+      );
+      dirEvict(this.dirCacheKey(category));
+      await this.pushWithPullRetry();
+      return docPath;
+    });
   }
 
   private async resolveUniqueSidecarPath(dirPath: string, sidecarFilename: string): Promise<string> {
@@ -365,30 +424,32 @@ export class BinderService {
     doc: MedicalDocument,
     sidecars: PendingSidecarWrite[],
   ): Promise<string> {
-    const docPath = await generateDocPath(this.info.repoDir, category, slug);
-    const slash = docPath.lastIndexOf('/');
-    const dirPath = slash >= 0 ? docPath.slice(0, slash) : category;
-    const filesToCommit = [docPath];
+    return this.runSerializedWrite(async () => {
+      const docPath = await generateDocPath(this.info.repoDir, category, slug);
+      const slash = docPath.lastIndexOf('/');
+      const dirPath = slash >= 0 ? docPath.slice(0, slash) : category;
+      const filesToCommit = [docPath];
 
-    for (const sidecar of sidecars) {
-      const sidecarPath = await this.resolveUniqueSidecarPath(dirPath, sidecar.sidecarFilename);
-      const binaryData = b64decode(sidecar.base64Data);
-      await this.io.writeSidecar('/' + sidecarPath, binaryData);
-      filesToCommit.push(sidecarPath);
-    }
+      for (const sidecar of sidecars) {
+        const sidecarPath = await this.resolveUniqueSidecarPath(dirPath, sidecar.sidecarFilename);
+        const binaryData = b64decode(sidecar.base64Data);
+        await this.io.writeSidecar('/' + sidecarPath, binaryData);
+        filesToCommit.push(sidecarPath);
+      }
 
-    const orderedDoc = await this.ensureEntryDisplayOrder(dirPath, doc);
-    await this.io.writeDocument('/' + docPath, orderedDoc);
+      const orderedDoc = await this.ensureEntryDisplayOrder(dirPath, doc);
+      await this.io.writeDocument('/' + docPath, orderedDoc);
 
-    await GitEngine.commitEntry(
-      this.info.repoDir,
-      filesToCommit,
-      `Add ${category} entry`,
-      this.info.author,
-    );
-    dirEvict(this.dirCacheKey(category));
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
-    return docPath;
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        filesToCommit,
+        `Add ${category} entry`,
+        this.info.author,
+      );
+      dirEvict(this.dirCacheKey(category));
+      await this.pushWithPullRetry();
+      return docPath;
+    });
   }
 
   /**
@@ -399,28 +460,30 @@ export class BinderService {
     binaryData: Uint8Array,
     sizeBytes: number,
   ): Promise<string> {
-    const docPath = await generateDocPath(this.info.repoDir, dirPath, 'photo');
-    const encPath = sidecarPathFrom(docPath, 'jpg');
+    return this.runSerializedWrite(async () => {
+      const docPath = await generateDocPath(this.info.repoDir, dirPath, 'photo');
+      const encPath = sidecarPathFrom(docPath, 'jpg');
 
-    // Write encrypted sidecar
-    await this.io.writeSidecar('/' + encPath, binaryData);
+      // Write encrypted sidecar
+      await this.io.writeSidecar('/' + encPath, binaryData);
 
-    // Write metadata document pointing to sidecar
-    const baseDoc = createPhotoRef(encPath.split('/').pop()!, sizeBytes);
-    const doc = await this.ensureEntryDisplayOrder(dirPath, baseDoc);
-    await this.io.writeDocument('/' + docPath, doc);
+      // Write metadata document pointing to sidecar
+      const baseDoc = createPhotoRef(encPath.split('/').pop()!, sizeBytes);
+      const doc = await this.ensureEntryDisplayOrder(dirPath, baseDoc);
+      await this.io.writeDocument('/' + docPath, doc);
 
-    // Commit both and push
-    await GitEngine.commitEntry(
-      this.info.repoDir,
-      [docPath, encPath],
-      `Add photo`,
-      this.info.author,
-    );
-    dirEvict(this.dirCacheKey(dirPath));
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+      // Commit both and push
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        [docPath, encPath],
+        `Add photo`,
+        this.info.author,
+      );
+      dirEvict(this.dirCacheKey(dirPath));
+      await this.pushWithPullRetry();
 
-    return docPath;
+      return docPath;
+    });
   }
 
   async addAudio(
@@ -429,25 +492,27 @@ export class BinderService {
     sizeBytes: number,
     durationMs: number,
   ): Promise<string> {
-    const docPath = await generateDocPath(this.info.repoDir, dirPath, 'recording');
-    const encPath = sidecarPathFrom(docPath, 'm4a');
+    return this.runSerializedWrite(async () => {
+      const docPath = await generateDocPath(this.info.repoDir, dirPath, 'recording');
+      const encPath = sidecarPathFrom(docPath, 'm4a');
 
-    await this.io.writeSidecar('/' + encPath, binaryData);
+      await this.io.writeSidecar('/' + encPath, binaryData);
 
-    const baseDoc = createAudioRef(encPath.split('/').pop()!, sizeBytes, durationMs);
-    const doc = await this.ensureEntryDisplayOrder(dirPath, baseDoc);
-    await this.io.writeDocument('/' + docPath, doc);
+      const baseDoc = createAudioRef(encPath.split('/').pop()!, sizeBytes, durationMs);
+      const doc = await this.ensureEntryDisplayOrder(dirPath, baseDoc);
+      await this.io.writeDocument('/' + docPath, doc);
 
-    await GitEngine.commitEntry(
-      this.info.repoDir,
-      [docPath, encPath],
-      `Add audio recording`,
-      this.info.author,
-    );
-    dirEvict(this.dirCacheKey(dirPath));
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        [docPath, encPath],
+        `Add audio recording`,
+        this.info.author,
+      );
+      dirEvict(this.dirCacheKey(dirPath));
+      await this.pushWithPullRetry();
 
-    return docPath;
+      return docPath;
+    });
   }
 
   // --- Folder metadata ---
@@ -462,34 +527,36 @@ export class BinderService {
     overviewDoc?: MedicalDocument,
     meta?: { icon?: string; color?: string; displayOrder?: number },
   ): Promise<void> {
-    const lastSlash = folderPath.lastIndexOf('/');
-    const parentDir = lastSlash > 0 ? folderPath.slice(0, lastSlash) : '';
-    const displayOrder =
-      typeof meta?.displayOrder === 'number' && Number.isFinite(meta.displayOrder)
-        ? meta.displayOrder
-        : await this.nextDisplayOrder(parentDir);
-    const metaPath = folderPath + '/.meta.json';
-    const metaObj = { displayName, ...meta, displayOrder };
-    await this.io.writeJSON('/' + metaPath, metaObj);
+    await this.runSerializedWrite(async () => {
+      const lastSlash = folderPath.lastIndexOf('/');
+      const parentDir = lastSlash > 0 ? folderPath.slice(0, lastSlash) : '';
+      const displayOrder =
+        typeof meta?.displayOrder === 'number' && Number.isFinite(meta.displayOrder)
+          ? meta.displayOrder
+          : await this.nextDisplayOrder(parentDir);
+      const metaPath = folderPath + '/.meta.json';
+      const metaObj = { displayName, ...meta, displayOrder };
+      await this.io.writeJSON('/' + metaPath, metaObj);
 
-    const filesToCommit = [metaPath];
+      const filesToCommit = [metaPath];
 
-    if (overviewDoc) {
-      const slug = 'overview';
-      const docPath = await generateDocPath(this.info.repoDir, folderPath, slug);
-      const orderedOverviewDoc = await this.ensureEntryDisplayOrder(folderPath, overviewDoc);
-      await this.io.writeDocument('/' + docPath, orderedOverviewDoc);
-      filesToCommit.push(docPath);
-    }
+      if (overviewDoc) {
+        const slug = 'overview';
+        const docPath = await generateDocPath(this.info.repoDir, folderPath, slug);
+        const orderedOverviewDoc = await this.ensureEntryDisplayOrder(folderPath, overviewDoc);
+        await this.io.writeDocument('/' + docPath, orderedOverviewDoc);
+        filesToCommit.push(docPath);
+      }
 
-    await GitEngine.commitEntry(
-      this.info.repoDir,
-      filesToCommit,
-      `Add ${displayName}`,
-      this.info.author,
-    );
-    dirEvict(this.parentDirCacheKey(folderPath));
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        filesToCommit,
+        `Add ${displayName}`,
+        this.info.author,
+      );
+      dirEvict(this.parentDirCacheKey(folderPath));
+      await this.pushWithPullRetry();
+    });
   }
 
   /**
@@ -517,30 +584,32 @@ export class BinderService {
    * Git rm, commit, push.
    */
   async deleteEntry(entryPath: string): Promise<void> {
-    const filesToRemove = [entryPath];
-    const basePath = entryPath.replace(/\.json$/, '');
+    await this.runSerializedWrite(async () => {
+      const filesToRemove = [entryPath];
+      const basePath = entryPath.replace(/\.json$/, '');
 
-    // Check for sidecar files (.enc, .jpg.enc, .m4a.enc, etc.)
-    const allFiles = await GitEngine.listFiles(this.info.repoDir);
-    for (const f of allFiles) {
-      if (f.startsWith(basePath) && f.endsWith('.enc')) {
-        filesToRemove.push(f);
+      // Check for sidecar files (.enc, .jpg.enc, .m4a.enc, etc.)
+      const allFiles = await GitEngine.listFiles(this.info.repoDir);
+      for (const f of allFiles) {
+        if (f.startsWith(basePath) && f.endsWith('.enc')) {
+          filesToRemove.push(f);
+        }
       }
-    }
 
-    await GitEngine.removeFiles(
-      this.info.repoDir,
-      filesToRemove,
-      `Delete ${entryPath.split('/').pop()}`,
-      this.info.author,
-    );
-    dirEvict(this.parentDirCacheKey(entryPath));
-    ptEvict(`${this.info.repoDir}:/${entryPath}`);
-    try {
-      await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
-    } catch (err: any) {
-      console.warn('Push failed after delete, changes saved locally:', err?.message);
-    }
+      await GitEngine.removeFiles(
+        this.info.repoDir,
+        filesToRemove,
+        `Delete ${entryPath.split('/').pop()}`,
+        this.info.author,
+      );
+      dirEvict(this.parentDirCacheKey(entryPath));
+      ptEvict(`${this.info.repoDir}:/${entryPath}`);
+      try {
+        await this.pushWithPullRetry();
+      } catch (err: any) {
+        console.warn('Push failed after delete, changes saved locally:', err?.message);
+      }
+    });
   }
 
   /**
@@ -548,32 +617,34 @@ export class BinderService {
    * Git rm all files under the folder, remove the directory, commit, push.
    */
   async deleteFolder(folderPath: string): Promise<void> {
-    const files = await GitEngine.listFilesUnder(this.info.repoDir, folderPath);
-    if (files.length === 0) return;
+    await this.runSerializedWrite(async () => {
+      const files = await GitEngine.listFilesUnder(this.info.repoDir, folderPath);
+      if (files.length === 0) return;
 
-    await GitEngine.removeFiles(
-      this.info.repoDir,
-      files,
-      `Delete folder ${folderPath.split('/').pop()}`,
-      this.info.author,
-    );
+      await GitEngine.removeFiles(
+        this.info.repoDir,
+        files,
+        `Delete folder ${folderPath.split('/').pop()}`,
+        this.info.author,
+      );
 
-    // Try to remove the now-empty directory from disk
-    const fs = createFSAdapter(this.info.repoDir);
-    try {
-      await fs.promises.rmdir('/' + folderPath);
-    } catch {
-      // Directory may already be gone or not fully empty
-    }
+      // Try to remove the now-empty directory from disk
+      const fs = createFSAdapter(this.info.repoDir);
+      try {
+        await fs.promises.rmdir('/' + folderPath);
+      } catch {
+        // Directory may already be gone or not fully empty
+      }
 
-    dirEvict(this.dirCacheKey(folderPath));
-    dirEvict(this.parentDirCacheKey(folderPath));
-    ptEvictPrefix(`${this.info.repoDir}:/${folderPath}`);
-    try {
-      await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
-    } catch (err: any) {
-      console.warn('Push failed after delete, changes saved locally:', err?.message);
-    }
+      dirEvict(this.dirCacheKey(folderPath));
+      dirEvict(this.parentDirCacheKey(folderPath));
+      ptEvictPrefix(`${this.info.repoDir}:/${folderPath}`);
+      try {
+        await this.pushWithPullRetry();
+      } catch (err: any) {
+        console.warn('Push failed after delete, changes saved locally:', err?.message);
+      }
+    });
   }
 
   // --- Update ---
@@ -586,16 +657,18 @@ export class BinderService {
     entryPath: string,
     doc: MedicalDocument,
   ): Promise<void> {
-    const docToWrite = await this.preserveEntryDisplayOrder(entryPath, doc);
-    await this.io.writeDocument('/' + entryPath, docToWrite);
-    await GitEngine.commitEntry(
-      this.info.repoDir,
-      [entryPath],
-      `Update ${doc.metadata.type} entry`,
-      this.info.author,
-    );
-    dirEvict(this.parentDirCacheKey(entryPath));
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+    await this.runSerializedWrite(async () => {
+      const docToWrite = await this.preserveEntryDisplayOrder(entryPath, doc);
+      await this.io.writeDocument('/' + entryPath, docToWrite);
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        [entryPath],
+        `Update ${doc.metadata.type} entry`,
+        this.info.author,
+      );
+      dirEvict(this.parentDirCacheKey(entryPath));
+      await this.pushWithPullRetry();
+    });
   }
 
   async updateEntryWithSidecars(
@@ -603,27 +676,29 @@ export class BinderService {
     doc: MedicalDocument,
     sidecars: PendingSidecarWrite[],
   ): Promise<void> {
-    const lastSlash = entryPath.lastIndexOf('/');
-    const dirPath = lastSlash > 0 ? entryPath.slice(0, lastSlash) : '';
-    const filesToCommit = [entryPath];
+    await this.runSerializedWrite(async () => {
+      const lastSlash = entryPath.lastIndexOf('/');
+      const dirPath = lastSlash > 0 ? entryPath.slice(0, lastSlash) : '';
+      const filesToCommit = [entryPath];
 
-    for (const sidecar of sidecars) {
-      const sidecarPath = await this.resolveUniqueSidecarPath(dirPath, sidecar.sidecarFilename);
-      const binaryData = b64decode(sidecar.base64Data);
-      await this.io.writeSidecar('/' + sidecarPath, binaryData);
-      filesToCommit.push(sidecarPath);
-    }
+      for (const sidecar of sidecars) {
+        const sidecarPath = await this.resolveUniqueSidecarPath(dirPath, sidecar.sidecarFilename);
+        const binaryData = b64decode(sidecar.base64Data);
+        await this.io.writeSidecar('/' + sidecarPath, binaryData);
+        filesToCommit.push(sidecarPath);
+      }
 
-    const docToWrite = await this.preserveEntryDisplayOrder(entryPath, doc);
-    await this.io.writeDocument('/' + entryPath, docToWrite);
-    await GitEngine.commitEntry(
-      this.info.repoDir,
-      filesToCommit,
-      `Update ${doc.metadata.type} entry`,
-      this.info.author,
-    );
-    dirEvict(this.parentDirCacheKey(entryPath));
-    await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+      const docToWrite = await this.preserveEntryDisplayOrder(entryPath, doc);
+      await this.io.writeDocument('/' + entryPath, docToWrite);
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        filesToCommit,
+        `Update ${doc.metadata.type} entry`,
+        this.info.author,
+      );
+      dirEvict(this.parentDirCacheKey(entryPath));
+      await this.pushWithPullRetry();
+    });
   }
 
   // --- Debug ---
@@ -641,24 +716,17 @@ export class BinderService {
    * Pull latest from remote. Call on binder open.
    */
   async pull(): Promise<void> {
-    await GitEngine.pull(
-      this.info.repoDir,
-      this.info.repoId,
-      this.info.auth,
-      this.info.author,
-    );
-    dirEvictPrefix(`${this.info.repoDir}:`);
-    ptEvictPrefix(`${this.info.repoDir}:`);
+    await this.runSerializedWrite(async () => {
+      await this.pullLatest();
+    });
   }
 
   /**
    * Push local commits to remote.
    */
   async push(): Promise<void> {
-    await GitEngine.push(
-      this.info.repoDir,
-      this.info.repoId,
-      this.info.auth,
-    );
+    await this.runSerializedWrite(async () => {
+      await this.pushWithPullRetry();
+    });
   }
 }
