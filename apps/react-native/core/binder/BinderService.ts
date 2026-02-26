@@ -60,6 +60,110 @@ export class BinderService {
     return this.dirCacheKey(parent);
   }
 
+  private normalizeDirPath(dirPath: string): string {
+    return dirPath.replace(/^\/+|\/+$/g, '');
+  }
+
+  private dirFsPath(dirPath: string): string {
+    const normalized = this.normalizeDirPath(dirPath);
+    return normalized ? '/' + normalized : '/';
+  }
+
+  private async nextDisplayOrder(dirPath: string): Promise<number> {
+    const fs = createFSAdapter(this.info.repoDir);
+    const fsPath = this.dirFsPath(dirPath);
+
+    let names: string[];
+    try {
+      names = await fs.promises.readdir(fsPath);
+    } catch {
+      return 0;
+    }
+
+    const candidates = names.filter((name) => {
+      if (name.startsWith('.')) return false;
+      if (name.endsWith('.enc')) return false;
+      if (name === 'patient-info.json' && fsPath === '/') return false;
+      return true;
+    });
+
+    let maxOrder = -1;
+
+    for (const name of candidates) {
+      const childPath = fsPath === '/' ? `/${name}` : `${fsPath}/${name}`;
+      try {
+        const stat = await fs.promises.stat(childPath);
+        if (stat.isDirectory()) {
+          try {
+            const meta = await this.io.readJSON<{ displayOrder?: number }>(`${childPath}/.meta.json`);
+            if (typeof meta.displayOrder === 'number' && Number.isFinite(meta.displayOrder)) {
+              maxOrder = Math.max(maxOrder, meta.displayOrder);
+            }
+          } catch {
+            // Folder has no readable metadata order.
+          }
+          continue;
+        }
+
+        if (name.endsWith('.json')) {
+          try {
+            const doc = await this.io.readDocument(childPath);
+            const order = doc.metadata.displayOrder;
+            if (typeof order === 'number' && Number.isFinite(order)) {
+              maxOrder = Math.max(maxOrder, order);
+            }
+          } catch {
+            // Entry unreadable — ignore for ordering baseline.
+          }
+        }
+      } catch {
+        // Child disappeared while scanning.
+      }
+    }
+
+    return maxOrder + 1;
+  }
+
+  private async ensureEntryDisplayOrder(dirPath: string, doc: MedicalDocument): Promise<MedicalDocument> {
+    if (typeof doc.metadata.displayOrder === 'number' && Number.isFinite(doc.metadata.displayOrder)) {
+      return doc;
+    }
+    const displayOrder = await this.nextDisplayOrder(dirPath);
+    return {
+      ...doc,
+      metadata: {
+        ...doc.metadata,
+        displayOrder,
+      },
+    };
+  }
+
+  private async preserveEntryDisplayOrder(entryPath: string, doc: MedicalDocument): Promise<MedicalDocument> {
+    if (typeof doc.metadata.displayOrder === 'number' && Number.isFinite(doc.metadata.displayOrder)) {
+      return doc;
+    }
+
+    try {
+      const existing = await this.io.readDocument('/' + entryPath);
+      if (
+        typeof existing.metadata.displayOrder === 'number'
+        && Number.isFinite(existing.metadata.displayOrder)
+      ) {
+        return {
+          ...doc,
+          metadata: {
+            ...doc.metadata,
+            displayOrder: existing.metadata.displayOrder,
+          },
+        };
+      }
+    } catch {
+      // Existing document not readable.
+    }
+
+    return doc;
+  }
+
   /** Synchronous cache peek — returns cached items or undefined. */
   peekDirCache(dirPath: string): DirItem[] | undefined {
     return dirGet(this.dirCacheKey(dirPath));
@@ -71,16 +175,21 @@ export class BinderService {
    * Initialize a new binder: git init, write encrypted patient-info.json, commit, push.
    */
   /** Default folder structure created with every new binder. */
-  private static readonly DEFAULT_FOLDERS: { folder: string; displayName: string; icon: string }[] = [
-    { folder: 'my-info',       displayName: 'My Info',       icon: '👤' },
+  private static readonly DEFAULT_FOLDERS: {
+    folder: string;
+    displayName: string;
+    icon: string;
+    displayOrder?: number;
+  }[] = [
+    { folder: 'my-info',       displayName: 'My Info',       icon: '👤', displayOrder: 0 },
     { folder: 'my-info/allergies',     displayName: 'Allergies',     icon: '🤧' },
     { folder: 'my-info/immunizations', displayName: 'Immunizations', icon: '💉' },
     { folder: 'my-info/billing-insurance',displayName: 'Billing & Insurance',icon: '🪪' },
-    { folder: 'conditions',    displayName: 'Conditions',    icon: '❤️‍🩹' },
-    { folder: 'medications',   displayName: 'Medications',   icon: '💊' },
-    { folder: 'visits',        displayName: 'Visits',        icon: '🩺' },
-    { folder: 'procedures',    displayName: 'Procedures',    icon: '🔪' },
-    { folder: 'labs-imaging',  displayName: 'Labs & Imaging',icon: '🔬' },
+    { folder: 'conditions',    displayName: 'Conditions',    icon: '❤️‍🩹', displayOrder: 1 },
+    { folder: 'medications',   displayName: 'Medications',   icon: '💊', displayOrder: 2 },
+    { folder: 'visits',        displayName: 'Visits',        icon: '🩺', displayOrder: 3 },
+    { folder: 'procedures',    displayName: 'Procedures',    icon: '🔪', displayOrder: 4 },
+    { folder: 'labs-imaging',  displayName: 'Labs & Imaging',icon: '🔬', displayOrder: 5 },
   ];
 
   static async create(
@@ -104,9 +213,23 @@ export class BinderService {
     const filesToCommit = ['patient-info.json'];
 
     // Create default folder hierarchy with .meta.json
-    for (const { folder, displayName, icon } of BinderService.DEFAULT_FOLDERS) {
+    const nextByParent = new Map<string, number>();
+    for (const { folder, displayName, icon, displayOrder: explicitOrder } of BinderService.DEFAULT_FOLDERS) {
+      const parts = folder.split('/').filter(Boolean);
+      parts.pop();
+      const parentDir = parts.join('/');
+      const displayOrder = typeof explicitOrder === 'number'
+        ? explicitOrder
+        : (nextByParent.get(parentDir) ?? 0);
+      nextByParent.set(parentDir, Math.max(nextByParent.get(parentDir) ?? 0, displayOrder + 1));
+
       const metaPath = `${folder}/.meta.json`;
-      await io.writeJSON('/' + metaPath, { displayName, icon, color: '#7F8C8D' });
+      await io.writeJSON('/' + metaPath, {
+        displayName,
+        icon,
+        color: '#7F8C8D',
+        displayOrder,
+      });
       filesToCommit.push(metaPath);
     }
 
@@ -200,8 +323,15 @@ export class BinderService {
     doc: MedicalDocument,
   ): Promise<string> {
     const docPath = await generateDocPath(this.info.repoDir, category, slug);
-    await this.io.writeDocument('/' + docPath, doc);
-    await GitEngine.commitEntry(this.info.repoDir, [docPath], `Add ${category} entry`, this.info.author);
+    const orderedDoc = await this.ensureEntryDisplayOrder(category, doc);
+    await this.io.writeDocument('/' + docPath, orderedDoc);
+
+    await GitEngine.commitEntry(
+      this.info.repoDir,
+      [docPath],
+      `Add ${category} entry`,
+      this.info.author,
+    );
     dirEvict(this.dirCacheKey(category));
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
     return docPath;
@@ -247,7 +377,9 @@ export class BinderService {
       filesToCommit.push(sidecarPath);
     }
 
-    await this.io.writeDocument('/' + docPath, doc);
+    const orderedDoc = await this.ensureEntryDisplayOrder(dirPath, doc);
+    await this.io.writeDocument('/' + docPath, orderedDoc);
+
     await GitEngine.commitEntry(
       this.info.repoDir,
       filesToCommit,
@@ -274,7 +406,8 @@ export class BinderService {
     await this.io.writeSidecar('/' + encPath, binaryData);
 
     // Write metadata document pointing to sidecar
-    const doc = createPhotoRef(encPath.split('/').pop()!, sizeBytes);
+    const baseDoc = createPhotoRef(encPath.split('/').pop()!, sizeBytes);
+    const doc = await this.ensureEntryDisplayOrder(dirPath, baseDoc);
     await this.io.writeDocument('/' + docPath, doc);
 
     // Commit both and push
@@ -301,7 +434,8 @@ export class BinderService {
 
     await this.io.writeSidecar('/' + encPath, binaryData);
 
-    const doc = createAudioRef(encPath.split('/').pop()!, sizeBytes, durationMs);
+    const baseDoc = createAudioRef(encPath.split('/').pop()!, sizeBytes, durationMs);
+    const doc = await this.ensureEntryDisplayOrder(dirPath, baseDoc);
     await this.io.writeDocument('/' + docPath, doc);
 
     await GitEngine.commitEntry(
@@ -326,10 +460,16 @@ export class BinderService {
     folderPath: string,
     displayName: string,
     overviewDoc?: MedicalDocument,
-    meta?: { icon?: string; color?: string },
+    meta?: { icon?: string; color?: string; displayOrder?: number },
   ): Promise<void> {
+    const lastSlash = folderPath.lastIndexOf('/');
+    const parentDir = lastSlash > 0 ? folderPath.slice(0, lastSlash) : '';
+    const displayOrder =
+      typeof meta?.displayOrder === 'number' && Number.isFinite(meta.displayOrder)
+        ? meta.displayOrder
+        : await this.nextDisplayOrder(parentDir);
     const metaPath = folderPath + '/.meta.json';
-    const metaObj = { displayName, ...meta };
+    const metaObj = { displayName, ...meta, displayOrder };
     await this.io.writeJSON('/' + metaPath, metaObj);
 
     const filesToCommit = [metaPath];
@@ -337,7 +477,8 @@ export class BinderService {
     if (overviewDoc) {
       const slug = 'overview';
       const docPath = await generateDocPath(this.info.repoDir, folderPath, slug);
-      await this.io.writeDocument('/' + docPath, overviewDoc);
+      const orderedOverviewDoc = await this.ensureEntryDisplayOrder(folderPath, overviewDoc);
+      await this.io.writeDocument('/' + docPath, orderedOverviewDoc);
       filesToCommit.push(docPath);
     }
 
@@ -445,7 +586,8 @@ export class BinderService {
     entryPath: string,
     doc: MedicalDocument,
   ): Promise<void> {
-    await this.io.writeDocument('/' + entryPath, doc);
+    const docToWrite = await this.preserveEntryDisplayOrder(entryPath, doc);
+    await this.io.writeDocument('/' + entryPath, docToWrite);
     await GitEngine.commitEntry(
       this.info.repoDir,
       [entryPath],
@@ -472,7 +614,8 @@ export class BinderService {
       filesToCommit.push(sidecarPath);
     }
 
-    await this.io.writeDocument('/' + entryPath, doc);
+    const docToWrite = await this.preserveEntryDisplayOrder(entryPath, doc);
+    await this.io.writeDocument('/' + entryPath, docToWrite);
     await GitEngine.commitEntry(
       this.info.repoDir,
       filesToCommit,

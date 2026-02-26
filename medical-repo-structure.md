@@ -513,18 +513,42 @@ Not in the original spec. Each user-created folder can have a `.meta.json` file 
 {
   "displayName": "Visits",
   "icon": "🏥",
-  "color": "#4a90d9"
+  "color": "#4a90d9",
+  "displayOrder": 3
 }
 ```
 
-This is read by `DirectoryReader` to provide display names, icons, and colors in the folder listing. If `.meta.json` is absent or corrupt, the folder falls back to its filesystem name and a default 📁 icon.
+This is read by `DirectoryReader` to provide display names, icons, colors, and explicit sort order in directory listings. If `.meta.json` is absent or corrupt, the folder falls back to its filesystem name and a default 📁 icon.
 
 **Note:** `.meta.json` is encrypted like everything else — it goes through `EncryptedIO.readJSON`, not plain filesystem reads.
 
-### A.5 condition Field in Metadata
+### A.5 displayOrder for Deterministic Directory Sorting
+
+Not in the original spec. The implementation supports optional `displayOrder` metadata on both folders and documents:
+
+- Folder order: `folder/.meta.json` → `displayOrder`
+- Entry order: `entry.json` → `metadata.displayOrder`
+
+When present, `displayOrder` is used first to sort mixed directory items (folders and entries) in ascending order. When absent, the implementation falls back to legacy behavior (folders before entries, then timestamp/name-based ordering).
+
+Example entry document:
+
+```json
+{
+  "value": "# Visit — 2026-02-10\n\n...",
+  "metadata": {
+    "type": "visit",
+    "created": "2026-02-10T12:00:00Z",
+    "displayOrder": 7
+  },
+  "children": []
+}
+```
+
+### A.6 condition Field in Metadata
 
 The `DocumentMetadata` type includes an optional `condition` field (e.g., `createPhotoRef` stores `condition: "back-acne"`). This is redundant with the folder path — a photo at `conditions/back-acne/2026-02-10-photo.json` already encodes its condition via its location. The field exists in the current implementation but may be removed in a future cleanup since the folder hierarchy is the source of truth for organization.
 
-### A.6 Children Array Semantics Unchanged
+### A.7 Children Array Semantics Unchanged
 
 The `children` array semantics from the original spec remain correct and unchanged: addendums, follow-up notes, and doctor interpretations are children of their parent document. The only change is that binary attachments have moved to sidecar files (A.3 above) rather than living as base64 children.

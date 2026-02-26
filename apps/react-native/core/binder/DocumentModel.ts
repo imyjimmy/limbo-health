@@ -20,6 +20,7 @@ export function isValidDocument(obj: unknown): obj is MedicalDocument {
   const meta = doc.metadata as Record<string, unknown>;
   if (typeof meta.type !== 'string') return false;
   if (typeof meta.created !== 'string') return false;
+  if (meta.displayOrder !== undefined && typeof meta.displayOrder !== 'number') return false;
   if (doc.renderer !== undefined && typeof doc.renderer !== 'string') return false;
   if (doc.editor !== undefined && typeof doc.editor !== 'string') return false;
 
@@ -140,6 +141,7 @@ export interface EntryMetadata {
   path: string;
   type: string;
   created: string;
+  displayOrder?: number;
   condition?: string;
 }
 
@@ -154,6 +156,7 @@ export function extractEntryMetadata(
     path,
     type: doc.metadata.type,
     created: doc.metadata.created,
+    displayOrder: doc.metadata.displayOrder,
     condition: doc.metadata.condition,
   };
 }

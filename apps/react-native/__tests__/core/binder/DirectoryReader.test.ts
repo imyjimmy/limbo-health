@@ -88,6 +88,49 @@ describe('readDirectory', () => {
     expect(result[1].name).toBe('z-note.json');
   });
 
+  test('displayOrder in existing metadata sorts folders and entries together', async () => {
+    const dirFS = createMockDirFS({
+      '/': 'dir',
+      '/z-note.json': 'file',
+      '/a-folder': 'dir',
+      '/a-folder/.meta.json': 'file',
+      '/a-folder/child.json': 'file',
+    });
+    const { io } = createTestIO();
+    await io.writeDocument('/z-note.json', makeDocument({ displayOrder: 1 }));
+    await io.writeJSON('/a-folder/.meta.json', {
+      displayName: 'A Folder',
+      displayOrder: 0,
+    });
+
+    const result = await readDirectory('/', dirFS, io);
+    expect(result.length).toBe(2);
+    expect(result[0].kind).toBe('folder');
+    expect(result[0].name).toBe('a-folder');
+    expect(result[1].kind).toBe('entry');
+    expect(result[1].name).toBe('z-note.json');
+  });
+
+  test('legacy root default folders fall back to canonical display order', async () => {
+    const dirFS = createMockDirFS({
+      '/': 'dir',
+      '/visits': 'dir',
+      '/visits/.meta.json': 'file',
+      '/conditions': 'dir',
+      '/conditions/.meta.json': 'file',
+      '/my-info': 'dir',
+      '/my-info/.meta.json': 'file',
+    });
+    const { io } = createTestIO();
+    await io.writeJSON('/visits/.meta.json', { displayName: 'Visits' });
+    await io.writeJSON('/conditions/.meta.json', { displayName: 'Conditions' });
+    await io.writeJSON('/my-info/.meta.json', { displayName: 'My Info' });
+
+    const result = await readDirectory('/', dirFS, io);
+    const names = result.filter((i) => i.kind === 'folder').map((i) => i.name);
+    expect(names).toEqual(['my-info', 'conditions', 'visits']);
+  });
+
   test('folders with no visible children are excluded', async () => {
     const dirFS = createMockDirFS({
       '/': 'dir',

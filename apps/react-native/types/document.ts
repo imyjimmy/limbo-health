@@ -5,6 +5,7 @@ export interface DocumentMetadata {
   type: string;
   created: string;           // ISO 8601
   updated?: string;          // ISO 8601
+  displayOrder?: number;
   provider?: string;
   npi?: string;
   tags?: string[];

@@ -7,6 +7,7 @@ export function makeDocument(overrides?: {
   value?: string;
   type?: string;
   created?: string;
+  displayOrder?: number;
   children?: MedicalDocument[];
   provider?: string;
   condition?: string;
@@ -17,6 +18,7 @@ export function makeDocument(overrides?: {
     metadata: {
       type: overrides?.type ?? 'visit',
       created: overrides?.created ?? '2026-01-15T10:00:00.000Z',
+      ...(typeof overrides?.displayOrder === 'number' ? { displayOrder: overrides.displayOrder } : {}),
       ...(overrides?.provider ? { provider: overrides.provider } : {}),
       ...(overrides?.condition ? { condition: overrides.condition } : {}),
       ...(overrides?.tags ? { tags: overrides.tags } : {}),

@@ -24,7 +24,17 @@ export interface FolderMeta {
   displayName?: string;
   icon?: string;
   color?: string;
+  displayOrder?: number;
 }
+
+const LEGACY_ROOT_FOLDER_DISPLAY_ORDER: Record<string, number> = {
+  'my-info': 0,
+  conditions: 1,
+  medications: 2,
+  visits: 3,
+  procedures: 4,
+  'labs-imaging': 5,
+};
 
 export interface DirFolder {
   kind: 'folder';
@@ -32,6 +42,8 @@ export interface DirFolder {
   /** Path relative to repo root, e.g. 'conditions/back-acne' */
   relativePath: string;
   meta?: FolderMeta;
+  /** Explicit display order from parent directory metadata */
+  displayOrder?: number;
   /** Number of visible children (excludes .meta.json, dotfiles, .enc sidecars) */
   childCount: number;
   /** Filesystem mtime (ms) — used for creation-order sorting */
@@ -43,6 +55,8 @@ export interface DirEntry {
   name: string;
   /** Path relative to repo root, e.g. 'visits/2026-02-12-follow-up.json' */
   relativePath: string;
+  /** Explicit display order from parent directory metadata */
+  displayOrder?: number;
   preview: EntryPreview | null; // null if decryption failed
 }
 
@@ -63,6 +77,7 @@ export async function readDirectory(
   io: EncryptedIO,
 ): Promise<DirItem[]> {
   const normalizedDir = dirPath.startsWith('/') ? dirPath : '/' + dirPath;
+  const isRoot = normalizedDir === '/';
 
   let names: string[];
   try {
@@ -122,7 +137,18 @@ export async function readDirectory(
           } catch { /* use dir mtime */ }
         }
 
-        return { kind: 'folder', name, relativePath, meta, childCount, mtime };
+        return {
+          kind: 'folder',
+          name,
+          relativePath,
+          meta,
+          displayOrder:
+            typeof meta?.displayOrder === 'number' && Number.isFinite(meta.displayOrder)
+              ? meta.displayOrder
+              : (isRoot ? LEGACY_ROOT_FOLDER_DISPLAY_ORDER[name] : undefined),
+          childCount,
+          mtime,
+        };
       } else if (name.endsWith('.json')) {
         const relativePath = childPath.startsWith('/')
           ? childPath.slice(1)
@@ -134,7 +160,16 @@ export async function readDirectory(
         } catch (err) {
           console.warn(`Failed to decrypt metadata for ${relativePath}:`, err);
         }
-        return { kind: 'entry', name, relativePath, preview };
+        return {
+          kind: 'entry',
+          name,
+          relativePath,
+          displayOrder:
+            typeof preview?.displayOrder === 'number' && Number.isFinite(preview.displayOrder)
+              ? preview.displayOrder
+              : undefined,
+          preview,
+        };
       }
 
       return null;
@@ -143,8 +178,11 @@ export async function readDirectory(
 
   const items = results.filter((r): r is DirItem => r !== null);
 
-  // Sort: folders first (by creation time), then entries (alphabetical = chronological for date-prefixed)
+  // Sort by explicit display order first. Fallback keeps legacy behavior.
   items.sort((a, b) => {
+    const aOrder = a.displayOrder ?? Number.POSITIVE_INFINITY;
+    const bOrder = b.displayOrder ?? Number.POSITIVE_INFINITY;
+    if (aOrder !== bOrder) return aOrder - bOrder;
     if (a.kind !== b.kind) return a.kind === 'folder' ? -1 : 1;
     if (a.kind === 'folder' && b.kind === 'folder') {
       return (a.mtime ?? 0) - (b.mtime ?? 0);
