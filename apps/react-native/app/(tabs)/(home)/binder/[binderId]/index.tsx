@@ -11,9 +11,14 @@ import { BinderDirectory } from '../../../../../components/binder/BinderDirector
 import { consumePendingRestore } from '../../../../../core/binder/LastViewedStore';
 
 export default function BinderRootScreen() {
-  const { binderId } = useLocalSearchParams<{ binderId: string }>();
+  const { binderId, binderName } = useLocalSearchParams<{
+    binderId: string;
+    binderName?: string | string[];
+  }>();
   const navigation = useNavigation();
   const [ready, setReady] = useState(false);
+  const resolvedBinderName = Array.isArray(binderName) ? binderName[0] : binderName;
+  const title = resolvedBinderName?.trim() ? resolvedBinderName : 'Binder';
 
   useEffect(() => {
     const dirPath = consumePendingRestore();
@@ -26,7 +31,7 @@ export default function BinderRootScreen() {
     // e.g. "conditions/back-acne" → [index, browse/conditions, browse/conditions/back-acne]
     const segments = dirPath.split('/');
     const routes: { name: string; params?: Record<string, unknown> }[] = [
-      { name: 'index', params: { binderId } },
+      { name: 'index', params: { binderId, binderName: resolvedBinderName } },
     ];
     for (let i = 1; i <= segments.length; i++) {
       routes.push({
@@ -52,7 +57,7 @@ export default function BinderRootScreen() {
     );
   }
 
-  return <BinderDirectory binderId={binderId!} dirPath="" title="Binder" />;
+  return <BinderDirectory binderId={binderId!} dirPath="" title={title} />;
 }
 
 const styles = StyleSheet.create({

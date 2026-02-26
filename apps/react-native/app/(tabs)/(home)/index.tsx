@@ -475,7 +475,10 @@ export default function BinderListScreen() {
         }
 
         SecureStore.setItemAsync(LAST_BINDER_KEY, repo.id);
-        router.push(`/binder/${repo.id}`);
+        router.push({
+          pathname: '/binder/[binderId]',
+          params: { binderId: repo.id, binderName: repo.name },
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         Alert.alert('Error', msg);
@@ -719,7 +722,6 @@ export default function BinderListScreen() {
                                 <ActivityIndicator size="small" color="#334155" style={styles.renameSpinner} />
                               ) : null}
                             </View>
-                            <Text style={styles.repoId} numberOfLines={1}>{repo.id}</Text>
 
                             <View style={styles.repoMetaSection}>
                               <View style={styles.repoMetaRow}>
@@ -752,18 +754,19 @@ export default function BinderListScreen() {
                           testID={`binder-list-item-${index}`}
                         >
                           <View style={styles.repoNameRow}>
+                            <Text style={styles.repoName} numberOfLines={1}>{repo.name}</Text>
                             <Pressable
                               onPress={(event) => {
                                 event.stopPropagation?.();
                                 beginRename(repo);
                               }}
-                              hitSlop={6}
+                              style={styles.repoNameEditButton}
+                              hitSlop={8}
                               testID={`binder-name-edit-${index}`}
                             >
-                              <Text style={styles.repoName} numberOfLines={1}>{repo.name}</Text>
+                              <Text style={styles.repoNameEditIcon}>✎</Text>
                             </Pressable>
                           </View>
-                          <Text style={styles.repoId} numberOfLines={1}>{repo.id}</Text>
 
                           <View style={styles.repoMetaSection}>
                             <View style={styles.repoMetaRow}>
@@ -1026,10 +1029,27 @@ addPhotoButton: {
   repoNameRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  repoId: { fontSize: 13, fontFamily: 'Courier', color: '#999' },
-  repoName: { fontSize: 17, fontWeight: '600', color: '#111', marginBottom: 4 },
+  repoName: {
+    color: '#111',
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  repoNameEditButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    height: 24,
+    justifyContent: 'center',
+    width: 24,
+  },
+  repoNameEditIcon: {
+    color: '#475569',
+    fontSize: 15,
+    fontWeight: '600',
+  },
   renameSpinner: {
     marginLeft: 8,
   },
