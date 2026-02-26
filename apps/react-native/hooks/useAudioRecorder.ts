@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from 'react';
-import { Audio } from 'expo-av';
 import RNFS from 'react-native-fs';
 import { decode as b64decode } from '../core/crypto/base64';
 
@@ -11,13 +10,34 @@ export interface AudioRecordingResult {
 
 export type RecorderStatus = 'idle' | 'recording' | 'stopped';
 
+type ExpoAudioModule = typeof import('expo-av');
+type ExpoRecording = import('expo-av').Audio.Recording;
+
+let cachedAudioModule: ExpoAudioModule['Audio'] | null = null;
+
+async function getAudioModule(): Promise<ExpoAudioModule['Audio']> {
+  if (cachedAudioModule) return cachedAudioModule;
+  try {
+    const mod = await import('expo-av');
+    cachedAudioModule = mod.Audio;
+    return cachedAudioModule;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Audio native module unavailable (${reason}). Rebuild iOS with: npx expo run:ios`,
+    );
+  }
+}
+
 export function useAudioRecorder() {
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingRef = useRef<ExpoRecording | null>(null);
   const [status, setStatus] = useState<RecorderStatus>('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
   const resultRef = useRef<AudioRecordingResult | null>(null);
 
   const start = useCallback(async () => {
+    const Audio = await getAudioModule();
+
     // Permission is often requested before showing recorder UI.
     // Verify it's granted here as a safety check.
     const permission = await Audio.getPermissionsAsync();
@@ -72,6 +92,7 @@ export function useAudioRecorder() {
   }, []);
 
   const stop = useCallback(async (): Promise<AudioRecordingResult> => {
+    const Audio = await getAudioModule();
     const recording = recordingRef.current;
     if (!recording) throw new Error('No active recording');
 
@@ -101,6 +122,7 @@ export function useAudioRecorder() {
   }, []);
 
   const cancel = useCallback(async () => {
+    const Audio = await getAudioModule();
     const recording = recordingRef.current;
     if (!recording) return;
 
