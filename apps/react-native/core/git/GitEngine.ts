@@ -2,7 +2,7 @@
 // Wraps isomorphic-git with Limbo-specific operations.
 // No other code in the app calls isomorphic-git directly.
 
-import git from 'isomorphic-git';
+import git, { type MergeDriverCallback } from 'isomorphic-git';
 import { createFSAdapter } from './fsAdapter';
 import { createHttpTransport, AuthConfig } from './httpTransport';
 import { gitRepoUrl } from '../../constants/api';
@@ -17,6 +17,11 @@ export interface CommitInfo {
     email: string;
     timestamp: number;
   };
+}
+
+export interface PullOptions {
+  fastForwardOnly?: boolean;
+  mergeDriver?: MergeDriverCallback;
 }
 
 // --- Author ---
@@ -91,9 +96,50 @@ export class GitEngine {
     repoId: string,
     auth: AuthConfig,
     author?: GitAuthor,
+    options?: PullOptions,
   ): Promise<void> {
     const fs = createFSAdapter(repoDir);
     const http = createHttpTransport(auth);
+    const commitAuthor = author || DEFAULT_AUTHOR;
+
+    // isomorphic-git `pull` currently does not expose `mergeDriver`,
+    // so use fetch+merge+checkout when a custom merge driver is needed.
+    if (options?.mergeDriver) {
+      const branch = await git.currentBranch({ fs, dir: '/' });
+      if (!branch) {
+        throw new Error('Cannot pull with merge driver: HEAD is detached.');
+      }
+
+      const { fetchHead, fetchHeadDescription } = await git.fetch({
+        fs,
+        http,
+        dir: '/',
+        url: gitRepoUrl(repoId),
+        ref: branch,
+        singleBranch: true,
+      });
+
+      if (!fetchHead) return;
+
+      await git.merge({
+        fs,
+        dir: '/',
+        ours: branch,
+        theirs: fetchHead,
+        message: `Merge ${fetchHeadDescription ?? fetchHead}`,
+        author: commitAuthor,
+        fastForwardOnly: options.fastForwardOnly ?? false,
+        mergeDriver: options.mergeDriver,
+      });
+
+      await git.checkout({
+        fs,
+        dir: '/',
+        ref: branch,
+        noCheckout: false,
+      });
+      return;
+    }
 
     await git.pull({
       fs,
@@ -101,7 +147,8 @@ export class GitEngine {
       dir: '/',
       url: gitRepoUrl(repoId),
       singleBranch: true,
-      author: author || DEFAULT_AUTHOR,
+      author: commitAuthor,
+      fastForwardOnly: options?.fastForwardOnly,
     });
   }
 

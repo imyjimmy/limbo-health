@@ -22,6 +22,22 @@ import type { AuthConfig } from '../git/httpTransport';
 import { dirGet, dirSet, dirEvict, dirEvictPrefix, ptEvict, ptEvictPrefix } from './BinderCache';
 import type { DirItem } from './DirectoryReader';
 import { decode as b64decode } from '../crypto/base64';
+import { decrypt, encrypt } from '../crypto/nip44';
+import type { MergeDriverCallback } from 'isomorphic-git';
+
+interface Diff3MergeBlock {
+  ok?: string[];
+  conflict?: {
+    a: string[];
+    b: string[];
+  };
+}
+
+const diff3Merge = require('diff3') as (
+  a: string[],
+  o: string[],
+  b: string[],
+) => Diff3MergeBlock[];
 
 // --- Types ---
 
@@ -42,10 +58,13 @@ export interface PendingSidecarWrite {
 export class BinderService {
   private io: EncryptedIO;
   private info: BinderInfo;
+  private masterConversationKey: Uint8Array;
   private static writeQueues = new Map<string, Promise<void>>();
+  private static readonly LINEBREAKS = /^.*(\r?\n|$)/gm;
 
   constructor(info: BinderInfo, masterConversationKey: Uint8Array) {
     this.info = info;
+    this.masterConversationKey = masterConversationKey;
     const fs = createFSAdapter(info.repoDir);
     this.io = new EncryptedIO(fs, masterConversationKey, info.repoDir);
   }
@@ -186,12 +205,113 @@ export class BinderService {
     ptEvictPrefix(`${this.info.repoDir}:`);
   }
 
+  private splitLines(content: string): string[] {
+    return content.match(BinderService.LINEBREAKS) ?? [content];
+  }
+
+  private canonicalizeJsonForMerge(content: string): string {
+    try {
+      return JSON.stringify(JSON.parse(content), null, 2) + '\n';
+    } catch {
+      return content;
+    }
+  }
+
+  private mergeText3Way(
+    branches: string[],
+    baseContent: string,
+    ourContent: string,
+    theirContent: string,
+  ): { cleanMerge: boolean; mergedText: string } {
+    const ours = this.splitLines(ourContent);
+    const base = this.splitLines(baseContent);
+    const theirs = this.splitLines(theirContent);
+    const result = diff3Merge(ours, base, theirs);
+
+    const ourName = branches[1] ?? 'ours';
+    const theirName = branches[2] ?? 'theirs';
+    const markerSize = 7;
+
+    let mergedText = '';
+    let cleanMerge = true;
+
+    for (const item of result) {
+      if (item.ok) {
+        mergedText += item.ok.join('');
+      }
+      if (item.conflict) {
+        cleanMerge = false;
+        mergedText += `${'<'.repeat(markerSize)} ${ourName}\n`;
+        mergedText += item.conflict.a.join('');
+        mergedText += `${'='.repeat(markerSize)}\n`;
+        mergedText += item.conflict.b.join('');
+        mergedText += `${'>'.repeat(markerSize)} ${theirName}\n`;
+      }
+    }
+
+    return { cleanMerge, mergedText };
+  }
+
+  private createDecryptedMergeDriver(): MergeDriverCallback {
+    return async ({ branches, contents, path }) => {
+      const baseCipher = contents[0] ?? '';
+      const ourCipher = contents[1] ?? '';
+      const theirCipher = contents[2] ?? '';
+
+      const mergeCiphertext = () => {
+        const merged = this.mergeText3Way(branches, baseCipher, ourCipher, theirCipher);
+        if (merged.cleanMerge) return merged;
+        console.warn(`Ciphertext merge conflict in ${path}; using local version.`);
+        return {
+          cleanMerge: true,
+          mergedText: ourCipher,
+        };
+      };
+
+      if (!path.endsWith('.json')) {
+        return mergeCiphertext();
+      }
+
+      try {
+        const basePlain = baseCipher ? decrypt(baseCipher, this.masterConversationKey) : '';
+        const ourPlain = ourCipher ? decrypt(ourCipher, this.masterConversationKey) : '';
+        const theirPlain = theirCipher ? decrypt(theirCipher, this.masterConversationKey) : '';
+
+        const merged = this.mergeText3Way(
+          branches,
+          this.canonicalizeJsonForMerge(basePlain),
+          this.canonicalizeJsonForMerge(ourPlain),
+          this.canonicalizeJsonForMerge(theirPlain),
+        );
+
+        if (!merged.cleanMerge) {
+          console.warn(`Decrypted merge conflict in ${path}; using local version.`);
+          return {
+            cleanMerge: true,
+            mergedText: encrypt(this.canonicalizeJsonForMerge(ourPlain), this.masterConversationKey),
+          };
+        }
+
+        return {
+          cleanMerge: true,
+          mergedText: encrypt(merged.mergedText, this.masterConversationKey),
+        };
+      } catch (err) {
+        console.warn(`Decrypted merge unavailable for ${path}; falling back to ciphertext merge.`, err);
+        return mergeCiphertext();
+      }
+    };
+  }
+
   private async pullLatest(): Promise<void> {
     await GitEngine.pull(
       this.info.repoDir,
       this.info.repoId,
       this.info.auth,
       this.info.author,
+      {
+        mergeDriver: this.createDecryptedMergeDriver(),
+      },
     );
     this.evictAllCaches();
   }
