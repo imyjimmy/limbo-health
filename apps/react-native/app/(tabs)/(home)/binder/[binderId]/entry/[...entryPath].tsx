@@ -532,11 +532,21 @@ export default function EntryDetailScreen() {
       </ScrollView>
 
       <DebugOverlay
+        sourceInfo={{
+          kind: 'mixed',
+          summary: `Current JSON is the decrypted repo document at "${rawPath}".`,
+          details: 'Git Files (HEAD) is generated via git.listFiles and is not a JSON file in the repo.',
+        }}
         data={doc}
-        loadExtra={() =>
-          binderService?.listAllFiles() ?? Promise.resolve([])
-        }
-        extraLabel="All Files"
+        loadExtra={async () => {
+          const files = await (binderService?.listAllFiles() ?? Promise.resolve([]));
+          return {
+            source: 'git.listFiles(ref: HEAD)',
+            count: files.length,
+            files,
+          };
+        }}
+        extraLabel="Git Files (HEAD)"
       />
     </>
   );

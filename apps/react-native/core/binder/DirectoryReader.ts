@@ -44,8 +44,6 @@ export interface DirFolder {
   meta?: FolderMeta;
   /** Explicit display order from parent directory metadata */
   displayOrder?: number;
-  /** Number of visible children (excludes .meta.json, dotfiles, .enc sidecars) */
-  childCount: number;
   /** Filesystem mtime (ms) — used for creation-order sorting */
   mtime?: number;
 }
@@ -115,10 +113,6 @@ export async function readDirectory(
           ? childPath.slice(1)
           : childPath;
 
-        const childCount = children.filter(
-          (c: string) => !c.startsWith('.') && !c.endsWith('.enc'),
-        ).length;
-
         let meta: FolderMeta | undefined;
         if (children.includes('.meta.json')) {
           try {
@@ -146,7 +140,6 @@ export async function readDirectory(
             typeof meta?.displayOrder === 'number' && Number.isFinite(meta.displayOrder)
               ? meta.displayOrder
               : (isRoot ? LEGACY_ROOT_FOLDER_DISPLAY_ORDER[name] : undefined),
-          childCount,
           mtime,
         };
       } else if (name.endsWith('.json')) {

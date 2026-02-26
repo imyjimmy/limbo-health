@@ -77,35 +77,20 @@ export function DirectoryList({
       return <EntryCard item={item} onPress={onOpenEntry} />;
     }
 
-    const isWarningFolder = item.kind === 'folder' && item.childCount > 0;
-
     if (item.kind === 'folder') {
       const iconInfo = getFolderIcon?.(item);
       return (
         <SwipeableRow
-          showWarning={isWarningFolder}
+          showWarning={false}
           onDelete={() => onDeleteItem(item)}
           onSwipeOpen={handleSwipeOpen}
         >
-          {isWarningFolder
-            ? (warningAnim) => (
-                <FolderRow
-                  item={item}
-                  emoji={item.meta?.icon ?? iconInfo?.emoji}
-                  iconColor={item.meta?.color ?? iconInfo?.color}
-                  onPress={onNavigateFolder}
-                  deleteWarningAnim={warningAnim}
-                />
-              )
-            : (
-                <FolderRow
-                  item={item}
-                  emoji={item.meta?.icon ?? iconInfo?.emoji}
-                  iconColor={item.meta?.color ?? iconInfo?.color}
-                  onPress={onNavigateFolder}
-                />
-              )
-          }
+          <FolderRow
+            item={item}
+            emoji={item.meta?.icon ?? iconInfo?.emoji}
+            iconColor={item.meta?.color ?? iconInfo?.color}
+            onPress={onNavigateFolder}
+          />
         </SwipeableRow>
       );
     }

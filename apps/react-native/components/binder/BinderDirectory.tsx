@@ -251,11 +251,21 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
         onCancel={() => setShowNewFolder(false)}
       />
       <DebugOverlay
+        sourceInfo={{
+          kind: 'mixed',
+          summary: 'Current JSON is generated from in-memory UI/debug state.',
+          details: 'Git Files (HEAD) is generated via git.listFiles and is not a JSON file in the repo.',
+        }}
         data={{ dirPath, items, cache: { dir: dirSize(), pt: ptSize() } }}
-        loadExtra={() =>
-          binderService?.listAllFiles() ?? Promise.resolve([])
-        }
-        extraLabel="All Files"
+        loadExtra={async () => {
+          const files = await (binderService?.listAllFiles() ?? Promise.resolve([]));
+          return {
+            source: 'git.listFiles(ref: HEAD)',
+            count: files.length,
+            files,
+          };
+        }}
+        extraLabel="Git Files (HEAD)"
       />
     </>
   );

@@ -213,28 +213,6 @@ describe('readDirectory', () => {
     }
   });
 
-  test('childCount excludes dotfiles and .enc files', async () => {
-    const dirFS = createMockDirFS({
-      '/': 'dir',
-      '/conditions': 'dir',
-      '/conditions/.meta.json': 'file',
-      '/conditions/.gitkeep': 'file',
-      '/conditions/note1.json': 'file',
-      '/conditions/note2.json': 'file',
-      '/conditions/photo.enc': 'file',
-    });
-    const { io } = createTestIO();
-    await io.writeJSON('/conditions/.meta.json', { displayName: 'Conditions' });
-
-    const result = await readDirectory('/', dirFS, io);
-    const folder = result.find(i => i.name === 'conditions');
-    expect(folder).toBeDefined();
-    if (folder?.kind === 'folder') {
-      // Should count note1.json and note2.json only (not .meta.json, .gitkeep, photo.enc)
-      expect(folder.childCount).toBe(2);
-    }
-  });
-
   test('entries are sorted alphabetically (date-prefixed = chronological)', async () => {
     const dirFS = createMockDirFS({
       '/visits': 'dir',

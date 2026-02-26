@@ -20,9 +20,15 @@ interface DebugOverlayProps {
   /** Optional extra data loaded lazily (e.g., full file tree) */
   loadExtra?: () => Promise<unknown>;
   extraLabel?: string;
+  /** Clarifies whether data is generated runtime state or repo-backed content */
+  sourceInfo?: {
+    kind: 'generated' | 'repo-file' | 'mixed';
+    summary: string;
+    details?: string;
+  };
 }
 
-export function DebugOverlay({ data, loadExtra, extraLabel }: DebugOverlayProps) {
+export function DebugOverlay({ data, loadExtra, extraLabel, sourceInfo }: DebugOverlayProps) {
   const [visible, setVisible] = useState(false);
   const [extra, setExtra] = useState<unknown>(null);
   const [loadingExtra, setLoadingExtra] = useState(false);
@@ -49,6 +55,13 @@ export function DebugOverlay({ data, loadExtra, extraLabel }: DebugOverlayProps)
 
   const allData = extra ? { current: data, [extraLabel ?? 'extra']: extra } : data;
   const json = JSON.stringify(allData, null, 2);
+  const sourceLabel = sourceInfo
+    ? sourceInfo.kind === 'generated'
+      ? 'Generated Runtime Data'
+      : sourceInfo.kind === 'repo-file'
+        ? 'Repo File Data'
+        : 'Mixed Data Sources'
+    : null;
 
   return (
     <>
@@ -79,6 +92,15 @@ export function DebugOverlay({ data, loadExtra, extraLabel }: DebugOverlayProps)
               </TouchableOpacity>
             </View>
           </View>
+          {sourceInfo && sourceLabel && (
+            <View style={styles.sourceBanner}>
+              <Text style={styles.sourceLabel}>{sourceLabel}</Text>
+              <Text style={styles.sourceSummary}>{sourceInfo.summary}</Text>
+              {sourceInfo.details ? (
+                <Text style={styles.sourceDetails}>{sourceInfo.details}</Text>
+              ) : null}
+            </View>
+          )}
           <ScrollView style={styles.scroll}>
             <Text style={styles.json} selectable>
               {json}
@@ -141,6 +163,30 @@ const styles = StyleSheet.create({
   scroll: {
     flex: 1,
     padding: 16,
+  },
+  sourceBanner: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#2f2f2f',
+    backgroundColor: '#111',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  sourceLabel: {
+    color: '#f5c96a',
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+  },
+  sourceSummary: {
+    color: '#f1f1f1',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  sourceDetails: {
+    color: '#bfbfbf',
+    fontSize: 11,
+    lineHeight: 16,
   },
   json: {
     fontSize: 12,
