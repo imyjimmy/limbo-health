@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import RNFS from 'react-native-fs';
@@ -89,6 +90,17 @@ function extractPatientCreatedAt(docValue: string): string | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
+function renamePatientInfoTitle(docValue: string, nextName: string): string {
+  const heading = `# ${nextName}`;
+  const lines = docValue.split('\n');
+  if (lines.length === 0) return heading;
+  if (lines[0].startsWith('# ')) {
+    lines[0] = heading;
+    return lines.join('\n');
+  }
+  return `${heading}\n\n${docValue.trimStart()}`;
+}
+
 // --- Screen ---
 
 export default function BinderListScreen() {
@@ -102,6 +114,9 @@ export default function BinderListScreen() {
   });
   const [binderTextures, setBinderTextures] = useState<Record<string, BinderTextureId>>({});
   const [expandedTextureCards, setExpandedTextureCards] = useState<Record<string, boolean>>({});
+  const [editingRepoId, setEditingRepoId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [renamingRepoId, setRenamingRepoId] = useState<string | null>(null);
 
   const binderRef = useRef<BinderService | null>(null);
 
@@ -288,6 +303,114 @@ export default function BinderListScreen() {
       [repoId]: !(prev[repoId] ?? false),
     }));
   }, []);
+
+  const beginRename = useCallback(
+    (repo: RepoSummary) => {
+      if (renamingRepoId) return;
+      setEditingRepoId(repo.id);
+      setEditingName(repo.name);
+    },
+    [renamingRepoId],
+  );
+
+  const renameBinder = useCallback(
+    async (repo: RepoSummary, nextName: string): Promise<boolean> => {
+      if (!jwt || !masterConversationKey) return false;
+
+      const cloned = repo.isCloned ?? (await isAlreadyCloned(repo.id));
+      if (!cloned) {
+        Alert.alert('Rename Unavailable', 'Open this binder once before renaming it.');
+        return false;
+      }
+
+      const nextUpdatedAt = new Date().toISOString();
+      setRenamingRepoId(repo.id);
+
+      try {
+        const service = new BinderService(
+          {
+            repoId: repo.id,
+            repoDir: repoDir(repo.id),
+            auth: authConfig(),
+            author: {
+              name: authState.metadata?.name || authState.googleProfile?.name || 'Limbo Health',
+              email: authState.googleProfile?.email || 'app@limbo.health',
+            },
+          },
+          masterConversationKey,
+        );
+
+        const patientInfo = await service.readPatientInfo();
+        if (!patientInfo) {
+          throw new Error('Missing patient-info.json');
+        }
+
+        const updatedDoc: MedicalDocument = {
+          ...patientInfo,
+          value: renamePatientInfoTitle(patientInfo.value, nextName),
+          metadata: {
+            ...patientInfo.metadata,
+            updated: nextUpdatedAt,
+          },
+        };
+
+        await service.updateEntry('patient-info.json', updatedDoc);
+
+        setScreenState((prev) => {
+          if (prev.phase !== 'repos-loaded') return prev;
+          return {
+            ...prev,
+            repos: prev.repos.map((r) =>
+              r.id === repo.id
+                ? {
+                    ...r,
+                    name: nextName,
+                    lastUpdatedAt: nextUpdatedAt,
+                  }
+                : r,
+            ),
+          };
+        });
+
+        return true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        Alert.alert('Rename Failed', msg);
+        return false;
+      } finally {
+        setRenamingRepoId(null);
+      }
+    },
+    [
+      jwt,
+      masterConversationKey,
+      authState.metadata?.name,
+      authState.googleProfile?.name,
+      authState.googleProfile?.email,
+    ],
+  );
+
+  const commitRename = useCallback(
+    async (repo: RepoSummary) => {
+      if (editingRepoId !== repo.id || renamingRepoId === repo.id) return;
+      const nextName = editingName.trim();
+
+      if (!nextName) {
+        setEditingName(repo.name);
+        setEditingRepoId(null);
+        return;
+      }
+
+      if (nextName === repo.name) {
+        setEditingRepoId(null);
+        return;
+      }
+
+      await renameBinder(repo, nextName);
+      setEditingRepoId(null);
+    },
+    [editingRepoId, renamingRepoId, editingName, renameBinder],
+  );
 
   useEffect(() => {
     if (jwt && cryptoReady) fetchRepos();
@@ -567,11 +690,6 @@ export default function BinderListScreen() {
                     timeStyle: 'short',
                   })
                 : 'Not available';
-              const createdLabel = repo.patientCreatedAt
-                ? new Date(repo.patientCreatedAt).toLocaleDateString(undefined, {
-                    dateStyle: 'medium',
-                  })
-                : 'Not available';
 
               return (
                 <View key={repo.id} style={styles.repoCardWrap}>
@@ -583,12 +701,68 @@ export default function BinderListScreen() {
                       <BinderTextureBackground textureId={selectedTexture} />
                       <View style={styles.repoCardOverlay} />
                       <View style={styles.repoCardContent}>
+                        {editingRepoId === repo.id ? (
+                          <View style={styles.repoOpenArea}>
+                            <View style={styles.repoNameRow}>
+                              <TextInput
+                                style={styles.repoNameInput}
+                                value={editingName}
+                                onChangeText={setEditingName}
+                                autoFocus
+                                selectTextOnFocus
+                                returnKeyType="done"
+                                onEndEditing={() => commitRename(repo)}
+                                editable={renamingRepoId !== repo.id}
+                                testID={`binder-name-input-${index}`}
+                              />
+                              {renamingRepoId === repo.id ? (
+                                <ActivityIndicator size="small" color="#334155" style={styles.renameSpinner} />
+                              ) : null}
+                            </View>
+                            <Text style={styles.repoId} numberOfLines={1}>{repo.id}</Text>
+
+                            <View style={styles.repoMetaSection}>
+                              <View style={styles.repoMetaRow}>
+                                <Text style={styles.repoMetaLabel}>Author</Text>
+                                <Text style={styles.repoMetaValue} numberOfLines={1}>
+                                  {repo.authorName ?? 'Not available'}
+                                </Text>
+                              </View>
+                              <View style={styles.repoMetaRow}>
+                                <Text style={styles.repoMetaLabel}>Updated</Text>
+                                <Text style={styles.repoMetaValue} numberOfLines={1}>
+                                  {updatedLabel}
+                                </Text>
+                              </View>
+                              <View style={styles.repoMetaRow}>
+                                <Text style={styles.repoMetaLabel}>Entries</Text>
+                                <Text style={styles.repoMetaValue}>
+                                  {repo.entryCount ?? 'Not available'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        ) : (
                         <Pressable
                           style={styles.repoOpenArea}
-                          onPress={() => openBinder(repo)}
+                          onPress={() => {
+                            if (editingRepoId) return;
+                            openBinder(repo);
+                          }}
                           testID={`binder-list-item-${index}`}
                         >
-                          <Text style={styles.repoName} numberOfLines={1}>{repo.name}</Text>
+                          <View style={styles.repoNameRow}>
+                            <Pressable
+                              onPress={(event) => {
+                                event.stopPropagation?.();
+                                beginRename(repo);
+                              }}
+                              hitSlop={6}
+                              testID={`binder-name-edit-${index}`}
+                            >
+                              <Text style={styles.repoName} numberOfLines={1}>{repo.name}</Text>
+                            </Pressable>
+                          </View>
                           <Text style={styles.repoId} numberOfLines={1}>{repo.id}</Text>
 
                           <View style={styles.repoMetaSection}>
@@ -605,44 +779,14 @@ export default function BinderListScreen() {
                               </Text>
                             </View>
                             <View style={styles.repoMetaRow}>
-                              <Text style={styles.repoMetaLabel}>Created</Text>
-                              <Text style={styles.repoMetaValue} numberOfLines={1}>
-                                {createdLabel}
-                              </Text>
-                            </View>
-                            <View style={styles.repoMetaRow}>
                               <Text style={styles.repoMetaLabel}>Entries</Text>
                               <Text style={styles.repoMetaValue}>
                                 {repo.entryCount ?? 'Not available'}
                               </Text>
                             </View>
-                            <View style={styles.repoMetaRow}>
-                              <Text style={styles.repoMetaLabel}>Folders</Text>
-                              <Text style={styles.repoMetaValue}>
-                                {repo.folderCount ?? 'Not available'}
-                              </Text>
-                            </View>
-                            <View style={styles.repoMetaRow}>
-                              <Text style={styles.repoMetaLabel}>Attachments</Text>
-                              <Text style={styles.repoMetaValue}>
-                                {repo.attachmentCount ?? 'Not available'}
-                              </Text>
-                            </View>
-                            <View style={styles.repoMetaRow}>
-                              <Text style={styles.repoMetaLabel}>Local</Text>
-                              <Text style={styles.repoMetaValue}>
-                                {repo.isCloned ? 'Cloned' : 'Cloud only'}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View style={styles.repoCommitSection}>
-                            <Text style={styles.repoCommitLabel}>Last Commit</Text>
-                            <Text style={styles.repoCommitMessage} numberOfLines={2}>
-                              {repo.lastCommitMessage ?? 'No recent commit message'}
-                            </Text>
                           </View>
                         </Pressable>
+                        )}
 
                         <View
                           style={[
@@ -871,24 +1015,23 @@ addPhotoButton: {
     paddingTop: 18,
     paddingBottom: 12,
   },
-  repoId: { fontSize: 13, fontFamily: 'Courier', color: '#999' },
-  repoName: { fontSize: 17, fontWeight: '600', color: '#111', marginBottom: 4 },
-  repoCommitLabel: {
-    color: '#6B7280',
-    fontSize: 12,
+  repoNameInput: {
+    color: '#111',
+    flex: 1,
+    fontSize: 17,
     fontWeight: '600',
+    margin: 0,
+    padding: 0,
+  },
+  repoNameRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
     marginBottom: 4,
   },
-  repoCommitMessage: {
-    color: '#334155',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  repoCommitSection: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(17, 17, 17, 0.06)',
-    paddingTop: 8,
+  repoId: { fontSize: 13, fontFamily: 'Courier', color: '#999' },
+  repoName: { fontSize: 17, fontWeight: '600', color: '#111', marginBottom: 4 },
+  renameSpinner: {
+    marginLeft: 8,
   },
   repoMetaLabel: {
     color: '#6B7280',
