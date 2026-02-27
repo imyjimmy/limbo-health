@@ -57,6 +57,14 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
     dirPath,
   );
 
+  // Run one-time migration on binder root open
+  useEffect(() => {
+    if (dirPath !== '' || !binderService) return;
+    binderService.migrateContextualAdd().catch((err) => {
+      console.warn('contextualAdd migration failed:', err);
+    });
+  }, [binderService, dirPath]);
+
   useEffect(() => {
     const unsubscribe = subscribeDirectoryChanged((event) => {
       if (event.binderId !== binderId) return;
@@ -256,7 +264,11 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
           summary: 'Current JSON is generated from in-memory UI/debug state.',
           details: 'Git Files (HEAD) is generated via git.listFiles and is not a JSON file in the repo.',
         }}
-        data={{ dirPath, items, cache: { dir: dirSize(), pt: ptSize() } }}
+        data={{ dirPath, items: items.map(it => {
+          if (it.kind !== 'folder') return it;
+          const { childCount, ...rest } = it;
+          return rest;
+        }), cache: { dir: dirSize(), pt: ptSize() } }}
         loadExtra={async () => {
           const files = await (binderService?.listAllFiles() ?? Promise.resolve([]));
           return {

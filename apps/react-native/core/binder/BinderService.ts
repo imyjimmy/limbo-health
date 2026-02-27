@@ -20,7 +20,8 @@ import type { MedicalDocument } from '../../types/document';
 import type { EntryMetadata } from './DocumentModel';
 import type { AuthConfig } from '../git/httpTransport';
 import { dirGet, dirSet, dirEvict, dirEvictPrefix, ptEvict, ptEvictPrefix } from './BinderCache';
-import type { DirItem } from './DirectoryReader';
+import type { DirItem, FolderMeta } from './DirectoryReader';
+import { inferBehavior } from './folderBehavior';
 import { decode as b64decode } from '../crypto/base64';
 import { decrypt, encrypt } from '../crypto/nip44';
 import type { MergeDriverCallback } from 'isomorphic-git';
@@ -351,7 +352,7 @@ export class BinderService {
   /**
    * Initialize a new binder: git init, write encrypted patient-info.json, commit, push.
    */
-  /** Default folder structure created with every new binder. */
+  /** Default folder structure created with every new binder. Purely structural — behavior is inferred from names via BEHAVIOR_RULES. */
   private static readonly DEFAULT_FOLDERS: {
     folder: string;
     displayName: string;
@@ -361,7 +362,7 @@ export class BinderService {
     { folder: 'my-info',       displayName: 'My Info',       icon: '👤', displayOrder: 0 },
     { folder: 'my-info/allergies',     displayName: 'Allergies',     icon: '🤧' },
     { folder: 'my-info/immunizations', displayName: 'Immunizations', icon: '💉' },
-    { folder: 'my-info/billing-insurance',displayName: 'Billing & Insurance',icon: '🪪' },
+    { folder: 'my-info/billing-insurance', displayName: 'Billing & Insurance', icon: '🪪' },
     { folder: 'conditions',    displayName: 'Conditions',    icon: '❤️‍🩹', displayOrder: 1 },
     { folder: 'medications',   displayName: 'Medications',   icon: '💊', displayOrder: 2 },
     { folder: 'visits',        displayName: 'Visits',        icon: '🩺', displayOrder: 3 },
@@ -390,8 +391,14 @@ export class BinderService {
     const filesToCommit = ['patient-info.json'];
 
     // Create default folder hierarchy with .meta.json
+    // Behavior (contextualAdd) is inferred from folder names via BEHAVIOR_RULES.
     const nextByParent = new Map<string, number>();
-    for (const { folder, displayName, icon, displayOrder: explicitOrder } of BinderService.DEFAULT_FOLDERS) {
+    for (const {
+      folder,
+      displayName,
+      icon,
+      displayOrder: explicitOrder,
+    } of BinderService.DEFAULT_FOLDERS) {
       const parts = folder.split('/').filter(Boolean);
       parts.pop();
       const parentDir = parts.join('/');
@@ -400,12 +407,14 @@ export class BinderService {
         : (nextByParent.get(parentDir) ?? 0);
       nextByParent.set(parentDir, Math.max(nextByParent.get(parentDir) ?? 0, displayOrder + 1));
 
+      const rule = inferBehavior(displayName);
       const metaPath = `${folder}/.meta.json`;
       await io.writeJSON('/' + metaPath, {
         displayName,
         icon,
         color: '#7F8C8D',
         displayOrder,
+        ...(rule ? { contextualAdd: rule.contextualAdd } : {}),
       });
       filesToCommit.push(metaPath);
     }
@@ -476,6 +485,16 @@ export class BinderService {
     const items = await readDirectory(dirPath, fs, this.io);
     dirSet(key, items);
     return items;
+  }
+
+  async readFolderMeta(dirPath: string): Promise<FolderMeta | null> {
+    const normalized = this.normalizeDirPath(dirPath);
+    if (!normalized) return null;
+    try {
+      return await this.io.readJSON<FolderMeta>('/' + normalized + '/.meta.json');
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -645,7 +664,12 @@ export class BinderService {
     folderPath: string,
     displayName: string,
     overviewDoc?: MedicalDocument,
-    meta?: { icon?: string; color?: string; displayOrder?: number },
+    meta?: {
+      icon?: string;
+      color?: string;
+      displayOrder?: number;
+      contextualAdd?: FolderMeta['contextualAdd'];
+    },
   ): Promise<void> {
     await this.runSerializedWrite(async () => {
       const lastSlash = folderPath.lastIndexOf('/');
@@ -655,7 +679,14 @@ export class BinderService {
           ? meta.displayOrder
           : await this.nextDisplayOrder(parentDir);
       const metaPath = folderPath + '/.meta.json';
-      const metaObj = { displayName, ...meta, displayOrder };
+      // Infer contextualAdd from the folder name when not explicitly provided
+      const rule = meta?.contextualAdd ? null : inferBehavior(displayName);
+      const metaObj = {
+        displayName,
+        ...meta,
+        displayOrder,
+        ...(rule && !meta?.contextualAdd ? { contextualAdd: rule.contextualAdd } : {}),
+      };
       await this.io.writeJSON('/' + metaPath, metaObj);
 
       const filesToCommit = [metaPath];
@@ -847,6 +878,85 @@ export class BinderService {
   async push(): Promise<void> {
     await this.runSerializedWrite(async () => {
       await this.pushWithPullRetry();
+    });
+  }
+
+  // --- Migrations ---
+
+  /**
+   * Backfill missing contextualAdd into existing .meta.json files.
+   * Walks every folder in the binder recursively, infers behavior from
+   * the leaf folder name via BEHAVIOR_RULES, and writes contextualAdd
+   * when missing. Idempotent. Commits + pushes once if any files changed.
+   */
+  async migrateContextualAdd(): Promise<void> {
+    await this.runSerializedWrite(async () => {
+      const fs = createFSAdapter(this.info.repoDir);
+      const updatedPaths: string[] = [];
+
+      const walkDir = async (dirPath: string) => {
+        let names: string[];
+        try {
+          names = await fs.promises.readdir(dirPath);
+        } catch {
+          return;
+        }
+
+        for (const name of names) {
+          if (name.startsWith('.')) continue;
+          const childPath = dirPath === '/' ? `/${name}` : `${dirPath}/${name}`;
+          let stat;
+          try {
+            stat = await fs.promises.stat(childPath);
+          } catch {
+            continue;
+          }
+          if (!stat.isDirectory()) continue;
+
+          // Check for .meta.json in this folder
+          const metaFsPath = `${childPath}/.meta.json`;
+          let existing: FolderMeta | null = null;
+          try {
+            existing = await this.io.readJSON<FolderMeta>(metaFsPath);
+          } catch {
+            // No .meta.json — nothing to patch
+          }
+
+          if (existing && !existing.contextualAdd) {
+            const folderDisplayName = existing.displayName || name;
+            const rule = inferBehavior(folderDisplayName);
+            if (rule) {
+              await this.io.writeJSON(metaFsPath, {
+                ...existing,
+                contextualAdd: rule.contextualAdd,
+              });
+              // Convert fs path to repo-relative path for git
+              const repoRelative = childPath.replace(/^\//, '') + '/.meta.json';
+              updatedPaths.push(repoRelative);
+            }
+          }
+
+          // Recurse into subdirectories
+          await walkDir(childPath);
+        }
+      };
+
+      await walkDir('/');
+
+      if (updatedPaths.length === 0) return;
+
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        updatedPaths,
+        'Infer contextualAdd from folder names',
+        this.info.author,
+      );
+      this.evictAllCaches();
+      try {
+        await this.pushWithPullRetry();
+      } catch (err: any) {
+        console.warn('Push failed after migration, changes saved locally:', err?.message);
+      }
     });
   }
 }

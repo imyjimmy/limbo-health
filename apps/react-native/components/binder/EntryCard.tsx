@@ -14,8 +14,7 @@ export function EntryCard({ item, onPress }: EntryCardProps) {
   const title = preview?.title ?? item.name.replace('.json', '');
   const medicationName = preview?.medicationName ?? title;
   const isMedicationSummary =
-    preview?.renderer === 'medication' ||
-    (preview?.type === 'medication' && !!preview?.medicationName);
+    !!preview?.medicationName;
   const dateStr = preview?.created
     ? formatDate(preview.created)
     : extractDateFromFilename(item.name);
