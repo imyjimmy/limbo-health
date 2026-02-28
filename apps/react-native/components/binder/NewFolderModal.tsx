@@ -2,7 +2,7 @@
 // Modal for creating a new subfolder (e.g., a new condition).
 // Name (required), icon (optional), color (optional).
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -14,21 +14,16 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-
-const EMOJI_OPTIONS = [
-  '❤️‍🩹', '🩺', '🧪', '💊', '💉', '⚠️', '🔬', '📷', '📄',
-  '🦴', '🧠', '👁️', '🦷', '👂', '🫁', '🫀', '🩻', '🩹',
-  '🏥', '🚑', '💊', '🧬', '🦠', '🩸', '🌡️', '😷', '🤒',
-];
-
-const COLOR_OPTIONS = [
-  '#E74C3C', '#E67E22', '#F1C40F', '#27AE60', '#16A085',
-  '#4A90D9', '#5B6ABF', '#8E44AD', '#7F8C8D', '#566573',
-];
+import {
+  ALLOWED_FOLDER_COLORS,
+  DEFAULT_FOLDER_COLOR,
+  FOLDER_EMOJI_OPTIONS,
+} from './folderAppearance';
 
 interface NewFolderModalProps {
   visible: boolean;
   title: string; // e.g. "New Condition"
+  initialName?: string;
   defaultEmoji?: string;
   defaultColor?: string;
   onConfirm: (name: string, emoji: string, color: string) => void;
@@ -38,27 +33,33 @@ interface NewFolderModalProps {
 export function NewFolderModal({
   visible,
   title,
+  initialName = '',
   defaultEmoji = '📁',
-  defaultColor = '#7F8C8D',
+  defaultColor = DEFAULT_FOLDER_COLOR,
   onConfirm,
   onCancel,
 }: NewFolderModalProps) {
-  const [name, setName] = useState('');
+  const [name, setName] = useState(initialName);
   const [selectedEmoji, setSelectedEmoji] = useState(defaultEmoji);
   const [selectedColor, setSelectedColor] = useState(defaultColor);
+  const colorOptions = useMemo(
+    () => (ALLOWED_FOLDER_COLORS.includes(defaultColor) ? ALLOWED_FOLDER_COLORS : [defaultColor, ...ALLOWED_FOLDER_COLORS]),
+    [defaultColor],
+  );
+
+  useEffect(() => {
+    if (!visible) return;
+    setName(initialName);
+    setSelectedEmoji(defaultEmoji);
+    setSelectedColor(defaultColor);
+  }, [visible, initialName, defaultEmoji, defaultColor]);
 
   const handleConfirm = () => {
     if (!name.trim()) return;
     onConfirm(name.trim(), selectedEmoji, selectedColor);
-    setName('');
-    setSelectedEmoji(defaultEmoji);
-    setSelectedColor(defaultColor);
   };
 
   const handleCancel = () => {
-    setName('');
-    setSelectedEmoji(defaultEmoji);
-    setSelectedColor(defaultColor);
     onCancel();
   };
 
@@ -116,7 +117,7 @@ export function NewFolderModal({
             style={styles.pickerRow}
             contentContainerStyle={styles.pickerContent}
           >
-            {EMOJI_OPTIONS.map((e, i) => (
+            {FOLDER_EMOJI_OPTIONS.map((e, i) => (
               <TouchableOpacity
                 key={`${e}-${i}`}
                 style={[
@@ -133,7 +134,7 @@ export function NewFolderModal({
           {/* Color picker */}
           <Text style={styles.sectionLabel}>Color</Text>
           <View style={styles.colorRow}>
-            {COLOR_OPTIONS.map((c) => (
+            {colorOptions.map((c) => (
               <TouchableOpacity
                 key={c}
                 style={[

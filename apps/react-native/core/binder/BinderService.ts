@@ -711,6 +711,59 @@ export class BinderService {
   }
 
   /**
+   * Update an existing folder's metadata (.meta.json).
+   * Supports editing displayName, icon, and color without changing folder path.
+   */
+  async updateFolderMeta(
+    folderPath: string,
+    updates: {
+      displayName: string;
+      icon: string;
+      color: string;
+    },
+  ): Promise<void> {
+    await this.runSerializedWrite(async () => {
+      const normalized = this.normalizeDirPath(folderPath);
+      if (!normalized) {
+        throw new Error('Cannot edit root folder metadata.');
+      }
+
+      const metaPath = `${normalized}/.meta.json`;
+      let existing: FolderMeta = {};
+      try {
+        existing = await this.io.readJSON<FolderMeta>('/' + metaPath);
+      } catch {
+        // Folder may not have metadata yet; create fresh metadata document.
+      }
+
+      const displayName = updates.displayName.trim();
+      if (!displayName) throw new Error('Folder name is required.');
+
+      const inferredRule = inferBehavior(displayName);
+      const nextMeta: FolderMeta = {
+        ...existing,
+        displayName,
+        icon: updates.icon,
+        color: updates.color,
+        ...(existing.contextualAdd
+          ? {}
+          : (inferredRule ? { contextualAdd: inferredRule.contextualAdd } : {})),
+      };
+
+      await this.io.writeJSON('/' + metaPath, nextMeta);
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        [metaPath],
+        `Update folder ${displayName}`,
+        this.info.author,
+      );
+      dirEvict(this.dirCacheKey(normalized));
+      dirEvict(this.parentDirCacheKey(normalized));
+      await this.pushWithPullRetry();
+    });
+  }
+
+  /**
    * Ensure a folder exists, creating it via createSubfolder if needed.
    * Returns the folderPath whether it was created or already existed.
    */

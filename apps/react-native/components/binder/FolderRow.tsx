@@ -1,6 +1,6 @@
 // components/binder/FolderRow.tsx
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Animated, TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import type { DirFolder } from '../../core/binder/DirectoryReader';
 
@@ -9,21 +9,36 @@ interface FolderRowProps {
   emoji?: string;
   iconColor?: string;
   onPress: (folder: DirFolder) => void;
+  onLongPress?: (folder: DirFolder) => void;
   /** Animated value 0→1 driving the "delete multiple items" pill visibility */
   deleteWarningAnim?: Animated.Value;
 }
 
-export function FolderRow({ item, emoji, iconColor, onPress, deleteWarningAnim }: FolderRowProps) {
+export function FolderRow({ item, emoji, iconColor, onPress, onLongPress, deleteWarningAnim }: FolderRowProps) {
+  const longPressFired = useRef(false);
   const baseColor = iconColor ?? '#8f99a6';
   const bgTint = withAlpha(baseColor, '22') ?? '#f0f0f0';
   const tabShade = withAlpha(baseColor, 'CC') ?? '#b5bfca';
   const tabBorder = withAlpha(baseColor, 'F2') ?? '#8792a0';
   const displayName = item.meta?.displayName ?? formatFolderName(item.name);
+  const handlePress = () => {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    onPress(item);
+  };
+  const handleLongPress = () => {
+    longPressFired.current = true;
+    onLongPress?.(item);
+  };
 
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={() => onPress(item)}
+      onPress={handlePress}
+      onLongPress={onLongPress ? handleLongPress : undefined}
+      delayLongPress={250}
       activeOpacity={0.6}
       testID={`folder-row-${item.name}`}
     >

@@ -35,6 +35,8 @@ interface DirectoryListProps {
   addSubfolderLabel?: string;
   /** If provided, enables swipe-to-delete on each row */
   onDeleteItem?: (item: DirItem) => void;
+  /** If provided, enables long-press folder edit */
+  onEditFolder?: (folder: DirFolder) => void;
 }
 
 export function DirectoryList({
@@ -49,6 +51,7 @@ export function DirectoryList({
   onAddSubfolder,
   addSubfolderLabel,
   onDeleteItem,
+  onEditFolder,
 }: DirectoryListProps) {
   // Track the currently open swipeable so only one row is open at a time
   const openSwipeableRef = useRef<Swipeable | null>(null);
@@ -71,6 +74,7 @@ export function DirectoryList({
             emoji={item.meta?.icon ?? iconInfo?.emoji}
             iconColor={item.meta?.color ?? iconInfo?.color}
             onPress={onNavigateFolder}
+            onLongPress={onEditFolder}
           />
         );
       }
@@ -94,6 +98,7 @@ export function DirectoryList({
                   emoji={item.meta?.icon ?? iconInfo?.emoji}
                   iconColor={item.meta?.color ?? iconInfo?.color}
                   onPress={onNavigateFolder}
+                  onLongPress={onEditFolder}
                   deleteWarningAnim={warningAnim}
                 />
               )
@@ -103,6 +108,7 @@ export function DirectoryList({
                   emoji={item.meta?.icon ?? iconInfo?.emoji}
                   iconColor={item.meta?.color ?? iconInfo?.color}
                   onPress={onNavigateFolder}
+                  onLongPress={onEditFolder}
                 />
               )
           }
@@ -199,7 +205,7 @@ export function DirectoryList({
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: 'transparent',
   },
   centered: {
     flex: 1,
