@@ -14,7 +14,10 @@ interface FolderRowProps {
 }
 
 export function FolderRow({ item, emoji, iconColor, onPress, deleteWarningAnim }: FolderRowProps) {
-  const bgTint = iconColor ? iconColor + '18' : '#f0f0f0';
+  const baseColor = iconColor ?? '#8f99a6';
+  const bgTint = withAlpha(baseColor, '22') ?? '#f0f0f0';
+  const tabShade = withAlpha(baseColor, 'CC') ?? '#b5bfca';
+  const tabBorder = withAlpha(baseColor, 'F2') ?? '#8792a0';
   const displayName = item.meta?.displayName ?? formatFolderName(item.name);
 
   return (
@@ -24,31 +27,39 @@ export function FolderRow({ item, emoji, iconColor, onPress, deleteWarningAnim }
       activeOpacity={0.6}
       testID={`folder-row-${item.name}`}
     >
-      <View style={[styles.iconContainer, { backgroundColor: bgTint }]}>
-        <Text style={styles.emoji}>{emoji ?? '📁'}</Text>
+      <View
+        style={[
+          styles.backgroundTab,
+          { backgroundColor: tabShade, borderColor: tabBorder },
+        ]}
+        pointerEvents="none"
+      />
+      <View style={styles.foregroundRow}>
+        <View style={[styles.iconContainer, { backgroundColor: bgTint }]}>
+          <Text style={styles.emoji}>{emoji ?? '📁'}</Text>
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.name}>{displayName}</Text>
+        </View>
+        {deleteWarningAnim && (
+          <Animated.View
+            style={[
+              styles.deletePill,
+              {
+                opacity: deleteWarningAnim,
+                transform: [{
+                  scale: deleteWarningAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.8, 1],
+                  }),
+                }],
+              },
+            ]}
+          >
+            <Text style={styles.deletePillText}>delete multiple items?</Text>
+          </Animated.View>
+        )}
       </View>
-      <View style={styles.textContainer}>
-        <Text style={styles.name}>{displayName}</Text>
-      </View>
-      {deleteWarningAnim && (
-        <Animated.View
-          style={[
-            styles.deletePill,
-            {
-              opacity: deleteWarningAnim,
-              transform: [{
-                scale: deleteWarningAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.8, 1],
-                }),
-              }],
-            },
-          ]}
-        >
-          <Text style={styles.deletePillText}>delete multiple items?</Text>
-        </Animated.View>
-      )}
-      <Text style={styles.chevron}>›</Text>
     </TouchableOpacity>
   );
 }
@@ -61,15 +72,42 @@ function formatFolderName(slug: string): string {
     .join(' ');
 }
 
+function withAlpha(color: string, alphaHex: string): string | null {
+  const longHexMatch = color.match(/^#([0-9a-fA-F]{6})$/);
+  if (longHexMatch) return `${color}${alphaHex}`;
+
+  const shortHexMatch = color.match(/^#([0-9a-fA-F]{3})$/);
+  if (!shortHexMatch) return null;
+
+  const [r, g, b] = shortHexMatch[1].split('');
+  return `#${r}${r}${g}${g}${b}${b}${alphaHex}`;
+}
+
 const styles = StyleSheet.create({
   container: {
+    position: 'relative',
+    backgroundColor: '#fff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e5e5e5',
+  },
+  backgroundTab: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 40,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  foregroundRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
     paddingHorizontal: 16,
+    marginRight: 18,
     backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e5e5',
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
   },
   iconContainer: {
     width: 40,
@@ -101,10 +139,5 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '600',
-  },
-  chevron: {
-    fontSize: 22,
-    color: '#999',
-    marginLeft: 8,
   },
 });
