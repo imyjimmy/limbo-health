@@ -4,7 +4,7 @@
 // Data drives rendering: items come from useDirectoryContents,
 // folder icons come from .meta.json on each item.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useRouter, Stack, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -42,6 +42,8 @@ const BINDER_TEXTURES_KEY = 'limbo_binder_card_textures_v1';
 export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryProps) {
   const router = useRouter();
   const [textureId, setTextureId] = useState<BinderTextureId>(DEFAULT_BINDER_TEXTURE_ID);
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const reorderPersistingRef = useRef(false);
 
   const { state: authState } = useAuthContext();
   const { masterConversationKey } = useCryptoContext();
@@ -130,6 +132,11 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
     }, [loadTexturePreference]),
   );
 
+  useEffect(() => {
+    reorderPersistingRef.current = false;
+    setReorderSaving(false);
+  }, [binderId, dirPath]);
+
   // --- Share ---
   const binderRepoDir = `binders/${binderId}`;
   const { state: shareState, startShare, retryPush, cancel: cancelShare } = useShareSession(
@@ -193,6 +200,27 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
       }
     },
     [binderService, refresh],
+  );
+
+  const handleReorderItems = useCallback(
+    async (nextItems: DirItem[]) => {
+      if (!binderService || reorderPersistingRef.current) return;
+      reorderPersistingRef.current = true;
+      setReorderSaving(true);
+      try {
+        await binderService.reorderDirectoryItems(
+          dirPath,
+          nextItems.map((item) => ({ kind: item.kind, relativePath: item.relativePath })),
+        );
+        refresh();
+      } catch (err: any) {
+        Alert.alert('Error', err?.message ?? 'Failed to save item order.');
+      } finally {
+        reorderPersistingRef.current = false;
+        setReorderSaving(false);
+      }
+    },
+    [binderService, dirPath, refresh],
   );
 
   // --- Add folder ---
@@ -328,6 +356,12 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
           </TouchableOpacity>
         </View>
       )}
+      {reorderSaving && (
+        <View style={styles.reorderProgress}>
+          <ActivityIndicator size="small" color="#007AFF" />
+          <Text style={styles.shareProgressText}>Saving order...</Text>
+        </View>
+      )}
 
       <View style={styles.directoryLayer}>
         <BinderTextureBackground textureId={textureId} />
@@ -343,6 +377,8 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
           addSubfolderLabel="Add a new folder..."
           onDeleteItem={handleDeleteItem}
           onEditFolder={handleStartEditFolder}
+          onReorder={handleReorderItems}
+          reorderBusy={reorderSaving}
         />
       </View>
       <NewFolderModal
@@ -425,6 +461,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     backgroundColor: '#FFF0F0',
+  },
+  reorderProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#EAF3FF',
   },
   shareErrorText: {
     fontSize: 13,

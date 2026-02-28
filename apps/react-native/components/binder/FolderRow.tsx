@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import { Animated, TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+import { IconGripVertical } from '@tabler/icons-react-native';
 import type { DirFolder } from '../../core/binder/DirectoryReader';
 
 interface FolderRowProps {
@@ -10,11 +11,20 @@ interface FolderRowProps {
   iconColor?: string;
   onPress: (folder: DirFolder) => void;
   onLongPress?: (folder: DirFolder) => void;
+  onDragHandleLongPress?: () => void;
   /** Animated value 0→1 driving the "delete multiple items" pill visibility */
   deleteWarningAnim?: Animated.Value;
 }
 
-export function FolderRow({ item, emoji, iconColor, onPress, onLongPress, deleteWarningAnim }: FolderRowProps) {
+export function FolderRow({
+  item,
+  emoji,
+  iconColor,
+  onPress,
+  onLongPress,
+  onDragHandleLongPress,
+  deleteWarningAnim,
+}: FolderRowProps) {
   const longPressFired = useRef(false);
   const baseColor = iconColor ?? '#8f99a6';
   const bgTint = withAlpha(baseColor, '22') ?? '#f0f0f0';
@@ -34,14 +44,7 @@ export function FolderRow({ item, emoji, iconColor, onPress, onLongPress, delete
   };
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      onPress={handlePress}
-      onLongPress={onLongPress ? handleLongPress : undefined}
-      delayLongPress={250}
-      activeOpacity={0.6}
-      testID={`folder-row-${item.name}`}
-    >
+    <View style={styles.container}>
       <View
         style={[
           styles.backgroundTab,
@@ -50,32 +53,51 @@ export function FolderRow({ item, emoji, iconColor, onPress, onLongPress, delete
         pointerEvents="none"
       />
       <View style={styles.foregroundRow}>
-        <View style={[styles.iconContainer, { backgroundColor: bgTint }]}>
-          <Text style={styles.emoji}>{emoji ?? '📁'}</Text>
-        </View>
-        <View style={styles.textContainer}>
-          <Text style={styles.name}>{displayName}</Text>
-        </View>
-        {deleteWarningAnim && (
-          <Animated.View
-            style={[
-              styles.deletePill,
-              {
-                opacity: deleteWarningAnim,
-                transform: [{
-                  scale: deleteWarningAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.8, 1],
-                  }),
-                }],
-              },
-            ]}
-          >
-            <Text style={styles.deletePillText}>delete multiple items?</Text>
-          </Animated.View>
-        )}
+        <TouchableOpacity
+          style={styles.mainPressArea}
+          onPress={handlePress}
+          onLongPress={onLongPress ? handleLongPress : undefined}
+          delayLongPress={250}
+          activeOpacity={0.6}
+          testID={`folder-row-${item.name}`}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: bgTint }]}>
+            <Text style={styles.emoji}>{emoji ?? '📁'}</Text>
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={styles.name}>{displayName}</Text>
+          </View>
+          {deleteWarningAnim && (
+            <Animated.View
+              style={[
+                styles.deletePill,
+                {
+                  opacity: deleteWarningAnim,
+                  transform: [{
+                    scale: deleteWarningAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1],
+                    }),
+                  }],
+                },
+              ]}
+            >
+              <Text style={styles.deletePillText}>delete multiple items?</Text>
+            </Animated.View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.dragHandle}
+          onLongPress={onDragHandleLongPress}
+          delayLongPress={120}
+          activeOpacity={0.7}
+          disabled={!onDragHandleLongPress}
+          testID={`folder-drag-handle-${item.name}`}
+        >
+          <IconGripVertical size={18} color={onDragHandleLongPress ? '#6B7280' : '#C5CCD7'} />
+        </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -117,12 +139,21 @@ const styles = StyleSheet.create({
   foregroundRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingLeft: 16,
+    paddingRight: 10,
     marginRight: 18,
     backgroundColor: '#fff',
     borderTopRightRadius: 14,
     borderBottomRightRadius: 14,
+  },
+  mainPressArea: {
+    flex: 1,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingRight: 8,
   },
   iconContainer: {
     width: 40,
@@ -154,5 +185,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '600',
+  },
+  dragHandle: {
+    width: 30,
+    height: 36,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
   },
 });

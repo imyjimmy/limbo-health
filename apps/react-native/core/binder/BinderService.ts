@@ -54,6 +54,11 @@ export interface PendingSidecarWrite {
   base64Data: string;
 }
 
+export interface ReorderDirectoryItemInput {
+  kind: DirItem['kind'];
+  relativePath: string;
+}
+
 // --- BinderService ---
 
 export class BinderService {
@@ -760,6 +765,97 @@ export class BinderService {
       dirEvict(this.dirCacheKey(normalized));
       dirEvict(this.parentDirCacheKey(normalized));
       await this.pushWithPullRetry();
+    });
+  }
+
+  /**
+   * Persist a new ordering for one directory level.
+   * Folders write displayOrder into <folder>/.meta.json.
+   * Entries write displayOrder into document metadata.
+   */
+  async reorderDirectoryItems(
+    dirPath: string,
+    items: ReorderDirectoryItemInput[],
+  ): Promise<void> {
+    await this.runSerializedWrite(async () => {
+      const normalizedDir = this.normalizeDirPath(dirPath);
+      if (items.length === 0) return;
+
+      const seen = new Set<string>();
+      const filesToCommit: string[] = [];
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const normalizedPath = this.normalizeDirPath(item.relativePath);
+        if (!normalizedPath) continue;
+        if (seen.has(normalizedPath)) {
+          throw new Error(`Duplicate reorder path: ${normalizedPath}`);
+        }
+        seen.add(normalizedPath);
+
+        const parent = normalizedPath.includes('/')
+          ? normalizedPath.slice(0, normalizedPath.lastIndexOf('/'))
+          : '';
+        if (parent !== normalizedDir) {
+          throw new Error(`Invalid reorder path outside directory: ${normalizedPath}`);
+        }
+
+        if (item.kind === 'folder') {
+          const metaPath = `${normalizedPath}/.meta.json`;
+          let existing: FolderMeta = {};
+          try {
+            existing = await this.io.readJSON<FolderMeta>('/' + metaPath);
+          } catch {
+            // Folder may not have metadata yet; create metadata with displayOrder.
+          }
+
+          const currentOrder =
+            typeof existing.displayOrder === 'number' && Number.isFinite(existing.displayOrder)
+              ? existing.displayOrder
+              : undefined;
+          if (currentOrder === index) continue;
+
+          await this.io.writeJSON('/' + metaPath, {
+            ...existing,
+            displayOrder: index,
+          });
+          filesToCommit.push(metaPath);
+          continue;
+        }
+
+        const docPath = normalizedPath;
+        const doc = await this.io.readDocument('/' + docPath);
+        const currentOrder =
+          typeof doc.metadata.displayOrder === 'number' && Number.isFinite(doc.metadata.displayOrder)
+            ? doc.metadata.displayOrder
+            : undefined;
+        if (currentOrder === index) continue;
+
+        await this.io.writeDocument('/' + docPath, {
+          ...doc,
+          metadata: {
+            ...doc.metadata,
+            displayOrder: index,
+          },
+        });
+        filesToCommit.push(docPath);
+      }
+
+      if (filesToCommit.length === 0) return;
+
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        filesToCommit,
+        normalizedDir ? `Reorder ${normalizedDir}` : 'Reorder root',
+        this.info.author,
+      );
+
+      dirEvict(this.dirCacheKey(normalizedDir));
+      try {
+        await this.pushWithPullRetry();
+      } catch (err: any) {
+        console.warn('Push failed after reorder, changes saved locally:', err?.message);
+      }
     });
   }
 
