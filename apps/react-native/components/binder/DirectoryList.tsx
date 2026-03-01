@@ -186,18 +186,7 @@ export function DirectoryList({
     );
   };
 
-  const reorderHeader = (
-    <>
-      {ListHeaderComponent}
-      {draggable && (
-        <View style={styles.reorderHintBox}>
-          <Text style={styles.reorderHintText}>
-            Long-press a drag handle to move items. Changes save automatically.
-          </Text>
-        </View>
-      )}
-    </>
-  );
+  const listHeader = ListHeaderComponent ?? undefined;
 
   if (draggable) {
     return (
@@ -206,7 +195,7 @@ export function DirectoryList({
           data={reorderItems}
           keyExtractor={(item) => item.relativePath}
           renderItem={renderDraggableItem}
-          ListHeaderComponent={reorderHeader}
+          ListHeaderComponent={listHeader}
           ListEmptyComponent={
             <>
               {onAddSubfolder && (
@@ -266,7 +255,7 @@ export function DirectoryList({
         data={items}
         keyExtractor={(item) => item.relativePath}
         renderItem={renderItem}
-        ListHeaderComponent={reorderHeader}
+        ListHeaderComponent={listHeader}
         ListEmptyComponent={
           <>
             {onAddSubfolder && (
@@ -393,18 +382,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     fontWeight: '400',
-  },
-  reorderHintBox: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#EAF3FF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#CCE0FF',
-  },
-  reorderHintText: {
-    fontSize: 13,
-    color: '#0B63CE',
-    fontWeight: '500',
   },
   dragActiveRow: {
     opacity: 0.92,

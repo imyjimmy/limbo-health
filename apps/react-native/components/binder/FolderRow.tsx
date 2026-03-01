@@ -2,7 +2,6 @@
 
 import React, { useRef } from 'react';
 import { Animated, TouchableOpacity, Text, View, StyleSheet } from 'react-native';
-import { IconGripVertical } from '@tabler/icons-react-native';
 import type { DirFolder } from '../../core/binder/DirectoryReader';
 
 interface FolderRowProps {
@@ -31,6 +30,7 @@ export function FolderRow({
   const tabShade = withAlpha(baseColor, 'CC') ?? '#b5bfca';
   const tabBorder = withAlpha(baseColor, 'F2') ?? '#8792a0';
   const displayName = item.meta?.displayName ?? formatFolderName(item.name);
+  const dragBarColor = onDragHandleLongPress ? '#6B7280' : '#C5CCD7';
   const handlePress = () => {
     if (longPressFired.current) {
       longPressFired.current = false;
@@ -94,7 +94,11 @@ export function FolderRow({
           disabled={!onDragHandleLongPress}
           testID={`folder-drag-handle-${item.name}`}
         >
-          <IconGripVertical size={18} color={onDragHandleLongPress ? '#6B7280' : '#C5CCD7'} />
+          <View style={styles.dragBars}>
+            <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+            <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+            <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -193,5 +197,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
+  },
+  dragBars: {
+    width: 14,
+    height: 12,
+    justifyContent: 'space-between',
+  },
+  dragBar: {
+    width: '100%',
+    height: 2,
+    borderRadius: 1,
   },
 });

@@ -59,6 +59,10 @@ export interface ReorderDirectoryItemInput {
   relativePath: string;
 }
 
+interface PendingReorderCommit {
+  filesByDir: Map<string, Set<string>>;
+}
+
 // --- BinderService ---
 
 export class BinderService {
@@ -66,6 +70,7 @@ export class BinderService {
   private info: BinderInfo;
   private masterConversationKey: Uint8Array;
   private static writeQueues = new Map<string, Promise<void>>();
+  private static pendingReorderCommits = new Map<string, PendingReorderCommit>();
   private static readonly LINEBREAKS = /^.*(\r?\n|$)/gm;
 
   constructor(info: BinderInfo, masterConversationKey: Uint8Array) {
@@ -345,6 +350,78 @@ export class BinderService {
 
     await this.pullLatest();
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
+  }
+
+  private queuePendingReorderFiles(dirPath: string, files: string[]): void {
+    const repoKey = this.info.repoDir;
+    const normalizedDir = this.normalizeDirPath(dirPath);
+    const pending = BinderService.pendingReorderCommits.get(repoKey) ?? {
+      filesByDir: new Map<string, Set<string>>(),
+    };
+    const dirFiles = pending.filesByDir.get(normalizedDir) ?? new Set<string>();
+
+    for (const file of files) {
+      dirFiles.add(file.startsWith('/') ? file.slice(1) : file);
+    }
+
+    pending.filesByDir.set(normalizedDir, dirFiles);
+    BinderService.pendingReorderCommits.set(repoKey, pending);
+  }
+
+  private reorderCommitMessage(dirPaths: string[]): string {
+    if (dirPaths.length === 1) {
+      const [dirPath] = dirPaths;
+      return dirPath ? `Reorder ${dirPath}` : 'Reorder root';
+    }
+    return 'Reorder directories';
+  }
+
+  /**
+   * Commit and push pending reordered displayOrder writes.
+   * When dirPath is provided, only flushes that directory's pending reorder files.
+   */
+  async flushPendingReorderCommit(dirPath?: string): Promise<void> {
+    await this.runSerializedWrite(async () => {
+      const repoKey = this.info.repoDir;
+      const pending = BinderService.pendingReorderCommits.get(repoKey);
+      if (!pending || pending.filesByDir.size === 0) return;
+
+      const targetDirs =
+        typeof dirPath === 'string'
+          ? [this.normalizeDirPath(dirPath)]
+          : Array.from(pending.filesByDir.keys());
+      const filesToCommit = new Set<string>();
+      const committedDirs: string[] = [];
+
+      for (const targetDir of targetDirs) {
+        const dirFiles = pending.filesByDir.get(targetDir);
+        if (!dirFiles || dirFiles.size === 0) continue;
+        committedDirs.push(targetDir);
+        for (const file of dirFiles) filesToCommit.add(file);
+      }
+
+      if (filesToCommit.size === 0) return;
+
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        Array.from(filesToCommit),
+        this.reorderCommitMessage(committedDirs),
+        this.info.author,
+      );
+
+      for (const committedDir of committedDirs) {
+        pending.filesByDir.delete(committedDir);
+      }
+      if (pending.filesByDir.size === 0) {
+        BinderService.pendingReorderCommits.delete(repoKey);
+      }
+
+      try {
+        await this.pushWithPullRetry();
+      } catch (err: any) {
+        console.warn('Push failed after reorder commit, changes saved locally:', err?.message);
+      }
+    });
   }
 
   /** Synchronous cache peek — returns cached items or undefined. */
@@ -842,20 +919,8 @@ export class BinderService {
       }
 
       if (filesToCommit.length === 0) return;
-
-      await GitEngine.commitEntry(
-        this.info.repoDir,
-        filesToCommit,
-        normalizedDir ? `Reorder ${normalizedDir}` : 'Reorder root',
-        this.info.author,
-      );
-
       dirEvict(this.dirCacheKey(normalizedDir));
-      try {
-        await this.pushWithPullRetry();
-      } catch (err: any) {
-        console.warn('Push failed after reorder, changes saved locally:', err?.message);
-      }
+      this.queuePendingReorderFiles(normalizedDir, filesToCommit);
     });
   }
 

@@ -131,6 +131,15 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
       loadTexturePreference();
     }, [loadTexturePreference]),
   );
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        binderService?.flushPendingReorderCommit(dirPath).catch((err) => {
+          console.warn('Failed to flush pending reorder commit on blur:', err);
+        });
+      };
+    }, [binderService, dirPath]),
+  );
 
   useEffect(() => {
     reorderPersistingRef.current = false;

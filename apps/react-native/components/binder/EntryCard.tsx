@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
-import { IconGripVertical } from '@tabler/icons-react-native';
 import type { DirEntry } from '../../core/binder/DirectoryReader';
 
 interface EntryCardProps {
@@ -28,6 +27,7 @@ export function EntryCard({
     ? formatDate(preview.created)
     : extractDateFromFilename(item.name);
   const typeLabel = preview?.type ? formatType(preview.type, preview.format) : '';
+  const dragBarColor = onDragHandleLongPress ? '#6B7280' : '#C5CCD7';
 
   const handlePress = () => {
     if (longPressRef.current) {
@@ -98,7 +98,11 @@ export function EntryCard({
         disabled={!onDragHandleLongPress}
         testID={`entry-drag-handle-${item.name}`}
       >
-        <IconGripVertical size={18} color={onDragHandleLongPress ? '#6B7280' : '#C5CCD7'} />
+        <View style={styles.dragBars}>
+          <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+          <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+          <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -223,5 +227,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
+  },
+  dragBars: {
+    width: 14,
+    height: 12,
+    justifyContent: 'space-between',
+  },
+  dragBar: {
+    width: '100%',
+    height: 2,
+    borderRadius: 1,
   },
 });
