@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   rowContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
   deleteAction: {
     backgroundColor: '#E57373',

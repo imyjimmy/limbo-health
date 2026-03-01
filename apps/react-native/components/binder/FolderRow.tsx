@@ -30,7 +30,7 @@ export function FolderRow({
   const tabShade = withAlpha(baseColor, 'CC') ?? '#b5bfca';
   const tabBorder = withAlpha(baseColor, 'F2') ?? '#8792a0';
   const displayName = item.meta?.displayName ?? formatFolderName(item.name);
-  const dragBarColor = onDragHandleLongPress ? '#6B7280' : '#C5CCD7';
+  const dragBarColor = onDragHandleLongPress ? '#D1D8E1' : '#DEE4EB';
   const handlePress = () => {
     if (longPressFired.current) {
       longPressFired.current = false;
@@ -127,13 +127,11 @@ function withAlpha(color: string, alphaHex: string): string | null {
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e5e5',
+    backgroundColor: 'transparent',
   },
   backgroundTab: {
     position: 'absolute',
-    right: 0,
+    right: 4,
     top: 0,
     bottom: 0,
     width: 40,
@@ -193,10 +191,10 @@ const styles = StyleSheet.create({
   dragHandle: {
     width: 30,
     height: 36,
-    borderRadius: 8,
+    marginRight: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
   },
   dragBars: {
     width: 14,

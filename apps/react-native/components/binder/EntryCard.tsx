@@ -27,7 +27,7 @@ export function EntryCard({
     ? formatDate(preview.created)
     : extractDateFromFilename(item.name);
   const typeLabel = preview?.type ? formatType(preview.type, preview.format) : '';
-  const dragBarColor = onDragHandleLongPress ? '#6B7280' : '#C5CCD7';
+  const dragBarColor = onDragHandleLongPress ? '#D1D8E1' : '#DEE4EB';
 
   const handlePress = () => {
     if (longPressRef.current) {
@@ -152,8 +152,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingLeft: 16,
     paddingRight: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e5e5',
+    marginRight: 4,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -223,10 +224,9 @@ const styles = StyleSheet.create({
   dragHandle: {
     width: 30,
     height: 36,
-    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: 'transparent',
   },
   dragBars: {
     width: 14,
