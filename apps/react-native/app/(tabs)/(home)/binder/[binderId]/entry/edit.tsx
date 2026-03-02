@@ -2,23 +2,19 @@
 //
 // Route screen for editing an existing medical note.
 // Receives `entryPath` as a search param (URL-encoded relative path within the binder).
-// Reads and decrypts the document, then renders NoteEditor with initialDoc.
+// Reads and decrypts the document, then renders via registry editor or NoteEditor.
 // On save, calls BinderService.updateEntry to overwrite the same file.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { NoteEditor } from '../../../../../../components/editor/NoteEditor';
-import { MedicationEntryForm } from '../../../../../../components/editor/MedicationEntryForm';
 import { BinderService } from '../../../../../../core/binder/BinderService';
 import { useAuthContext } from '../../../../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../../../../providers/CryptoProvider';
 import type { MedicalDocument } from '../../../../../../types/document';
 import type { PendingSidecar } from '../../../../../../components/editor/AttachmentList';
-import {
-  buildMedicationMarkdown,
-  parseMedicationEntry,
-} from '../../../../../../core/markdown/medicationEntry';
+import { getEditor } from '../../../../../../components/registry/componentRegistry';
 
 export default function EditEntryScreen() {
   const router = useRouter();
@@ -119,31 +115,6 @@ export default function EditEntryScreen() {
     [doc?.editor, doc?.renderer, saveUpdatedDoc],
   );
 
-  const handleSaveMedication = useCallback(
-    async (payload: {
-      name: string;
-      dosage: string;
-      frequency: string;
-      startDate: string;
-      stopDate?: string;
-    }) => {
-      if (!doc) return;
-      const updatedDoc: MedicalDocument = {
-        ...doc,
-        value: buildMedicationMarkdown(payload),
-        metadata: {
-          ...doc.metadata,
-          type: 'medication',
-          updated: new Date().toISOString(),
-        },
-        renderer: 'medication',
-        editor: 'medication',
-      };
-      await saveUpdatedDoc(updatedDoc, []);
-    },
-    [doc, saveUpdatedDoc],
-  );
-
   const handleCancel = useCallback(() => {
     router.back();
   }, [router]);
@@ -171,10 +142,8 @@ export default function EditEntryScreen() {
     );
   }
 
-  const medicationEntry = parseMedicationEntry(doc.value);
-  const useMedicationComposer =
-    doc.editor === 'medication' ||
-    (doc.metadata.type === 'medication' && medicationEntry.isMedicationEntry);
+  // Registry lookup — resolves both new keys and legacy aliases
+  const EditorComponent = getEditor(doc.editor);
 
   // Derive dirPath and categoryType from the existing document for NoteEditor
   const dirPath = entryPath.substring(0, entryPath.lastIndexOf('/') + 1) || '/';
@@ -183,18 +152,13 @@ export default function EditEntryScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      {useMedicationComposer ? (
-        <MedicationEntryForm
-          dirPath={dirPath}
+      {EditorComponent ? (
+        <EditorComponent
           mode="edit"
-          initialValues={{
-            name: medicationEntry.fields?.name ?? '',
-            dosage: medicationEntry.fields?.dosage ?? '',
-            frequency: medicationEntry.fields?.frequency ?? '',
-            startDate: medicationEntry.fields?.startDate ?? '',
-            stopDate: medicationEntry.fields?.stopDate ?? '',
-          }}
-          onSave={handleSaveMedication}
+          doc={doc}
+          dirPath={dirPath}
+          categoryType={categoryType}
+          onSave={saveUpdatedDoc}
           onCancel={handleCancel}
         />
       ) : (

@@ -202,9 +202,7 @@ export function extractEntryPreview(
   doc: MedicalDocument,
 ): EntryPreview {
   const medication = parseMedicationEntry(doc.value);
-  const isMedicationEntry =
-    doc.renderer === 'medication' ||
-    (doc.metadata.type === 'medication' && medication.isMedicationEntry);
+  const isMedicationEntry = medication.isMedicationEntry;
 
   return {
     ...extractEntryMetadata(path, doc),

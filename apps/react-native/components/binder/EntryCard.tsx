@@ -7,65 +7,104 @@ import type { DirEntry } from '../../core/binder/DirectoryReader';
 interface EntryCardProps {
   item: DirEntry;
   onPress: (entry: DirEntry) => void;
+  onLongPress?: (entry: DirEntry) => void;
+  onDragHandleLongPress?: () => void;
 }
 
-export function EntryCard({ item, onPress }: EntryCardProps) {
+export function EntryCard({
+  item,
+  onPress,
+  onLongPress,
+  onDragHandleLongPress,
+}: EntryCardProps) {
+  const longPressRef = React.useRef(false);
   const preview = item.preview;
   const title = preview?.title ?? item.name.replace('.json', '');
   const medicationName = preview?.medicationName ?? title;
   const isMedicationSummary =
-    preview?.renderer === 'medication' ||
-    (preview?.type === 'medication' && !!preview?.medicationName);
+    !!preview?.medicationName;
   const dateStr = preview?.created
     ? formatDate(preview.created)
     : extractDateFromFilename(item.name);
   const typeLabel = preview?.type ? formatType(preview.type, preview.format) : '';
+  const dragBarColor = onDragHandleLongPress ? '#D1D8E1' : '#DEE4EB';
+
+  const handlePress = () => {
+    if (longPressRef.current) {
+      longPressRef.current = false;
+      return;
+    }
+    onPress(item);
+  };
+
+  const handleLongPress = () => {
+    longPressRef.current = true;
+    onLongPress?.(item);
+  };
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      onPress={() => onPress(item)}
-      activeOpacity={0.6}
-      testID={`entry-card-${item.name}`}
-    >
-      <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={1}>
-          {isMedicationSummary ? medicationName : title}
-        </Text>
-        {preview?.hasChildren && (
-          <View style={styles.attachmentBadge}>
-            <Text style={styles.attachmentIcon}>📎</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.metaRow}>
-        {isMedicationSummary ? (
-          <>
-            {preview?.medicationDosage ? (
-              <View style={styles.medicationPill}>
-                <Text style={styles.medicationPillText}>{preview.medicationDosage}</Text>
-              </View>
-            ) : null}
-            {preview?.medicationFrequency ? (
-              <Text style={styles.medicationFrequency} numberOfLines={1}>
-                {preview.medicationFrequency}
-              </Text>
-            ) : null}
-          </>
-        ) : typeLabel ? (
-          <View style={styles.typePill}>
-            <Text style={styles.typeText}>{typeLabel}</Text>
-          </View>
-        ) : null}
-        {dateStr ? <Text style={styles.date}>{dateStr}</Text> : null}
-        {preview?.provider ? (
-          <Text style={styles.provider} numberOfLines={1}>
-            {preview.provider}
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={styles.mainPressArea}
+        onPress={handlePress}
+        onLongPress={onLongPress ? handleLongPress : undefined}
+        delayLongPress={250}
+        activeOpacity={0.6}
+        testID={`entry-card-${item.name}`}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title} numberOfLines={1}>
+            {isMedicationSummary ? medicationName : title}
           </Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
+          {preview?.hasChildren && (
+            <View style={styles.attachmentBadge}>
+              <Text style={styles.attachmentIcon}>📎</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.metaRow}>
+          {isMedicationSummary ? (
+            <>
+              {preview?.medicationDosage ? (
+                <View style={styles.medicationPill}>
+                  <Text style={styles.medicationPillText}>{preview.medicationDosage}</Text>
+                </View>
+              ) : null}
+              {preview?.medicationFrequency ? (
+                <Text style={styles.medicationFrequency} numberOfLines={1}>
+                  {preview.medicationFrequency}
+                </Text>
+              ) : null}
+            </>
+          ) : typeLabel ? (
+            <View style={styles.typePill}>
+              <Text style={styles.typeText}>{typeLabel}</Text>
+            </View>
+          ) : null}
+          {dateStr ? <Text style={styles.date}>{dateStr}</Text> : null}
+          {preview?.provider ? (
+            <Text style={styles.provider} numberOfLines={1}>
+              {preview.provider}
+            </Text>
+          ) : null}
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.dragHandle}
+        onLongPress={onDragHandleLongPress}
+        delayLongPress={120}
+        activeOpacity={0.7}
+        disabled={!onDragHandleLongPress}
+        testID={`entry-drag-handle-${item.name}`}
+      >
+        <View style={styles.dragBars}>
+          <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+          <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+          <View style={[styles.dragBar, { backgroundColor: dragBarColor }]} />
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -109,10 +148,20 @@ function formatType(type: string, format?: string): string {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e5e5',
+    minHeight: 64,
+    paddingVertical: 10,
+    paddingLeft: 16,
+    paddingRight: 10,
+    marginRight: 4,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  mainPressArea: {
+    flex: 1,
+    paddingVertical: 2,
+    paddingRight: 8,
   },
   header: {
     flexDirection: 'row',
@@ -171,5 +220,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#888',
     flex: 1,
+  },
+  dragHandle: {
+    width: 30,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  dragBars: {
+    width: 14,
+    height: 12,
+    justifyContent: 'space-between',
+  },
+  dragBar: {
+    width: '100%',
+    height: 2,
+    borderRadius: 1,
   },
 });

@@ -4,7 +4,7 @@
 // Tap folder -> onNavigateFolder callback.
 // Tap entry -> onOpenEntry callback.
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   View,
@@ -14,6 +14,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import type Swipeable from 'react-native-gesture-handler/Swipeable';
+import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import type { DirItem, DirFolder, DirEntry } from '../../core/binder/DirectoryReader';
 import { FolderRow } from './FolderRow';
 import { EntryCard } from './EntryCard';
@@ -35,6 +36,12 @@ interface DirectoryListProps {
   addSubfolderLabel?: string;
   /** If provided, enables swipe-to-delete on each row */
   onDeleteItem?: (item: DirItem) => void;
+  /** If provided, enables long-press folder edit */
+  onEditFolder?: (folder: DirFolder) => void;
+  /** Persist new order after drag end (enables drag handles). */
+  onReorder?: (nextItems: DirItem[]) => void;
+  /** Disable new drags while saving order */
+  reorderBusy?: boolean;
 }
 
 export function DirectoryList({
@@ -49,9 +56,18 @@ export function DirectoryList({
   onAddSubfolder,
   addSubfolderLabel,
   onDeleteItem,
+  onEditFolder,
+  onReorder,
+  reorderBusy = false,
 }: DirectoryListProps) {
   // Track the currently open swipeable so only one row is open at a time
   const openSwipeableRef = useRef<Swipeable | null>(null);
+  const [reorderItems, setReorderItems] = useState<DirItem[]>(items);
+  const draggable = !!onReorder;
+
+  useEffect(() => {
+    setReorderItems(items);
+  }, [items]);
 
   const handleSwipeOpen = useCallback((ref: Swipeable) => {
     if (openSwipeableRef.current && openSwipeableRef.current !== ref) {
@@ -60,7 +76,10 @@ export function DirectoryList({
     openSwipeableRef.current = ref;
   }, []);
 
-  const renderItem = ({ item }: { item: DirItem }) => {
+  const renderDirectoryItem = (
+    item: DirItem,
+    onDragHandleLongPress?: () => void,
+  ) => {
     if (!onDeleteItem) {
       // No delete support — render plain rows
       if (item.kind === 'folder') {
@@ -71,26 +90,53 @@ export function DirectoryList({
             emoji={item.meta?.icon ?? iconInfo?.emoji}
             iconColor={item.meta?.color ?? iconInfo?.color}
             onPress={onNavigateFolder}
+            onLongPress={onEditFolder}
+            onDragHandleLongPress={reorderBusy ? undefined : onDragHandleLongPress}
           />
         );
       }
-      return <EntryCard item={item} onPress={onOpenEntry} />;
+      return (
+        <EntryCard
+          item={item}
+          onPress={onOpenEntry}
+          onDragHandleLongPress={reorderBusy ? undefined : onDragHandleLongPress}
+        />
+      );
     }
+
+    const isWarningFolder = item.kind === 'folder' && item.childCount > 0;
 
     if (item.kind === 'folder') {
       const iconInfo = getFolderIcon?.(item);
       return (
         <SwipeableRow
-          showWarning={false}
+          showWarning={isWarningFolder}
           onDelete={() => onDeleteItem(item)}
           onSwipeOpen={handleSwipeOpen}
         >
-          <FolderRow
-            item={item}
-            emoji={item.meta?.icon ?? iconInfo?.emoji}
-            iconColor={item.meta?.color ?? iconInfo?.color}
-            onPress={onNavigateFolder}
-          />
+          {isWarningFolder
+            ? (warningAnim) => (
+                <FolderRow
+                  item={item}
+                  emoji={item.meta?.icon ?? iconInfo?.emoji}
+                  iconColor={item.meta?.color ?? iconInfo?.color}
+                  onPress={onNavigateFolder}
+                  onLongPress={onEditFolder}
+                  onDragHandleLongPress={reorderBusy ? undefined : onDragHandleLongPress}
+                  deleteWarningAnim={warningAnim}
+                />
+              )
+            : (
+                <FolderRow
+                  item={item}
+                  emoji={item.meta?.icon ?? iconInfo?.emoji}
+                  iconColor={item.meta?.color ?? iconInfo?.color}
+                  onPress={onNavigateFolder}
+                  onLongPress={onEditFolder}
+                  onDragHandleLongPress={reorderBusy ? undefined : onDragHandleLongPress}
+                />
+              )
+          }
         </SwipeableRow>
       );
     }
@@ -101,10 +147,16 @@ export function DirectoryList({
         onDelete={() => onDeleteItem(item)}
         onSwipeOpen={handleSwipeOpen}
       >
-        <EntryCard item={item} onPress={onOpenEntry} />
+        <EntryCard
+          item={item}
+          onPress={onOpenEntry}
+          onDragHandleLongPress={reorderBusy ? undefined : onDragHandleLongPress}
+        />
       </SwipeableRow>
     );
   };
+
+  const renderItem = ({ item }: { item: DirItem }) => renderDirectoryItem(item);
 
   if (loading && items.length === 0) {
     return (
@@ -126,13 +178,84 @@ export function DirectoryList({
     );
   }
 
+  const renderDraggableItem = ({ item, drag, isActive }: RenderItemParams<DirItem>) => {
+    return (
+      <View style={isActive ? styles.dragActiveRow : undefined}>
+        {renderDirectoryItem(item, drag)}
+      </View>
+    );
+  };
+
+  const listHeader = ListHeaderComponent ?? undefined;
+
+  if (draggable) {
+    return (
+      <View style={styles.wrapper} testID="directory-list">
+        <DraggableFlatList
+          data={reorderItems}
+          keyExtractor={(item) => item.relativePath}
+          renderItem={renderDraggableItem}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            <>
+              {onAddSubfolder && (
+                <TouchableOpacity
+                  style={styles.addSubfolderRow}
+                  onPress={onAddSubfolder}
+                  activeOpacity={0.6}
+                >
+                  <View style={styles.addSubfolderIconContainer}>
+                    <Text style={styles.addSubfolderPlus}>+</Text>
+                  </View>
+                  <Text style={styles.addSubfolderText}>
+                    {addSubfolderLabel}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <View style={styles.centered}>
+                <Text style={styles.emptyText}>No entries yet</Text>
+                <Text style={styles.emptySubtext}>
+                  Tap <Text style={styles.addSubfolderPlusInline}>[+]</Text> to add your first entry
+                </Text>
+              </View>
+            </>
+          }
+          ListFooterComponent={
+            reorderItems.length > 0 && onAddSubfolder ? (
+              <TouchableOpacity
+                style={styles.addSubfolderRow}
+                onPress={onAddSubfolder}
+                activeOpacity={0.6}
+              >
+                <View style={styles.addSubfolderIconContainer}>
+                  <Text style={styles.addSubfolderPlus}>+</Text>
+                </View>
+                <Text style={styles.addSubfolderText}>
+                  {addSubfolderLabel}
+                </Text>
+              </TouchableOpacity>
+            ) : undefined
+          }
+          refreshing={loading}
+          onRefresh={onRefresh}
+          contentContainerStyle={reorderItems.length === 0 ? styles.emptyContainer : undefined}
+          activationDistance={12}
+          onDragEnd={({ data }) => {
+            setReorderItems(data);
+            onReorder?.(data);
+          }}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.wrapper} testID="directory-list">
       <FlatList
         data={items}
         keyExtractor={(item) => item.relativePath}
         renderItem={renderItem}
-        ListHeaderComponent={ListHeaderComponent}
+        ListHeaderComponent={listHeader}
         ListEmptyComponent={
           <>
             {onAddSubfolder && (
@@ -184,7 +307,7 @@ export function DirectoryList({
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#fafafa',
+    backgroundColor: 'transparent',
   },
   centered: {
     flex: 1,
@@ -231,10 +354,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingLeft: 16,
+    paddingRight: 16,
+    marginRight: 4,
     backgroundColor: '#fff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e5e5',
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
   },
   addSubfolderIconContainer: {
     width: 40,
@@ -259,5 +384,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     fontWeight: '400',
+  },
+  dragActiveRow: {
+    opacity: 0.92,
   },
 });

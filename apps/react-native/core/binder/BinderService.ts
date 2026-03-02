@@ -20,7 +20,8 @@ import type { MedicalDocument } from '../../types/document';
 import type { EntryMetadata } from './DocumentModel';
 import type { AuthConfig } from '../git/httpTransport';
 import { dirGet, dirSet, dirEvict, dirEvictPrefix, ptEvict, ptEvictPrefix } from './BinderCache';
-import type { DirItem } from './DirectoryReader';
+import type { DirItem, FolderMeta } from './DirectoryReader';
+import { inferBehavior } from './folderBehavior';
 import { decode as b64decode } from '../crypto/base64';
 import { decrypt, encrypt } from '../crypto/nip44';
 import type { MergeDriverCallback } from 'isomorphic-git';
@@ -53,6 +54,15 @@ export interface PendingSidecarWrite {
   base64Data: string;
 }
 
+export interface ReorderDirectoryItemInput {
+  kind: DirItem['kind'];
+  relativePath: string;
+}
+
+interface PendingReorderCommit {
+  filesByDir: Map<string, Set<string>>;
+}
+
 // --- BinderService ---
 
 export class BinderService {
@@ -60,6 +70,7 @@ export class BinderService {
   private info: BinderInfo;
   private masterConversationKey: Uint8Array;
   private static writeQueues = new Map<string, Promise<void>>();
+  private static pendingReorderCommits = new Map<string, PendingReorderCommit>();
   private static readonly LINEBREAKS = /^.*(\r?\n|$)/gm;
 
   constructor(info: BinderInfo, masterConversationKey: Uint8Array) {
@@ -341,6 +352,78 @@ export class BinderService {
     await GitEngine.push(this.info.repoDir, this.info.repoId, this.info.auth);
   }
 
+  private queuePendingReorderFiles(dirPath: string, files: string[]): void {
+    const repoKey = this.info.repoDir;
+    const normalizedDir = this.normalizeDirPath(dirPath);
+    const pending = BinderService.pendingReorderCommits.get(repoKey) ?? {
+      filesByDir: new Map<string, Set<string>>(),
+    };
+    const dirFiles = pending.filesByDir.get(normalizedDir) ?? new Set<string>();
+
+    for (const file of files) {
+      dirFiles.add(file.startsWith('/') ? file.slice(1) : file);
+    }
+
+    pending.filesByDir.set(normalizedDir, dirFiles);
+    BinderService.pendingReorderCommits.set(repoKey, pending);
+  }
+
+  private reorderCommitMessage(dirPaths: string[]): string {
+    if (dirPaths.length === 1) {
+      const [dirPath] = dirPaths;
+      return dirPath ? `Reorder ${dirPath}` : 'Reorder root';
+    }
+    return 'Reorder directories';
+  }
+
+  /**
+   * Commit and push pending reordered displayOrder writes.
+   * When dirPath is provided, only flushes that directory's pending reorder files.
+   */
+  async flushPendingReorderCommit(dirPath?: string): Promise<void> {
+    await this.runSerializedWrite(async () => {
+      const repoKey = this.info.repoDir;
+      const pending = BinderService.pendingReorderCommits.get(repoKey);
+      if (!pending || pending.filesByDir.size === 0) return;
+
+      const targetDirs =
+        typeof dirPath === 'string'
+          ? [this.normalizeDirPath(dirPath)]
+          : Array.from(pending.filesByDir.keys());
+      const filesToCommit = new Set<string>();
+      const committedDirs: string[] = [];
+
+      for (const targetDir of targetDirs) {
+        const dirFiles = pending.filesByDir.get(targetDir);
+        if (!dirFiles || dirFiles.size === 0) continue;
+        committedDirs.push(targetDir);
+        for (const file of dirFiles) filesToCommit.add(file);
+      }
+
+      if (filesToCommit.size === 0) return;
+
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        Array.from(filesToCommit),
+        this.reorderCommitMessage(committedDirs),
+        this.info.author,
+      );
+
+      for (const committedDir of committedDirs) {
+        pending.filesByDir.delete(committedDir);
+      }
+      if (pending.filesByDir.size === 0) {
+        BinderService.pendingReorderCommits.delete(repoKey);
+      }
+
+      try {
+        await this.pushWithPullRetry();
+      } catch (err: any) {
+        console.warn('Push failed after reorder commit, changes saved locally:', err?.message);
+      }
+    });
+  }
+
   /** Synchronous cache peek — returns cached items or undefined. */
   peekDirCache(dirPath: string): DirItem[] | undefined {
     return dirGet(this.dirCacheKey(dirPath));
@@ -351,7 +434,7 @@ export class BinderService {
   /**
    * Initialize a new binder: git init, write encrypted patient-info.json, commit, push.
    */
-  /** Default folder structure created with every new binder. */
+  /** Default folder structure created with every new binder. Purely structural — behavior is inferred from names via BEHAVIOR_RULES. */
   private static readonly DEFAULT_FOLDERS: {
     folder: string;
     displayName: string;
@@ -361,7 +444,7 @@ export class BinderService {
     { folder: 'my-info',       displayName: 'My Info',       icon: '👤', displayOrder: 0 },
     { folder: 'my-info/allergies',     displayName: 'Allergies',     icon: '🤧' },
     { folder: 'my-info/immunizations', displayName: 'Immunizations', icon: '💉' },
-    { folder: 'my-info/billing-insurance',displayName: 'Billing & Insurance',icon: '🪪' },
+    { folder: 'my-info/billing-insurance', displayName: 'Billing & Insurance', icon: '🪪' },
     { folder: 'conditions',    displayName: 'Conditions',    icon: '❤️‍🩹', displayOrder: 1 },
     { folder: 'medications',   displayName: 'Medications',   icon: '💊', displayOrder: 2 },
     { folder: 'visits',        displayName: 'Visits',        icon: '🩺', displayOrder: 3 },
@@ -390,8 +473,14 @@ export class BinderService {
     const filesToCommit = ['patient-info.json'];
 
     // Create default folder hierarchy with .meta.json
+    // Behavior (contextualAdd) is inferred from folder names via BEHAVIOR_RULES.
     const nextByParent = new Map<string, number>();
-    for (const { folder, displayName, icon, displayOrder: explicitOrder } of BinderService.DEFAULT_FOLDERS) {
+    for (const {
+      folder,
+      displayName,
+      icon,
+      displayOrder: explicitOrder,
+    } of BinderService.DEFAULT_FOLDERS) {
       const parts = folder.split('/').filter(Boolean);
       parts.pop();
       const parentDir = parts.join('/');
@@ -400,12 +489,14 @@ export class BinderService {
         : (nextByParent.get(parentDir) ?? 0);
       nextByParent.set(parentDir, Math.max(nextByParent.get(parentDir) ?? 0, displayOrder + 1));
 
+      const rule = inferBehavior(displayName);
       const metaPath = `${folder}/.meta.json`;
       await io.writeJSON('/' + metaPath, {
         displayName,
         icon,
         color: '#7F8C8D',
         displayOrder,
+        ...(rule ? { contextualAdd: rule.contextualAdd } : {}),
       });
       filesToCommit.push(metaPath);
     }
@@ -476,6 +567,16 @@ export class BinderService {
     const items = await readDirectory(dirPath, fs, this.io);
     dirSet(key, items);
     return items;
+  }
+
+  async readFolderMeta(dirPath: string): Promise<FolderMeta | null> {
+    const normalized = this.normalizeDirPath(dirPath);
+    if (!normalized) return null;
+    try {
+      return await this.io.readJSON<FolderMeta>('/' + normalized + '/.meta.json');
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -645,7 +746,12 @@ export class BinderService {
     folderPath: string,
     displayName: string,
     overviewDoc?: MedicalDocument,
-    meta?: { icon?: string; color?: string; displayOrder?: number },
+    meta?: {
+      icon?: string;
+      color?: string;
+      displayOrder?: number;
+      contextualAdd?: FolderMeta['contextualAdd'];
+    },
   ): Promise<void> {
     await this.runSerializedWrite(async () => {
       const lastSlash = folderPath.lastIndexOf('/');
@@ -655,7 +761,14 @@ export class BinderService {
           ? meta.displayOrder
           : await this.nextDisplayOrder(parentDir);
       const metaPath = folderPath + '/.meta.json';
-      const metaObj = { displayName, ...meta, displayOrder };
+      // Infer contextualAdd from the folder name when not explicitly provided
+      const rule = meta?.contextualAdd ? null : inferBehavior(displayName);
+      const metaObj = {
+        displayName,
+        ...meta,
+        displayOrder,
+        ...(rule && !meta?.contextualAdd ? { contextualAdd: rule.contextualAdd } : {}),
+      };
       await this.io.writeJSON('/' + metaPath, metaObj);
 
       const filesToCommit = [metaPath];
@@ -676,6 +789,138 @@ export class BinderService {
       );
       dirEvict(this.parentDirCacheKey(folderPath));
       await this.pushWithPullRetry();
+    });
+  }
+
+  /**
+   * Update an existing folder's metadata (.meta.json).
+   * Supports editing displayName, icon, and color without changing folder path.
+   */
+  async updateFolderMeta(
+    folderPath: string,
+    updates: {
+      displayName: string;
+      icon: string;
+      color: string;
+    },
+  ): Promise<void> {
+    await this.runSerializedWrite(async () => {
+      const normalized = this.normalizeDirPath(folderPath);
+      if (!normalized) {
+        throw new Error('Cannot edit root folder metadata.');
+      }
+
+      const metaPath = `${normalized}/.meta.json`;
+      let existing: FolderMeta = {};
+      try {
+        existing = await this.io.readJSON<FolderMeta>('/' + metaPath);
+      } catch {
+        // Folder may not have metadata yet; create fresh metadata document.
+      }
+
+      const displayName = updates.displayName.trim();
+      if (!displayName) throw new Error('Folder name is required.');
+
+      const inferredRule = inferBehavior(displayName);
+      const nextMeta: FolderMeta = {
+        ...existing,
+        displayName,
+        icon: updates.icon,
+        color: updates.color,
+        ...(existing.contextualAdd
+          ? {}
+          : (inferredRule ? { contextualAdd: inferredRule.contextualAdd } : {})),
+      };
+
+      await this.io.writeJSON('/' + metaPath, nextMeta);
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        [metaPath],
+        `Update folder ${displayName}`,
+        this.info.author,
+      );
+      dirEvict(this.dirCacheKey(normalized));
+      dirEvict(this.parentDirCacheKey(normalized));
+      await this.pushWithPullRetry();
+    });
+  }
+
+  /**
+   * Persist a new ordering for one directory level.
+   * Folders write displayOrder into <folder>/.meta.json.
+   * Entries write displayOrder into document metadata.
+   */
+  async reorderDirectoryItems(
+    dirPath: string,
+    items: ReorderDirectoryItemInput[],
+  ): Promise<void> {
+    await this.runSerializedWrite(async () => {
+      const normalizedDir = this.normalizeDirPath(dirPath);
+      if (items.length === 0) return;
+
+      const seen = new Set<string>();
+      const filesToCommit: string[] = [];
+
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        const normalizedPath = this.normalizeDirPath(item.relativePath);
+        if (!normalizedPath) continue;
+        if (seen.has(normalizedPath)) {
+          throw new Error(`Duplicate reorder path: ${normalizedPath}`);
+        }
+        seen.add(normalizedPath);
+
+        const parent = normalizedPath.includes('/')
+          ? normalizedPath.slice(0, normalizedPath.lastIndexOf('/'))
+          : '';
+        if (parent !== normalizedDir) {
+          throw new Error(`Invalid reorder path outside directory: ${normalizedPath}`);
+        }
+
+        if (item.kind === 'folder') {
+          const metaPath = `${normalizedPath}/.meta.json`;
+          let existing: FolderMeta = {};
+          try {
+            existing = await this.io.readJSON<FolderMeta>('/' + metaPath);
+          } catch {
+            // Folder may not have metadata yet; create metadata with displayOrder.
+          }
+
+          const currentOrder =
+            typeof existing.displayOrder === 'number' && Number.isFinite(existing.displayOrder)
+              ? existing.displayOrder
+              : undefined;
+          if (currentOrder === index) continue;
+
+          await this.io.writeJSON('/' + metaPath, {
+            ...existing,
+            displayOrder: index,
+          });
+          filesToCommit.push(metaPath);
+          continue;
+        }
+
+        const docPath = normalizedPath;
+        const doc = await this.io.readDocument('/' + docPath);
+        const currentOrder =
+          typeof doc.metadata.displayOrder === 'number' && Number.isFinite(doc.metadata.displayOrder)
+            ? doc.metadata.displayOrder
+            : undefined;
+        if (currentOrder === index) continue;
+
+        await this.io.writeDocument('/' + docPath, {
+          ...doc,
+          metadata: {
+            ...doc.metadata,
+            displayOrder: index,
+          },
+        });
+        filesToCommit.push(docPath);
+      }
+
+      if (filesToCommit.length === 0) return;
+      dirEvict(this.dirCacheKey(normalizedDir));
+      this.queuePendingReorderFiles(normalizedDir, filesToCommit);
     });
   }
 
@@ -847,6 +1092,85 @@ export class BinderService {
   async push(): Promise<void> {
     await this.runSerializedWrite(async () => {
       await this.pushWithPullRetry();
+    });
+  }
+
+  // --- Migrations ---
+
+  /**
+   * Backfill missing contextualAdd into existing .meta.json files.
+   * Walks every folder in the binder recursively, infers behavior from
+   * the leaf folder name via BEHAVIOR_RULES, and writes contextualAdd
+   * when missing. Idempotent. Commits + pushes once if any files changed.
+   */
+  async migrateContextualAdd(): Promise<void> {
+    await this.runSerializedWrite(async () => {
+      const fs = createFSAdapter(this.info.repoDir);
+      const updatedPaths: string[] = [];
+
+      const walkDir = async (dirPath: string) => {
+        let names: string[];
+        try {
+          names = await fs.promises.readdir(dirPath);
+        } catch {
+          return;
+        }
+
+        for (const name of names) {
+          if (name.startsWith('.')) continue;
+          const childPath = dirPath === '/' ? `/${name}` : `${dirPath}/${name}`;
+          let stat;
+          try {
+            stat = await fs.promises.stat(childPath);
+          } catch {
+            continue;
+          }
+          if (!stat.isDirectory()) continue;
+
+          // Check for .meta.json in this folder
+          const metaFsPath = `${childPath}/.meta.json`;
+          let existing: FolderMeta | null = null;
+          try {
+            existing = await this.io.readJSON<FolderMeta>(metaFsPath);
+          } catch {
+            // No .meta.json — nothing to patch
+          }
+
+          if (existing && !existing.contextualAdd) {
+            const folderDisplayName = existing.displayName || name;
+            const rule = inferBehavior(folderDisplayName);
+            if (rule) {
+              await this.io.writeJSON(metaFsPath, {
+                ...existing,
+                contextualAdd: rule.contextualAdd,
+              });
+              // Convert fs path to repo-relative path for git
+              const repoRelative = childPath.replace(/^\//, '') + '/.meta.json';
+              updatedPaths.push(repoRelative);
+            }
+          }
+
+          // Recurse into subdirectories
+          await walkDir(childPath);
+        }
+      };
+
+      await walkDir('/');
+
+      if (updatedPaths.length === 0) return;
+
+      await GitEngine.commitEntry(
+        this.info.repoDir,
+        updatedPaths,
+        'Infer contextualAdd from folder names',
+        this.info.author,
+      );
+      this.evictAllCaches();
+      try {
+        await this.pushWithPullRetry();
+      } catch (err: any) {
+        console.warn('Push failed after migration, changes saved locally:', err?.message);
+      }
     });
   }
 }
