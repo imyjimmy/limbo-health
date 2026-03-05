@@ -67,6 +67,8 @@ interface DecryptedEntry {
 const BINDERS_ROOT = `${RNFS.DocumentDirectoryPath}/binders`;
 const LAST_BINDER_KEY = 'limbo_last_binder';
 const BINDER_TEXTURES_KEY = 'limbo_binder_card_textures_v1';
+const REPO_BINDER_RING_COUNT = 24;
+const REPO_BINDER_RING_GAP = 24;
 
 function repoDir(repoId: string): string {
   return `binders/${repoId}`;
@@ -703,6 +705,24 @@ export default function BinderListScreen() {
                     <View style={styles.repoCard}>
                       <BinderTextureBackground textureId={selectedTexture} />
                       <View style={styles.repoCardOverlay} />
+                      <View style={styles.repoNotebookLines} pointerEvents="none">
+                        <View style={[styles.repoNotebookRule, styles.repoNotebookRuleTop]} />
+                        <View style={[styles.repoNotebookRule, styles.repoNotebookRuleMiddle]} />
+                        <View style={[styles.repoNotebookRule, styles.repoNotebookRuleBottom]} />
+                        <View style={styles.repoNotebookMargin} />
+                      </View>
+                      <View style={styles.repoBinderSpine} pointerEvents="none">
+                        {Array.from({ length: REPO_BINDER_RING_COUNT }).map((_, ringIndex) => (
+                          <View
+                            key={`${repo.id}-ring-${ringIndex}`}
+                            style={[
+                              styles.repoBinderRing,
+                              ringIndex !== REPO_BINDER_RING_COUNT - 1 && styles.repoBinderRingSpacing,
+                            ]}
+                          />
+                        ))}
+                      </View>
+                      <View style={styles.repoFolderTab} pointerEvents="none" />
                       <View style={styles.repoCardContent}>
                         {editingRepoId === repo.id ? (
                           <View style={styles.repoOpenArea}>
@@ -999,22 +1019,97 @@ addPhotoButton: {
     marginBottom: 18,
   },
   repoCard: {
+    position: 'relative',
     backgroundColor: '#ffffff',
-    borderColor: 'rgba(17, 17, 17, 0.08)',
+    borderColor: 'rgba(74, 63, 52, 0.18)',
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#243447',
+    shadowOpacity: 0.09,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  repoBinderSpine: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 22,
+    backgroundColor: 'rgba(233, 225, 211, 0.75)',
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: 'rgba(74, 63, 52, 0.28)',
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 10,
+    overflow: 'hidden',
+    zIndex: 2,
+  },
+  repoBinderRing: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: 'rgba(250, 247, 240, 0.95)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(74, 63, 52, 0.38)',
+  },
+  repoBinderRingSpacing: {
+    marginBottom: REPO_BINDER_RING_GAP,
   },
   repoCardContent: {
     position: 'relative',
-    zIndex: 2,
+    zIndex: 3,
   },
   repoCardOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+    backgroundColor: 'rgba(252, 249, 242, 0.62)',
+    zIndex: 1,
+  },
+  repoFolderTab: {
+    position: 'absolute',
+    top: 0,
+    right: 22,
+    width: 64,
+    height: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    borderBottomLeftRadius: 9,
+    borderBottomRightRadius: 9,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(74, 63, 52, 0.18)',
+    zIndex: 2,
+  },
+  repoNotebookLines: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  repoNotebookRule: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(105, 154, 205, 0.2)',
+  },
+  repoNotebookRuleTop: {
+    top: 62,
+  },
+  repoNotebookRuleMiddle: {
+    top: 104,
+  },
+  repoNotebookRuleBottom: {
+    top: 146,
+  },
+  repoNotebookMargin: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 44,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: 'rgba(212, 95, 110, 0.35)',
   },
   repoOpenArea: {
-    paddingHorizontal: 16,
+    paddingLeft: 30,
+    paddingRight: 16,
     paddingTop: 18,
     paddingBottom: 12,
   },
@@ -1068,7 +1163,7 @@ addPhotoButton: {
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(17, 17, 17, 0.06)',
+    borderTopColor: 'rgba(74, 63, 52, 0.12)',
   },
   repoMetaValue: {
     color: '#334155',
@@ -1098,8 +1193,9 @@ addPhotoButton: {
   },
   repoTextureSection: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(17, 17, 17, 0.06)',
-    paddingHorizontal: 16,
+    borderTopColor: 'rgba(74, 63, 52, 0.12)',
+    paddingLeft: 30,
+    paddingRight: 16,
   },
   repoTextureSectionCollapsed: {
     height: 24,
