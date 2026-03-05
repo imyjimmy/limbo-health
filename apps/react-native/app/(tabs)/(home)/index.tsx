@@ -32,6 +32,7 @@ import {
   isBinderTextureId,
   type BinderTextureId,
 } from '../../../components/binder/BinderTextureBackground';
+import { BinderSpine } from '../../../components/binder/BinderSpine';
 
 // --- Types ---
 
@@ -67,8 +68,6 @@ interface DecryptedEntry {
 const BINDERS_ROOT = `${RNFS.DocumentDirectoryPath}/binders`;
 const LAST_BINDER_KEY = 'limbo_last_binder';
 const BINDER_TEXTURES_KEY = 'limbo_binder_card_textures_v1';
-const REPO_BINDER_RING_COUNT = 24;
-const REPO_BINDER_RING_GAP = 24;
 
 function repoDir(repoId: string): string {
   return `binders/${repoId}`;
@@ -711,17 +710,18 @@ export default function BinderListScreen() {
                         <View style={[styles.repoNotebookRule, styles.repoNotebookRuleBottom]} />
                         <View style={styles.repoNotebookMargin} />
                       </View>
-                      <View style={styles.repoBinderSpine} pointerEvents="none">
-                        {Array.from({ length: REPO_BINDER_RING_COUNT }).map((_, ringIndex) => (
-                          <View
-                            key={`${repo.id}-ring-${ringIndex}`}
-                            style={[
-                              styles.repoBinderRing,
-                              ringIndex !== REPO_BINDER_RING_COUNT - 1 && styles.repoBinderRingSpacing,
-                            ]}
-                          />
-                        ))}
-                      </View>
+                      <BinderSpine
+                        style={styles.repoBinderSpine}
+                        width={22}
+                        holeSize={9}
+                        interval={12}
+                        verticalPadding={10}
+                        minVisibleHoles={3}
+                        backgroundColor="rgba(233, 225, 211, 0.75)"
+                        borderColor="rgba(74, 63, 52, 0.28)"
+                        holeColor="rgba(250, 247, 240, 0.95)"
+                        holeBorderColor="rgba(74, 63, 52, 0.38)"
+                      />
                       <View style={styles.repoFolderTab} pointerEvents="none" />
                       <View style={styles.repoCardContent}>
                         {editingRepoId === repo.id ? (
@@ -1032,30 +1032,7 @@ addPhotoButton: {
     elevation: 2,
   },
   repoBinderSpine: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 22,
-    backgroundColor: 'rgba(233, 225, 211, 0.75)',
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: 'rgba(74, 63, 52, 0.28)',
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 10,
-    overflow: 'hidden',
     zIndex: 2,
-  },
-  repoBinderRing: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: 'rgba(250, 247, 240, 0.95)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(74, 63, 52, 0.38)',
-  },
-  repoBinderRingSpacing: {
-    marginBottom: REPO_BINDER_RING_GAP,
   },
   repoCardContent: {
     position: 'relative',

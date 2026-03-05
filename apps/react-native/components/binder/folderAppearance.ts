@@ -3,9 +3,24 @@
 // Allowed colors are sampled from color-palette.png.
 
 export const FOLDER_EMOJI_OPTIONS = [
-  '❤️‍🩹', '🩺', '🧪', '💊', '💉', '⚠️', '🔬', '📷', '📄',
-  '🦴', '🧠', '👁️', '🦷', '👂', '🫁', '🫀', '🩻', '🩹',
-  '🏥', '🚑', '🧬', '🦠', '🩸', '🌡️', '😷', '🤒', '🎙️',
+  // Core folder + medical quick picks
+  '📁', '📂', '🗂️', '📋', '📄', '📝', '🧾', '🎙️',
+  '❤️‍🩹', '🩺', '💊', '💉', '🧪', '🧬', '🦠', '🩸', '🩹', '⚠️',
+
+  // Anatomy and body systems
+  '🫀', '🫁', '🧠', '🦴', '🦷', '👁️', '👂', '🦶', '👃',
+
+  // Clinical workflow / visits
+  '🏥', '🚑', '🛏️', '🧑‍⚕️', '👩‍⚕️', '👨‍⚕️', '🧍', '🗓️', '⏱️',
+
+  // Imaging / labs / records
+  '🔬', '🩻', '📷', '🖥️', '📈', '📉', '📊',
+
+  // Procedures / treatment
+  '🔪', '🗡️', '🪡', '🩼', '🦽', '🧴',
+
+  // Symptoms / status
+  '🌡️', '😷', '🤒', '🤕', '🤧', '🫨',
 ];
 
 export const ALLOWED_FOLDER_COLORS = [

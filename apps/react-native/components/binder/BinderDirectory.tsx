@@ -11,6 +11,7 @@ import * as SecureStore from 'expo-secure-store';
 import { IconShare3 } from '@tabler/icons-react-native';
 import { DirectoryList } from './DirectoryList';
 import { NewFolderModal } from './NewFolderModal';
+import { InlineFolderComposer } from './InlineFolderComposer';
 import { DebugOverlay } from './DebugOverlay';
 import { DEFAULT_FOLDER_COLOR } from './folderAppearance';
 import {
@@ -233,14 +234,15 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
   );
 
   // --- Add folder ---
-  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [showInlineAddFolder, setShowInlineAddFolder] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const [showEditFolder, setShowEditFolder] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState<DirFolder | null>(null);
 
   const handleAddFolder = useCallback(
     async (name: string, emoji: string, color: string) => {
       if (!binderService) return;
-      setShowNewFolder(false);
+      setCreatingFolder(true);
       const slug = slugify(name);
       const folderPath = dirPath ? `${dirPath}/${slug}` : slug;
       try {
@@ -248,6 +250,7 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
           icon: emoji,
           color,
         });
+        setShowInlineAddFolder(false);
         refresh();
       } catch (err: any) {
         const message = err?.message ?? '';
@@ -258,10 +261,13 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
           lower.includes('401');
         if (isPushError) {
           console.warn('Push failed, folder created locally:', message);
+          setShowInlineAddFolder(false);
           refresh();
         } else {
           Alert.alert('Error', message || 'Failed to create folder. Please try again.');
         }
+      } finally {
+        setCreatingFolder(false);
       }
     },
     [binderService, dirPath, refresh],
@@ -382,20 +388,20 @@ export function BinderDirectory({ binderId, dirPath, title }: BinderDirectoryPro
           onOpenEntry={handleOpenEntry}
           onRefresh={refresh}
           getFolderIcon={getFolderIcon}
-          onAddSubfolder={() => setShowNewFolder(true)}
+          onAddSubfolder={() => setShowInlineAddFolder((prev) => !prev)}
           addSubfolderLabel="Add a new folder..."
+          addSubfolderComposer={showInlineAddFolder ? (
+            <InlineFolderComposer
+              saving={creatingFolder}
+              onSave={handleAddFolder}
+            />
+          ) : undefined}
           onDeleteItem={handleDeleteItem}
           onEditFolder={handleStartEditFolder}
           onReorder={handleReorderItems}
           reorderBusy={reorderSaving}
         />
       </View>
-      <NewFolderModal
-        visible={showNewFolder}
-        title="New Folder"
-        onConfirm={handleAddFolder}
-        onCancel={() => setShowNewFolder(false)}
-      />
       <NewFolderModal
         visible={showEditFolder}
         title="Edit Folder"

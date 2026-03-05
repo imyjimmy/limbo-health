@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import { IconPlus, IconTrash } from '@tabler/icons-react-native';
 import type Swipeable from 'react-native-gesture-handler/Swipeable';
 import DraggableFlatList, { type RenderItemParams } from 'react-native-draggable-flatlist';
 import type { DirItem, DirFolder, DirEntry } from '../../core/binder/DirectoryReader';
@@ -34,6 +35,8 @@ interface DirectoryListProps {
   /** If provided, renders an inline "Add a new ..." row at the bottom */
   onAddSubfolder?: () => void;
   addSubfolderLabel?: string;
+  /** Optional inline composer rendered near the add-row */
+  addSubfolderComposer?: React.ReactElement;
   /** If provided, enables swipe-to-delete on each row */
   onDeleteItem?: (item: DirItem) => void;
   /** If provided, enables long-press folder edit */
@@ -55,6 +58,7 @@ export function DirectoryList({
   getFolderIcon,
   onAddSubfolder,
   addSubfolderLabel,
+  addSubfolderComposer,
   onDeleteItem,
   onEditFolder,
   onReorder,
@@ -188,6 +192,54 @@ export function DirectoryList({
 
   const listHeader = ListHeaderComponent ?? undefined;
 
+  const renderAddSubfolderRow = () => {
+    if (!onAddSubfolder && !addSubfolderComposer) return null;
+
+    const expanded = !!addSubfolderComposer;
+
+    return (
+      <View style={styles.addSubfolderRow}>
+        {onAddSubfolder ? (
+          <TouchableOpacity
+            style={[
+              styles.addSubfolderIconContainer,
+              expanded && styles.addSubfolderIconContainerExpanded,
+            ]}
+            onPress={onAddSubfolder}
+            activeOpacity={0.65}
+            testID="folder-inline-toggle"
+          >
+            {expanded ? (
+              <IconTrash size={18} strokeWidth={2.2} color="#8C3A3A" />
+            ) : (
+              <IconPlus size={18} strokeWidth={2.2} color="#7F8896" />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.addSubfolderIconContainer}>
+            <IconPlus size={18} strokeWidth={2.2} color="#7F8896" />
+          </View>
+        )}
+        <View style={styles.addSubfolderMain}>
+          {expanded ? (
+            addSubfolderComposer
+          ) : (
+            <TouchableOpacity
+              style={styles.addSubfolderLabelButton}
+              onPress={onAddSubfolder}
+              activeOpacity={0.65}
+              disabled={!onAddSubfolder}
+            >
+              <Text style={styles.addSubfolderText}>
+                {addSubfolderLabel}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   if (draggable) {
     return (
       <View style={styles.wrapper} testID="directory-list">
@@ -198,20 +250,7 @@ export function DirectoryList({
           ListHeaderComponent={listHeader}
           ListEmptyComponent={
             <>
-              {onAddSubfolder && (
-                <TouchableOpacity
-                  style={styles.addSubfolderRow}
-                  onPress={onAddSubfolder}
-                  activeOpacity={0.6}
-                >
-                  <View style={styles.addSubfolderIconContainer}>
-                    <Text style={styles.addSubfolderPlus}>+</Text>
-                  </View>
-                  <Text style={styles.addSubfolderText}>
-                    {addSubfolderLabel}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              {renderAddSubfolderRow()}
               <View style={styles.centered}>
                 <Text style={styles.emptyText}>No entries yet</Text>
                 <Text style={styles.emptySubtext}>
@@ -221,20 +260,7 @@ export function DirectoryList({
             </>
           }
           ListFooterComponent={
-            reorderItems.length > 0 && onAddSubfolder ? (
-              <TouchableOpacity
-                style={styles.addSubfolderRow}
-                onPress={onAddSubfolder}
-                activeOpacity={0.6}
-              >
-                <View style={styles.addSubfolderIconContainer}>
-                  <Text style={styles.addSubfolderPlus}>+</Text>
-                </View>
-                <Text style={styles.addSubfolderText}>
-                  {addSubfolderLabel}
-                </Text>
-              </TouchableOpacity>
-            ) : undefined
+            reorderItems.length > 0 ? renderAddSubfolderRow() : undefined
           }
           refreshing={loading}
           onRefresh={onRefresh}
@@ -258,20 +284,7 @@ export function DirectoryList({
         ListHeaderComponent={listHeader}
         ListEmptyComponent={
           <>
-            {onAddSubfolder && (
-              <TouchableOpacity
-                style={styles.addSubfolderRow}
-                onPress={onAddSubfolder}
-                activeOpacity={0.6}
-              >
-                <View style={styles.addSubfolderIconContainer}>
-                  <Text style={styles.addSubfolderPlus}>+</Text>
-                </View>
-                <Text style={styles.addSubfolderText}>
-                  {addSubfolderLabel}
-                </Text>
-              </TouchableOpacity>
-            )}
+            {renderAddSubfolderRow()}
             <View style={styles.centered}>
               <Text style={styles.emptyText}>No entries yet</Text>
               <Text style={styles.emptySubtext}>
@@ -281,20 +294,7 @@ export function DirectoryList({
           </>
         }
         ListFooterComponent={
-          items.length > 0 && onAddSubfolder ? (
-            <TouchableOpacity
-              style={styles.addSubfolderRow}
-              onPress={onAddSubfolder}
-              activeOpacity={0.6}
-            >
-              <View style={styles.addSubfolderIconContainer}>
-                <Text style={styles.addSubfolderPlus}>+</Text>
-              </View>
-              <Text style={styles.addSubfolderText}>
-                {addSubfolderLabel}
-              </Text>
-            </TouchableOpacity>
-          ) : undefined
+          items.length > 0 ? renderAddSubfolderRow() : undefined
         }
         refreshing={loading}
         onRefresh={onRefresh}
@@ -361,19 +361,29 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 14,
     borderBottomRightRadius: 14,
   },
+  addSubfolderMain: {
+    flex: 1,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  addSubfolderLabelButton: {
+    minHeight: 36,
+    justifyContent: 'center',
+  },
   addSubfolderIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 8,
     backgroundColor: '#f0f0f0',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(42, 56, 78, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  addSubfolderPlus: {
-    fontSize: 20,
-    color: '#999',
-    fontWeight: '300',
+  addSubfolderIconContainerExpanded: {
+    backgroundColor: '#F7EDEE',
+    borderColor: 'rgba(161, 71, 71, 0.28)',
   },
   addSubfolderPlusInline: {
     fontSize: 14,

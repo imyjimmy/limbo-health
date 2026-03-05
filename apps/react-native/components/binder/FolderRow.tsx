@@ -3,6 +3,7 @@
 import React, { useRef } from 'react';
 import { Animated, TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import type { DirFolder } from '../../core/binder/DirectoryReader';
+import { BinderSpine } from './BinderSpine';
 
 interface FolderRowProps {
   item: DirFolder;
@@ -31,6 +32,7 @@ export function FolderRow({
   const tabBorder = withAlpha(baseColor, 'F2') ?? '#8792a0';
   const displayName = item.meta?.displayName ?? formatFolderName(item.name);
   const dragBarColor = onDragHandleLongPress ? '#D1D8E1' : '#DEE4EB';
+
   const handlePress = () => {
     if (longPressFired.current) {
       longPressFired.current = false;
@@ -38,6 +40,7 @@ export function FolderRow({
     }
     onPress(item);
   };
+
   const handleLongPress = () => {
     longPressFired.current = true;
     onLongPress?.(item);
@@ -53,6 +56,19 @@ export function FolderRow({
         pointerEvents="none"
       />
       <View style={styles.foregroundRow}>
+        <View style={styles.paperLayer} pointerEvents="none">
+          <View style={[styles.ruleLine, styles.ruleLineTop]} />
+          <View style={[styles.ruleLine, styles.ruleLineBottom]} />
+          <View style={styles.marginLine} />
+        </View>
+        <BinderSpine
+          style={styles.spine}
+          width={12}
+          holeSize={6}
+          interval={16}
+          verticalPadding={7}
+          minVisibleHoles={2}
+        />
         <TouchableOpacity
           style={styles.mainPressArea}
           onPress={handlePress}
@@ -139,15 +155,51 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   foregroundRow: {
+    position: 'relative',
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     paddingLeft: 16,
     paddingRight: 10,
     marginRight: 18,
-    backgroundColor: '#fff',
+    backgroundColor: '#FEFCF6',
     borderTopRightRadius: 14,
     borderBottomRightRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(74, 63, 52, 0.2)',
+    shadowColor: '#243447',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  paperLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  ruleLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(105, 154, 205, 0.2)',
+  },
+  ruleLineTop: {
+    top: 18,
+  },
+  ruleLineBottom: {
+    top: 36,
+  },
+  marginLine: {
+    position: 'absolute',
+    left: 30,
+    top: 0,
+    bottom: 0,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: 'rgba(212, 95, 110, 0.32)',
+  },
+  spine: {
+    // BinderSpine provides geometry and paint.
   },
   mainPressArea: {
     flex: 1,
@@ -164,6 +216,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(90, 79, 62, 0.18)',
   },
   emoji: {
     fontSize: 20,
@@ -174,7 +228,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: '#1F2D3D',
   },
   deletePill: {
     backgroundColor: '#E57373',

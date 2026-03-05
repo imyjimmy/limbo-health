@@ -3,6 +3,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import type { DirEntry } from '../../core/binder/DirectoryReader';
+import { BinderSpine } from './BinderSpine';
 
 interface EntryCardProps {
   item: DirEntry;
@@ -21,8 +22,7 @@ export function EntryCard({
   const preview = item.preview;
   const title = preview?.title ?? item.name.replace('.json', '');
   const medicationName = preview?.medicationName ?? title;
-  const isMedicationSummary =
-    !!preview?.medicationName;
+  const isMedicationSummary = !!preview?.medicationName;
   const dateStr = preview?.created
     ? formatDate(preview.created)
     : extractDateFromFilename(item.name);
@@ -44,6 +44,19 @@ export function EntryCard({
 
   return (
     <View style={styles.container}>
+      <View style={styles.paperLayer} pointerEvents="none">
+        <View style={[styles.ruleLine, styles.ruleLineTop]} />
+        <View style={[styles.ruleLine, styles.ruleLineBottom]} />
+        <View style={styles.marginLine} />
+      </View>
+      <BinderSpine
+        style={styles.spine}
+        width={12}
+        holeSize={6}
+        interval={10}
+        verticalPadding={8}
+        minVisibleHoles={2}
+      />
       <TouchableOpacity
         style={styles.mainPressArea}
         onPress={handlePress}
@@ -147,7 +160,9 @@ function formatType(type: string, format?: string): string {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#FEFCF6',
     minHeight: 64,
     paddingVertical: 10,
     paddingLeft: 16,
@@ -157,6 +172,40 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(74, 63, 52, 0.18)',
+    shadowColor: '#243447',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  paperLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  ruleLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(105, 154, 205, 0.18)',
+  },
+  ruleLineTop: {
+    top: 22,
+  },
+  ruleLineBottom: {
+    top: 44,
+  },
+  marginLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 30,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: 'rgba(212, 95, 110, 0.3)',
+  },
+  spine: {
+    // BinderSpine provides geometry and paint.
   },
   mainPressArea: {
     flex: 1,
@@ -171,7 +220,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1a1a1a',
+    color: '#1F2D3D',
     flex: 1,
   },
   attachmentBadge: {
@@ -186,7 +235,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   typePill: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(232, 227, 214, 0.9)',
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
