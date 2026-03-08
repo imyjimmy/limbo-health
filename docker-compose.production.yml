@@ -73,6 +73,24 @@ services:
       - mysql
     restart: unless-stopped
 
+  # Records workflow API - Public records crawler and read API
+  records-workflow-api:
+    environment:
+      - NODE_ENV=production
+      - PORT=3020
+      - DATABASE_URL=postgres://${RECORDS_WORKFLOW_DB_USER:-postgres}:${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME:-records_workflow}
+      - RAW_STORAGE_DIR=/app/storage/raw
+    ports:
+      - "3020:3020"
+    networks:
+      - limbo-network
+    depends_on:
+      - records-workflow-postgres
+    restart: unless-stopped
+    command: sh -c "npm run migrate && npm run seed && npm run start"
+    volumes:
+      - ./apps/records-workflow-api/storage/raw:/app/storage/raw
+
   # Frontend - React SPA
   frontend:
     build:
@@ -98,6 +116,7 @@ services:
       - auth-api
       - mgit-api
       - scheduler-api
+      - records-workflow-api
       - frontend
     restart: unless-stopped
     volumes:
@@ -119,6 +138,21 @@ services:
     restart: unless-stopped
     command: --default-authentication-plugin=mysql_native_password
 
+  # Records workflow Postgres
+  records-workflow-postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${RECORDS_WORKFLOW_DB_NAME:-records_workflow}
+      - POSTGRES_USER=${RECORDS_WORKFLOW_DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}
+    volumes:
+      - records_workflow_pg_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - limbo-network
+    restart: unless-stopped
+
 networks:
   limbo-network:
     driver: bridge
@@ -127,4 +161,6 @@ volumes:
   mysql-data:
     driver: local
   repos-data:
+    driver: local
+  records_workflow_pg_data:
     driver: local
