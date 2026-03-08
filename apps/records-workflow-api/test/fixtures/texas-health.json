@@ -1,0 +1,11 @@
+{
+  "title": "Request Medical Records",
+  "text": "Texas Health Resources accepts centralized requests for medical records and provides request status tracking through Verisma. Submit your authorization form online or by fax.",
+  "links": [
+    {
+      "text": "Verisma status portal",
+      "href": "https://www.verisma.com/status"
+    }
+  ],
+  "contacts": []
+}

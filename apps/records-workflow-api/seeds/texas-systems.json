@@ -1,0 +1,70 @@
+[
+  {
+    "system_name": "Baylor Scott & White Health",
+    "domain": "bswhealth.com",
+    "seed_urls": [
+      "https://www.bswhealth.com/patient-tools/request-copies-of-your-medical-records"
+    ]
+  },
+  {
+    "system_name": "St. David's HealthCare",
+    "domain": "stdavids.com",
+    "seed_urls": [
+      "https://www.stdavids.com/locations/st-davids-medical-center/for-patients/medical-records",
+      "https://www.stdavids.com/about-us/managing-your-care-with-myhealthone"
+    ],
+    "facilities": [
+      {
+        "facility_name": "St. David's Medical Center",
+        "city": "Austin",
+        "state": "TX",
+        "facility_page_url": "https://www.stdavids.com/locations/st-davids-medical-center"
+      }
+    ]
+  },
+  {
+    "system_name": "Texas Health Resources",
+    "domain": "texashealth.org",
+    "seed_urls": [
+      "https://www.texashealth.org/About-Texas-Health/Request-Medical-Records"
+    ]
+  },
+  {
+    "system_name": "UT Southwestern Medical Center",
+    "domain": "utswmed.org",
+    "seed_urls": [
+      "https://utswmed.org/patient-resources/medical-records/",
+      "https://utswmed.org/patient-resources/medical-records/requesting-your-record/"
+    ]
+  },
+  {
+    "system_name": "Methodist Health System",
+    "domain": "methodisthealthsystem.org",
+    "seed_urls": [
+      "https://www.methodisthealthsystem.org/patients-visitors/patient-tools-support/accessing-your-medical-records",
+      "https://www.methodisthealthsystem.org/patients-visitors/patient-tools-support/mychart"
+    ]
+  },
+  {
+    "system_name": "Houston Methodist",
+    "domain": "houstonmethodist.org",
+    "seed_urls": [
+      "https://www.houstonmethodist.org/medical-records/"
+    ]
+  },
+  {
+    "system_name": "Memorial Hermann",
+    "domain": "memorialhermann.org",
+    "seed_urls": [
+      "https://memorialhermann.org/patients-visitors/patient-services/release-medical-records",
+      "https://memorialhermann.org/services/specialties/imaging/request-imaging-records"
+    ]
+  },
+  {
+    "system_name": "Ascension Seton",
+    "domain": "healthcare.ascension.org",
+    "seed_urls": [
+      "https://healthcare.ascension.org/medical-records"
+    ]
+  }
+]

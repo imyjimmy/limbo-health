@@ -1,0 +1,15 @@
+{
+  "title": "Request Copies of Your Medical Records",
+  "text": "Baylor Scott & White patients may request copies of your medical records through HealthMark Group's Request Manager or by mailing a paper Authorization for Release of Medical Information form. Fax and mail options are available.",
+  "links": [
+    {
+      "text": "HealthMark Request Manager",
+      "href": "https://requestmanager.healthmark-group.com"
+    },
+    {
+      "text": "Authorization for Release of Medical Information",
+      "href": "https://www.bswhealth.com/forms/authorization-for-release-of-medical-information.pdf"
+    }
+  ],
+  "contacts": []
+}

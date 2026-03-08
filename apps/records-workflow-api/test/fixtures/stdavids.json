@@ -1,0 +1,15 @@
+{
+  "title": "Medical Records | St. David's Medical Center",
+  "text": "Patients can view medical records online using MyHealthONE. To request copies of your medical records, complete the request online or submit by email, fax, or mail to the medical records department.",
+  "links": [
+    {
+      "text": "MyHealthONE",
+      "href": "https://myhealthone.com"
+    },
+    {
+      "text": "Online Medical Record Request",
+      "href": "https://www.stdavids.com/medical-records/request"
+    }
+  ],
+  "contacts": []
+}
