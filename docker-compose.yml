@@ -52,6 +52,7 @@ services:
     depends_on:
       - mgit-api
       - scheduler-api
+      - records-workflow-api
 
   mysql:
     image: mysql:8.0
@@ -96,6 +97,34 @@ services:
     volumes:
       - ./apps/scheduler-api/uploads:/app/uploads
 
+  records-workflow-postgres:
+    image: postgres:16-alpine
+    container_name: ${CONTAINER_PREFIX}_records_workflow_postgres_1
+    environment:
+      POSTGRES_DB: ${RECORDS_WORKFLOW_DB_NAME:-records_workflow}
+      POSTGRES_USER: ${RECORDS_WORKFLOW_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}
+    volumes:
+      - records_workflow_pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  records-workflow-api:
+    build:
+      context: .
+      dockerfile: apps/records-workflow-api/Dockerfile
+    container_name: ${CONTAINER_PREFIX}_records_workflow_api_1
+    depends_on:
+      - records-workflow-postgres
+    environment:
+      - NODE_ENV=production
+      - PORT=3020
+      - DATABASE_URL=postgres://${RECORDS_WORKFLOW_DB_USER:-postgres}:${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME:-records_workflow}
+      - RAW_STORAGE_DIR=/app/storage/raw
+    command: sh -c "npm run migrate && npm run seed && npm run start"
+    volumes:
+      - ./apps/records-workflow-api/storage/raw:/app/storage/raw
+    restart: unless-stopped
+
   # plebdoc-api:
   #   build: ../plebdoc-scheduler-service/api
   #   container_name: ${CONTAINER_PREFIX}_plebdoc_api_1
@@ -130,3 +159,4 @@ services:
 volumes:
   mysql_data:
   repos_data:
+  records_workflow_pg_data:

@@ -1,0 +1,24 @@
+{
+  "name": "records-workflow-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Texas medical-records workflow crawler and read API",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate": "node src/migrate.js",
+    "seed": "node src/seed.js",
+    "crawl": "node src/crawl.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
+    "pdf-parse": "^1.1.1",
+    "pg": "^8.16.3"
+  }
+}

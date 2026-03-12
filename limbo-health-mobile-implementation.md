@@ -60,7 +60,7 @@ limbo-health-mobile/
 │   │   └── generate-key.tsx                # Generate keypair, show nsec backup
 │   ├── (tabs)/                             # Authenticated tab navigator
 │   │   ├── _layout.tsx                     # Tab bar config
-│   │   ├── index.tsx                       # Binder List (home)
+│   │   ├── (binders)/index.tsx             # Binder List tab root
 │   │   ├── scan.tsx                        # QR scanner (clone repo from web app)
 │   │   └── settings.tsx                    # Settings root
 │   └── binder/                             # Binder detail stack (not a tab)

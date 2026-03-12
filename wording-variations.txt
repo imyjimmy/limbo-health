@@ -1,0 +1,74 @@
+Landing Page Wording Variations (from this session)
+
+Hero Headline Variations
+- Modern Telemedicine
+- with
+- Old School Doctors
+- Your Medical History as a Git Repo.
+- Your Medical History
+- as a
+- Git Repo
+- A Medical Advocate
+- at the Palm of
+- Your Hands
+- A Personal Medical Record
+- That Moves with You
+
+Hero Supporting / Subcopy Variations
+- Where Doctors and Patients Connect
+- Without Distractions
+- Access to your own Medical Records has always been Fragmented and Painful. Not anymore.
+- Version-controlled health records. Share with doctors on your terms. Your body, your data, your repository.
+- A Personal Medical Record That Moves with You. Version-controlled health records. Share with doctors on your terms. Your body, your data, your repository.
+
+Primary CTA Variations
+- Expand Your Practice Online
+- Enter Doctor Portal
+- Get Early Access
+- Join the Waitlist
+
+Secondary CTA Variations
+- Learn More
+
+Benefit / Feature Title Variations
+- A Medical Advocate at the Palm of Your Hands
+- A Personal Medical Record That Moves with You.
+- Fine-Grained Access Control
+- The Foundation for an AI Doctor
+- Your Medical History as a Git Repo
+
+Benefit / Feature Description Variations
+- Immutable audit trail for every record change
+- Portable history that moves with the patient
+- A Personal Medical Record that Moves with You
+- Cryptographic access control for sharing and revocation
+- Fine-grained access control for sharing with your doctor
+- Fine-grained access control for sharing with any doctor
+- Fight Medical Gaslighting with a tool that vouches for you.
+- Fight medical gaslighting with a longitudinal record that vouches for you. Bring timestamps, symptom history, meds, and outcomes into every visit so your concerns are harder to dismiss and easier to act on.
+- Carry your complete medical record everywhere. Instant access during emergencies, travel, or new doctor visits.
+- Carry your full medical timeline everywhere so critical context is never missing. In emergencies, while traveling, or when meeting a new doctor, you can instantly provide diagnoses, medications, allergies, labs, imaging, and prior treatment outcomes.
+- Share specific records with any doctor, specialist, or caregiver. Revoke access anytime. You own your data.
+- Structured, longitudinal medical data makes intelligent clinical assistance possible. This record format prepares the ground for AI that can spot patterns, summarize history, and support better decisions.
+- Bring receipts to every visit: timestamped symptoms, meds, labs, and outcomes that make your case hard to dismiss.
+- Your records travel with you: in emergencies, at new clinics, or on the road, share critical history in seconds.
+- Because the record is stored as markdown, AI can parse history, spot patterns, and prep smarter summaries before visits.
+
+Terminal / Command Snippet Variations
+- $ medrepo init --your-health
+- $ git init --your-health
+- git log --oneline medical-history
+- medrepo pull --all records
+- git pull --all records
+- medrepo grant --read dr.smith@cardiology
+- git grant --read dr.smith@cardiology
+- git summarize --history --for ai-doctor
+
+Brand / Label Variations Touched in the Landing
+- MedRepo
+- Limbo Health
+
+# like
+Bring timestamps, symptom history, meds, and outcomes into every visit so your concerns are harder to dismiss and easier to act on.
+Carry your complete medical record everywhere. Instant access during emergencies, travel, or new doctor visits.
+Portable personal medical records unlock AI medicine: richer context, earlier insights, and safer, personalized care.

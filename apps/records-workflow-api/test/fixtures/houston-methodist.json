@@ -1,0 +1,19 @@
+{
+  "title": "For Patients: Medical Records",
+  "text": "Houston Methodist offers an online records request form, a downloadable PDF authorization form, and MyChart access. Requests can also be sent by mail, fax, and email.",
+  "links": [
+    {
+      "text": "Online Request Form",
+      "href": "https://www.houstonmethodist.org/medical-records/request-online"
+    },
+    {
+      "text": "Authorization Form PDF",
+      "href": "https://www.houstonmethodist.org/forms/authorization.pdf"
+    },
+    {
+      "text": "MyChart",
+      "href": "https://mychart.houstonmethodist.org"
+    }
+  ],
+  "contacts": []
+}

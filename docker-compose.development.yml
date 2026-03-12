@@ -78,6 +78,27 @@ services:
     networks:
       - limbo_network
 
+  records-workflow-postgres:
+    env_file:
+      - .env.development
+    ports:
+      - "5433:5432"
+    networks:
+      - limbo_network
+
+  records-workflow-api:
+    env_file:
+      - .env.development
+    ports:
+      - "3020:3020"
+    volumes:
+      - ./apps/records-workflow-api:/app
+      - /app/node_modules
+      - ./apps/records-workflow-api/storage/raw:/app/storage/raw
+    command: sh -c "npm run migrate && npm run seed && npm run dev"
+    networks:
+      - limbo_network
+
   swagger-ui:
     ports:
       - "8090:8080"
