@@ -711,6 +711,11 @@ export default function BinderListScreen() {
                 <Text style={{ fontSize: 28, color: '#007AFF', marginTop: -6 }}>+</Text>
               </Pressable>
             </View>
+            <View style={styles.digitalInfoCard}>
+              <Text style={styles.digitalInfoText}>
+                Create a personal binder for your medical history. Store records, upload scans, track doctor visits, and keep notes—all organized in one place.
+              </Text>
+            </View>
             {screenState.repos.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>No binders yet.</Text>
@@ -892,14 +897,6 @@ export default function BinderListScreen() {
                                         >
                                           <BinderTextureBackground textureId={texture.id} />
                                         </View>
-                                        <Text
-                                          style={[
-                                            styles.repoTextureLabel,
-                                            isSelected && styles.repoTextureLabelSelected,
-                                          ]}
-                                        >
-                                          {texture.label}
-                                        </Text>
                                       </Pressable>
                                     );
                                   })}
@@ -1048,6 +1045,21 @@ addPhotoButton: {
   digitalBindersSection: {
     paddingTop: 0,
   },
+  digitalInfoCard: {
+    marginTop: 6,
+    marginBottom: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  digitalInfoText: {
+    color: '#475569',
+    fontSize: 13,
+    lineHeight: 18,
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1177,8 +1189,8 @@ addPhotoButton: {
   repoOpenArea: {
     paddingLeft: 30,
     paddingRight: 16,
-    paddingTop: 18,
-    paddingBottom: 12,
+    paddingTop: 14,
+    paddingBottom: 8,
   },
   repoNameInput: {
     color: '#111',
@@ -1191,7 +1203,7 @@ addPhotoButton: {
   repoNameRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   repoName: {
     color: '#111',
@@ -1224,13 +1236,13 @@ addPhotoButton: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 3,
+    marginTop: 1,
   },
   repoMetaSection: {
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(74, 63, 52, 0.12)',
+    marginTop: 6,
+    paddingTop: 5,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(74, 63, 52, 0.08)',
   },
   repoMetaValue: {
     color: '#334155',
@@ -1241,26 +1253,19 @@ addPhotoButton: {
     textAlign: 'right',
   },
   repoTextureContent: {
-    paddingTop: 8,
-    paddingRight: 6,
-  },
-  repoTextureLabel: {
-    marginTop: 6,
-    fontSize: 11,
-    color: '#475569',
-  },
-  repoTextureLabelSelected: {
-    color: '#007AFF',
-    fontWeight: '600',
+    paddingTop: 0,
+    paddingRight: 2,
   },
   repoTextureOption: {
-    width: 70,
+    width: 40,
+    height: 40,
     alignItems: 'center',
-    marginRight: 10,
+    justifyContent: 'center',
+    marginRight: 12,
   },
   repoTextureSection: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(74, 63, 52, 0.12)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(74, 63, 52, 0.08)',
     paddingLeft: 30,
     paddingRight: 16,
   },
@@ -1268,14 +1273,14 @@ addPhotoButton: {
     height: 24,
   },
   repoTextureSectionExpanded: {
-    paddingBottom: 16,
+    paddingBottom: 8,
   },
   repoTextureToggle: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   repoTextureToggleExpanded: {
-    minHeight: 24,
+    minHeight: 2,
   },
   repoTextureToggleCollapsed: {
     flex: 1,
@@ -1285,12 +1290,12 @@ addPhotoButton: {
     color: '#334155',
   },
   repoTextureExpandedContent: {
-    paddingTop: 12,
+    paddingTop: 0,
   },
   repoTextureSwatch: {
-    width: 54,
-    height: 54,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(17, 17, 17, 0.14)',
@@ -1303,7 +1308,7 @@ addPhotoButton: {
     color: '#4B5563',
     fontSize: 12,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 2,
   },
   retryButton: {
     backgroundColor: '#111', borderRadius: 10,
