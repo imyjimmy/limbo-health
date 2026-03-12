@@ -29,12 +29,29 @@ const ACTIVE_COLOR = '#ffffff';
 
 type CreateAction = 'note' | 'audio' | 'photo' | 'medication';
 type ContextualCreateIconKey = 'medication' | 'bio' | 'note';
+type TabKind = 'home' | 'binders' | 'create' | 'page' | 'profile';
 
 const CREATE_MENU_ITEMS = [
   { key: 'audio', label: 'Record Audio', Icon: IconMicrophone },
   { key: 'note', label: 'Add Note', Icon: IconContract },
   { key: 'photo', label: 'Take Photo', Icon: IconCamera },
 ] as const;
+
+function getTabKind(routeName: string): TabKind | null {
+  if (routeName === 'home') return 'home';
+  if (routeName === 'create') return 'create';
+  if (routeName === 'page') return 'page';
+  if (routeName === 'profile') return 'profile';
+  if (
+    routeName === '(binders)' ||
+    routeName === '(binders)/index' ||
+    routeName === '(home)' ||
+    routeName === '(home)/index'
+  ) {
+    return 'binders';
+  }
+  return null;
+}
 
 interface CustomTabBarProps extends BottomTabBarProps {
   profileImageUrl?: string | null;
@@ -60,9 +77,9 @@ export function CustomTabBar({
   onDocumentPress,
 }: CustomTabBarProps) {
   const [menuVisible, setMenuVisible] = useState(false);
-  const orderedRouteNames = ['home', '(home)', 'create', 'page', 'profile'] as const;
-  const visibleRoutes = orderedRouteNames
-    .map((name) => state.routes.find((route) => route.name === name))
+  const orderedTabKinds: TabKind[] = ['home', 'binders', 'create', 'page', 'profile'];
+  const visibleRoutes = orderedTabKinds
+    .map((kind) => state.routes.find((route) => getTabKind(route.name) === kind))
     .filter((route): route is (typeof state.routes)[number] => Boolean(route));
 
   const handleCreatePress = (action: CreateAction) => {
@@ -82,16 +99,18 @@ export function CustomTabBar({
           {visibleRoutes.map((route) => {
             const index = state.routes.indexOf(route);
             const isActive = state.index === index;
+            const tabKind = getTabKind(route.name);
+            if (!tabKind) return null;
 
             const onPress = () => {
               // Center "create" tab opens menu instead of navigating
-              if (route.name === 'create') {
+              if (tabKind === 'create') {
                 setMenuVisible(true);
                 return;
               }
 
               // Document tab jumps to last viewed directory
-              if (route.name === 'page') {
+              if (tabKind === 'page') {
                 onDocumentPress?.();
                 return;
               }
@@ -122,11 +141,11 @@ export function CustomTabBar({
                   onLongPress={onLongPress}
                   accessibilityRole="button"
                   accessibilityState={isActive ? { selected: true } : {}}
-                  accessibilityLabel={route.name}
-                  testID={`tab-${route.name}`}
+                  accessibilityLabel={tabKind}
+                  testID={`tab-${tabKind}`}
                   style={styles.tabButton}
                 >
-                  {renderTabIcon(route.name, isActive, {
+                  {renderTabIcon(tabKind, isActive, {
                     profileImageUrl,
                     profileInitials,
                     hasNotification,
@@ -195,7 +214,7 @@ export function CustomTabBar({
 }
 
 function renderTabIcon(
-  routeName: string,
+  tabKind: TabKind,
   isActive: boolean,
   profile: {
     profileImageUrl?: string | null;
@@ -205,7 +224,7 @@ function renderTabIcon(
 ) {
   const color = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
 
-  switch (routeName) {
+  switch (tabKind) {
     case 'home':
       return isActive ? (
         <IconHomeFilled size={ICON_SIZE} color={color} />
@@ -213,7 +232,7 @@ function renderTabIcon(
         <IconHome size={ICON_SIZE} color={color} strokeWidth={2} />
       );
 
-    case '(home)':
+    case 'binders':
       return (
         <IconBook2 size={ICON_SIZE} color={color} strokeWidth={2} />
       );

@@ -113,9 +113,9 @@ function TabLayoutInner() {
     if (dirPath) {
       setPendingRestore(dirPath);
     }
-    // Pop the (home) stack to root first (clears any stale binder),
+    // Pop the (binders) stack to root first (clears any stale binder),
     // then push a fresh binder instance
-    router.navigate('/(tabs)/(home)');
+    router.navigate('/(tabs)/(binders)');
     setTimeout(() => {
       router.push(`/binder/${binderId}`);
     }, 0);
@@ -242,7 +242,7 @@ function TabLayoutInner() {
         }}
       >
         <Tabs.Screen name="home" options={{ title: 'Home' }} />
-        <Tabs.Screen name="(home)" options={{ title: 'Binder List' }} />
+        <Tabs.Screen name="(binders)" options={{ title: 'Binder List' }} />
         <Tabs.Screen name="create" options={{ title: 'Create' }} />
         <Tabs.Screen name="page" options={{ title: 'Current View' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />

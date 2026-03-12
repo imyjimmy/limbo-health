@@ -109,7 +109,7 @@ export default function EntryDetailScreen() {
     }
     // Fallback: navigate to standalone NoteEditor
     router.push({
-      pathname: '/(tabs)/(home)/binder/[binderId]/entry/edit',
+      pathname: '/(tabs)/(binders)/binder/[binderId]/entry/edit',
       params: { binderId: binderId!, entryPath: rawPath },
     });
   }, [Renderer, binderId, rawPath, router]);

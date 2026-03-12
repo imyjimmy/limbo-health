@@ -462,18 +462,11 @@ export default function BinderListScreen() {
 
       try {
         const cloned = await isAlreadyCloned(repo.id);
-        const { GitEngine } = await import('../../../core/git/GitEngine');
         if (!cloned) {
+          const { GitEngine } = await import('../../../core/git/GitEngine');
           setScreenState({ phase: 'cloning', repoId: repo.id });
           await GitEngine.cloneRepo(repoDir(repo.id), repo.id, authConfig());
           setScreenState({ phase: 'repos-loaded', repos: (screenState as any).repos ?? [] });
-        } else {
-          // Pull latest so local is up to date before navigating
-          try {
-            await GitEngine.pull(repoDir(repo.id), repo.id, authConfig());
-          } catch (err) {
-            console.warn('Pull before open failed:', err);
-          }
         }
 
         SecureStore.setItemAsync(LAST_BINDER_KEY, repo.id);
@@ -672,7 +665,7 @@ export default function BinderListScreen() {
       return (
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           <View style={styles.headerRow}>
-            <Text style={styles.screenTitle}>Binders</Text>
+            <Text style={styles.screenTitle}>Digital Binders</Text>
             <Pressable onPress={createBinder} hitSlop={8} testID="create-binder-button">
               <Text style={{ fontSize: 28, color: '#007AFF', marginTop: -6 }}>+</Text>
             </Pressable>
