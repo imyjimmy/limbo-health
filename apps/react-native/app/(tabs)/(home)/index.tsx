@@ -29,6 +29,7 @@ import {
   BINDER_TEXTURE_OPTIONS,
   BinderTextureBackground,
   DEFAULT_BINDER_TEXTURE_ID,
+  getBinderSpinePalette,
   isBinderTextureId,
   type BinderTextureId,
 } from '../../../components/binder/BinderTextureBackground';
@@ -687,6 +688,7 @@ export default function BinderListScreen() {
           ) : (
             screenState.repos.map((repo, index) => {
               const selectedTexture = binderTextures[repo.id] ?? DEFAULT_BINDER_TEXTURE_ID;
+              const selectedSpinePalette = getBinderSpinePalette(selectedTexture);
               const isTextureExpanded = expandedTextureCards[repo.id] ?? false;
               const updatedLabel = repo.lastUpdatedAt
                 ? new Date(repo.lastUpdatedAt).toLocaleString(undefined, {
@@ -717,10 +719,10 @@ export default function BinderListScreen() {
                         interval={12}
                         verticalPadding={10}
                         minVisibleHoles={3}
-                        backgroundColor="rgba(233, 225, 211, 0.75)"
-                        borderColor="rgba(74, 63, 52, 0.28)"
-                        holeColor="rgba(250, 247, 240, 0.95)"
-                        holeBorderColor="rgba(74, 63, 52, 0.38)"
+                        backgroundColor={selectedSpinePalette.backgroundColor}
+                        borderColor={selectedSpinePalette.borderColor}
+                        holeColor={selectedSpinePalette.holeColor}
+                        holeBorderColor={selectedSpinePalette.holeBorderColor}
                       />
                       <View style={styles.repoFolderTab} pointerEvents="none" />
                       <View style={styles.repoCardContent}>

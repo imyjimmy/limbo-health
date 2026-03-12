@@ -17,6 +17,13 @@ export interface BinderTextureOption {
   pattern: TexturePattern;
 }
 
+export interface BinderSpinePalette {
+  backgroundColor: string;
+  borderColor: string;
+  holeColor: string;
+  holeBorderColor: string;
+}
+
 export const DEFAULT_BINDER_TEXTURE_ID: BinderTextureId = 'linen';
 
 export const BINDER_TEXTURE_OPTIONS: BinderTextureOption[] = [
@@ -69,6 +76,33 @@ const TEXTURE_LOOKUP: Record<BinderTextureId, BinderTextureOption> = {
   sandstone: BINDER_TEXTURE_OPTIONS[3],
 };
 
+const SPINE_PALETTE_LOOKUP: Record<BinderTextureId, BinderSpinePalette> = {
+  linen: {
+    backgroundColor: 'rgba(233, 225, 211, 0.75)',
+    borderColor: 'rgba(74, 63, 52, 0.28)',
+    holeColor: 'rgba(250, 247, 240, 0.95)',
+    holeBorderColor: 'rgba(74, 63, 52, 0.38)',
+  },
+  blueprint: {
+    backgroundColor: 'rgba(214, 226, 244, 0.8)',
+    borderColor: 'rgba(73, 100, 140, 0.3)',
+    holeColor: 'rgba(246, 250, 255, 0.96)',
+    holeBorderColor: 'rgba(73, 100, 140, 0.36)',
+  },
+  sage: {
+    backgroundColor: 'rgba(216, 230, 219, 0.8)',
+    borderColor: 'rgba(85, 112, 94, 0.3)',
+    holeColor: 'rgba(245, 251, 246, 0.96)',
+    holeBorderColor: 'rgba(85, 112, 94, 0.35)',
+  },
+  sandstone: {
+    backgroundColor: 'rgba(231, 215, 197, 0.8)',
+    borderColor: 'rgba(119, 90, 66, 0.3)',
+    holeColor: 'rgba(251, 243, 233, 0.96)',
+    holeBorderColor: 'rgba(119, 90, 66, 0.36)',
+  },
+};
+
 export function isBinderTextureId(value: string | null | undefined): value is BinderTextureId {
   if (!value) return false;
   return value in TEXTURE_LOOKUP;
@@ -76,6 +110,10 @@ export function isBinderTextureId(value: string | null | undefined): value is Bi
 
 export function getBinderTexture(textureId: BinderTextureId): BinderTextureOption {
   return TEXTURE_LOOKUP[textureId] ?? TEXTURE_LOOKUP[DEFAULT_BINDER_TEXTURE_ID];
+}
+
+export function getBinderSpinePalette(textureId: BinderTextureId): BinderSpinePalette {
+  return SPINE_PALETTE_LOOKUP[textureId] ?? SPINE_PALETTE_LOOKUP[DEFAULT_BINDER_TEXTURE_ID];
 }
 
 function renderPattern(texture: BinderTextureOption, patternId: string) {

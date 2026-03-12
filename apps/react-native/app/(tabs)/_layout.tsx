@@ -223,10 +223,6 @@ function TabLayoutInner() {
     setActiveAudioContext(null);
   };
 
-  const handleSearchPress = () => {
-    showToast('Search coming soon');
-  };
-
   return (
     <View style={styles.screen}>
       <Tabs
@@ -239,17 +235,16 @@ function TabLayoutInner() {
             onCreateAction={handleCreateAction}
             contextualCreateAction={contextualCreateAction}
             onDocumentPress={handleDocumentPress}
-            onSearchPress={handleSearchPress}
           />
         )}
         screenOptions={{
           headerShown: false,
         }}
       >
-        <Tabs.Screen name="(home)" options={{ title: 'Home' }} />
-        <Tabs.Screen name="page" options={{ title: 'Page' }} />
+        <Tabs.Screen name="home" options={{ title: 'Home' }} />
+        <Tabs.Screen name="(home)" options={{ title: 'Binder List' }} />
         <Tabs.Screen name="create" options={{ title: 'Create' }} />
-        <Tabs.Screen name="search" options={{ title: 'Search' }} />
+        <Tabs.Screen name="page" options={{ title: 'Current View' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
 

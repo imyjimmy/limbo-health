@@ -6,13 +6,13 @@ import {
   Modal,
   Text,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   IconBook2,
   IconBook,
   IconBookFilled,
+  IconHome,
+  IconHomeFilled,
   IconPlus,
-  IconSearch,
   IconContract,
   IconId,
   IconMicrophone,
@@ -47,7 +47,6 @@ interface CustomTabBarProps extends BottomTabBarProps {
     icon?: ContextualCreateIconKey;
   } | null;
   onDocumentPress?: () => void;
-  onSearchPress?: () => void;
 }
 
 export function CustomTabBar({
@@ -59,10 +58,12 @@ export function CustomTabBar({
   onCreateAction,
   contextualCreateAction = null,
   onDocumentPress,
-  onSearchPress,
 }: CustomTabBarProps) {
-  const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
+  const orderedRouteNames = ['home', '(home)', 'create', 'page', 'profile'] as const;
+  const visibleRoutes = orderedRouteNames
+    .map((name) => state.routes.find((route) => route.name === name))
+    .filter((route): route is (typeof state.routes)[number] => Boolean(route));
 
   const handleCreatePress = (action: CreateAction) => {
     setMenuVisible(false);
@@ -78,9 +79,7 @@ export function CustomTabBar({
       >
          
         <View style={styles.tabRow}>
-          {state.routes.filter((r) =>
-            ['(home)', 'page', 'create', 'search', 'profile'].includes(r.name)
-          ).map((route) => {
+          {visibleRoutes.map((route) => {
             const index = state.routes.indexOf(route);
             const isActive = state.index === index;
 
@@ -94,11 +93,6 @@ export function CustomTabBar({
               // Document tab jumps to last viewed directory
               if (route.name === 'page') {
                 onDocumentPress?.();
-                return;
-              }
-
-              if (route.name === 'search') {
-                onSearchPress?.();
                 return;
               }
 
@@ -212,6 +206,13 @@ function renderTabIcon(
   const color = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
 
   switch (routeName) {
+    case 'home':
+      return isActive ? (
+        <IconHomeFilled size={ICON_SIZE} color={color} />
+      ) : (
+        <IconHome size={ICON_SIZE} color={color} strokeWidth={2} />
+      );
+
     case '(home)':
       return (
         <IconBook2 size={ICON_SIZE} color={color} strokeWidth={2} />
@@ -229,11 +230,6 @@ function renderTabIcon(
         <View style={styles.plusButton}>
           <IconPlus size={PLUS_SIZE} color={color} strokeWidth={isActive ? 2.5 : 2} />
         </View>
-      );
-
-    case 'search':
-      return (
-        <IconSearch size={ICON_SIZE} color={color} strokeWidth={2} />
       );
 
     case 'profile':
