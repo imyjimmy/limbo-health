@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
+  type LayoutChangeEvent,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import RNFS from 'react-native-fs';
@@ -119,6 +120,8 @@ export default function BinderListScreen() {
   const [editingRepoId, setEditingRepoId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [renamingRepoId, setRenamingRepoId] = useState<string | null>(null);
+  const [listViewportHeight, setListViewportHeight] = useState(0);
+  const [pendingSectionBottom, setPendingSectionBottom] = useState(0);
 
   const binderRef = useRef<BinderService | null>(null);
 
@@ -608,6 +611,22 @@ export default function BinderListScreen() {
     [capture, openBinder],
   );
 
+  const handleListViewportLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    setListViewportHeight((prev) => (Math.abs(prev - nextHeight) < 1 ? prev : nextHeight));
+  }, []);
+
+  const handlePendingSectionLayout = useCallback((event: LayoutChangeEvent) => {
+    const { y, height } = event.nativeEvent.layout;
+    const nextBottom = y + height;
+    setPendingSectionBottom((prev) => (Math.abs(prev - nextBottom) < 1 ? prev : nextBottom));
+  }, []);
+
+  const digitalBindersMarginTop =
+    listViewportHeight > 0 && pendingSectionBottom > 0
+      ? Math.max(16, Math.round(listViewportHeight / 2 - pendingSectionBottom))
+      : 16;
+
   // --- Render ---
 
   if (!jwt) {
@@ -663,79 +682,145 @@ export default function BinderListScreen() {
 
     case 'repos-loaded':
       return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-          <View style={styles.headerRow}>
-            <Text style={styles.screenTitle}>Digital Binders</Text>
-            <Pressable onPress={createBinder} hitSlop={8} testID="create-binder-button">
-              <Text style={{ fontSize: 28, color: '#007AFF', marginTop: -6 }}>+</Text>
-            </Pressable>
+        <ScrollView
+          style={styles.container}
+          onLayout={handleListViewportLayout}
+          contentContainerStyle={[styles.scrollContent, styles.scrollContentExpanded]}
+        >
+          <View style={styles.pendingSection} onLayout={handlePendingSectionLayout}>
+            <View style={styles.headerRow}>
+              <Text style={styles.screenTitle}>Pending Requests</Text>
+            </View>
+            <View style={styles.pendingInfoCard}>
+              <View style={styles.pendingInfoBadge}>
+                <Text style={styles.pendingInfoBadgeText}>i</Text>
+              </View>
+              <View style={styles.pendingInfoBody}>
+                <Text style={styles.pendingInfoTitle}>No pending requests yet</Text>
+                <Text style={styles.pendingInfoText}>
+                  Pending medical records requests will appear here once they are created.
+                </Text>
+              </View>
+            </View>
           </View>
 
-          {screenState.repos.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No binders yet.</Text>
-              <Pressable style={styles.createButton} onPress={createBinder}>
-                <Text style={styles.createButtonText}>Create a Binder</Text>
+          <View style={[styles.digitalBindersSection, { marginTop: digitalBindersMarginTop }]}>
+            <View style={styles.digitalBindersHeaderRow}>
+              <Text style={styles.screenTitle}>Digital Binders</Text>
+              <Pressable onPress={createBinder} hitSlop={8} testID="create-binder-button">
+                <Text style={{ fontSize: 28, color: '#007AFF', marginTop: -6 }}>+</Text>
               </Pressable>
             </View>
-          ) : (
-            screenState.repos.map((repo, index) => {
-              const selectedTexture = binderTextures[repo.id] ?? DEFAULT_BINDER_TEXTURE_ID;
-              const selectedSpinePalette = getBinderSpinePalette(selectedTexture);
-              const isTextureExpanded = expandedTextureCards[repo.id] ?? false;
-              const updatedLabel = repo.lastUpdatedAt
-                ? new Date(repo.lastUpdatedAt).toLocaleString(undefined, {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })
-                : 'Not available';
+            {screenState.repos.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No binders yet.</Text>
+                <Pressable style={styles.createButton} onPress={createBinder}>
+                  <Text style={styles.createButtonText}>Create a Binder</Text>
+                </Pressable>
+              </View>
+            ) : (
+              screenState.repos.map((repo, index) => {
+                const selectedTexture = binderTextures[repo.id] ?? DEFAULT_BINDER_TEXTURE_ID;
+                const selectedSpinePalette = getBinderSpinePalette(selectedTexture);
+                const isTextureExpanded = expandedTextureCards[repo.id] ?? false;
+                const updatedLabel = repo.lastUpdatedAt
+                  ? new Date(repo.lastUpdatedAt).toLocaleString(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })
+                  : 'Not available';
 
-              return (
-                <View key={repo.id} style={styles.repoCardWrap}>
-                  <SwipeableRow
-                    showWarning={true}
-                    onDelete={() => deleteBinder(repo)}
-                  >
-                    <View style={styles.repoCard}>
-                      <BinderTextureBackground textureId={selectedTexture} />
-                      <View style={styles.repoCardOverlay} />
-                      <View style={styles.repoNotebookLines} pointerEvents="none">
-                        <View style={[styles.repoNotebookRule, styles.repoNotebookRuleTop]} />
-                        <View style={[styles.repoNotebookRule, styles.repoNotebookRuleMiddle]} />
-                        <View style={[styles.repoNotebookRule, styles.repoNotebookRuleBottom]} />
-                        <View style={styles.repoNotebookMargin} />
-                      </View>
-                      <BinderSpine
-                        style={styles.repoBinderSpine}
-                        width={22}
-                        holeSize={9}
-                        interval={12}
-                        verticalPadding={10}
-                        minVisibleHoles={3}
-                        backgroundColor={selectedSpinePalette.backgroundColor}
-                        borderColor={selectedSpinePalette.borderColor}
-                        holeColor={selectedSpinePalette.holeColor}
-                        holeBorderColor={selectedSpinePalette.holeBorderColor}
-                      />
-                      <View style={styles.repoFolderTab} pointerEvents="none" />
-                      <View style={styles.repoCardContent}>
-                        {editingRepoId === repo.id ? (
-                          <View style={styles.repoOpenArea}>
+                return (
+                  <View key={repo.id} style={styles.repoCardWrap}>
+                    <SwipeableRow
+                      showWarning={true}
+                      onDelete={() => deleteBinder(repo)}
+                    >
+                      <View style={styles.repoCard}>
+                        <BinderTextureBackground textureId={selectedTexture} />
+                        <View style={styles.repoCardOverlay} />
+                        <View style={styles.repoNotebookLines} pointerEvents="none">
+                          <View style={[styles.repoNotebookRule, styles.repoNotebookRuleTop]} />
+                          <View style={[styles.repoNotebookRule, styles.repoNotebookRuleMiddle]} />
+                          <View style={[styles.repoNotebookRule, styles.repoNotebookRuleBottom]} />
+                          <View style={styles.repoNotebookMargin} />
+                        </View>
+                        <BinderSpine
+                          style={styles.repoBinderSpine}
+                          width={22}
+                          holeSize={9}
+                          interval={12}
+                          verticalPadding={10}
+                          minVisibleHoles={3}
+                          backgroundColor={selectedSpinePalette.backgroundColor}
+                          borderColor={selectedSpinePalette.borderColor}
+                          holeColor={selectedSpinePalette.holeColor}
+                          holeBorderColor={selectedSpinePalette.holeBorderColor}
+                        />
+                        <View style={styles.repoFolderTab} pointerEvents="none" />
+                        <View style={styles.repoCardContent}>
+                          {editingRepoId === repo.id ? (
+                            <View style={styles.repoOpenArea}>
+                              <View style={styles.repoNameRow}>
+                                <TextInput
+                                  style={styles.repoNameInput}
+                                  value={editingName}
+                                  onChangeText={setEditingName}
+                                  autoFocus
+                                  selectTextOnFocus
+                                  returnKeyType="done"
+                                  onEndEditing={() => commitRename(repo)}
+                                  editable={renamingRepoId !== repo.id}
+                                  testID={`binder-name-input-${index}`}
+                                />
+                                {renamingRepoId === repo.id ? (
+                                  <ActivityIndicator size="small" color="#334155" style={styles.renameSpinner} />
+                                ) : null}
+                              </View>
+
+                              <View style={styles.repoMetaSection}>
+                                <View style={styles.repoMetaRow}>
+                                  <Text style={styles.repoMetaLabel}>Author</Text>
+                                  <Text style={styles.repoMetaValue} numberOfLines={1}>
+                                    {repo.authorName ?? 'Not available'}
+                                  </Text>
+                                </View>
+                                <View style={styles.repoMetaRow}>
+                                  <Text style={styles.repoMetaLabel}>Updated</Text>
+                                  <Text style={styles.repoMetaValue} numberOfLines={1}>
+                                    {updatedLabel}
+                                  </Text>
+                                </View>
+                                <View style={styles.repoMetaRow}>
+                                  <Text style={styles.repoMetaLabel}>Entries</Text>
+                                  <Text style={styles.repoMetaValue}>
+                                    {repo.entryCount ?? 'Not available'}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          ) : (
+                          <Pressable
+                            style={styles.repoOpenArea}
+                            onPress={() => {
+                              if (editingRepoId) return;
+                              openBinder(repo);
+                            }}
+                            testID={`binder-list-item-${index}`}
+                          >
                             <View style={styles.repoNameRow}>
-                              <TextInput
-                                style={styles.repoNameInput}
-                                value={editingName}
-                                onChangeText={setEditingName}
-                                autoFocus
-                                selectTextOnFocus
-                                returnKeyType="done"
-                                onEndEditing={() => commitRename(repo)}
-                                editable={renamingRepoId !== repo.id}
-                                testID={`binder-name-input-${index}`}
-                              />
-                              {renamingRepoId === repo.id ? (
-                                <ActivityIndicator size="small" color="#334155" style={styles.renameSpinner} />
-                              ) : null}
+                              <Text style={styles.repoName} numberOfLines={1}>{repo.name}</Text>
+                              <Pressable
+                                onPress={(event) => {
+                                  event.stopPropagation?.();
+                                  beginRename(repo);
+                                }}
+                                style={styles.repoNameEditButton}
+                                hitSlop={8}
+                                testID={`binder-name-edit-${index}`}
+                              >
+                                <Text style={styles.repoNameEditIcon}>✎</Text>
+                              </Pressable>
                             </View>
 
                             <View style={styles.repoMetaSection}>
@@ -758,122 +843,78 @@ export default function BinderListScreen() {
                                 </Text>
                               </View>
                             </View>
-                          </View>
-                        ) : (
-                        <Pressable
-                          style={styles.repoOpenArea}
-                          onPress={() => {
-                            if (editingRepoId) return;
-                            openBinder(repo);
-                          }}
-                          testID={`binder-list-item-${index}`}
-                        >
-                          <View style={styles.repoNameRow}>
-                            <Text style={styles.repoName} numberOfLines={1}>{repo.name}</Text>
-                            <Pressable
-                              onPress={(event) => {
-                                event.stopPropagation?.();
-                                beginRename(repo);
-                              }}
-                              style={styles.repoNameEditButton}
-                              hitSlop={8}
-                              testID={`binder-name-edit-${index}`}
-                            >
-                              <Text style={styles.repoNameEditIcon}>✎</Text>
-                            </Pressable>
-                          </View>
-
-                          <View style={styles.repoMetaSection}>
-                            <View style={styles.repoMetaRow}>
-                              <Text style={styles.repoMetaLabel}>Author</Text>
-                              <Text style={styles.repoMetaValue} numberOfLines={1}>
-                                {repo.authorName ?? 'Not available'}
-                              </Text>
-                            </View>
-                            <View style={styles.repoMetaRow}>
-                              <Text style={styles.repoMetaLabel}>Updated</Text>
-                              <Text style={styles.repoMetaValue} numberOfLines={1}>
-                                {updatedLabel}
-                              </Text>
-                            </View>
-                            <View style={styles.repoMetaRow}>
-                              <Text style={styles.repoMetaLabel}>Entries</Text>
-                              <Text style={styles.repoMetaValue}>
-                                {repo.entryCount ?? 'Not available'}
-                              </Text>
-                            </View>
-                          </View>
-                        </Pressable>
-                        )}
-
-                        <View
-                          style={[
-                            styles.repoTextureSection,
-                            isTextureExpanded && styles.repoTextureSectionExpanded,
-                            !isTextureExpanded && styles.repoTextureSectionCollapsed,
-                          ]}
-                        >
-                          <Pressable
-                            style={[
-                              styles.repoTextureToggle,
-                              isTextureExpanded && styles.repoTextureToggleExpanded,
-                              !isTextureExpanded && styles.repoTextureToggleCollapsed,
-                            ]}
-                            onPress={() => toggleTextureSectionForRepo(repo.id)}
-                            testID={`binder-texture-toggle-${repo.id}`}
-                          >
-                            <Text style={styles.repoTextureChevron}>
-                              {isTextureExpanded ? '▾' : '▸'}
-                            </Text>
                           </Pressable>
-
-                          {isTextureExpanded && (
-                            <View style={styles.repoTextureExpandedContent}>
-                              <Text style={styles.repoTextureTitle}>Card Texture</Text>
-                              <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.repoTextureContent}
-                              >
-                                {BINDER_TEXTURE_OPTIONS.map((texture) => {
-                                  const isSelected = texture.id === selectedTexture;
-                                  return (
-                                    <Pressable
-                                      key={texture.id}
-                                      style={styles.repoTextureOption}
-                                      onPress={() => selectTextureForRepo(repo.id, texture.id)}
-                                      testID={`binder-texture-${repo.id}-${texture.id}`}
-                                    >
-                                      <View
-                                        style={[
-                                          styles.repoTextureSwatch,
-                                          isSelected && styles.repoTextureSwatchSelected,
-                                        ]}
-                                      >
-                                        <BinderTextureBackground textureId={texture.id} />
-                                      </View>
-                                      <Text
-                                        style={[
-                                          styles.repoTextureLabel,
-                                          isSelected && styles.repoTextureLabelSelected,
-                                        ]}
-                                      >
-                                        {texture.label}
-                                      </Text>
-                                    </Pressable>
-                                  );
-                                })}
-                              </ScrollView>
-                            </View>
                           )}
+
+                          <View
+                            style={[
+                              styles.repoTextureSection,
+                              isTextureExpanded && styles.repoTextureSectionExpanded,
+                              !isTextureExpanded && styles.repoTextureSectionCollapsed,
+                            ]}
+                          >
+                            <Pressable
+                              style={[
+                                styles.repoTextureToggle,
+                                isTextureExpanded && styles.repoTextureToggleExpanded,
+                                !isTextureExpanded && styles.repoTextureToggleCollapsed,
+                              ]}
+                              onPress={() => toggleTextureSectionForRepo(repo.id)}
+                              testID={`binder-texture-toggle-${repo.id}`}
+                            >
+                              <Text style={styles.repoTextureChevron}>
+                                {isTextureExpanded ? '▾' : '▸'}
+                              </Text>
+                            </Pressable>
+
+                            {isTextureExpanded && (
+                              <View style={styles.repoTextureExpandedContent}>
+                                <Text style={styles.repoTextureTitle}>Card Texture</Text>
+                                <ScrollView
+                                  horizontal
+                                  showsHorizontalScrollIndicator={false}
+                                  contentContainerStyle={styles.repoTextureContent}
+                                >
+                                  {BINDER_TEXTURE_OPTIONS.map((texture) => {
+                                    const isSelected = texture.id === selectedTexture;
+                                    return (
+                                      <Pressable
+                                        key={texture.id}
+                                        style={styles.repoTextureOption}
+                                        onPress={() => selectTextureForRepo(repo.id, texture.id)}
+                                        testID={`binder-texture-${repo.id}-${texture.id}`}
+                                      >
+                                        <View
+                                          style={[
+                                            styles.repoTextureSwatch,
+                                            isSelected && styles.repoTextureSwatchSelected,
+                                          ]}
+                                        >
+                                          <BinderTextureBackground textureId={texture.id} />
+                                        </View>
+                                        <Text
+                                          style={[
+                                            styles.repoTextureLabel,
+                                            isSelected && styles.repoTextureLabelSelected,
+                                          ]}
+                                        >
+                                          {texture.label}
+                                        </Text>
+                                      </Pressable>
+                                    );
+                                  })}
+                                </ScrollView>
+                              </View>
+                            )}
+                          </View>
                         </View>
                       </View>
-                    </View>
-                  </SwipeableRow>
-                </View>
-              );
-            })
-          )}
+                    </SwipeableRow>
+                  </View>
+                );
+              })
+            )}
+          </View>
         </ScrollView>
       );
 
@@ -997,6 +1038,16 @@ addPhotoButton: {
   },
   entryValue: { fontSize: 15, color: '#333', lineHeight: 22 },
   errorText: { fontSize: 15, color: '#c00', textAlign: 'center', marginBottom: 16 },
+  digitalBindersHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 12,
+    paddingHorizontal: 0,
+  },
+  digitalBindersSection: {
+    paddingTop: 0,
+  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1010,6 +1061,50 @@ addPhotoButton: {
     // borderBottomColor: 'red',
   },
   loadingText: { fontSize: 15, color: '#666', marginTop: 12 },
+  pendingInfoBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    marginTop: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  pendingInfoBadgeText: {
+    color: '#334155',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  pendingInfoBody: {
+    flex: 1,
+  },
+  pendingInfoCard: {
+    marginTop: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  pendingInfoText: {
+    color: '#475569',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  pendingInfoTitle: {
+    color: '#0F172A',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  pendingSection: {
+    paddingBottom: 8,
+  },
   repoCardWrap: {
     marginBottom: 18,
   },
@@ -1221,6 +1316,9 @@ addPhotoButton: {
     color: '#111',
   },
   scrollContent: { paddingHorizontal: 24, paddingTop: 40, paddingBottom: 48 },
+  scrollContentExpanded: {
+    flexGrow: 1,
+  },
   shareButton: {
     backgroundColor: '#34C759',
     borderRadius: 12,
