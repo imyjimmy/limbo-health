@@ -61,10 +61,10 @@ export const BINDER_TEXTURE_OPTIONS: BinderTextureOption[] = [
     id: 'sandstone',
     label: 'Sandstone',
     description: 'Crosshatch cover',
-    baseColor: '#F7EFE6',
-    tintColor: '#EEE2D5',
-    patternColor: 'rgba(144, 110, 82, 0.14)',
-    secondaryPatternColor: 'rgba(144, 110, 82, 0.07)',
+    baseColor: '#F8F1EA',
+    tintColor: '#F0E5DA',
+    patternColor: 'rgba(144, 110, 82, 0.16)',
+    secondaryPatternColor: 'rgba(144, 110, 82, 0.09)',
     pattern: 'crosshatch',
   },
 ];
@@ -164,8 +164,9 @@ interface BinderTextureBackgroundProps {
 
 export function BinderTextureBackground({ textureId }: BinderTextureBackgroundProps) {
   const texture = getBinderTexture(textureId);
-  const gradientId = `${texture.id}-gradient`;
-  const patternId = `${texture.id}-pattern`;
+  const textureInstanceId = React.useMemo(() => `tx-${Math.random().toString(36).slice(2, 10)}`, []);
+  const gradientId = `${texture.id}-${textureInstanceId}-gradient`;
+  const patternId = `${texture.id}-${textureInstanceId}-pattern`;
 
   return (
     <View style={styles.fill} pointerEvents="none">

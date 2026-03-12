@@ -4,6 +4,8 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
+  Animated,
+  Easing,
   View,
   Text,
   StyleSheet,
@@ -70,6 +72,7 @@ interface DecryptedEntry {
 const BINDERS_ROOT = `${RNFS.DocumentDirectoryPath}/binders`;
 const LAST_BINDER_KEY = 'limbo_last_binder';
 const BINDER_TEXTURES_KEY = 'limbo_binder_card_textures_v1';
+const DIGITAL_INFO_REVEAL_HEIGHT = 104;
 
 function repoDir(repoId: string): string {
   return `binders/${repoId}`;
@@ -120,10 +123,12 @@ export default function BinderListScreen() {
   const [editingRepoId, setEditingRepoId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [renamingRepoId, setRenamingRepoId] = useState<string | null>(null);
+  const [isDigitalInfoVisible, setIsDigitalInfoVisible] = useState(false);
   const [listViewportHeight, setListViewportHeight] = useState(0);
   const [pendingSectionBottom, setPendingSectionBottom] = useState(0);
 
   const binderRef = useRef<BinderService | null>(null);
+  const digitalInfoReveal = useRef(new Animated.Value(0)).current;
 
   const jwt = authState.status === 'authenticated' ? authState.jwt : null;
 
@@ -308,6 +313,29 @@ export default function BinderListScreen() {
       [repoId]: !(prev[repoId] ?? false),
     }));
   }, []);
+
+  const toggleDigitalInfo = useCallback(() => {
+    const nextVisible = !isDigitalInfoVisible;
+    setIsDigitalInfoVisible(nextVisible);
+    digitalInfoReveal.stopAnimation();
+
+    if (nextVisible) {
+      Animated.spring(digitalInfoReveal, {
+        toValue: 1,
+        tension: 84,
+        friction: 10,
+        useNativeDriver: false,
+      }).start();
+      return;
+    }
+
+    Animated.timing(digitalInfoReveal, {
+      toValue: 0,
+      duration: 190,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [digitalInfoReveal, isDigitalInfoVisible]);
 
   const beginRename = useCallback(
     (repo: RepoSummary) => {
@@ -626,6 +654,27 @@ export default function BinderListScreen() {
     listViewportHeight > 0 && pendingSectionBottom > 0
       ? Math.max(16, Math.round(listViewportHeight / 2 - pendingSectionBottom))
       : 16;
+  const digitalInfoSlotHeight = digitalInfoReveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, DIGITAL_INFO_REVEAL_HEIGHT],
+    extrapolate: 'clamp',
+  });
+  const digitalInfoCardOpacity = digitalInfoReveal.interpolate({
+    inputRange: [0, 0.2, 1],
+    outputRange: [0, 0.12, 1],
+  });
+  const digitalInfoCardTranslateY = digitalInfoReveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-14, 0],
+  });
+  const digitalInfoCardScale = digitalInfoReveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.97, 1],
+  });
+  const digitalInfoIconScale = digitalInfoReveal.interpolate({
+    inputRange: [0, 0.45, 1],
+    outputRange: [1, 1.12, 1],
+  });
 
   // --- Render ---
 
@@ -706,16 +755,49 @@ export default function BinderListScreen() {
 
           <View style={[styles.digitalBindersSection, { marginTop: digitalBindersMarginTop }]}>
             <View style={styles.digitalBindersHeaderRow}>
-              <Text style={styles.screenTitle}>Digital Binders</Text>
+              <View style={styles.digitalBindersTitleRow}>
+                <Text style={styles.screenTitle}>Digital Binders</Text>
+                <Pressable
+                  onPress={toggleDigitalInfo}
+                  style={[
+                    styles.digitalInfoIconButton,
+                    isDigitalInfoVisible && styles.digitalInfoIconButtonActive,
+                  ]}
+                  hitSlop={8}
+                  testID="digital-binders-info-button"
+                >
+                  <Animated.View style={{ transform: [{ scale: digitalInfoIconScale }] }}>
+                    <Text
+                      style={[
+                        styles.digitalInfoIconText,
+                        isDigitalInfoVisible && styles.digitalInfoIconTextActive,
+                      ]}
+                    >
+                      i
+                    </Text>
+                  </Animated.View>
+                </Pressable>
+              </View>
               <Pressable onPress={createBinder} hitSlop={8} testID="create-binder-button">
                 <Text style={{ fontSize: 28, color: '#007AFF', marginTop: -6 }}>+</Text>
               </Pressable>
             </View>
-            <View style={styles.digitalInfoCard}>
-              <Text style={styles.digitalInfoText}>
-                Create a personal binder for your medical history. Store records, upload scans, track doctor visits, and keep notes—all organized in one place.
-              </Text>
-            </View>
+            <Animated.View style={[styles.digitalInfoRevealSlot, { height: digitalInfoSlotHeight }]}>
+              <Animated.View
+                style={[
+                  styles.digitalInfoCard,
+                  {
+                    opacity: digitalInfoCardOpacity,
+                    transform: [{ translateY: digitalInfoCardTranslateY }, { scale: digitalInfoCardScale }],
+                  },
+                ]}
+                pointerEvents={isDigitalInfoVisible ? 'auto' : 'none'}
+              >
+                <Text style={styles.digitalInfoText}>
+                  Create a personal binder for your medical history. Store records, upload scans, track doctor visits, and keep notes—all organized in one place.
+                </Text>
+              </Animated.View>
+            </Animated.View>
             {screenState.repos.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>No binders yet.</Text>
@@ -742,8 +824,10 @@ export default function BinderListScreen() {
                       onDelete={() => deleteBinder(repo)}
                     >
                       <View style={styles.repoCard}>
-                        <BinderTextureBackground textureId={selectedTexture} />
-                        <View style={styles.repoCardOverlay} />
+                        <BinderTextureBackground
+                          key={`${repo.id}-${selectedTexture}-${isTextureExpanded ? 'expanded' : 'collapsed'}`}
+                          textureId={selectedTexture}
+                        />
                         <View style={styles.repoNotebookLines} pointerEvents="none">
                           <View style={[styles.repoNotebookRule, styles.repoNotebookRuleTop]} />
                           <View style={[styles.repoNotebookRule, styles.repoNotebookRuleMiddle]} />
@@ -865,9 +949,15 @@ export default function BinderListScreen() {
                                 !isTextureExpanded && styles.repoTextureToggleCollapsed,
                               ]}
                               onPress={() => toggleTextureSectionForRepo(repo.id)}
+                              hitSlop={10}
                               testID={`binder-texture-toggle-${repo.id}`}
                             >
-                              <Text style={styles.repoTextureChevron}>
+                              <Text
+                                style={[
+                                  styles.repoTextureChevron,
+                                  !isTextureExpanded && styles.repoTextureChevronCollapsed,
+                                ]}
+                              >
                                 {isTextureExpanded ? '▾' : '▸'}
                               </Text>
                             </Pressable>
@@ -1042,12 +1132,19 @@ addPhotoButton: {
     paddingBottom: 12,
     paddingHorizontal: 0,
   },
+  digitalBindersTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   digitalBindersSection: {
     paddingTop: 0,
   },
+  digitalInfoRevealSlot: {
+    overflow: 'hidden',
+  },
   digitalInfoCard: {
     marginTop: 6,
-    marginBottom: 16,
+    marginBottom: 12,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -1059,6 +1156,31 @@ addPhotoButton: {
     color: '#475569',
     fontSize: 13,
     lineHeight: 18,
+  },
+  digitalInfoIconButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    marginLeft: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+  },
+  digitalInfoIconButtonActive: {
+    backgroundColor: '#E2E8F0',
+    borderColor: '#94A3B8',
+  },
+  digitalInfoIconText: {
+    color: '#475569',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  digitalInfoIconTextActive: {
+    color: '#0F172A',
   },
   headerRow: {
     flexDirection: 'row',
@@ -1140,11 +1262,6 @@ addPhotoButton: {
     position: 'relative',
     zIndex: 3,
   },
-  repoCardOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(252, 249, 242, 0.62)',
-    zIndex: 1,
-  },
   repoFolderTab: {
     position: 'absolute',
     top: 0,
@@ -1189,8 +1306,8 @@ addPhotoButton: {
   repoOpenArea: {
     paddingLeft: 30,
     paddingRight: 16,
-    paddingTop: 14,
-    paddingBottom: 8,
+    paddingTop: 18,
+    paddingBottom: 12,
   },
   repoNameInput: {
     color: '#111',
@@ -1203,7 +1320,7 @@ addPhotoButton: {
   repoNameRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   repoName: {
     color: '#111',
@@ -1236,13 +1353,13 @@ addPhotoButton: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 1,
+    marginTop: 3,
   },
   repoMetaSection: {
-    marginTop: 6,
-    paddingTop: 5,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(74, 63, 52, 0.08)',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(74, 63, 52, 0.12)',
   },
   repoMetaValue: {
     color: '#334155',
@@ -1253,27 +1370,27 @@ addPhotoButton: {
     textAlign: 'right',
   },
   repoTextureContent: {
-    paddingTop: 0,
+    paddingTop: 1,
     paddingRight: 2,
   },
   repoTextureOption: {
-    width: 40,
-    height: 40,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 8,
   },
   repoTextureSection: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(74, 63, 52, 0.08)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(74, 63, 52, 0.12)',
     paddingLeft: 30,
     paddingRight: 16,
   },
   repoTextureSectionCollapsed: {
-    height: 24,
+    height: 18,
   },
   repoTextureSectionExpanded: {
-    paddingBottom: 8,
+    paddingBottom: 4,
   },
   repoTextureToggle: {
     alignItems: 'center',
@@ -1287,15 +1404,20 @@ addPhotoButton: {
   },
   repoTextureChevron: {
     fontSize: 18,
+    lineHeight: 18,
     color: '#334155',
+    textAlign: 'center',
+  },
+  repoTextureChevronCollapsed: {
+    marginTop: -2,
   },
   repoTextureExpandedContent: {
     paddingTop: 0,
   },
   repoTextureSwatch: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(17, 17, 17, 0.14)',
@@ -1306,9 +1428,9 @@ addPhotoButton: {
   },
   repoTextureTitle: {
     color: '#4B5563',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   retryButton: {
     backgroundColor: '#111', borderRadius: 10,
