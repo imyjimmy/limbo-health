@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 import { useGoogleAuth } from '../../core/auth/googleAuth';
 import { useAuthContext } from '../../providers/AuthProvider';
+import { colors } from '../../constants/colors';
 
 function GoogleLogo({ size = 20 }: { size?: number }) {
   return (
@@ -88,7 +89,7 @@ export default function WelcomeScreen() {
 
       <View style={styles.buttons}>
         <Pressable
-          style={[styles.authButton, (!request || googleLoading) && styles.buttonDisabled]}
+          style={[styles.authButton, styles.googleButton, (!request || googleLoading) && styles.buttonDisabled]}
           onPress={() => promptAsync()}
           disabled={!request || googleLoading}
         >
@@ -103,7 +104,7 @@ export default function WelcomeScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.authButton, styles.buttonDisabled]}
+          style={[styles.authButton, styles.appleButton, styles.buttonDisabled]}
           disabled
         >
           <View style={styles.buttonContent}>
@@ -113,7 +114,7 @@ export default function WelcomeScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.authButton, styles.buttonDisabled]}
+          style={[styles.authButton, styles.githubButton, styles.buttonDisabled]}
           disabled
         >
           <View style={styles.buttonContent}>
@@ -131,7 +132,7 @@ export default function WelcomeScreen() {
             disabled={nostrLoading}
           >
             {nostrLoading ? (
-              <ActivityIndicator color="#8e45e6" />
+              <ActivityIndicator color={colors.brand.violet} />
             ) : (
               <Text style={styles.nostrPillText}>Continue with Nostr</Text>
             )}
@@ -149,7 +150,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface.sky,
     paddingHorizontal: 24,
   },
   content: {
@@ -160,12 +161,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#111',
+    color: colors.base.ink,
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 17,
-    color: '#666',
+    color: colors.base.slate,
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 20,
@@ -182,15 +183,26 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   authButton: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.base.white,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: colors.base.border,
+  },
+  googleButton: {
+    backgroundColor: colors.base.white,
+  },
+  appleButton: {
+    backgroundColor: colors.surface.violetSoft,
+    borderColor: '#D7C8FF',
+  },
+  githubButton: {
+    backgroundColor: colors.surface.tealSoft,
+    borderColor: '#BEE6E0',
   },
   authButtonText: {
-    color: '#111',
+    color: colors.base.ink,
     fontSize: 17,
     fontWeight: '600',
   },
@@ -202,15 +214,15 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   nostrPill: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface.violetSoft,
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 24,
     borderWidth: 1,
-    borderColor: '#8e45e6',
+    borderColor: '#C7B1FF',
   },
   nostrPillText: {
-    color: '#8e45e6',
+    color: colors.brand.violet,
     fontSize: 15,
     fontWeight: '600',
   },

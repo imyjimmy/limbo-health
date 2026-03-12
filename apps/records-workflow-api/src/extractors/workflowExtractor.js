@@ -70,7 +70,7 @@ function classifyPortalScope(text, hasPortal) {
     return 'full';
   }
 
-  if (/most\s+records/i.test(text)) {
+  if (/most\s+records/i.test(text) || /most\s+of\s+(your|their)?\s*(medical|health)?\s*records/i.test(text)) {
     return 'most_records';
   }
 
@@ -159,6 +159,30 @@ function inferRequestScope({ workflowType, methods, formalRequestRequired }) {
   return 'unclear';
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function extractLabeledValue(text, label, nextLabels = []) {
+  const labelBoundary = `\\b${escapeRegex(label)}:\\s*`;
+  const nextLabelPatterns = nextLabels.map((item) => `\\b${escapeRegex(item)}:\\s*`);
+  const hardStops = [
+    '\\bTo obtain\\b',
+    '\\bFor questions\\b',
+    '\\bUrgent requests\\b',
+    '\\bNon-patient requests\\b',
+    '\\bRecords delivered\\b'
+  ];
+
+  const lookahead = [...nextLabelPatterns, ...hardStops, '$'].join('|');
+  const pattern = new RegExp(`${labelBoundary}([\\s\\S]*?)(?=${lookahead})`, 'i');
+  const match = pattern.exec(text);
+  if (!match) return null;
+
+  const value = collapseWhitespace(match[1]);
+  return value || null;
+}
+
 function detectForms(links) {
   const forms = links
     .filter((link) => {
@@ -185,6 +209,175 @@ function detectForms(links) {
     });
 
   return uniqueBy(forms, (form) => form.url);
+}
+
+function buildStructuredInstructions(text, portalScope) {
+  const instructions = [];
+  let sequence = 1;
+
+  const pushInstruction = ({ instructionKind, label, channel = null, value = null, details }) => {
+    instructions.push({
+      instructionKind,
+      sequenceNo: sequence++,
+      label: label || null,
+      channel,
+      value,
+      details: collapseWhitespace(details)
+    });
+  };
+
+  if (/download,\s*print and complete the authorization form/i.test(text)) {
+    pushInstruction({
+      instructionKind: 'step',
+      label: 'Complete Authorization Form',
+      channel: 'other',
+      details: 'Download, print, and complete the authorization form before submitting.'
+    });
+  }
+
+  if (/authorization form must be signed and dated/i.test(text)) {
+    pushInstruction({
+      instructionKind: 'requirement',
+      label: 'Signed And Dated Form',
+      channel: 'other',
+      details: 'The authorization form must be signed and dated.'
+    });
+  }
+
+  const photoIdMatch = /valid photo i\.?d\.?\s*\(([^)]+)\)/i.exec(text);
+  if (/require .*valid photo i\.?d/i.test(text)) {
+    pushInstruction({
+      instructionKind: 'requirement',
+      label: 'Photo ID Required',
+      channel: 'other',
+      value: photoIdMatch ? collapseWhitespace(photoIdMatch[1]) : null,
+      details:
+        'A legible copy of a valid photo ID is required to verify identity and validate authorization.'
+    });
+  }
+
+  if (/you may send your request in the following ways/i.test(text)) {
+    pushInstruction({
+      instructionKind: 'note',
+      label: 'Submission Methods',
+      channel: 'other',
+      details: 'Requests may be sent through multiple channels listed below.'
+    });
+  }
+
+  const faxValue = extractLabeledValue(text, 'Fax', ['Email', 'Mail']);
+  if (faxValue) {
+    pushInstruction({
+      instructionKind: 'submission_channel',
+      label: 'Fax Submission',
+      channel: 'fax',
+      value: faxValue,
+      details: `Submit by fax: ${faxValue}`
+    });
+  }
+
+  const emailValue = extractLabeledValue(text, 'Email', ['Mail']);
+  if (emailValue) {
+    pushInstruction({
+      instructionKind: 'submission_channel',
+      label: 'Email Submission',
+      channel: 'email',
+      value: emailValue,
+      details: `Submit by email: ${emailValue}`
+    });
+  }
+
+  const mailValue = extractLabeledValue(text, 'Mail', []);
+  if (mailValue) {
+    pushInstruction({
+      instructionKind: 'submission_channel',
+      label: 'Mail Submission',
+      channel: 'mail',
+      value: mailValue,
+      details: `Submit by mail: ${mailValue}`
+    });
+  }
+
+  if (portalScope === 'most_records' || /most of your medical records/i.test(text)) {
+    pushInstruction({
+      instructionKind: 'special_case',
+      label: 'Portal Coverage',
+      channel: 'portal',
+      details: 'Portal access may include most records, not necessarily a complete chart.'
+    });
+  }
+
+  if (/some medical records may only be available through .*medical records office/i.test(text)) {
+    pushInstruction({
+      instructionKind: 'special_case',
+      label: 'Medical Records Office Required',
+      channel: 'other',
+      details: 'Some records may only be available through the hospital Medical Records office.'
+    });
+  }
+
+  if (/to obtain radiology images.*contact the radiology department directly/i.test(text)) {
+    pushInstruction({
+      instructionKind: 'special_case',
+      label: 'Radiology Routing',
+      channel: 'other',
+      details: 'Radiology images require direct contact with the Radiology Department.'
+    });
+  }
+
+  if (/certified copy of your birth certificate/i.test(text)) {
+    pushInstruction({
+      instructionKind: 'special_case',
+      label: 'Birth Certificate Routing',
+      channel: 'other',
+      details: 'Certified birth certificates must be requested from state or local Vital Statistics offices.'
+    });
+  }
+
+  const mailTurnaroundMatch =
+    /records delivered by mail will be shipped within\s+([\s\S]*?)(?:\.|\bfor questions\b|\burgent requests\b|$)/i.exec(
+      text
+    );
+  if (mailTurnaroundMatch) {
+    pushInstruction({
+      instructionKind: 'turnaround',
+      label: 'Mail Delivery Timing',
+      channel: 'mail',
+      value: collapseWhitespace(mailTurnaroundMatch[1]),
+      details: `Records delivered by mail are shipped within ${collapseWhitespace(mailTurnaroundMatch[1])}.`
+    });
+  }
+
+  const emailTurnaroundMatch =
+    /records delivered by email will be received within\s+([\s\S]*?)(?:\.|\bfor questions\b|\burgent requests\b|$)/i.exec(
+      text
+    );
+  if (emailTurnaroundMatch) {
+    pushInstruction({
+      instructionKind: 'turnaround',
+      label: 'Email Delivery Timing',
+      channel: 'email',
+      value: collapseWhitespace(emailTurnaroundMatch[1]),
+      details: `Records delivered by email are received within ${collapseWhitespace(emailTurnaroundMatch[1])}.`
+    });
+  }
+
+  return uniqueBy(
+    instructions.filter((item) => item.details),
+    (item) => `${item.instructionKind}:${item.channel || ''}:${item.label || ''}:${item.details}`
+  );
+}
+
+function instructionsForWorkflow(workflowType, instructions) {
+  if (workflowType === 'medical_records') return instructions;
+
+  if (workflowType === 'imaging') {
+    return instructions.filter(
+      (item) => item.instructionKind === 'special_case' && /radiology|imaging/i.test(item.details)
+    );
+  }
+
+  return [];
 }
 
 function normalizeContacts(existingContacts, links, portal) {
@@ -299,6 +492,7 @@ export function extractWorkflowBundle(document, context) {
 
   const forms = detectForms(document.links || []);
   const contacts = normalizeContacts(document.contacts || [], document.links || [], portalDetected);
+  const structuredInstructions = buildStructuredInstructions(text, portalScope);
 
   const types = inferWorkflowTypes(text);
   const notes = pickNotes(text);
@@ -327,6 +521,7 @@ export function extractWorkflowBundle(document, context) {
     specialInstructions: notes.specialInstructions,
     contacts,
     forms,
+    instructions: instructionsForWorkflow(workflowType, structuredInstructions),
     evidenceSnippets: evidenceSnippets(text),
     confidence
   }));

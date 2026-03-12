@@ -36,13 +36,34 @@ test('Baylor fixture resolves HealthMark plus authorization forms', () => {
 test("St. David's fixture resolves MyHealthONE plus multi-channel requests", () => {
   const bundle = extractWorkflowBundle(fixture('stdavids.json'), { isOfficialDomain: true });
   const workflow = medicalWorkflow(bundle);
+  const instructionDetails = workflow.instructions.map((item) => item.details).join(' | ');
 
   assert.equal(bundle.portal.portalName, 'MyHealthONE');
+  assert.equal(bundle.portal.portalScope, 'most_records');
   assert.equal(workflow.formalRequestRequired, true);
   assert.equal(workflow.mailAvailable, true);
   assert.equal(workflow.emailAvailable, true);
   assert.equal(workflow.faxAvailable, true);
   assert.equal(workflow.onlineRequestAvailable, true);
+  assert.ok(
+    workflow.instructions.some(
+      (item) => item.instructionKind === 'requirement' && /signed and dated/i.test(item.details)
+    )
+  );
+  assert.ok(
+    workflow.instructions.some(
+      (item) => item.instructionKind === 'requirement' && /photo id/i.test(item.details)
+    )
+  );
+  assert.ok(
+    workflow.instructions.some(
+      (item) =>
+        item.instructionKind === 'submission_channel' &&
+        item.channel === 'mail' &&
+        /Nashville, TN 37229-0789/i.test(item.value || '')
+    )
+  );
+  assert.match(instructionDetails, /radiology images require direct contact/i);
 });
 
 test('Texas Health fixture resolves workflow with Verisma evidence', () => {

@@ -1,0 +1,27 @@
+aws_region   = "us-east-1"
+project_name = "limbo-records-workflow"
+environment  = "dev"
+
+# Optional: add ACM certificate ARN to enable HTTPS listener and HTTP->HTTPS redirect.
+acm_certificate_arn = ""
+
+# ECS app sizing
+container_port = 3020
+desired_count  = 1
+task_cpu       = "512"
+task_memory    = "1024"
+
+# RDS sizing
+db_name                 = "recordsworkflow"
+db_username             = "recordsadmin"
+db_instance_class       = "db.t3.micro"
+db_allocated_storage    = 20
+db_backup_retention_days = 7
+
+# Scheduler for periodic crawl jobs
+enable_scheduled_crawl  = true
+crawl_schedule_expression = "rate(30 days)"
+
+tags = {
+  Owner = "limbo-health"
+}

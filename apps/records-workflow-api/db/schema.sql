@@ -102,6 +102,25 @@ create table if not exists workflow_forms (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists workflow_instructions (
+  id uuid primary key default gen_random_uuid(),
+  records_workflow_id uuid not null references records_workflows(id) on delete cascade,
+  instruction_kind text not null check (
+    instruction_kind in ('step', 'requirement', 'submission_channel', 'special_case', 'turnaround', 'note')
+  ),
+  sequence_no int not null default 0,
+  label text,
+  channel text check (
+    channel in ('portal', 'online_request', 'fax', 'email', 'mail', 'phone', 'in_person', 'other')
+  ),
+  value text,
+  details text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists workflow_instructions_lookup
+  on workflow_instructions (records_workflow_id, sequence_no);
+
 create table if not exists source_documents (
   id uuid primary key default gen_random_uuid(),
   hospital_system_id uuid references hospital_systems(id),

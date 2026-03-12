@@ -17,17 +17,17 @@ export default function Index() {
   }
 
   if (state.status === 'onboarding') {
-    return <Redirect href="/(auth)/welcome" />;
+    return <Redirect href="/(auth)/welcome" withAnchor />;
   }
 
   if (state.status === 'expired') {
     // Google users need to re-login (no refresh token in v1)
     if (state.loginMethod === 'google') {
-      return <Redirect href="/(auth)/welcome" />;
+      return <Redirect href="/(auth)/welcome" withAnchor />;
     }
     // Nostr users: go to tabs and let refreshAuth handle it
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href="/(tabs)" withAnchor />;
   }
 
-  return <Redirect href="/(tabs)" />;
+  return <Redirect href="/(tabs)" withAnchor />;
 }

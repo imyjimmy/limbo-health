@@ -251,9 +251,21 @@ export async function upsertPortalProfile(
   client = null
 ) {
   const q = client || { query };
+  const scopeRank = {
+    none: 0,
+    unclear: 1,
+    partial: 2,
+    most_records: 3,
+    full: 4
+  };
 
   const existing = await q.query(
-    `select id
+    `select
+       id,
+       portal_name,
+       portal_url,
+       portal_scope,
+       supports_formal_copy_request_in_portal
      from portal_profiles
      where hospital_system_id = $1
        and facility_id is not distinct from $2
@@ -263,7 +275,25 @@ export async function upsertPortalProfile(
   );
 
   if (existing.rows.length > 0) {
-    const portalId = existing.rows[0].id;
+    const current = existing.rows[0];
+    const portalId = current.id;
+    const incomingRank = scopeRank[portalScope] ?? 0;
+    const currentRank = scopeRank[current.portal_scope] ?? 0;
+    const incomingHasPortalIdentity = Boolean(portalName || portalUrl);
+    const preserveCurrent = !incomingHasPortalIdentity && incomingRank <= currentRank;
+
+    const nextPortalName = preserveCurrent
+      ? current.portal_name
+      : portalName || current.portal_name;
+    const nextPortalUrl = preserveCurrent
+      ? current.portal_url
+      : portalUrl || current.portal_url;
+    const nextPortalScope = preserveCurrent ? current.portal_scope : portalScope;
+    const nextSupportsFormal = preserveCurrent
+      ? current.supports_formal_copy_request_in_portal
+      : supportsFormalCopyRequestInPortal ??
+        current.supports_formal_copy_request_in_portal;
+
     await q.query(
       `update portal_profiles
        set portal_name = $2,
@@ -273,7 +303,14 @@ export async function upsertPortalProfile(
            notes = $6,
            updated_at = now()
        where id = $1`,
-      [portalId, portalName, portalUrl, portalScope, supportsFormalCopyRequestInPortal, notes]
+      [
+        portalId,
+        nextPortalName,
+        nextPortalUrl,
+        nextPortalScope,
+        nextSupportsFormal,
+        notes
+      ]
     );
 
     return portalId;
@@ -459,6 +496,31 @@ export async function upsertWorkflowBundle(
       );
     }
 
+    await q.query('delete from workflow_instructions where records_workflow_id = $1', [workflowId]);
+    for (const instruction of workflow.instructions || []) {
+      await q.query(
+        `insert into workflow_instructions (
+           records_workflow_id,
+           instruction_kind,
+           sequence_no,
+           label,
+           channel,
+           value,
+           details
+         )
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          workflowId,
+          instruction.instructionKind,
+          instruction.sequenceNo ?? 0,
+          instruction.label || null,
+          instruction.channel || null,
+          instruction.value || null,
+          instruction.details
+        ]
+      );
+    }
+
     workflowIds.push(workflowId);
   }
 
@@ -512,6 +574,9 @@ export async function saveExtractionResult(payload) {
 
 export async function searchFacilities(searchTerm, limit = 20) {
   const q = `%${searchTerm}%`;
+  const normalizedSearch = searchTerm.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const normalizedLike = `%${normalizedSearch}%`;
+  const normalizedPrefix = `${normalizedSearch}%`;
 
   const result = await query(
     `select
@@ -524,12 +589,21 @@ export async function searchFacilities(searchTerm, limit = 20) {
      join hospital_systems hs on hs.id = f.hospital_system_id
      where f.active = true
        and hs.active = true
-       and (f.facility_name ilike $1 or hs.system_name ilike $1)
+       and (
+         f.facility_name ilike $1
+         or hs.system_name ilike $1
+         or regexp_replace(lower(f.facility_name), '[^a-z0-9]+', '', 'g') like $2
+         or regexp_replace(lower(hs.system_name), '[^a-z0-9]+', '', 'g') like $2
+       )
      order by
-       case when f.facility_name ilike $2 then 0 else 1 end,
+       case
+         when f.facility_name ilike $3 then 0
+         when regexp_replace(lower(f.facility_name), '[^a-z0-9]+', '', 'g') like $4 then 1
+         else 2
+       end,
        f.facility_name asc
-     limit $3`,
-    [q, `${searchTerm}%`, limit]
+     limit $5`,
+    [q, normalizedLike, `${searchTerm}%`, normalizedPrefix, limit]
   );
 
   return result.rows;
@@ -575,7 +649,27 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
          rw.*,
          row_number() over (
            partition by workflow_type
-           order by case when facility_id = $2 then 0 else 1 end, updated_at desc
+           order by
+             case when facility_id = $2 then 0 else 1 end,
+             case
+               when workflow_type = 'medical_records' and formal_request_required then 0
+               when workflow_type = 'medical_records' then 1
+               else 0
+             end,
+             case
+               when workflow_type = 'medical_records'
+                    and request_scope in ('mixed', 'complete_chart') then 0
+               when workflow_type = 'medical_records' then 1
+               else 0
+             end,
+             case
+               when workflow_type = 'medical_records'
+                    and official_page_url ~* '(medical-records|requesting-your-record|release|authorization)'
+               then 0
+               when workflow_type = 'medical_records' then 1
+               else 0
+             end,
+             updated_at desc
          ) as rn
        from records_workflows rw
        where rw.hospital_system_id = $1
@@ -591,8 +685,9 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
 
   let contacts = [];
   let forms = [];
+  let instructions = [];
   if (medicalWorkflow) {
-    const [contactsRes, formsRes] = await Promise.all([
+    const [contactsRes, formsRes, instructionsRes] = await Promise.all([
       query(
         `select contact_type as type, label, value
          from workflow_contacts
@@ -606,11 +701,25 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
          where records_workflow_id = $1
          order by created_at asc`,
         [medicalWorkflow.id]
+      ),
+      query(
+        `select
+           instruction_kind as kind,
+           sequence_no,
+           label,
+           channel,
+           value,
+           details
+         from workflow_instructions
+         where records_workflow_id = $1
+         order by sequence_no asc, created_at asc`,
+        [medicalWorkflow.id]
       )
     ]);
 
     contacts = contactsRes.rows;
     forms = formsRes.rows;
+    instructions = instructionsRes.rows;
   }
 
   const portal = portalRes.rows[0] || {
@@ -671,6 +780,7 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
     })),
     contacts,
     forms,
+    instructions,
     sources
   };
 }

@@ -1,0 +1,29 @@
+# Test Commands Used (ad-hoc)
+
+## 0) Bring up services needed for mgit/auth tests
+# Note: scheduler/frontend can be down; gateway now stays up.
+cd /Users/imyjimmy/dev/pleb-emr/limbo-health
+
+docker compose -f docker-compose.yml -f docker-compose.development.yml up -d --no-deps mysql auth-api mgit-api gateway
+
+# Optional checks
+curl -sS -i http://localhost:3003/api/health | head -n 20
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST http://localhost:3003/api/auth/nostr/challenge
+curl -sS -o /dev/null -w '%{http_code}\n' http://localhost:3003/api/mgit/user/repositories
+
+## 1) Backend delete-endpoint integration test (mgit)
+cd /Users/imyjimmy/dev/pleb-emr/limbo-health
+npx vitest run apps/mgit-api/__tests__/repo-delete.test.ts --reporter=dot
+
+# (alternate reporter used during debugging)
+# npx vitest run apps/mgit-api/__tests__/repo-delete.test.ts --reporter=verbose
+
+## 2) React Native Maestro delete-binder flow
+cd /Users/imyjimmy/dev/pleb-emr/limbo-health/apps/react-native
+maestro test .maestro/create-delete-binder.yaml
+
+## 3) Full-suite shortcuts after migration to apps/*/__tests__
+cd /Users/imyjimmy/dev/pleb-emr/limbo-health
+npm run test:auth
+npm run test:mgit
+npm run test:integration

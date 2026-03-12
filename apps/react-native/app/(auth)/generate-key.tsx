@@ -16,6 +16,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { KeyManager } from '../../core/crypto/KeyManager';
 import { useAuthContext } from '../../providers/AuthProvider';
+import { colors } from '../../constants/colors';
 
 export default function GenerateKeyScreen() {
   const router = useRouter();
@@ -117,7 +118,7 @@ export default function GenerateKeyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface.sky,
   },
   contentContainer: {
     paddingHorizontal: 24,
@@ -127,23 +128,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#111',
+    color: colors.base.ink,
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.base.slate,
     lineHeight: 22,
     marginBottom: 32,
   },
   keyBox: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.surface.amberSoft,
+    borderWidth: 1,
+    borderColor: '#F4D8A3',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
   },
   pubkeyBox: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surface.violetSoft,
+    borderWidth: 1,
+    borderColor: '#DCCFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 32,
@@ -151,7 +156,7 @@ const styles = StyleSheet.create({
   keyLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#888',
+    color: colors.base.muted,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -159,13 +164,13 @@ const styles = StyleSheet.create({
   keyValue: {
     fontSize: 14,
     fontFamily: 'Courier',
-    color: '#111',
+    color: colors.base.ink,
     lineHeight: 20,
   },
   pubkeyValue: {
     fontSize: 14,
     fontFamily: 'Courier',
-    color: '#666',
+    color: '#5B4698',
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -178,13 +183,13 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#ccc',
+    borderColor: '#A6B8D9',
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: '#111',
-    borderColor: '#111',
+    backgroundColor: colors.brand.teal,
+    borderColor: colors.brand.teal,
   },
   checkmark: {
     color: '#fff',
@@ -193,11 +198,11 @@ const styles = StyleSheet.create({
   },
   checkboxLabel: {
     fontSize: 15,
-    color: '#333',
+    color: colors.base.slate,
     flex: 1,
   },
   continueButton: {
-    backgroundColor: '#111',
+    backgroundColor: colors.brand.blue,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

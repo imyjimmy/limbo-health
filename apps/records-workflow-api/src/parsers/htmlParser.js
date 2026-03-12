@@ -1,4 +1,4 @@
-import cheerio from 'cheerio';
+import { load } from 'cheerio';
 import { collapseWhitespace, uniqueBy } from '../utils/text.js';
 import { normalizeUrl } from '../utils/urls.js';
 
@@ -46,7 +46,7 @@ function extractContactCandidates(text, links) {
 }
 
 export function parseHtmlDocument({ html, url }) {
-  const $ = cheerio.load(html);
+  const $ = load(html);
 
   $('script, style, noscript, svg').remove();
 

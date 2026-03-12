@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { useRouter, useNavigation } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as SecureStore from 'expo-secure-store';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
@@ -19,6 +19,7 @@ import { bech32 } from '@scure/base';
 import { useAuthContext } from '../../../providers/AuthProvider';
 import { KeyManager } from '../../../core/crypto/KeyManager';
 import ImportKeyForm from '../../../components/auth/ImportKeyForm';
+import { colors } from '../../../constants/colors';
 
 function encodeBech32(prefix: string, hexStr: string): string {
   const bytes = hexToBytes(hexStr);
@@ -31,7 +32,6 @@ function truncateKey(key: string): string {
 }
 
 export default function EncryptionKeysRoute() {
-  const router = useRouter();
   const navigation = useNavigation();
   const { state } = useAuthContext();
   const keyManager = useMemo(() => new KeyManager(SecureStore), []);
@@ -140,7 +140,7 @@ export default function EncryptionKeysRoute() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface.sky,
   },
   contentContainer: {
     paddingHorizontal: 24,
@@ -149,12 +149,14 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.base.slate,
     lineHeight: 22,
     marginBottom: 28,
   },
   keyBox: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surface.tealSoft,
+    borderWidth: 1,
+    borderColor: '#BEE6E0',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -162,7 +164,7 @@ const styles = StyleSheet.create({
   keyLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#888',
+    color: colors.base.muted,
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -170,15 +172,15 @@ const styles = StyleSheet.create({
   keyValue: {
     fontSize: 14,
     fontFamily: 'Courier',
-    color: '#111',
+    color: colors.base.ink,
     marginBottom: 4,
   },
   keyAction: {
     fontSize: 12,
-    color: '#999',
+    color: '#0F766E',
   },
   exportButton: {
-    backgroundColor: '#111',
+    backgroundColor: colors.brand.blue,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -190,36 +192,40 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   nsecBox: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: colors.surface.roseSoft,
+    borderWidth: 1,
+    borderColor: '#FECACA',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     gap: 8,
   },
   nsecWarning: {
-    color: '#dc2626',
+    color: '#B91C1C',
     fontSize: 13,
     lineHeight: 18,
   },
   nsecValue: {
-    color: '#111',
+    color: colors.base.ink,
     fontSize: 12,
     fontFamily: 'Courier',
     lineHeight: 18,
   },
   nsecDismiss: {
-    color: '#999',
+    color: colors.base.muted,
     fontSize: 13,
     textAlign: 'right',
   },
   importButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surface.violetSoft,
+    borderWidth: 1,
+    borderColor: '#DCCFFF',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
   importButtonText: {
-    color: '#111',
+    color: colors.brand.violet,
     fontSize: 17,
     fontWeight: '600',
   },

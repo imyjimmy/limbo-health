@@ -5,6 +5,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { colors } from '../../constants/colors';
 
 export default function SetupKeyScreen() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export default function SetupKeyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface.sky,
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingTop: 120,
@@ -53,12 +54,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#111',
+    color: colors.base.ink,
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.base.slate,
     textAlign: 'center',
     lineHeight: 22,
     paddingHorizontal: 12,
@@ -67,7 +68,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   primaryButton: {
-    backgroundColor: '#111',
+    backgroundColor: colors.brand.blue,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -78,13 +79,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.surface.violetSoft,
+    borderWidth: 1,
+    borderColor: '#D7C8FF',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#111',
+    color: colors.brand.violet,
     fontSize: 17,
     fontWeight: '600',
   },

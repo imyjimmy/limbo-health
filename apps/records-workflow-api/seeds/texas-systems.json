@@ -53,7 +53,7 @@
     ]
   },
   {
-    "system_name": "Memorial Hermann",
+    "system_name": "Memorial Hermann Health System",
     "domain": "memorialhermann.org",
     "seed_urls": [
       "https://memorialhermann.org/patients-visitors/patient-services/release-medical-records",
@@ -65,6 +65,125 @@
     "domain": "healthcare.ascension.org",
     "seed_urls": [
       "https://healthcare.ascension.org/medical-records"
+    ]
+  },
+  {
+    "system_name": "Tenet Healthcare",
+    "domain": "tenethealth.com",
+    "seed_urls": [
+      "https://www.tenethealth.com/"
+    ]
+  },
+  {
+    "system_name": "CHRISTUS Health",
+    "domain": "christushealth.org",
+    "seed_urls": [
+      "https://www.christushealth.org/patient-resources/request-medical-records"
+    ]
+  },
+  {
+    "system_name": "Ernest Health",
+    "domain": "ernesthealth.com",
+    "seed_urls": [
+      "https://www.ernesthealth.com/"
+    ]
+  },
+  {
+    "system_name": "Oceans Healthcare",
+    "domain": "oceanshealthcare.com",
+    "seed_urls": [
+      "https://www.oceanshealthcare.com/"
+    ]
+  },
+  {
+    "system_name": "HCA Medical City Healthcare (North Texas Division)",
+    "domain": "medicalcityhealthcare.com",
+    "seed_urls": [
+      "https://www.medicalcityhealthcare.com/contact-us"
+    ]
+  },
+  {
+    "system_name": "Nutex Health",
+    "domain": "nutexhealth.com",
+    "seed_urls": [
+      "https://www.nutexhealth.com/"
+    ]
+  },
+  {
+    "system_name": "Baptist Health System (San Antonio)",
+    "domain": "baptisthealthsystem.com",
+    "seed_urls": [
+      "https://www.baptisthealthsystem.com/patients/request-medical-records"
+    ]
+  },
+  {
+    "system_name": "Community Hospital Corporation",
+    "domain": "chc.com",
+    "seed_urls": [
+      "https://www.chc.com/"
+    ]
+  },
+  {
+    "system_name": "Nobis Rehabilitation Partners",
+    "domain": "nobisrehabpartners.com",
+    "seed_urls": [
+      "https://www.nobisrehabpartners.com/"
+    ]
+  },
+  {
+    "system_name": "HCA San Antonio Division (Methodist Healthcare of San Antonio)",
+    "domain": "sahealth.com",
+    "seed_urls": [
+      "https://www.sahealth.com/contact-us/"
+    ]
+  },
+  {
+    "system_name": "HCA Gulf Coast Division (HCA Houston Healthcare)",
+    "domain": "hcahoustonhealthcare.com",
+    "seed_urls": [
+      "https://hcahoustonhealthcare.com/patients-and-visitors/medical-records.dot"
+    ]
+  },
+  {
+    "system_name": "University of Texas System",
+    "domain": "utsystem.edu",
+    "seed_urls": [
+      "https://www.utsystem.edu/"
+    ]
+  },
+  {
+    "system_name": "UT Health East Texas",
+    "domain": "uthealtheasttexas.com",
+    "seed_urls": [
+      "https://uthealtheasttexas.com/medical-records-request"
+    ]
+  },
+  {
+    "system_name": "CHI St. Luke's Health",
+    "domain": "stlukeshealth.org",
+    "seed_urls": [
+      "https://www.stlukeshealth.org/patients-visitors/patients/request-patient-records"
+    ]
+  },
+  {
+    "system_name": "The Hospitals of Providence",
+    "domain": "thehospitalsofprovidence.com",
+    "seed_urls": [
+      "https://www.thehospitalsofprovidence.com/patients/request-medical-records"
+    ]
+  },
+  {
+    "system_name": "Exceptional Community Hospitals",
+    "domain": "ehc24.com",
+    "seed_urls": [
+      "https://www.ehc24.com/"
+    ]
+  },
+  {
+    "system_name": "United Surgical Partners International (USPI)",
+    "domain": "uspi.com",
+    "seed_urls": [
+      "https://www.uspi.com/"
     ]
   }
 ]
