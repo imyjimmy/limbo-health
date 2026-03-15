@@ -738,7 +738,7 @@ export default function BinderListScreen() {
         >
           <View style={styles.pendingSection} onLayout={handlePendingSectionLayout}>
             <View style={styles.headerRow}>
-              <Text style={styles.screenTitle}>Pending Requests</Text>
+              <Text style={styles.screenTitle}>Records Requests</Text>
             </View>
             <View style={styles.pendingInfoCard}>
               <View style={styles.pendingInfoBadge}>
