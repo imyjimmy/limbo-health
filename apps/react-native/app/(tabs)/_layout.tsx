@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
-import { Tabs, useRouter, usePathname } from 'expo-router';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Redirect, Tabs, useRouter, usePathname } from 'expo-router';
 import { CustomTabBar } from '../../components/navigation/CustomTabBar';
 import { getLastViewed, setPendingRestore } from '../../core/binder/LastViewedStore';
 import { ToastProvider, useToast } from '../../components/Toast';
 
 import { useAuthContext } from '../../providers/AuthProvider';
+import { useBioProfile } from '../../providers/BioProfileProvider';
 import { useCryptoContext } from '../../providers/CryptoProvider';
 import { InlineRecorderBar } from '../../components/audio/InlineRecorderBar';
 import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
@@ -26,6 +27,7 @@ function TabLayoutInner() {
   const router = useRouter();
   const pathname = usePathname();
   const { state } = useAuthContext();
+  const { status: bioStatus, hasProfile } = useBioProfile();
   const { masterConversationKey } = useCryptoContext();
   const { showToast } = useToast();
   const [activeAudioContext, setActiveAudioContext] = useState<{
@@ -188,6 +190,18 @@ function TabLayoutInner() {
     state.googleProfile?.email,
   ]);
 
+  if (bioStatus === 'loading') {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
+
+  if (!hasProfile) {
+    return <Redirect href="/bio-setup" withAnchor />;
+  }
+
   const handleInlineAudioComplete = async (result: AudioRecordingResult) => {
     if (!activeAudioContext || !recordingBinderService) {
       showToast('Unable to save recording');
@@ -263,6 +277,12 @@ function TabLayoutInner() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+  },
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
   },
   inlineRecorderWrap: {
     position: 'absolute',

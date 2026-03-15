@@ -9,6 +9,7 @@ import {
   type ViewStyle,
   View,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   IconMedicalCross,
   IconCirclePlus,
@@ -121,6 +122,7 @@ function LogoMarqueeRow({
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [failedLogos, setFailedLogos] = useState<Record<string, boolean>>({});
   const logoRows = useMemo(() => {
     const midpoint = Math.ceil(TEXAS_HOSPITAL_LOGOS.length / 2);
@@ -220,11 +222,11 @@ export default function HomeScreen() {
           </View>
 
           <Pressable
-            onPress={() => {}}
+            onPress={() => router.push('/records-request')}
             style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaButtonPressed]}
           >
             <IconCirclePlus size={22} color="#FFFFFF" strokeWidth={2} />
-            <Text style={styles.ctaText}>New Records Request</Text>
+            <Text style={styles.ctaText}>Start Records Request</Text>
             <IconChevronRight size={20} color="#FFFFFF" strokeWidth={2} />
           </Pressable>
         </View>

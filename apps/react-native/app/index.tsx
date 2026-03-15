@@ -3,12 +3,18 @@
 
 import { Redirect } from 'expo-router';
 import { useAuthContext } from '../providers/AuthProvider';
+import { useBioProfile } from '../providers/BioProfileProvider';
 import { ActivityIndicator, View } from 'react-native';
 
 export default function Index() {
   const { state } = useAuthContext();
+  const { status: bioStatus, hasProfile } = useBioProfile();
 
-  if (state.status === 'loading') {
+  const shouldCheckBio =
+    state.status === 'authenticated' ||
+    (state.status === 'expired' && state.loginMethod !== 'google');
+
+  if (state.status === 'loading' || (shouldCheckBio && bioStatus === 'loading')) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
@@ -27,6 +33,10 @@ export default function Index() {
     }
     // Nostr users: go to tabs and let refreshAuth handle it
     return <Redirect href="/(tabs)" withAnchor />;
+  }
+
+  if (!hasProfile) {
+    return <Redirect href="/bio-setup" withAnchor />;
   }
 
   return <Redirect href="/(tabs)" withAnchor />;
