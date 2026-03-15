@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useGoogleAuth } from '../../core/auth/googleAuth';
 import { useAuthContext } from '../../providers/AuthProvider';
+import { colors } from '../../constants/colors';
 
 function GoogleLogo({ size = 20 }: { size?: number }) {
   return (
@@ -106,6 +107,33 @@ export default function WelcomeScreen() {
     scrollRef.current?.scrollTo({ x: width * index, animated: true });
   };
 
+  const renderNostrEntryPoint = () => {
+    if (hasStoredNostrKey) {
+      return (
+        <Pressable
+          style={[styles.nostrButton, nostrLoading && styles.authButtonDisabled]}
+          onPress={handleNostrLogin}
+          disabled={nostrLoading}
+        >
+          {nostrLoading ? (
+            <ActivityIndicator color={colors.brand.violet} />
+          ) : (
+            <Text style={styles.nostrButtonText}>Sign in with Nostr</Text>
+          )}
+        </Pressable>
+      );
+    }
+
+    return (
+      <Pressable
+        style={styles.nostrButton}
+        onPress={() => router.push('/(auth)/import-key')}
+      >
+        <Text style={styles.nostrButtonText}>Sign in with Nostr</Text>
+      </Pressable>
+    );
+  };
+
   return (
     <View style={styles.screen}>
       <View style={[styles.topGlow, { top: insets.top + 10 }]} />
@@ -113,11 +141,15 @@ export default function WelcomeScreen() {
 
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.brand}>Limbo Health</Text>
-        {currentSlide < 2 && (
-          <Pressable onPress={() => goToSlide(2)} style={styles.skipButton}>
+        <View style={styles.topBarActionSlot}>
+          <Pressable
+            onPress={() => goToSlide(2)}
+            style={[styles.skipButton, currentSlide === 2 && styles.skipButtonHidden]}
+            disabled={currentSlide === 2}
+          >
             <Text style={styles.skipButtonText}>Skip</Text>
           </Pressable>
-        )}
+        </View>
       </View>
 
       <ScrollView
@@ -131,10 +163,10 @@ export default function WelcomeScreen() {
           setCurrentSlide(nextSlide);
         }}
       >
-        {SLIDES.map((slide) => (
+        {SLIDES.map((slide, index) => (
           <View key={slide.title} style={[styles.slide, { width }]}>
             <View style={styles.slideInner}>
-              <OnboardingArt color={slide.accent} />
+              {index === 0 ? <OnboardingArt color={slide.accent} /> : null}
               <Text style={styles.slideEyebrow}>{slide.eyebrow}</Text>
               <Text style={styles.slideTitle}>{slide.title}</Text>
               <Text style={styles.slideBody}>{slide.body}</Text>
@@ -160,51 +192,33 @@ export default function WelcomeScreen() {
               </Text>
             </View>
 
-            <View style={styles.authCard}>
-              <Pressable
-                style={[
-                  styles.authButton,
-                  (!request || googleLoading) && styles.authButtonDisabled,
-                ]}
-                onPress={() => promptAsync()}
-                disabled={!request || googleLoading}
-              >
-                {googleLoading ? (
-                  <ActivityIndicator color="#0F172A" />
-                ) : (
-                  <View style={styles.authButtonContent}>
-                    <GoogleLogo size={20} />
-                    <Text style={styles.authButtonText}>Continue with Google</Text>
-                  </View>
-                )}
-              </Pressable>
-
-              {hasStoredNostrKey ? (
-                <Pressable
-                  style={[styles.nostrButton, nostrLoading && styles.authButtonDisabled]}
-                  onPress={handleNostrLogin}
-                  disabled={nostrLoading}
-                >
-                  {nostrLoading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.nostrButtonText}>Continue with Nostr</Text>
-                  )}
-                </Pressable>
+            <Pressable
+              style={[
+                styles.authButton,
+                styles.finalPrimaryButton,
+                (!request || googleLoading) && styles.authButtonDisabled,
+              ]}
+              onPress={() => promptAsync()}
+              disabled={!request || googleLoading}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color="#0F172A" />
               ) : (
-                <Pressable
-                  style={styles.linkButton}
-                  onPress={() => router.push('/(auth)/import-key')}
-                >
-                  <Text style={styles.linkButtonText}>I already have a Nostr key</Text>
-                </Pressable>
+                <View style={styles.authButtonContent}>
+                  <GoogleLogo size={20} />
+                  <Text style={styles.authButtonText}>Continue with Google</Text>
+                </View>
               )}
-            </View>
+            </Pressable>
           </View>
         </View>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 18 }]}>
+        <View style={styles.secondaryFooterSlot}>
+          {currentSlide === 2 ? renderNostrEntryPoint() : null}
+        </View>
+
         <View style={styles.paginationRow}>
           {[0, 1, 2].map((index) => (
             <Pressable
@@ -218,16 +232,18 @@ export default function WelcomeScreen() {
           ))}
         </View>
 
-        {currentSlide < 2 ? (
-          <Pressable
-            onPress={() => goToSlide(currentSlide + 1)}
-            style={({ pressed }) => [styles.nextButton, pressed && styles.nextButtonPressed]}
-          >
-            <Text style={styles.nextButtonText}>Next</Text>
-          </Pressable>
-        ) : (
-          <Text style={styles.footerNote}>Bio setup comes right after sign-in.</Text>
-        )}
+        <View style={styles.footerActionSlot}>
+          {currentSlide < 2 ? (
+            <Pressable
+              onPress={() => goToSlide(currentSlide + 1)}
+              style={({ pressed }) => [styles.nextButton, pressed && styles.nextButtonPressed]}
+            >
+              <Text style={styles.nextButtonText}>Next</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.footerNote}>Bio setup comes right after sign-in.</Text>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -262,6 +278,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingBottom: 8,
+    minHeight: 44,
+  },
+  topBarActionSlot: {
+    minWidth: 48,
+    minHeight: 34,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   brand: {
     color: '#0F172A',
@@ -270,6 +293,9 @@ const styles = StyleSheet.create({
   },
   skipButton: {
     paddingVertical: 8,
+  },
+  skipButtonHidden: {
+    opacity: 0,
   },
   skipButtonText: {
     color: '#2563EB',
@@ -398,14 +424,6 @@ const styles = StyleSheet.create({
   finalHero: {
     marginBottom: 24,
   },
-  authCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 30,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 12,
-  },
   authButton: {
     backgroundColor: '#F8FAFC',
     borderRadius: 18,
@@ -428,31 +446,37 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
   },
+  finalPrimaryButton: {
+    marginTop: 4,
+  },
   nostrButton: {
-    backgroundColor: '#0F172A',
-    borderRadius: 18,
-    paddingVertical: 16,
+    alignSelf: 'center',
+    backgroundColor: colors.surface.violetSoft,
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#C7B1FF',
   },
   nostrButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  linkButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  linkButtonText: {
-    color: '#2563EB',
+    color: colors.brand.violet,
     fontSize: 15,
     fontWeight: '600',
   },
   footer: {
     paddingHorizontal: 24,
     gap: 14,
+  },
+  secondaryFooterSlot: {
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerActionSlot: {
+    minHeight: 56,
+    justifyContent: 'center',
   },
   paginationRow: {
     flexDirection: 'row',

@@ -41,7 +41,8 @@ function ownerKeyForAuthState(
 }
 
 function storageKeyForOwner(ownerKey: string): string {
-  return `${STORAGE_KEY_PREFIX}:${encodeURIComponent(ownerKey)}`;
+  const encodedOwner = encodeURIComponent(ownerKey).replace(/%/g, '_');
+  return `${STORAGE_KEY_PREFIX}.${encodedOwner}`;
 }
 
 export function BioProfileProvider({ children }: { children: React.ReactNode }) {

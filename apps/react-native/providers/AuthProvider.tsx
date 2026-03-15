@@ -25,6 +25,14 @@ const JWT_STORAGE_KEY = 'limbo_jwt';
 const LOGIN_METHOD_KEY = 'limbo_login_method';
 const GOOGLE_PROFILE_KEY = 'limbo_google_profile';
 const STARTUP_SECURE_STORE_DELAY_MS = 350;
+const BIO_PROFILE_STORAGE_KEY_PREFIX = 'limbo_bio_profile_v1';
+const LAST_BINDER_KEY = 'limbo_last_binder';
+const BINDER_TEXTURES_KEY = 'limbo_binder_card_textures_v1';
+const DEV_RESET_MARKER_KEY = 'limbo_dev_reset_consumed_v1';
+const DEV_RESET_LOCAL_STATE_TOKEN =
+  __DEV__ && typeof process.env.EXPO_PUBLIC_RESET_LOCAL_STATE === 'string'
+    ? process.env.EXPO_PUBLIC_RESET_LOCAL_STATE.trim()
+    : '';
 
 // --- Context ---
 
@@ -149,6 +157,30 @@ function parseJsonSafe<T>(raw: string | null, label: string): T | null {
   }
 }
 
+function parseJwtPayload(jwt: string): Record<string, unknown> | null {
+  try {
+    const parts = jwt.split('.');
+    if (parts.length !== 3) return null;
+
+    let payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (payload.length % 4) payload += '=';
+
+    const bytes = base64Decode(payload);
+    const decoded = new TextDecoder().decode(bytes);
+    const parsed = JSON.parse(decoded) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function bioStorageKeyForOwner(ownerKey: string): string {
+  const encodedOwner = encodeURIComponent(ownerKey).replace(/%/g, '_');
+  return `${BIO_PROFILE_STORAGE_KEY_PREFIX}.${encodedOwner}`;
+}
+
 /** Best-effort fetch of profile data from /api/auth/me. Returns empty payload on failure. */
 async function fetchProfile(jwt: string): Promise<ProfileSnapshot> {
   try {
@@ -217,6 +249,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
+    const secureStoreDeleteSafe = async (key: string): Promise<void> => {
+      try {
+        await SecureStore.deleteItemAsync(key);
+      } catch (err) {
+        console.warn(`[AuthProvider] SecureStore delete failed for "${key}"`, err);
+      }
+    };
+
+    const maybeResetLocalStateForDevelopment = async (): Promise<boolean> => {
+      if (!DEV_RESET_LOCAL_STATE_TOKEN) return false;
+
+      const consumedToken = await secureStoreGetSafe(DEV_RESET_MARKER_KEY);
+      if (consumedToken === DEV_RESET_LOCAL_STATE_TOKEN) return false;
+
+      const storedJwt = await secureStoreGetSafe(JWT_STORAGE_KEY);
+      const cachedProfile = await secureStoreGetSafe(GOOGLE_PROFILE_KEY);
+      const googleProfile = parseJsonSafe<GoogleProfile>(cachedProfile, GOOGLE_PROFILE_KEY);
+      const jwtPayload = storedJwt ? parseJwtPayload(storedJwt) : null;
+      const candidateBioKeys = new Set<string>();
+      const storedPubkey = asNonEmptyString(jwtPayload?.pubkey);
+
+      if (storedPubkey) {
+        candidateBioKeys.add(bioStorageKeyForOwner(`nostr:${storedPubkey}`));
+      }
+      if (googleProfile?.googleId) {
+        candidateBioKeys.add(bioStorageKeyForOwner(`google-id:${googleProfile.googleId}`));
+      }
+      if (googleProfile?.email) {
+        candidateBioKeys.add(bioStorageKeyForOwner(`google-email:${googleProfile.email}`));
+      }
+
+      await Promise.all([
+        secureStoreDeleteSafe(JWT_STORAGE_KEY),
+        secureStoreDeleteSafe('limbo_metadata'),
+        secureStoreDeleteSafe(LOGIN_METHOD_KEY),
+        secureStoreDeleteSafe(GOOGLE_PROFILE_KEY),
+        secureStoreDeleteSafe(LAST_BINDER_KEY),
+        secureStoreDeleteSafe(BINDER_TEXTURES_KEY),
+        ...Array.from(candidateBioKeys, key => secureStoreDeleteSafe(key)),
+      ]);
+
+      try {
+        await keyManager.deleteMasterPrivkey();
+      } catch (err) {
+        console.warn('[AuthProvider] Failed to delete stored Nostr key during reset', err);
+      }
+
+      await secureStoreSetSafe(DEV_RESET_MARKER_KEY, DEV_RESET_LOCAL_STATE_TOKEN);
+      return true;
+    };
+
     (async () => {
       let startupLoginMethod: LoginMethod | null = null;
 
@@ -225,6 +308,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // seen on specific iOS patch builds with TurboModule startup pressure.
         await sleep(STARTUP_SECURE_STORE_DELAY_MS);
         if (cancelled) return;
+
+        const resetRan = await maybeResetLocalStateForDevelopment();
+        if (resetRan) {
+          setPrivkeySafe(null);
+          setHasStoredNostrKeySafe(false);
+          setStateSafe(emptyState('onboarding'));
+          return;
+        }
 
         const storedLoginMethod = await secureStoreGetSafe(LOGIN_METHOD_KEY);
         startupLoginMethod = storedLoginMethod === 'google' || storedLoginMethod === 'nostr'
