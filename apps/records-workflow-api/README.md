@@ -35,12 +35,18 @@ Postgres-backed crawler + extraction service that ingests public hospital record
    - `npm run seed`
 6. Crawl:
    - `npm run crawl`
-7. Run API:
+7. Remove stale crawl artifacts without wiping current data:
+   - Preview: `npm run cleanup:stale-crawl:dry-run`
+   - Apply: `npm run cleanup:stale-crawl`
+8. Run API:
    - `npm run start`
 
 ## Notes
 
-- Raw HTML/PDF snapshots are stored under `storage/raw` by content hash.
+- Raw HTML/PDF snapshots are stored under `storage/raw`.
+- Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
+- Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
+- Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.
 - Crawler depth defaults to `2` and only follows workflow-relevant links.
 - Facility-level workflows override system-level workflows at read time.
 - Browser automation/login flows are intentionally out of scope.

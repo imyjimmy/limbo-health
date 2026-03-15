@@ -140,9 +140,11 @@ export async function listActiveSeeds({ systemName = null } = {}) {
        su.hospital_system_id,
        su.facility_id,
        hs.system_name,
-       hs.canonical_domain
+       hs.canonical_domain,
+       f.facility_name
      from seed_urls su
      join hospital_systems hs on hs.id = su.hospital_system_id
+     left join facilities f on f.id = su.facility_id
      ${where}
      order by hs.system_name, su.created_at`,
     params
@@ -185,7 +187,12 @@ export async function insertSourceDocument(
      )
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      on conflict (source_url, content_hash)
-     do update set fetched_at = excluded.fetched_at,
+     do update set hospital_system_id = case
+                     when excluded.facility_id is not null then excluded.hospital_system_id
+                     else source_documents.hospital_system_id
+                   end,
+                   facility_id = coalesce(excluded.facility_id, source_documents.facility_id),
+                   fetched_at = excluded.fetched_at,
                    http_status = excluded.http_status,
                    title = excluded.title,
                    storage_path = excluded.storage_path,

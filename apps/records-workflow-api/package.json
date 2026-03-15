@@ -11,6 +11,8 @@
     "migrate": "node src/migrate.js",
     "seed": "node src/seed.js",
     "crawl": "node src/crawl.js",
+    "cleanup:stale-crawl": "node src/cleanupStaleCrawlData.js --apply",
+    "cleanup:stale-crawl:dry-run": "node src/cleanupStaleCrawlData.js",
     "test": "node --test"
   },
   "dependencies": {

@@ -6,7 +6,9 @@ const APPROVED_EXTERNAL_DOMAINS = [
   'mychart.com',
   'verisma.com',
   'docusign.net',
-  'hcahealthcare.com'
+  'hcahealthcare.com',
+  'hcadam.com',
+  'swellbox.com'
 ];
 
 export function expandCandidateLinks({ document, allowedDomain }) {
@@ -18,7 +20,9 @@ export function expandCandidateLinks({ document, allowedDomain }) {
         href: link.href,
         text: link.text,
         allowedDomain,
-        approvedExternal: APPROVED_EXTERNAL_DOMAINS
+        approvedExternal: APPROVED_EXTERNAL_DOMAINS,
+        sourceTitle: document.title || '',
+        sourceText: document.text || ''
       })
     )
     .map((link) => link.href)
