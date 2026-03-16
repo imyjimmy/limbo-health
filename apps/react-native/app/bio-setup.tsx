@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  InputAccessoryView,
   Keyboard,
   KeyboardAvoidingView,
   LayoutChangeEvent,
@@ -26,6 +27,7 @@ import {
 const STEP_COUNT = 3;
 const FIELD_SCROLL_TOP_PADDING = 28;
 const FIELD_SCROLL_KEYBOARD_PADDING = 92;
+const NUMBER_PAD_ACCESSORY_ID = 'bio-setup-number-pad-accessory';
 
 type BioFieldKey =
   | 'fullName'
@@ -165,6 +167,11 @@ export default function BioSetupScreen() {
     });
   }, [keyboardVisible]);
 
+  const dismissKeyboard = useCallback(() => {
+    focusedFieldRef.current = null;
+    Keyboard.dismiss();
+  }, []);
+
   const handleSave = async () => {
     const validationError = validateProfile(form);
     if (validationError) {
@@ -266,13 +273,18 @@ export default function BioSetupScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={dismissKeyboard}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.hero, currentStep === 0 && styles.heroIntro]}>
+        <Pressable
+          onPress={dismissKeyboard}
+          disabled={!keyboardVisible}
+          style={[styles.hero, currentStep === 0 && styles.heroIntro]}
+        >
           <Text style={styles.eyebrow}>{activeStep.eyebrow}</Text>
           <Text style={styles.title}>{activeStep.title}</Text>
           <Text style={styles.subtitle}>{activeStep.body}</Text>
-        </View>
+        </Pressable>
 
         {currentStep === 0 ? (
           <View style={styles.introCard}>
@@ -317,6 +329,7 @@ export default function BioSetupScreen() {
                 style={styles.input}
                 keyboardType="number-pad"
                 returnKeyType="done"
+                inputAccessoryViewID={Platform.OS === 'ios' ? NUMBER_PAD_ACCESSORY_ID : undefined}
               />
             </View>
           </View>
@@ -399,10 +412,17 @@ export default function BioSetupScreen() {
                 style={styles.input}
                 keyboardType="number-pad"
                 textContentType="postalCode"
+                inputAccessoryViewID={Platform.OS === 'ios' ? NUMBER_PAD_ACCESSORY_ID : undefined}
               />
             </View>
           </View>
         ) : null}
+
+        <Pressable
+          onPress={dismissKeyboard}
+          disabled={!keyboardVisible}
+          style={styles.dismissArea}
+        />
       </ScrollView>
 
       {!keyboardVisible ? (
@@ -448,6 +468,16 @@ export default function BioSetupScreen() {
             </Text>
           </Pressable>
         </View>
+      ) : null}
+
+      {Platform.OS === 'ios' ? (
+        <InputAccessoryView nativeID={NUMBER_PAD_ACCESSORY_ID}>
+          <View style={styles.keyboardAccessory}>
+            <Pressable onPress={dismissKeyboard} style={styles.keyboardAccessoryButton}>
+              <Text style={styles.keyboardAccessoryButtonText}>Done</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
       ) : null}
     </KeyboardAvoidingView>
   );
@@ -582,6 +612,10 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontSize: 16,
   },
+  dismissArea: {
+    flexGrow: 1,
+    minHeight: 72,
+  },
   inlineRow: {
     flexDirection: 'row',
     gap: 12,
@@ -625,6 +659,24 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
+    fontWeight: '700',
+  },
+  keyboardAccessory: {
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'flex-end',
+  },
+  keyboardAccessoryButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  keyboardAccessoryButtonText: {
+    color: '#2563EB',
+    fontSize: 16,
     fontWeight: '700',
   },
 });
