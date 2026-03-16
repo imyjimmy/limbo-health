@@ -24,6 +24,7 @@ import { decode as base64Decode } from '../core/crypto/base64';
 const JWT_STORAGE_KEY = 'limbo_jwt';
 const LOGIN_METHOD_KEY = 'limbo_login_method';
 const GOOGLE_PROFILE_KEY = 'limbo_google_profile';
+const METADATA_STORAGE_KEY = 'limbo_metadata';
 const STARTUP_SECURE_STORE_DELAY_MS = 350;
 const BIO_PROFILE_STORAGE_KEY_PREFIX = 'limbo_bio_profile_v1';
 const LAST_BINDER_KEY = 'limbo_last_binder';
@@ -49,6 +50,7 @@ interface AuthContextValue {
   /** Store a Nostr key for an already-authenticated Google user (for encryption). */
   storeNostrKey: (privkey: Uint8Array) => Promise<void>;
   logout: () => Promise<void>;
+  resetLocalAppState: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   updateMetadata: (partial: Partial<NostrMetadata>) => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -147,6 +149,14 @@ async function secureStoreSetSafe(key: string, value: string): Promise<boolean> 
   }
 }
 
+async function secureStoreDeleteSafe(key: string): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(key);
+  } catch (err) {
+    console.warn(`[AuthProvider] SecureStore delete failed for "${key}"`, err);
+  }
+}
+
 function parseJsonSafe<T>(raw: string | null, label: string): T | null {
   if (!raw) return null;
   try {
@@ -179,6 +189,76 @@ function parseJwtPayload(jwt: string): Record<string, unknown> | null {
 function bioStorageKeyForOwner(ownerKey: string): string {
   const encodedOwner = encodeURIComponent(ownerKey).replace(/%/g, '_');
   return `${BIO_PROFILE_STORAGE_KEY_PREFIX}.${encodedOwner}`;
+}
+
+function addBioStorageKeyCandidate(candidateKeys: Set<string>, ownerKey: string | null): void {
+  if (!ownerKey) return;
+  candidateKeys.add(bioStorageKeyForOwner(ownerKey));
+}
+
+interface ClearLocalAppStateOptions {
+  keyManager: KeyManager;
+  currentState?: AuthState | null;
+  devResetToken?: string;
+}
+
+async function clearLocalAppStateStorage({
+  keyManager,
+  currentState,
+  devResetToken,
+}: ClearLocalAppStateOptions): Promise<void> {
+  const storedJwt = await secureStoreGetSafe(JWT_STORAGE_KEY);
+  const cachedProfile = await secureStoreGetSafe(GOOGLE_PROFILE_KEY);
+  const googleProfile = parseJsonSafe<GoogleProfile>(cachedProfile, GOOGLE_PROFILE_KEY);
+  const jwtPayload = storedJwt ? parseJwtPayload(storedJwt) : null;
+  const candidateBioKeys = new Set<string>();
+  const stateGoogleProfile = currentState?.googleProfile ?? null;
+  const storedPubkey = asNonEmptyString(jwtPayload?.pubkey);
+
+  addBioStorageKeyCandidate(
+    candidateBioKeys,
+    currentState?.pubkey ? `nostr:${currentState.pubkey}` : null,
+  );
+  addBioStorageKeyCandidate(
+    candidateBioKeys,
+    stateGoogleProfile?.googleId ? `google-id:${stateGoogleProfile.googleId}` : null,
+  );
+  addBioStorageKeyCandidate(
+    candidateBioKeys,
+    stateGoogleProfile?.email ? `google-email:${stateGoogleProfile.email}` : null,
+  );
+  addBioStorageKeyCandidate(
+    candidateBioKeys,
+    storedPubkey ? `nostr:${storedPubkey}` : null,
+  );
+  addBioStorageKeyCandidate(
+    candidateBioKeys,
+    googleProfile?.googleId ? `google-id:${googleProfile.googleId}` : null,
+  );
+  addBioStorageKeyCandidate(
+    candidateBioKeys,
+    googleProfile?.email ? `google-email:${googleProfile.email}` : null,
+  );
+
+  await Promise.all([
+    secureStoreDeleteSafe(JWT_STORAGE_KEY),
+    secureStoreDeleteSafe(METADATA_STORAGE_KEY),
+    secureStoreDeleteSafe(LOGIN_METHOD_KEY),
+    secureStoreDeleteSafe(GOOGLE_PROFILE_KEY),
+    secureStoreDeleteSafe(LAST_BINDER_KEY),
+    secureStoreDeleteSafe(BINDER_TEXTURES_KEY),
+    ...Array.from(candidateBioKeys, key => secureStoreDeleteSafe(key)),
+  ]);
+
+  try {
+    await keyManager.deleteMasterPrivkey();
+  } catch (err) {
+    console.warn('[AuthProvider] Failed to delete stored Nostr key during local reset', err);
+  }
+
+  if (devResetToken) {
+    await secureStoreSetSafe(DEV_RESET_MARKER_KEY, devResetToken);
+  }
 }
 
 /** Best-effort fetch of profile data from /api/auth/me. Returns empty payload on failure. */
@@ -249,54 +329,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const secureStoreDeleteSafe = async (key: string): Promise<void> => {
-      try {
-        await SecureStore.deleteItemAsync(key);
-      } catch (err) {
-        console.warn(`[AuthProvider] SecureStore delete failed for "${key}"`, err);
-      }
-    };
-
     const maybeResetLocalStateForDevelopment = async (): Promise<boolean> => {
       if (!DEV_RESET_LOCAL_STATE_TOKEN) return false;
 
       const consumedToken = await secureStoreGetSafe(DEV_RESET_MARKER_KEY);
       if (consumedToken === DEV_RESET_LOCAL_STATE_TOKEN) return false;
 
-      const storedJwt = await secureStoreGetSafe(JWT_STORAGE_KEY);
-      const cachedProfile = await secureStoreGetSafe(GOOGLE_PROFILE_KEY);
-      const googleProfile = parseJsonSafe<GoogleProfile>(cachedProfile, GOOGLE_PROFILE_KEY);
-      const jwtPayload = storedJwt ? parseJwtPayload(storedJwt) : null;
-      const candidateBioKeys = new Set<string>();
-      const storedPubkey = asNonEmptyString(jwtPayload?.pubkey);
-
-      if (storedPubkey) {
-        candidateBioKeys.add(bioStorageKeyForOwner(`nostr:${storedPubkey}`));
-      }
-      if (googleProfile?.googleId) {
-        candidateBioKeys.add(bioStorageKeyForOwner(`google-id:${googleProfile.googleId}`));
-      }
-      if (googleProfile?.email) {
-        candidateBioKeys.add(bioStorageKeyForOwner(`google-email:${googleProfile.email}`));
-      }
-
-      await Promise.all([
-        secureStoreDeleteSafe(JWT_STORAGE_KEY),
-        secureStoreDeleteSafe('limbo_metadata'),
-        secureStoreDeleteSafe(LOGIN_METHOD_KEY),
-        secureStoreDeleteSafe(GOOGLE_PROFILE_KEY),
-        secureStoreDeleteSafe(LAST_BINDER_KEY),
-        secureStoreDeleteSafe(BINDER_TEXTURES_KEY),
-        ...Array.from(candidateBioKeys, key => secureStoreDeleteSafe(key)),
-      ]);
-
-      try {
-        await keyManager.deleteMasterPrivkey();
-      } catch (err) {
-        console.warn('[AuthProvider] Failed to delete stored Nostr key during reset', err);
-      }
-
-      await secureStoreSetSafe(DEV_RESET_MARKER_KEY, DEV_RESET_LOCAL_STATE_TOKEN);
+      await clearLocalAppStateStorage({
+        keyManager,
+        devResetToken: DEV_RESET_LOCAL_STATE_TOKEN,
+      });
       return true;
     };
 
@@ -341,8 +383,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }
             }
 
-            const cachedMeta = await secureStoreGetSafe('limbo_metadata');
-            const metadata = parseJsonSafe<NostrMetadata>(cachedMeta, 'limbo_metadata');
+            const cachedMeta = await secureStoreGetSafe(METADATA_STORAGE_KEY);
+            const metadata = parseJsonSafe<NostrMetadata>(cachedMeta, METADATA_STORAGE_KEY);
             setStateSafe({
               status: 'authenticated',
               jwt: storedJwt,
@@ -389,8 +431,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Check for stored JWT
         const storedJwt = await secureStoreGetSafe(JWT_STORAGE_KEY);
         if (storedJwt && !isJwtExpired(storedJwt)) {
-          const cachedMeta = await secureStoreGetSafe('limbo_metadata');
-          const metadata = parseJsonSafe<NostrMetadata>(cachedMeta, 'limbo_metadata');
+          const cachedMeta = await secureStoreGetSafe(METADATA_STORAGE_KEY);
+          const metadata = parseJsonSafe<NostrMetadata>(cachedMeta, METADATA_STORAGE_KEY);
           setStateSafe({ status: 'authenticated', jwt: storedJwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
           fetchProfile(storedJwt).then((profile) => {
             if (cancelled) return;
@@ -402,7 +444,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // JWT missing or expired — silent re-auth (no additional biometric)
         const auth = await authenticateNostr(privkey, API_BASE_URL);
         await secureStoreSetSafe(JWT_STORAGE_KEY, auth.jwt);
-        if (auth.metadata) await secureStoreSetSafe('limbo_metadata', JSON.stringify(auth.metadata));
+        if (auth.metadata) await secureStoreSetSafe(METADATA_STORAGE_KEY, JSON.stringify(auth.metadata));
         setStateSafe({ status: 'authenticated', jwt: auth.jwt, pubkey: auth.pubkey, metadata: auth.metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
         fetchProfile(auth.jwt).then((profile) => {
           if (cancelled) return;
@@ -475,7 +517,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
       await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
       await SecureStore.setItemAsync(LOGIN_METHOD_KEY, 'nostr');
-      if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
+      if (metadata) await SecureStore.setItemAsync(METADATA_STORAGE_KEY, JSON.stringify(metadata));
       setHasStoredNostrKey(true);
       setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
       fetchProfile(jwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
@@ -526,7 +568,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync(LOGIN_METHOD_KEY, 'google');
       await SecureStore.setItemAsync(GOOGLE_PROFILE_KEY, JSON.stringify(googleProfile));
       if (seededMetadata) {
-        await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(seededMetadata));
+        await SecureStore.setItemAsync(METADATA_STORAGE_KEY, JSON.stringify(seededMetadata));
       }
 
       // Auto-generate a Nostr keypair only on truly first Google login
@@ -617,12 +659,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await SecureStore.deleteItemAsync(JWT_STORAGE_KEY);
-    await SecureStore.deleteItemAsync('limbo_metadata');
+    await SecureStore.deleteItemAsync(METADATA_STORAGE_KEY);
     await SecureStore.deleteItemAsync(LOGIN_METHOD_KEY);
     await SecureStore.deleteItemAsync(GOOGLE_PROFILE_KEY);
     setPrivkeyRef(null);
     setState(emptyState('onboarding'));
   }, []);
+
+  const resetLocalAppState = useCallback(async () => {
+    await clearLocalAppStateStorage({
+      keyManager,
+      currentState: state,
+    });
+    setHasStoredNostrKey(false);
+    setPrivkeyRef(null);
+    setState(emptyState('onboarding'));
+  }, [keyManager, state]);
 
   // --- Update metadata (display name, etc.) ---
 
@@ -633,7 +685,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if ('name' in partial && !partial.name) {
       delete updated.name;
     }
-    await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(updated));
+    await SecureStore.setItemAsync(METADATA_STORAGE_KEY, JSON.stringify(updated));
     setState(prev => ({ ...prev, metadata: updated }));
   }, [state.metadata]);
 
@@ -659,7 +711,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await SecureStore.deleteItemAsync(JWT_STORAGE_KEY);
-    await SecureStore.deleteItemAsync('limbo_metadata');
+    await SecureStore.deleteItemAsync(METADATA_STORAGE_KEY);
     await SecureStore.deleteItemAsync(LOGIN_METHOD_KEY);
     await SecureStore.deleteItemAsync(GOOGLE_PROFILE_KEY);
     setHasStoredNostrKey(false);
@@ -689,7 +741,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const { jwt, pubkey, metadata } = await authenticateNostr(privkey, API_BASE_URL);
     await SecureStore.setItemAsync(JWT_STORAGE_KEY, jwt);
-    if (metadata) await SecureStore.setItemAsync('limbo_metadata', JSON.stringify(metadata));
+    if (metadata) await SecureStore.setItemAsync(METADATA_STORAGE_KEY, JSON.stringify(metadata));
     setState({ status: 'authenticated', jwt, pubkey, metadata, loginMethod: 'nostr', googleProfile: null, connections: [] });
     fetchProfile(jwt).then(profile => setState(prev => applyProfileSnapshot(prev, profile)));
   }, [keyManager, privkeyRef, state.loginMethod]);
@@ -706,11 +758,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithStoredNostr,
       storeNostrKey,
       logout,
+      resetLocalAppState,
       refreshAuth,
       updateMetadata,
       deleteAccount,
     }),
-    [state, privkeyRef, hasStoredNostrKey, login, loginWithGoogle, loginWithStoredNostr, storeNostrKey, logout, refreshAuth, updateMetadata, deleteAccount],
+    [state, privkeyRef, hasStoredNostrKey, login, loginWithGoogle, loginWithStoredNostr, storeNostrKey, logout, resetLocalAppState, refreshAuth, updateMetadata, deleteAccount],
   );
 
   return (
