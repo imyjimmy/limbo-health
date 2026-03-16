@@ -110,8 +110,8 @@ function renamePatientInfoTitle(docValue: string, nextName: string): string {
 // --- Screen ---
 
 export default function BinderListScreen() {
-  const { state: authState } = useAuthContext();
-  const { ready: cryptoReady, needsEncryptionKey, masterConversationKey } = useCryptoContext();
+  const { state: authState, hasStoredNostrKey } = useAuthContext();
+  const { needsEncryptionKey, masterConversationKey } = useCryptoContext();
   const { capture } = useCamera();
   const router = useRouter();
 
@@ -147,6 +147,45 @@ export default function BinderListScreen() {
     if (!jwt) throw new Error('Not authenticated');
     return { type: 'jwt' as const, token: jwt };
   }
+
+  const handleMissingEncryptionAccess = useCallback(() => {
+    if (needsEncryptionKey) {
+      Alert.alert(
+        'Encryption Key Needed',
+        'Add or import your encryption key before you open or create digital binders.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Set Up Key', onPress: () => router.push('/(auth)/setup-key') },
+        ],
+      );
+      return;
+    }
+
+    if (hasStoredNostrKey) {
+      Alert.alert(
+        'Unlock Encryption Key',
+        'Use Face ID to unlock your encryption key, then try that binder action again.',
+      );
+      return;
+    }
+
+    if (authState.pubkey) {
+      Alert.alert(
+        'Import Encryption Key',
+        'This account already has an encryption key. Import it on this device before opening or creating digital binders.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Import Key', onPress: () => router.push('/(auth)/import-key?mode=keyOnly') },
+        ],
+      );
+      return;
+    }
+
+    Alert.alert(
+      'Encryption Unavailable',
+      'Your encryption key is not ready yet. Please try again in a moment.',
+    );
+  }, [authState.pubkey, hasStoredNostrKey, needsEncryptionKey, router]);
 
   // --- Fetch repo list ---
 
@@ -348,7 +387,10 @@ export default function BinderListScreen() {
 
   const renameBinder = useCallback(
     async (repo: RepoSummary, nextName: string): Promise<boolean> => {
-      if (!jwt || !masterConversationKey) return false;
+      if (!jwt || !masterConversationKey) {
+        handleMissingEncryptionAccess();
+        return false;
+      }
 
       const cloned = repo.isCloned ?? (await isAlreadyCloned(repo.id));
       if (!cloned) {
@@ -415,6 +457,7 @@ export default function BinderListScreen() {
       }
     },
     [
+      handleMissingEncryptionAccess,
       jwt,
       masterConversationKey,
       authState.metadata?.name,
@@ -446,8 +489,8 @@ export default function BinderListScreen() {
   );
 
   useEffect(() => {
-    if (jwt && cryptoReady) fetchRepos();
-  }, [jwt, cryptoReady, fetchRepos]);
+    if (jwt) fetchRepos();
+  }, [jwt, fetchRepos]);
 
   // --- Background pull last-opened binder when repo list loads ---
 
@@ -487,7 +530,10 @@ export default function BinderListScreen() {
 
   const openBinder = useCallback(
     async (repo: RepoSummary) => {
-      if (!jwt || !masterConversationKey) return;
+      if (!jwt || !masterConversationKey) {
+        handleMissingEncryptionAccess();
+        return;
+      }
       if (openingRef.current) return;
       openingRef.current = true;
 
@@ -513,7 +559,7 @@ export default function BinderListScreen() {
         openingRef.current = false;
       }
     },
-    [jwt, masterConversationKey, fetchRepos, router, screenState],
+    [fetchRepos, handleMissingEncryptionAccess, jwt, masterConversationKey, router, screenState],
   );
 
   // --- Back to repo list ---
@@ -526,7 +572,10 @@ export default function BinderListScreen() {
   // --- Create binder ---
 
   const createBinder = useCallback(() => {
-    if (!jwt || !masterConversationKey) return;
+    if (!jwt || !masterConversationKey) {
+      handleMissingEncryptionAccess();
+      return;
+    }
 
     Alert.prompt(
       'New Binder',
@@ -569,7 +618,15 @@ export default function BinderListScreen() {
       ],
       'plain-text',
     );
-  }, [jwt, masterConversationKey, fetchRepos, authState.metadata?.name, authState.googleProfile?.name, authState.googleProfile?.email]);
+  }, [
+    authState.metadata?.name,
+    authState.googleProfile?.email,
+    authState.googleProfile?.name,
+    fetchRepos,
+    handleMissingEncryptionAccess,
+    jwt,
+    masterConversationKey,
+  ]);
 
   // --- Delete binder (server + local) ---
 
@@ -701,15 +758,6 @@ export default function BinderListScreen() {
     );
   }
 
-  if (!cryptoReady) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#111" />
-        <Text style={styles.loadingText}>Initializing...</Text>
-      </View>
-    );
-  }
-
   switch (screenState.phase) {
     case 'loading-repos':
       return (
@@ -738,7 +786,7 @@ export default function BinderListScreen() {
         >
           <View style={styles.pendingSection} onLayout={handlePendingSectionLayout}>
             <View style={styles.headerRow}>
-              <Text style={styles.screenTitle}>Records Requests</Text>
+              <Text style={styles.screenTitle}>Pending Requests</Text>
             </View>
             <View style={styles.pendingInfoCard}>
               <View style={styles.pendingInfoBadge}>

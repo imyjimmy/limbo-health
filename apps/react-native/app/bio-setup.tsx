@@ -182,7 +182,7 @@ export default function BioSetupScreen() {
     setSaving(true);
     try {
       await saveProfile(form);
-      router.replace(returnTo || '/(tabs)');
+      router.replace(returnTo || '/(tabs)/home');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save your bio profile.';
       Alert.alert('Could Not Save', message);
@@ -196,7 +196,7 @@ export default function BioSetupScreen() {
       router.replace(returnTo);
       return;
     }
-    router.replace('/(tabs)');
+    router.replace('/(tabs)/home');
   };
 
   const handlePrevious = () => {

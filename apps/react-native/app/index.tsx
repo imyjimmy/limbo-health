@@ -32,12 +32,12 @@ export default function Index() {
       return <Redirect href="/(auth)/welcome" withAnchor />;
     }
     // Nostr users: go to tabs and let refreshAuth handle it
-    return <Redirect href="/(tabs)" withAnchor />;
+    return <Redirect href="/(tabs)/home" withAnchor />;
   }
 
   if (!hasProfile) {
     return <Redirect href="/bio-setup" withAnchor />;
   }
 
-  return <Redirect href="/(tabs)" withAnchor />;
+  return <Redirect href="/(tabs)/home" withAnchor />;
 }

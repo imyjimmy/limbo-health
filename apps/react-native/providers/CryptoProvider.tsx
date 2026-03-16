@@ -38,13 +38,17 @@ export function useCryptoContext(): CryptoContextValue {
 // --- Provider ---
 
 export function CryptoProvider({ children }: { children: React.ReactNode }) {
-  const { state: authState, privkey } = useAuthContext();
+  const { state: authState, privkey, hasStoredNostrKey } = useAuthContext();
   const [masterConversationKey, setMasterConversationKey] =
     useState<Uint8Array | null>(null);
   const [masterPubkey, setMasterPubkey] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
-  const needsEncryptionKey = authState.status === 'authenticated' && !privkey;
+  const needsEncryptionKey =
+    authState.status === 'authenticated' &&
+    !privkey &&
+    !hasStoredNostrKey &&
+    !authState.pubkey;
 
   // --- Activate when authenticated + privkey available (no Keychain read) ---
 
