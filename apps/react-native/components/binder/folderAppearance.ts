@@ -1,6 +1,6 @@
 // components/binder/folderAppearance.ts
 // Shared folder icon/color options for create/edit flows.
-// Allowed colors are sampled from color-palette.png.
+// Allowed colors are sampled from the binder folder palette study.
 
 export const FOLDER_EMOJI_OPTIONS = [
   // Core folder + medical quick picks

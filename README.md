@@ -38,6 +38,12 @@ limbo-health/
 │       └── nginx.conf.template
 ├── private_repos/                     # Medical record repositories (volume mount)
 ├── mysql-backups/                     # Database backup storage
+├── docs/                              # Planning docs, specs, diagrams, and notes
+│   ├── diagrams/                      # Mermaid flows and interaction docs
+│   ├── notes/                         # Working notes, reports, TODOs, copy drafts
+│   ├── plans/                         # Implementation guides and test plans
+│   ├── specs/                         # Requirements and technical specifications
+│   └── README.md                      # Documentation index
 ├── railway-export/                    # Railway deployment configs
 │   ├── railway-config.template.yml    # Safe template (no secrets)
 │   └── README.md                      # Deployment guide
@@ -81,6 +87,10 @@ The gateway routes requests based on path:
 - `/api/mgit/*` → MGit API (medical records repositories)
 - `/api/webrtc/*` → Scheduler API (video signaling)
 - `/api/*` → Scheduler API (appointments, billing, providers, patients)
+
+## Documentation
+
+Planning docs, specs, diagrams, and working notes now live under [`docs/`](docs/README.md) so the repository root stays focused on code and operational files.
 
 ## Quick Start
 
