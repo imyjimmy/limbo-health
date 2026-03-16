@@ -135,7 +135,7 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
   const saveProfile = useCallback(
     async (nextProfile: BioProfile) => {
       if (!ownerKey) {
-        throw new Error('You must be signed in before saving your bio profile.');
+        throw new Error('You must be signed in before saving your personal info.');
       }
 
       await SecureStore.setItemAsync(

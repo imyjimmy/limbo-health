@@ -48,6 +48,24 @@ export function isValidDateOfBirth(value: string): boolean {
   );
 }
 
+export function validateBioProfileBasicDetails(profile: BioProfile): string | null {
+  if (!profile.fullName.trim()) return 'Please enter your full name.';
+  if (!isValidDateOfBirth(profile.dateOfBirth.trim())) return 'Please enter a valid date of birth.';
+  return null;
+}
+
+export function validateBioProfileAddress(profile: BioProfile): string | null {
+  if (!profile.addressLine1.trim()) return 'Please enter your street address.';
+  if (!profile.city.trim()) return 'Please enter your city.';
+  if (!profile.state.trim()) return 'Please enter your state.';
+  if (profile.postalCode.trim().length < 5) return 'Please enter a valid postal code.';
+  return null;
+}
+
+export function validateBioProfile(profile: BioProfile): string | null {
+  return validateBioProfileBasicDetails(profile) || validateBioProfileAddress(profile);
+}
+
 export function isBioProfileComplete(profile: BioProfile | null | undefined): profile is BioProfile {
   if (!profile) return false;
 

@@ -187,7 +187,7 @@ export default function WelcomeScreen() {
               <Text style={styles.slideEyebrow}>Ready when you are</Text>
               <Text style={styles.slideTitle}>Generate requests without starting from scratch.</Text>
               <Text style={styles.slideBody}>
-                Sign in once, add your bio profile on the next screen, and start generating
+                Sign in once, add your personal info on the next screen, and start generating
                 request packets for Texas hospital systems.
               </Text>
             </View>

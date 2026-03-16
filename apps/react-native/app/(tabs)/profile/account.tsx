@@ -162,7 +162,7 @@ export default function AccountScreen() {
   const handleResetLocalAppState = useCallback(() => {
     Alert.alert(
       'Reset Local App State',
-      'This only resets data on this device. It signs you out, removes the local encryption key, clears your saved bio profile and device-only preferences, and returns you to Welcome. It does not delete your backend account or server-side data. If this device is your only copy of the encryption key, back it up before continuing.',
+      'This only resets data on this device. It signs you out, removes the local encryption key, clears your saved personal info and device-only preferences, and returns you to Welcome. It does not delete your backend account or server-side data. If this device is your only copy of the encryption key, back it up before continuing.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

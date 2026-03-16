@@ -20,6 +20,9 @@ import {
   emptyBioProfile,
   formatDateOfBirthInput,
   isValidDateOfBirth,
+  validateBioProfile,
+  validateBioProfileAddress,
+  validateBioProfileBasicDetails,
   type BioProfile,
 } from '../types/bio';
 
@@ -41,27 +44,9 @@ function readParam(value: string | string[] | undefined): string | null {
   return value ?? null;
 }
 
-function validateBasicDetails(profile: BioProfile): string | null {
-  if (!profile.fullName.trim()) return 'Please enter your full name.';
-  if (!isValidDateOfBirth(profile.dateOfBirth.trim())) return 'Please enter a valid date of birth.';
-  return null;
-}
-
-function validateAddress(profile: BioProfile): string | null {
-  if (!profile.addressLine1.trim()) return 'Please enter your street address.';
-  if (!profile.city.trim()) return 'Please enter your city.';
-  if (!profile.state.trim()) return 'Please enter your state.';
-  if (profile.postalCode.trim().length < 5) return 'Please enter a valid postal code.';
-  return null;
-}
-
-function validateProfile(profile: BioProfile): string | null {
-  return validateBasicDetails(profile) || validateAddress(profile);
-}
-
 function validateStep(step: number, profile: BioProfile): string | null {
-  if (step === 1) return validateBasicDetails(profile);
-  if (step === 2) return validateAddress(profile);
+  if (step === 1) return validateBioProfileBasicDetails(profile);
+  if (step === 2) return validateBioProfileAddress(profile);
   return null;
 }
 
@@ -88,7 +73,7 @@ export default function BioSetupScreen() {
   const steps = useMemo(
     () => [
       {
-        eyebrow: 'Bio Profile',
+        eyebrow: 'Personal Info',
         title: hasProfile ? 'Keep your request details current.' : 'Set up your request identity.',
         body:
           'We keep this profile on your device and use it to prefill medical-records request packets so you do not have to keep retyping it.',
@@ -177,9 +162,9 @@ export default function BioSetupScreen() {
   }, []);
 
   const handleSave = async () => {
-    const validationError = validateProfile(form);
+    const validationError = validateBioProfile(form);
     if (validationError) {
-      Alert.alert('Incomplete Bio Profile', validationError);
+      Alert.alert('Incomplete Personal Info', validationError);
       return;
     }
 
@@ -188,7 +173,7 @@ export default function BioSetupScreen() {
       await saveProfile(form);
       router.replace(returnTo || '/(tabs)/home');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to save your bio profile.';
+      const message = error instanceof Error ? error.message : 'Unable to save your personal info.';
       Alert.alert('Could Not Save', message);
     } finally {
       setSaving(false);
@@ -215,7 +200,7 @@ export default function BioSetupScreen() {
     if (currentStep < STEP_COUNT - 1) {
       const validationError = validateStep(currentStep, form);
       if (validationError) {
-        Alert.alert('Incomplete Bio Profile', validationError);
+        Alert.alert('Incomplete Personal Info', validationError);
         return;
       }
       setCurrentStep((prev) => prev + 1);
@@ -235,7 +220,7 @@ export default function BioSetupScreen() {
 
     const validationError = validateStep(currentStep, form);
     if (validationError) {
-      Alert.alert('Incomplete Bio Profile', validationError);
+      Alert.alert('Incomplete Personal Info', validationError);
       return;
     }
     setCurrentStep(targetStep);
@@ -480,7 +465,7 @@ export default function BioSetupScreen() {
                   ? 'Get started'
                   : currentStep === STEP_COUNT - 1
                     ? hasProfile
-                      ? 'Save Bio Profile'
+                      ? 'Save Personal Info'
                       : 'Save and continue'
                     : 'Continue'}
             </Text>

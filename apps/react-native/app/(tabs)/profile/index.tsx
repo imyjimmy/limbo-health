@@ -5,6 +5,20 @@ import { ProfileAvatar } from '../../../components/navigation/ProfileAvatar';
 import { useAuthContext } from '../../../providers/AuthProvider';
 import { useRouter } from 'expo-router';
 
+type MenuItemKey =
+  | 'account'
+  | 'personal-info'
+  | 'encryption-keys'
+  | 'notifications'
+  | 'about'
+  | 'sign-out';
+
+type MenuItem = {
+  key: MenuItemKey;
+  label: string;
+  destructive: boolean;
+};
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { state, logout } = useAuthContext();
@@ -26,25 +40,24 @@ export default function ProfileScreen() {
     .slice(0, 2)
     .toUpperCase();
 
-  const menuItems = [
-    { label: 'Bio Profile', destructive: false },
-    { label: 'Account', destructive: false },
-    { label: 'Encryption Keys', destructive: false },
-    { label: 'Notifications', destructive: false },
-    { label: 'About', destructive: false },
-    { label: 'Sign Out', destructive: true },
+  const menuItems: MenuItem[] = [
+    { key: 'account', label: 'Account', destructive: false },
+    { key: 'personal-info', label: 'My Personal Info', destructive: false },
+    { key: 'encryption-keys', label: 'Encryption Keys', destructive: false },
+    { key: 'notifications', label: 'Notifications', destructive: false },
+    { key: 'about', label: 'About', destructive: false },
+    { key: 'sign-out', label: 'Sign Out', destructive: true },
   ];
 
-  const handleMenuPress = async (label: string) => {
-    if (label === 'Sign Out') {
+  const handleMenuPress = async (key: MenuItemKey) => {
+    if (key === 'sign-out') {
       await logout?.();
       router.replace('/(auth)/welcome');
+      return;
     }
-    if (label === 'Bio Profile') {
-      router.push({ pathname: '/bio-setup', params: { returnTo: '/(tabs)/profile' } });
-    }
-    if (label === 'Account') router.push('/(tabs)/profile/account');
-    if (label === 'Encryption Keys') router.push('/(tabs)/profile/encryption-keys');
+    if (key === 'account') router.push('/(tabs)/profile/account');
+    if (key === 'personal-info') router.push('/(tabs)/profile/personal-info');
+    if (key === 'encryption-keys') router.push('/(tabs)/profile/encryption-keys');
   };
 
   return (
@@ -69,7 +82,7 @@ export default function ProfileScreen() {
         {menuItems.map((item, i) => (
           <Pressable
             key={item.label}
-            onPress={() => handleMenuPress(item.label)}
+            onPress={() => handleMenuPress(item.key)}
             style={({ pressed }) => [
               styles.menuItem,
               i === 0 && styles.menuItemFirst,

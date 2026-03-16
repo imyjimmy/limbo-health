@@ -16,6 +16,17 @@ export default function ProfileLayout() {
         }}
       />
       <Stack.Screen
+        name="personal-info"
+        options={{
+          headerShown: true,
+          title: 'My Personal Info',
+          headerBackButtonDisplayMode: 'default',
+          headerStyle: { backgroundColor: '#0f1923' },
+          headerTintColor: '#007AFF',
+          headerTitleStyle: { color: '#ffffff' },
+        }}
+      />
+      <Stack.Screen
         name="encryption-keys"
         options={{
           headerShown: true,

@@ -275,7 +275,7 @@ export default function RecordsRequestScreen() {
 
         {currentStep === 0 && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Step 1: Verify your bio profile</Text>
+            <Text style={styles.sectionTitle}>Step 1: Verify your personal info</Text>
             <Text style={styles.sectionBody}>
               This information will be used to prefill your medical-records request packet.
             </Text>
@@ -304,7 +304,7 @@ export default function RecordsRequestScreen() {
                   pressed && styles.secondaryButtonPressed,
                 ]}
               >
-                <Text style={styles.secondaryButtonText}>Edit Bio Profile</Text>
+                <Text style={styles.secondaryButtonText}>Edit Personal Info</Text>
               </Pressable>
 
               <Pressable
@@ -522,7 +522,7 @@ export default function RecordsRequestScreen() {
           <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Step 4: Review and generate PDF</Text>
           <Text style={styles.sectionBody}>
-            We&apos;ll fill the selected hospital PDF locally on this device using your bio profile
+            We&apos;ll fill the selected hospital PDF locally on this device using your personal info
             and append your ID image as an extra page if you attached one.
           </Text>
 
