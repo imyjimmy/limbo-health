@@ -434,6 +434,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const hasKey = await keyManager.hasStoredKey();
       if (!hasKey) return;
+      setHasStoredNostrKey(true);
 
       try {
         const pk = await keyManager.getMasterPrivkey();
@@ -532,12 +533,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // (no key on backend AND no local key). If backend already has a pubkey
       // but local Keychain is empty (e.g. after logout), the user must re-import.
       let pubkey: string | null = data.nostrPubkey || null;
-      const hasLocalKey = await keyManager.hasStoredKey();
+      let hasLocalKey = await keyManager.hasStoredKey();
+      setHasStoredNostrKey(hasLocalKey);
 
       if (!hasLocalKey && !data.nostrPubkey) {
         const privkey = secp256k1.utils.randomSecretKey();
         await keyManager.storeMasterPrivkey(privkey);
         setPrivkeyRef(privkey);
+        setHasStoredNostrKey(true);
         pubkey = KeyManager.pubkeyFromPrivkey(privkey);
 
         // Link the new key to the Google account on the backend

@@ -33,11 +33,17 @@ function truncateKey(key: string): string {
 
 export default function EncryptionKeysRoute() {
   const navigation = useNavigation();
-  const { state } = useAuthContext();
+  const { state, hasStoredNostrKey } = useAuthContext();
   const keyManager = useMemo(() => new KeyManager(SecureStore), []);
 
-  const hasKey = !!state.pubkey;
-  const npub = hasKey ? encodeBech32('npub', state.pubkey!) : null;
+  const hasLinkedKey = !!state.pubkey;
+  const hasLocalKey = hasStoredNostrKey;
+  const npub = hasLinkedKey ? encodeBech32('npub', state.pubkey!) : null;
+  const description = hasLocalKey
+    ? 'Your medical records are encrypted with a keypair stored on this device.'
+    : hasLinkedKey
+      ? 'This account is linked to an encryption key, but the private key is not stored on this device yet. Import it here to open binders.'
+      : 'Add an encryption key to this device so you can encrypt and open binders.';
 
   const [revealedNsec, setRevealedNsec] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -88,18 +94,22 @@ export default function EncryptionKeysRoute() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.description}>
-        Your medical records are encrypted with a keypair stored on this device.
+        {description}
       </Text>
 
-      {hasKey && npub && (
+      {hasLinkedKey && npub && (
         <Pressable style={styles.keyBox} onPress={handleCopyNpub}>
-          <Text style={styles.keyLabel}>Public Key (npub)</Text>
+          <Text style={styles.keyLabel}>
+            {hasLocalKey ? 'Public Key (npub)' : 'Linked Public Key (npub)'}
+          </Text>
           <Text style={styles.keyValue}>{truncateKey(npub)}</Text>
-          <Text style={styles.keyAction}>Tap to copy</Text>
+          <Text style={styles.keyAction}>
+            {hasLocalKey ? 'Tap to copy' : 'Linked to your account. Import the private key on this device to decrypt binders.'}
+          </Text>
         </Pressable>
       )}
 
-      {hasKey && !revealedNsec && (
+      {hasLocalKey && !revealedNsec && (
         <Pressable
           style={styles.exportButton}
           onPress={handleExportKey}
@@ -131,7 +141,9 @@ export default function EncryptionKeysRoute() {
         style={styles.importButton}
         onPress={() => setShowImport(true)}
       >
-        <Text style={styles.importButtonText}>Import existing key</Text>
+        <Text style={styles.importButtonText}>
+          {hasLinkedKey && !hasLocalKey ? 'Import private key to this device' : 'Import existing key'}
+        </Text>
       </Pressable>
     </ScrollView>
   );

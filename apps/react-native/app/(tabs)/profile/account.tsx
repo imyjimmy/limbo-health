@@ -80,7 +80,7 @@ function OAuthProviderLogo({ provider }: { provider: string }) {
 
 export default function AccountScreen() {
   const router = useRouter();
-  const { state, updateMetadata, deleteAccount } = useAuthContext();
+  const { state, hasStoredNostrKey, updateMetadata, deleteAccount } = useAuthContext();
 
   const fallbackName = state.googleProfile?.name || '';
   const [firstName, setFirstName] = useState(
@@ -95,8 +95,8 @@ export default function AccountScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const oauthConnections = state.connections.filter(conn => !!conn.provider);
-  const hasNostrKey = !!state.pubkey;
-  const npub = hasNostrKey ? encodeBech32('npub', state.pubkey!) : null;
+  const hasLinkedNostrKey = !!state.pubkey;
+  const npub = hasLinkedNostrKey ? encodeBech32('npub', state.pubkey!) : null;
 
   useEffect(() => {
     if (firstName || lastName || displayName) return;
@@ -255,10 +255,12 @@ export default function AccountScreen() {
             <Text style={styles.providerName}>Nostr</Text>
           </View>
           <View style={styles.connectionRight}>
-            {hasNostrKey && npub ? (
+            {hasLinkedNostrKey && npub ? (
               <>
                 <Text style={styles.connectionDetail}>{truncateNpub(npub)}</Text>
-                <Text style={styles.connectedBadge}>✓</Text>
+                <Text style={hasStoredNostrKey ? styles.connectedBadge : styles.importBadge}>
+                  {hasStoredNostrKey ? '✓' : 'Import'}
+                </Text>
               </>
             ) : (
               <Text style={styles.notConnected}>Not connected</Text>
@@ -394,6 +396,13 @@ const styles = StyleSheet.create({
     color: '#34d399',
     fontSize: 16,
     fontWeight: '600',
+  },
+  importBadge: {
+    color: '#FBBF24',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   notConnected: {
     color: 'rgba(255,255,255,0.3)',
