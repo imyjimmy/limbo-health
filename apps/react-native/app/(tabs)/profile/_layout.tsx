@@ -1,6 +1,8 @@
 import { Stack } from 'expo-router/stack';
+import { useTheme } from '../../../theme';
 
 export default function ProfileLayout() {
+  const theme = useTheme();
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" options={{ title: 'Profile' }} />
@@ -10,9 +12,9 @@ export default function ProfileLayout() {
           headerShown: true,
           title: 'Account',
           headerBackButtonDisplayMode: 'default',
-          headerStyle: { backgroundColor: '#0f1923' },
-          headerTintColor: '#007AFF',
-          headerTitleStyle: { color: '#ffffff' },
+          headerStyle: { backgroundColor: theme.colors.headerBackground },
+          headerTintColor: theme.colors.secondary,
+          headerTitleStyle: { color: theme.colors.headerText },
         }}
       />
       <Stack.Screen
@@ -21,9 +23,9 @@ export default function ProfileLayout() {
           headerShown: true,
           title: 'My Personal Info',
           headerBackButtonDisplayMode: 'default',
-          headerStyle: { backgroundColor: '#0f1923' },
-          headerTintColor: '#007AFF',
-          headerTitleStyle: { color: '#ffffff' },
+          headerStyle: { backgroundColor: theme.colors.headerBackground },
+          headerTintColor: theme.colors.secondary,
+          headerTitleStyle: { color: theme.colors.headerText },
         }}
       />
       <Stack.Screen

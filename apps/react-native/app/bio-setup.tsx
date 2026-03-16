@@ -8,13 +8,13 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 import { useBioProfile } from '../providers/BioProfileProvider';
 import {
   emptyBioProfile,
@@ -53,6 +53,8 @@ function validateStep(step: number, profile: BioProfile): string | null {
 export default function BioSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const returnTo = readParam(params.returnTo);
   const { status, profile, suggestedProfile, saveProfile, hasProfile } = useBioProfile();
@@ -229,7 +231,7 @@ export default function BioSetupScreen() {
   if (status === 'loading' && !didHydrate) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={theme.colors.secondary} />
       </View>
     );
   }
@@ -297,7 +299,7 @@ export default function BioSetupScreen() {
                 onFocus={() => focusField('fullName')}
                 onBlur={() => blurField('fullName')}
                 placeholder="Jane Doe"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.colors.inputPlaceholder}
                 style={styles.input}
                 autoCapitalize="words"
                 textContentType="name"
@@ -319,7 +321,7 @@ export default function BioSetupScreen() {
                 onBlur={() => blurField('dateOfBirth')}
                 onSubmitEditing={dismissKeyboard}
                 placeholder="MM/DD/YYYY"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.colors.inputPlaceholder}
                 style={styles.input}
                 keyboardType="number-pad"
                 inputAccessoryViewButtonLabel={
@@ -340,7 +342,7 @@ export default function BioSetupScreen() {
                 onFocus={() => focusField('addressLine1')}
                 onBlur={() => blurField('addressLine1')}
                 placeholder="123 Main St"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.colors.inputPlaceholder}
                 style={styles.input}
                 autoCapitalize="words"
                 textContentType="streetAddressLine1"
@@ -355,7 +357,7 @@ export default function BioSetupScreen() {
                 onFocus={() => focusField('addressLine2')}
                 onBlur={() => blurField('addressLine2')}
                 placeholder="Apt 4B"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.colors.inputPlaceholder}
                 style={styles.input}
                 autoCapitalize="words"
                 textContentType="streetAddressLine2"
@@ -371,7 +373,7 @@ export default function BioSetupScreen() {
                   onFocus={() => focusField('city')}
                   onBlur={() => blurField('city')}
                   placeholder="Austin"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   autoCapitalize="words"
                   textContentType="addressCity"
@@ -386,7 +388,7 @@ export default function BioSetupScreen() {
                   onFocus={() => focusField('state')}
                   onBlur={() => blurField('state')}
                   placeholder="TX"
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   autoCapitalize="characters"
                   textContentType="addressState"
@@ -409,7 +411,7 @@ export default function BioSetupScreen() {
                 onBlur={() => blurField('postalCode')}
                 onSubmitEditing={dismissKeyboard}
                 placeholder="78701"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.colors.inputPlaceholder}
                 style={styles.input}
                 keyboardType="number-pad"
                 textContentType="postalCode"
@@ -476,16 +478,16 @@ export default function BioSetupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   screen: {
     flex: 1,
-    backgroundColor: '#F5F8FF',
+    backgroundColor: theme.colors.background,
   },
   loadingScreen: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F5F8FF',
+    backgroundColor: theme.colors.background,
   },
   topGlow: {
     position: 'absolute',
@@ -493,7 +495,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: '#D6F5EE',
+    backgroundColor: theme.colors.primarySoft,
     opacity: 0.8,
   },
   bottomGlow: {
@@ -502,7 +504,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: theme.colors.secondarySoft,
     opacity: 0.72,
   },
   topBar: {
@@ -518,7 +520,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   backButtonText: {
-    color: '#2563EB',
+    color: theme.colors.secondary,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -538,71 +540,71 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   eyebrow: {
-    color: '#0F766E',
+    color: theme.colors.primary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
   title: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 30,
     fontWeight: '800',
     lineHeight: 34,
     letterSpacing: -0.8,
   },
   subtitle: {
-    color: '#475569',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     lineHeight: 23,
   },
   introCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 28,
     padding: 22,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
   },
   introCardTitle: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 4,
   },
   introCardBody: {
-    color: '#334155',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     lineHeight: 22,
   },
   introCardFootnote: {
-    color: '#0F766E',
+    color: theme.colors.primary,
     fontSize: 14,
     fontWeight: '700',
     marginTop: 8,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 24,
     padding: 18,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
   },
   fieldLabel: {
-    color: '#334155',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
   },
   input: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.inputBackground,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: theme.colors.inputBorder,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 16,
   },
   dismissArea: {
@@ -634,14 +636,14 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: theme.colors.border,
   },
   paginationDotActive: {
     width: 28,
-    backgroundColor: '#0F766E',
+    backgroundColor: theme.colors.primary,
   },
   primaryButton: {
-    backgroundColor: '#0F766E',
+    backgroundColor: theme.colors.primary,
     borderRadius: 18,
     paddingVertical: 17,
     alignItems: 'center',
@@ -650,8 +652,8 @@ const styles = StyleSheet.create({
     opacity: 0.86,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: theme.colors.primaryForeground,
     fontSize: 17,
     fontWeight: '700',
   },
-});
+}));

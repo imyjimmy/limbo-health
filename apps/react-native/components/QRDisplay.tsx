@@ -6,11 +6,11 @@ import {
   View,
   Text,
   Pressable,
-  StyleSheet,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import type { ScanQRPayload } from '../core/scan/ScanSession';
 import type { PushStatus } from '../hooks/useShareSession';
+import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 
 // --- Props ---
 
@@ -24,6 +24,8 @@ interface QRDisplayProps {
 // --- Component ---
 
 export function QRDisplay({ payload, pushStatus, onRetry, onCancel }: QRDisplayProps) {
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [remainingSeconds, setRemainingSeconds] = useState(() =>
     Math.max(0, Math.floor((payload.expiresAt * 1000 - Date.now()) / 1000)),
   );
@@ -70,8 +72,8 @@ export function QRDisplay({ payload, pushStatus, onRetry, onCancel }: QRDisplayP
           <QRCode
             value={qrData}
             size={280}
-            backgroundColor="#fff"
-            color="#111"
+            backgroundColor={theme.colors.surface}
+            color={theme.colors.text}
           />
         )}
       </View>
@@ -104,10 +106,10 @@ export function QRDisplay({ payload, pushStatus, onRetry, onCancel }: QRDisplayP
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -115,21 +117,21 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#111',
+    color: theme.colors.text,
     marginBottom: 8,
   },
   instruction: {
     fontSize: 15,
-    color: '#666',
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 22,
   },
   qrContainer: {
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: theme.colors.overlayStrong,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -141,27 +143,27 @@ const styles = StyleSheet.create({
     height: 280,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 8,
   },
   expiredText: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#999',
+    color: theme.colors.textMuted,
   },
   timer: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#111',
+    color: theme.colors.text,
     marginBottom: 32,
   },
   timerExpired: {
-    color: '#c00',
+    color: theme.colors.danger,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF3CD',
+    backgroundColor: theme.colors.warningSoft,
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 16,
@@ -169,19 +171,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pillError: {
-    backgroundColor: '#F8D7DA',
+    backgroundColor: theme.colors.dangerSoft,
   },
   pillText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#856404',
+    color: theme.colors.warning,
     textAlign: 'center',
   },
   pillTextError: {
-    color: '#721C24',
+    color: theme.colors.danger,
   },
   retryButton: {
-    backgroundColor: '#721C24',
+    backgroundColor: theme.colors.danger,
     borderRadius: 12,
     paddingVertical: 4,
     paddingHorizontal: 12,
@@ -189,10 +191,10 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#fff',
+    color: theme.colors.dangerForeground,
   },
   cancelButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 32,
@@ -200,6 +202,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.textSecondary,
   },
-});
+}));

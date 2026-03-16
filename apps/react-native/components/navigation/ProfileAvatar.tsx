@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
+import { createThemedStyles, useThemedStyles } from '../../theme';
 
 interface ProfileAvatarProps {
   isActive: boolean;
@@ -16,6 +17,7 @@ export function ProfileAvatar({
   initials,
   size = 28,
 }: ProfileAvatarProps) {
+  const styles = useThemedStyles(createStyles);
   const ringSize = size + 6;
   const dotSize = 10;
 
@@ -31,8 +33,8 @@ export function ProfileAvatar({
             borderRadius: ringSize / 2,
             borderWidth: isActive ? 2 : 1.5,
             borderColor: isActive
-              ? '#ffffff'
-              : 'rgba(255,255,255,0.25)',
+              ? styles.activeRing.borderColor
+              : styles.inactiveRing.borderColor,
           },
         ]}
       />
@@ -75,7 +77,7 @@ export function ProfileAvatar({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -84,7 +86,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   avatar: {
-    backgroundColor: '#2a2a3e',
+    backgroundColor: theme.colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -95,15 +97,21 @@ const styles = StyleSheet.create({
   initialsText: {
     fontSize: 11,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: theme.colors.textSecondary,
     letterSpacing: 0.5,
   },
   notificationDot: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#ef4444',
+    backgroundColor: theme.colors.danger,
     borderWidth: 2,
-    borderColor: '#0f1923',
+    borderColor: theme.colors.tabBarBackground,
   },
-});
+  activeRing: {
+    borderColor: theme.colors.tabIconActive,
+  },
+  inactiveRing: {
+    borderColor: theme.colors.tabBarBorder,
+  },
+}));

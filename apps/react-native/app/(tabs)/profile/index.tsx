@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProfileAvatar } from '../../../components/navigation/ProfileAvatar';
 import { useAuthContext } from '../../../providers/AuthProvider';
 import { useRouter } from 'expo-router';
+import { createThemedStyles, useThemedStyles } from '../../../theme';
 
 type MenuItemKey =
   | 'account'
@@ -23,6 +24,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { state, logout } = useAuthContext();
   const router = useRouter();
+  const styles = useThemedStyles(createStyles);
 
   const isGoogle = state.loginMethod === 'google';
 
@@ -108,14 +110,14 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#0f1923',
+    backgroundColor: theme.colors.headerBackground,
     paddingHorizontal: 20,
   },
   headerTitle: {
-    color: '#ffffff',
+    color: theme.colors.headerText,
     fontSize: 22,
     fontWeight: '700',
     letterSpacing: -0.3,
@@ -127,20 +129,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   displayName: {
-    color: '#ffffff',
+    color: theme.colors.headerText,
     fontSize: 18,
     fontWeight: '600',
     marginTop: 4,
   },
   emailText: {
-    color: 'rgba(255,255,255,0.5)',
+    color: theme.colors.textMuted,
     fontSize: 14,
   },
   menuContainer: {
     gap: 1,
   },
   menuItem: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: theme.colors.surfaceSubtle,
     paddingVertical: 14,
     paddingHorizontal: 16,
     flexDirection: 'row',
@@ -156,17 +158,17 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 12,
   },
   menuItemPressed: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.colors.overlayMuted,
   },
   menuItemText: {
-    color: 'rgba(255,255,255,0.8)',
+    color: theme.colors.textSecondary,
     fontSize: 15,
   },
   menuItemDestructive: {
-    color: '#ef4444',
+    color: theme.colors.danger,
   },
   menuItemChevron: {
-    color: 'rgba(255,255,255,0.2)',
+    color: theme.colors.textMuted,
     fontSize: 13,
   },
-});
+}));

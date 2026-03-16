@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { createThemedStyles, useThemedStyles } from '../../theme';
 
 export default function CreateStub() {
+  const styles = useThemedStyles(createStyles);
   return <View style={styles.container} />;
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f1923' },
-});
+const createStyles = createThemedStyles((theme) => ({
+  container: { flex: 1, backgroundColor: theme.colors.headerBackground },
+}));

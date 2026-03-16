@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 
 interface RequestStepperProps {
   steps: string[];
@@ -7,6 +8,9 @@ interface RequestStepperProps {
 }
 
 export function RequestStepper({ steps, currentStep }: RequestStepperProps) {
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.row}>
       {steps.map((step, index) => {
@@ -19,14 +23,14 @@ export function RequestStepper({ steps, currentStep }: RequestStepperProps) {
               <View
                 style={[
                   styles.stepCircle,
-                  isActive && styles.stepCircleActive,
-                  isComplete && styles.stepCircleComplete,
+                  isActive && { backgroundColor: theme.colors.primary },
+                  isComplete && { backgroundColor: theme.colors.secondary },
                 ]}
               >
                 <Text
                   style={[
                     styles.stepNumber,
-                    (isActive || isComplete) && styles.stepNumberActive,
+                    (isActive || isComplete) && { color: theme.colors.textInverse },
                   ]}
                 >
                   {index + 1}
@@ -35,8 +39,8 @@ export function RequestStepper({ steps, currentStep }: RequestStepperProps) {
               <Text
                 style={[
                   styles.stepLabel,
-                  isActive && styles.stepLabelActive,
-                  isComplete && styles.stepLabelComplete,
+                  isActive && { color: theme.colors.text },
+                  isComplete && { color: theme.colors.secondary },
                 ]}
                 numberOfLines={1}
               >
@@ -47,7 +51,7 @@ export function RequestStepper({ steps, currentStep }: RequestStepperProps) {
               <View
                 style={[
                   styles.connector,
-                  index < currentStep && styles.connectorComplete,
+                  index < currentStep && { backgroundColor: theme.colors.secondary },
                 ]}
               />
             )}
@@ -58,7 +62,7 @@ export function RequestStepper({ steps, currentStep }: RequestStepperProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -72,43 +76,25 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.surfaceSubtle,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepCircleActive: {
-    backgroundColor: '#0F766E',
-  },
-  stepCircleComplete: {
-    backgroundColor: '#2563EB',
-  },
   stepNumber: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: '700',
   },
-  stepNumberActive: {
-    color: '#FFFFFF',
-  },
   stepLabel: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '600',
-  },
-  stepLabelActive: {
-    color: '#0F172A',
-  },
-  stepLabelComplete: {
-    color: '#1E3A8A',
   },
   connector: {
     flex: 1,
     height: 2,
     borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.border,
     marginBottom: 22,
   },
-  connectorComplete: {
-    backgroundColor: '#2563EB',
-  },
-});
+}));

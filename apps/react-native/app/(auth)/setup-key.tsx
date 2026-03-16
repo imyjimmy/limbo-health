@@ -5,10 +5,11 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '../../constants/colors';
+import { createThemedStyles, useThemedStyles } from '../../theme';
 
 export default function SetupKeyScreen() {
   const router = useRouter();
+  const styles = useThemedStyles(createStyles);
 
   return (
     <View style={styles.container}>
@@ -39,10 +40,10 @@ export default function SetupKeyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.surface.sky,
+    backgroundColor: theme.colors.background,
     justifyContent: 'space-between',
     paddingHorizontal: 24,
     paddingTop: 120,
@@ -54,12 +55,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.base.ink,
+    color: theme.colors.text,
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: colors.base.slate,
+    color: theme.colors.textSecondary,
     textAlign: 'center',
     lineHeight: 22,
     paddingHorizontal: 12,
@@ -68,27 +69,27 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   primaryButton: {
-    backgroundColor: colors.brand.blue,
+    backgroundColor: theme.colors.secondary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
   primaryButtonText: {
-    color: '#fff',
+    color: theme.colors.secondaryForeground,
     fontSize: 17,
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: colors.surface.violetSoft,
+    backgroundColor: theme.colors.accent,
     borderWidth: 1,
-    borderColor: '#D7C8FF',
+    borderColor: theme.colors.accent,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: colors.brand.violet,
+    color: theme.colors.accentForeground,
     fontSize: 17,
     fontWeight: '600',
   },
-});
+}));

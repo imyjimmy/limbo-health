@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 
 interface RecordingSheetProps {
   onComplete: (result: AudioRecordingResult) => void;
@@ -18,6 +19,8 @@ function formatElapsed(ms: number): string {
 
 export function RecordingSheet({ onComplete, onCancel }: RecordingSheetProps) {
   const { status, elapsedMs, start, stop, cancel } = useAudioRecorder();
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   useEffect(() => {
     start().catch((err) => {
@@ -54,7 +57,7 @@ export function RecordingSheet({ onComplete, onCancel }: RecordingSheetProps) {
           onPress={handleStop}
           disabled={status !== 'recording'}
         >
-          <Ionicons name="stop" size={36} color="#fff" />
+          <Ionicons name="stop" size={36} color={theme.colors.dangerForeground} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
@@ -65,10 +68,10 @@ export function RecordingSheet({ onComplete, onCancel }: RecordingSheetProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.headerBackground,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -85,19 +88,19 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#FF3B30',
+    backgroundColor: theme.colors.danger,
   },
   timer: {
     fontSize: 48,
     fontWeight: '300',
-    color: '#fff',
+    color: theme.colors.headerText,
     fontVariant: ['tabular-nums'],
   },
   stopButton: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FF3B30',
+    backgroundColor: theme.colors.danger,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -107,6 +110,6 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     fontSize: 17,
-    color: '#999',
+    color: theme.colors.tabIconInactive,
   },
-});
+}));

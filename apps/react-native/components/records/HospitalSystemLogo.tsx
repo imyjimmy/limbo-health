@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { SvgUri } from 'react-native-svg';
 import {
   TEXAS_HOSPITAL_LOGOS,
   type TexasHospitalLogo,
 } from '../../constants/texasHospitalLogos';
+import { createThemedStyles, useThemedStyles } from '../../theme';
 
 const MONOGRAM_STOP_WORDS = new Set([
   'and',
@@ -50,6 +51,7 @@ export function HospitalSystemLogo({
 }: HospitalSystemLogoProps) {
   const [failed, setFailed] = useState(false);
   const logo = useMemo(() => findLogo(systemName), [systemName]);
+  const styles = useThemedStyles(createStyles);
 
   if (!logo || failed) {
     return (
@@ -93,7 +95,7 @@ export function HospitalSystemLogo({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -106,11 +108,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 18,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.surfaceSubtle,
   },
   fallbackText: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
-});
+}));

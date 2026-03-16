@@ -14,10 +14,10 @@ import {
   TouchableOpacity,
   FlatList,
   Image,
-  StyleSheet,
   Alert,
 } from 'react-native';
 import type { MedicalDocument } from '../../types/document';
+import { createThemedStyles, useThemedStyles } from '../../theme';
 
 // Icons — using text placeholders for now, replace with @tabler/icons-react-native
 const ICONS = {
@@ -68,6 +68,8 @@ export function AttachmentList({
   onCapturePhoto,
   onRecordAudio,
 }: AttachmentListProps) {
+  const styles = useThemedStyles(createStyles);
+
   const handleAddPhoto = async () => {
     if (!onCapturePhoto) return;
     const result = await onCapturePhoto();
@@ -146,7 +148,7 @@ export function AttachmentList({
                 const idx = item.index!;
                 const fmt = c.metadata.format?.toUpperCase() ?? 'FILE';
                 return (
-                  <View style={[styles.attachmentChip, { alignItems: 'flex-start', gap: 2 }]}>
+                  <View style={styles.existingAttachmentChip}>
                     <View style={styles.fileBadge}>
                       <Text style={styles.fileBadgeText}>{fmt}</Text>
                     </View>
@@ -163,7 +165,7 @@ export function AttachmentList({
                           );
                         }}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        style={{ paddingTop: 2 }}
+                        style={styles.existingRemoveButton}
                       >
                         <Text style={styles.removeButton}>{ICONS.remove}</Text>
                       </TouchableOpacity>
@@ -214,10 +216,10 @@ export function buildAttachmentChildren(attachments: PendingSidecar[]): MedicalD
   }));
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
+    borderTopColor: theme.colors.border,
   },
   listContent: {
     paddingHorizontal: 16,
@@ -227,10 +229,19 @@ const styles = StyleSheet.create({
   attachmentChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 8,
     padding: 4,
     gap: 8,
+    maxWidth: 200,
+  },
+  existingAttachmentChip: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 8,
+    padding: 4,
+    gap: 2,
     maxWidth: 200,
   },
   thumbnail: {
@@ -242,24 +253,27 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 4,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: theme.colors.secondarySoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
   fileBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#666',
+    color: theme.colors.secondary,
   },
   attachmentName: {
     flex: 1,
     fontSize: 12,
-    color: '#333',
+    color: theme.colors.textSecondary,
   },
   removeButton: {
     fontSize: 16,
-    color: '#999',
+    color: theme.colors.textMuted,
     paddingLeft: 4,
+  },
+  existingRemoveButton: {
+    paddingTop: 2,
   },
   addButtons: {
     flexDirection: 'row',
@@ -270,7 +284,7 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F0F0',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 20,
     paddingVertical: 6,
     paddingHorizontal: 12,
@@ -281,6 +295,6 @@ const styles = StyleSheet.create({
   },
   addButtonLabel: {
     fontSize: 13,
-    color: '#555',
+    color: theme.colors.textSecondary,
   },
-});
+}));

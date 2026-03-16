@@ -16,7 +16,7 @@ import { secp256k1 } from '@noble/curves/secp256k1.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 import { KeyManager } from '../../core/crypto/KeyManager';
 import { useAuthContext } from '../../providers/AuthProvider';
-import { colors } from '../../constants/colors';
+import { createThemedStyles, useThemedStyles } from '../../theme';
 
 export default function GenerateKeyScreen() {
   const router = useRouter();
@@ -25,6 +25,7 @@ export default function GenerateKeyScreen() {
   const keyOnly = mode === 'keyOnly';
   const [loading, setLoading] = useState(false);
   const [backedUp, setBackedUp] = useState(false);
+  const styles = useThemedStyles(createStyles);
 
   // Generate keypair once when screen mounts
   const keypair = useMemo(() => {
@@ -106,7 +107,7 @@ export default function GenerateKeyScreen() {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={styles.continueButtonText.color} />
         ) : (
           <Text style={styles.continueButtonText}>Continue</Text>
         )}
@@ -115,10 +116,10 @@ export default function GenerateKeyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.surface.sky,
+    backgroundColor: theme.colors.background,
   },
   contentContainer: {
     paddingHorizontal: 24,
@@ -128,27 +129,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.base.ink,
+    color: theme.colors.text,
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: colors.base.slate,
+    color: theme.colors.textSecondary,
     lineHeight: 22,
     marginBottom: 32,
   },
   keyBox: {
-    backgroundColor: colors.surface.amberSoft,
+    backgroundColor: theme.colors.warningSoft,
     borderWidth: 1,
-    borderColor: '#F4D8A3',
+    borderColor: theme.colors.warning,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
   },
   pubkeyBox: {
-    backgroundColor: colors.surface.violetSoft,
+    backgroundColor: theme.colors.accent,
     borderWidth: 1,
-    borderColor: '#DCCFFF',
+    borderColor: theme.colors.accent,
     borderRadius: 12,
     padding: 16,
     marginBottom: 32,
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
   keyLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.base.muted,
+    color: theme.colors.textMuted,
     marginBottom: 8,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -164,13 +165,13 @@ const styles = StyleSheet.create({
   keyValue: {
     fontSize: 14,
     fontFamily: 'Courier',
-    color: colors.base.ink,
+    color: theme.colors.text,
     lineHeight: 20,
   },
   pubkeyValue: {
     fontSize: 14,
     fontFamily: 'Courier',
-    color: '#5B4698',
+    color: theme.colors.accentForeground,
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -183,26 +184,26 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#A6B8D9',
+    borderColor: theme.colors.borderStrong,
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxChecked: {
-    backgroundColor: colors.brand.teal,
-    borderColor: colors.brand.teal,
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
   },
   checkmark: {
-    color: '#fff',
+    color: theme.colors.primaryForeground,
     fontSize: 14,
     fontWeight: '700',
   },
   checkboxLabel: {
     fontSize: 15,
-    color: colors.base.slate,
+    color: theme.colors.textSecondary,
     flex: 1,
   },
   continueButton: {
-    backgroundColor: colors.brand.blue,
+    backgroundColor: theme.colors.secondary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -211,8 +212,8 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   continueButtonText: {
-    color: '#fff',
+    color: theme.colors.secondaryForeground,
     fontSize: 17,
     fontWeight: '600',
   },
-});
+}));

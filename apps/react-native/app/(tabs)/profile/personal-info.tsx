@@ -20,10 +20,13 @@ import {
   type BioProfile,
   validateBioProfile,
 } from '../../../types/bio';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../../theme';
 
 export default function PersonalInfoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { status, profile, suggestedProfile, saveProfile } = useBioProfile();
   const [form, setForm] = useState<BioProfile>(emptyBioProfile());
   const [didHydrate, setDidHydrate] = useState(false);
@@ -57,7 +60,7 @@ export default function PersonalInfoScreen() {
   if (status === 'loading' && !didHydrate) {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={theme.colors.secondary} />
       </View>
     );
   }
@@ -88,7 +91,7 @@ export default function PersonalInfoScreen() {
               value={form.fullName}
               onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
               placeholder="Jane Doe"
-              placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholderTextColor={theme.colors.inputPlaceholder}
               style={styles.fieldInput}
               autoCapitalize="words"
               autoCorrect={false}
@@ -110,7 +113,7 @@ export default function PersonalInfoScreen() {
                 }))
               }
               placeholder="MM/DD/YYYY"
-              placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholderTextColor={theme.colors.inputPlaceholder}
               style={styles.fieldInput}
               keyboardType="number-pad"
               textContentType="birthdate"
@@ -126,7 +129,7 @@ export default function PersonalInfoScreen() {
               value={form.addressLine1}
               onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
               placeholder="123 Main St"
-              placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholderTextColor={theme.colors.inputPlaceholder}
               style={styles.fieldInput}
               autoCapitalize="words"
               autoCorrect={false}
@@ -142,7 +145,7 @@ export default function PersonalInfoScreen() {
               value={form.addressLine2}
               onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
               placeholder="Apt 4B"
-              placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholderTextColor={theme.colors.inputPlaceholder}
               style={styles.fieldInput}
               autoCapitalize="words"
               autoCorrect={false}
@@ -158,7 +161,7 @@ export default function PersonalInfoScreen() {
               value={form.city}
               onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
               placeholder="Austin"
-              placeholderTextColor="rgba(255,255,255,0.3)"
+              placeholderTextColor={theme.colors.inputPlaceholder}
               style={styles.fieldInput}
               autoCapitalize="words"
               autoCorrect={false}
@@ -175,7 +178,7 @@ export default function PersonalInfoScreen() {
                 value={form.state}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
                 placeholder="TX"
-                placeholderTextColor="rgba(255,255,255,0.3)"
+                placeholderTextColor={theme.colors.inputPlaceholder}
                 style={styles.fieldInput}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -197,7 +200,7 @@ export default function PersonalInfoScreen() {
                   }))
                 }
                 placeholder="78701"
-                placeholderTextColor="rgba(255,255,255,0.3)"
+                placeholderTextColor={theme.colors.inputPlaceholder}
                 style={styles.fieldInput}
                 keyboardType="number-pad"
                 textContentType="postalCode"
@@ -215,7 +218,7 @@ export default function PersonalInfoScreen() {
           ]}
         >
           {saving ? (
-            <ActivityIndicator color="#0F172A" />
+            <ActivityIndicator color={theme.colors.primaryForeground} />
           ) : (
             <Text style={styles.saveButtonText}>Save Changes</Text>
           )}
@@ -225,16 +228,16 @@ export default function PersonalInfoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#0f1923',
+    backgroundColor: theme.colors.headerBackground,
   },
   loadingScreen: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0f1923',
+    backgroundColor: theme.colors.headerBackground,
   },
   content: {
     paddingHorizontal: 20,
@@ -242,7 +245,7 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   sectionLabel: {
-    color: 'rgba(255,255,255,0.4)',
+    color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -251,11 +254,11 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   card: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 12,
   },
   helperText: {
-    color: 'rgba(255,255,255,0.74)',
+    color: theme.colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
     paddingHorizontal: 16,
@@ -267,18 +270,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   fieldLabel: {
-    color: 'rgba(255,255,255,0.5)',
+    color: theme.colors.textMuted,
     fontSize: 13,
     fontWeight: '600',
   },
   fieldInput: {
-    color: '#ffffff',
+    color: theme.colors.headerText,
     fontSize: 16,
     padding: 0,
   },
   rowSeparator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.colors.overlayMuted,
     marginLeft: 16,
   },
   inlineRow: {
@@ -290,10 +293,10 @@ const styles = StyleSheet.create({
   },
   inlineDivider: {
     width: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.colors.overlayMuted,
   },
   saveButton: {
-    backgroundColor: '#D6F5EE',
+    backgroundColor: theme.colors.primary,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -304,8 +307,8 @@ const styles = StyleSheet.create({
     opacity: 0.82,
   },
   saveButtonText: {
-    color: '#0F172A',
+    color: theme.colors.primaryForeground,
     fontSize: 16,
     fontWeight: '700',
   },
-});
+}));

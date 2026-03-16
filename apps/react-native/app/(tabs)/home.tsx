@@ -16,7 +16,7 @@ import {
   IconChevronRight,
 } from '@tabler/icons-react-native';
 import { SvgUri } from 'react-native-svg';
-import { colors } from '../../constants/colors';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 import {
   TEXAS_HOSPITAL_LOGOS,
   type TexasHospitalLogo,
@@ -123,6 +123,8 @@ function LogoMarqueeRow({
 
 export default function HomeScreen() {
   const router = useRouter();
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [failedLogos, setFailedLogos] = useState<Record<string, boolean>>({});
   const logoRows = useMemo(() => {
     const midpoint = Math.ceil(TEXAS_HOSPITAL_LOGOS.length / 2);
@@ -189,7 +191,7 @@ export default function HomeScreen() {
           <View style={styles.infoCard}>
             <View style={styles.infoHeader}>
               <View style={styles.infoIconWrap}>
-                <IconMedicalCross size={20} color={colors.brand.rose} strokeWidth={2} />
+                <IconMedicalCross size={20} color={theme.colors.danger} strokeWidth={2} />
               </View>
               <View style={styles.infoHeadingWrap}>
                 <Text style={styles.infoTitle}>Medical Records</Text>
@@ -225,9 +227,9 @@ export default function HomeScreen() {
             onPress={() => router.push('/records-request')}
             style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaButtonPressed]}
           >
-            <IconCirclePlus size={22} color="#FFFFFF" strokeWidth={2} />
+            <IconCirclePlus size={22} color={theme.colors.primaryForeground} strokeWidth={2} />
             <Text style={styles.ctaText}>Start Records Request</Text>
-            <IconChevronRight size={20} color="#FFFFFF" strokeWidth={2} />
+            <IconChevronRight size={20} color={theme.colors.primaryForeground} strokeWidth={2} />
           </Pressable>
         </View>
       </View>
@@ -235,10 +237,10 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
   },
   content: {
     flex: 1,
@@ -254,7 +256,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   screenTitle: {
-    color: '#111',
+    color: theme.colors.text,
     fontSize: 28,
     fontWeight: '700',
   },
@@ -265,8 +267,8 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(37, 99, 235, 0.28)',
-    backgroundColor: '#F8FBFF',
+    borderColor: theme.colors.overlay,
+    backgroundColor: theme.colors.backgroundSubtle,
     paddingVertical: 14,
     marginBottom: 16,
     justifyContent: 'center',
@@ -289,8 +291,8 @@ const styles = StyleSheet.create({
     marginRight: LOGO_TILE_GAP,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(148, 163, 184, 0.4)',
-    backgroundColor: '#FFFFFF',
+    borderColor: theme.colors.overlayMuted,
+    backgroundColor: theme.colors.surface,
     paddingHorizontal: 8,
     paddingVertical: 8,
     alignItems: 'center',
@@ -308,22 +310,22 @@ const styles = StyleSheet.create({
   },
   logoFallbackMark: {
     alignItems: 'center',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.border,
     borderRadius: 8,
     justifyContent: 'center',
     width: '100%',
     height: '100%',
   },
   logoFallbackText: {
-    color: '#334155',
+    color: theme.colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
   },
   infoCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(225, 29, 72, 0.22)',
+    borderColor: theme.colors.dangerSoft,
     paddingHorizontal: 14,
     paddingVertical: 14,
     marginBottom: 16,
@@ -335,7 +337,7 @@ const styles = StyleSheet.create({
   },
   infoIconWrap: {
     alignItems: 'center',
-    backgroundColor: 'rgba(225, 29, 72, 0.14)',
+    backgroundColor: theme.colors.dangerSoft,
     borderRadius: 10,
     height: 34,
     justifyContent: 'center',
@@ -346,26 +348,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoTitle: {
-    color: colors.base.ink,
+    color: theme.colors.text,
     fontSize: 22,
     fontWeight: '700',
     lineHeight: 28,
   },
   infoSubtitle: {
-    color: colors.base.slate,
+    color: theme.colors.textSecondary,
     fontSize: 17,
     fontWeight: '500',
     lineHeight: 22,
   },
   infoBody: {
-    color: colors.base.slate,
+    color: theme.colors.textSecondary,
     fontSize: 16,
     lineHeight: 24,
     paddingRight: 6,
   },
   ctaButton: {
     alignItems: 'center',
-    backgroundColor: '#E65941',
+    backgroundColor: theme.colors.primary,
     borderRadius: 14,
     flexDirection: 'row',
     paddingHorizontal: 14,
@@ -375,10 +377,10 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   ctaText: {
-    color: '#FFFFFF',
+    color: theme.colors.primaryForeground,
     flex: 1,
     fontSize: 19,
     fontWeight: '600',
     marginLeft: 10,
   },
-});
+}));

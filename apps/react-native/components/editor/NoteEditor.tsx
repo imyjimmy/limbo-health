@@ -33,6 +33,7 @@ import { InlineRecorderBar } from '../audio/InlineRecorderBar';
 import { encode as b64encode } from '../../core/crypto/base64';
 import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
 import { parseMarkdownFrontMatter } from '../../core/markdown/frontmatter';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 
 interface NoteEditorProps {
   /** Directory path where the note will be saved, e.g. "visits/" or "conditions/back-acne/" */
@@ -54,6 +55,8 @@ export function NoteEditor({
   onSave,
   onCancel,
 }: NoteEditorProps) {
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const parsedInitialValue = parseMarkdownFrontMatter(initialDoc?.value ?? '');
   const initialFrontMatterRaw = parsedInitialValue.hasFrontMatter
     ? parsedInitialValue.raw
@@ -252,7 +255,7 @@ export function NoteEditor({
         </Text>
         <TouchableOpacity onPress={handleSave} disabled={saving} testID="editor-save">
           {saving ? (
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={theme.colors.secondary} />
           ) : (
             <Text style={styles.saveText}>Save</Text>
           )}
@@ -263,7 +266,7 @@ export function NoteEditor({
       <TextInput
         style={styles.titleInput}
         placeholder="Note title..."
-        placeholderTextColor="#999"
+        placeholderTextColor={theme.colors.inputPlaceholder}
         value={title}
         onChangeText={setTitle}
         returnKeyType="next"
@@ -276,7 +279,7 @@ export function NoteEditor({
         <RichText editor={editor} onLoad={handleEditorLoad} />
         {!editorReady && (
           <View style={styles.editorOverlay}>
-            <ActivityIndicator size="small" color="#999" />
+            <ActivityIndicator size="small" color={theme.colors.textMuted} />
           </View>
         )}
       </View>
@@ -323,10 +326,10 @@ export function NoteEditor({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -335,40 +338,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
   cancelText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   headerPath: {
     fontSize: 13,
-    color: '#999',
+    color: theme.colors.textMuted,
     flex: 1,
     textAlign: 'center',
     marginHorizontal: 12,
   },
   saveText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: theme.colors.secondary,
     fontWeight: '600',
   },
   titleInput: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: theme.colors.text,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
   editorContainer: {
     flex: 1,
     position: 'relative',
+    backgroundColor: theme.colors.surface,
   },
   editorOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -380,6 +386,6 @@ const styles = StyleSheet.create({
   recorderRow: {
     paddingHorizontal: 12,
     paddingBottom: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
   },
-});
+}));

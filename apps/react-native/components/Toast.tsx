@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
+import { createThemedStyles, useThemedStyles } from '../theme';
 
 interface ToastContextValue {
   showToast: (message: string) => void;
@@ -10,6 +11,7 @@ const ToastContext = createContext<ToastContextValue>({ showToast: () => {} });
 export const useToast = () => useContext(ToastContext);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const styles = useThemedStyles(createStyles);
   const [message, setMessage] = useState<string | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,7 +56,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   wrapper: {
     flex: 1,
   },
@@ -62,14 +64,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 100,
     alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: theme.colors.overlayStrong,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
   },
   text: {
-    color: '#ffffff',
+    color: theme.colors.textInverse,
     fontSize: 14,
     fontWeight: '500',
   },
-});
+}));

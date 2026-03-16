@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useGoogleAuth } from '../../core/auth/googleAuth';
 import { useAuthContext } from '../../providers/AuthProvider';
-import { colors } from '../../constants/colors';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 
 function GoogleLogo({ size = 20 }: { size?: number }) {
   return (
@@ -27,26 +27,7 @@ function GoogleLogo({ size = 20 }: { size?: number }) {
   );
 }
 
-const SLIDES = [
-  {
-    eyebrow: 'Private by default',
-    title: 'Own the record trail.',
-    body:
-      'Keep your medical-records requests, identity details, and binder data under your control instead of scattered across portals and forms.',
-    accent: '#0F766E',
-    pills: ['Encrypted access', 'Reusable profile', 'Device-first'],
-  },
-  {
-    eyebrow: 'Workflow over chaos',
-    title: 'Turn hospital bureaucracy into steps.',
-    body:
-      'Pick a Texas hospital system, review exactly what it requires, attach ID only when needed, and move through a guided request flow.',
-    accent: '#1D4ED8',
-    pills: ['System workflows', 'ID requirement detection', 'Official form links'],
-  },
-] as const;
-
-function OnboardingArt({ color }: { color: string }) {
+function OnboardingArt({ color, styles }: { color: string; styles: ReturnType<typeof createStyles> }) {
   return (
     <View style={styles.artFrame}>
       <View style={[styles.artPanelLarge, { backgroundColor: color }]} />
@@ -69,12 +50,32 @@ export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const scrollRef = useRef<ScrollView>(null);
   const { loginWithGoogle, loginWithStoredNostr, hasStoredNostrKey } = useAuthContext();
   const { request, response, promptAsync } = useGoogleAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [nostrLoading, setNostrLoading] = useState(false);
+  const slides = [
+    {
+      eyebrow: 'Private by default',
+      title: 'Own the record trail.',
+      body:
+        'Keep your medical-records requests, identity details, and binder data under your control instead of scattered across portals and forms.',
+      accent: theme.colors.primary,
+      pills: ['Encrypted access', 'Reusable profile', 'Device-first'],
+    },
+    {
+      eyebrow: 'Workflow over chaos',
+      title: 'Turn hospital bureaucracy into steps.',
+      body:
+        'Pick a Texas hospital system, review exactly what it requires, attach ID only when needed, and move through a guided request flow.',
+      accent: theme.colors.secondary,
+      pills: ['System workflows', 'ID requirement detection', 'Official form links'],
+    },
+  ] as const;
 
   useEffect(() => {
     if (response?.type === 'success' && response.authentication?.accessToken) {
@@ -116,7 +117,7 @@ export default function WelcomeScreen() {
           disabled={nostrLoading}
         >
           {nostrLoading ? (
-            <ActivityIndicator color={colors.brand.violet} />
+            <ActivityIndicator color={theme.colors.accentForeground} />
           ) : (
             <Text style={styles.nostrButtonText}>Sign in with Nostr</Text>
           )}
@@ -163,10 +164,10 @@ export default function WelcomeScreen() {
           setCurrentSlide(nextSlide);
         }}
       >
-        {SLIDES.map((slide, index) => (
+        {slides.map((slide, index) => (
           <View key={slide.title} style={[styles.slide, { width }]}>
             <View style={styles.slideInner}>
-              {index === 0 ? <OnboardingArt color={slide.accent} /> : null}
+              {index === 0 ? <OnboardingArt color={slide.accent} styles={styles} /> : null}
               <Text style={styles.slideEyebrow}>{slide.eyebrow}</Text>
               <Text style={styles.slideTitle}>{slide.title}</Text>
               <Text style={styles.slideBody}>{slide.body}</Text>
@@ -202,7 +203,7 @@ export default function WelcomeScreen() {
               disabled={!request || googleLoading}
             >
               {googleLoading ? (
-                <ActivityIndicator color="#0F172A" />
+                <ActivityIndicator color={theme.colors.text} />
               ) : (
                 <View style={styles.authButtonContent}>
                   <GoogleLogo size={20} />
@@ -249,10 +250,10 @@ export default function WelcomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   screen: {
     flex: 1,
-    backgroundColor: '#F5F8FF',
+    backgroundColor: theme.colors.background,
   },
   topGlow: {
     position: 'absolute',
@@ -260,7 +261,7 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: '#D6F5EE',
+    backgroundColor: theme.colors.primarySoft,
     opacity: 0.8,
   },
   bottomGlow: {
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: theme.colors.secondarySoft,
     opacity: 0.7,
   },
   topBar: {
@@ -287,7 +288,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   brand: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -298,7 +299,7 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   skipButtonText: {
-    color: '#2563EB',
+    color: theme.colors.secondary,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -315,12 +316,12 @@ const styles = StyleSheet.create({
   artFrame: {
     height: 280,
     borderRadius: 34,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     padding: 18,
     marginBottom: 26,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
   },
   artPanelLarge: {
     position: 'absolute',
@@ -332,26 +333,26 @@ const styles = StyleSheet.create({
     opacity: 0.16,
   },
   artCardTop: {
-    backgroundColor: '#0F172A',
+    backgroundColor: theme.colors.surfaceInverse,
     borderRadius: 24,
     padding: 20,
     minHeight: 122,
     justifyContent: 'flex-end',
   },
   artCardTitle: {
-    color: '#FFFFFF',
+    color: theme.colors.textInverse,
     fontSize: 22,
     fontWeight: '700',
     marginBottom: 8,
   },
   artCardBody: {
-    color: '#CBD5E1',
+    color: theme.colors.textMuted,
     fontSize: 15,
     lineHeight: 22,
   },
   artCardBottom: {
     marginTop: 14,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 24,
     padding: 18,
     flex: 1,
@@ -360,29 +361,29 @@ const styles = StyleSheet.create({
     width: 96,
     height: 12,
     borderRadius: 999,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: theme.colors.secondarySoft,
     marginBottom: 10,
   },
   artBadgeWide: {
     width: 148,
-    backgroundColor: '#D1FAE5',
+    backgroundColor: theme.colors.primarySoft,
   },
   artDivider: {
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.border,
     marginVertical: 12,
   },
   artLine: {
     height: 16,
     borderRadius: 8,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.border,
     marginBottom: 10,
   },
   artLineShort: {
     width: '68%',
   },
   slideEyebrow: {
-    color: '#0F766E',
+    color: theme.colors.primary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.4,
@@ -390,7 +391,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   slideTitle: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 32,
     fontWeight: '800',
     lineHeight: 36,
@@ -398,7 +399,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   slideBody: {
-    color: '#475569',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     lineHeight: 24,
   },
@@ -409,15 +410,15 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   pill: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#D6E3FF',
+    borderColor: theme.colors.secondarySoft,
     paddingHorizontal: 14,
     paddingVertical: 9,
   },
   pillText: {
-    color: '#1E3A8A',
+    color: theme.colors.secondary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -425,13 +426,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   authButton: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 18,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: theme.colors.border,
   },
   authButtonDisabled: {
     opacity: 0.45,
@@ -442,7 +443,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   authButtonText: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 17,
     fontWeight: '700',
   },
@@ -451,17 +452,17 @@ const styles = StyleSheet.create({
   },
   nostrButton: {
     alignSelf: 'center',
-    backgroundColor: colors.surface.violetSoft,
+    backgroundColor: theme.colors.accent,
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#C7B1FF',
+    borderColor: theme.colors.accent,
   },
   nostrButtonText: {
-    color: colors.brand.violet,
+    color: theme.colors.accentForeground,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -487,14 +488,14 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: theme.colors.border,
   },
   paginationDotActive: {
     width: 28,
-    backgroundColor: '#0F766E',
+    backgroundColor: theme.colors.primary,
   },
   nextButton: {
-    backgroundColor: '#0F766E',
+    backgroundColor: theme.colors.primary,
     borderRadius: 18,
     paddingVertical: 16,
     alignItems: 'center',
@@ -503,14 +504,14 @@ const styles = StyleSheet.create({
     opacity: 0.88,
   },
   nextButtonText: {
-    color: '#FFFFFF',
+    color: theme.colors.primaryForeground,
     fontSize: 17,
     fontWeight: '700',
   },
   footerNote: {
     textAlign: 'center',
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 14,
     fontWeight: '600',
   },
-});
+}));

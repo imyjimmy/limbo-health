@@ -6,6 +6,7 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthContext } from '../providers/AuthProvider';
+import { createThemedStyles, useThemedStyles } from '../theme';
 
 function getInitials(metadata: any, pubkey: string | null): string {
   const name = metadata?.display_name || metadata?.name;
@@ -23,6 +24,7 @@ function getInitials(metadata: any, pubkey: string | null): string {
 export function ProfileAvatar({ size = 36 }: { size?: number }) {
   const router = useRouter();
   const { state } = useAuthContext();
+  const styles = useThemedStyles(createStyles);
   const { metadata, pubkey } = state;
   const picture = metadata?.picture;
 
@@ -52,17 +54,17 @@ export function ProfileAvatar({ size = 36 }: { size?: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   image: {
-    backgroundColor: '#e5e5e5',
+    backgroundColor: theme.colors.border,
   },
   fallback: {
-    backgroundColor: '#374151',
+    backgroundColor: theme.colors.surfaceInverse,
     alignItems: 'center',
     justifyContent: 'center',
   },
   initials: {
-    color: '#fff',
+    color: theme.colors.textInverse,
     fontWeight: '700',
   },
-});
+}));

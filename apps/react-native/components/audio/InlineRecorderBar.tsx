@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 
 interface InlineRecorderBarProps {
   onComplete: (result: AudioRecordingResult) => Promise<void> | void;
@@ -19,6 +20,8 @@ function formatElapsed(ms: number): string {
 export function InlineRecorderBar({ onComplete, onCancel }: InlineRecorderBarProps) {
   const { status, elapsedMs, start, stop, cancel } = useAudioRecorder();
   const [busy, setBusy] = useState(false);
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
 
   useEffect(() => {
     start().catch((err) => {
@@ -56,7 +59,7 @@ export function InlineRecorderBar({ onComplete, onCancel }: InlineRecorderBarPro
       <View style={styles.spacer} />
 
       {busy ? (
-        <ActivityIndicator size="small" color="#666" />
+        <ActivityIndicator size="small" color={theme.colors.textMuted} />
       ) : (
         <>
           <Pressable
@@ -65,7 +68,7 @@ export function InlineRecorderBar({ onComplete, onCancel }: InlineRecorderBarPro
             accessibilityRole="button"
             accessibilityLabel="Cancel recording"
           >
-            <Ionicons name="close" size={18} color="#666" />
+            <Ionicons name="close" size={18} color={theme.colors.textMuted} />
           </Pressable>
           <Pressable
             style={[styles.iconButton, styles.stopButton]}
@@ -74,7 +77,7 @@ export function InlineRecorderBar({ onComplete, onCancel }: InlineRecorderBarPro
             accessibilityRole="button"
             accessibilityLabel="Stop recording"
           >
-            <Ionicons name="stop" size={14} color="#fff" />
+            <Ionicons name="stop" size={14} color={theme.colors.dangerForeground} />
           </Pressable>
         </>
       )}
@@ -82,13 +85,13 @@ export function InlineRecorderBar({ onComplete, onCancel }: InlineRecorderBarPro
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F1F1F1',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderWidth: 1,
-    borderColor: '#E2E2E2',
+    borderColor: theme.colors.border,
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
@@ -98,12 +101,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#D11A2A',
+    backgroundColor: theme.colors.danger,
   },
   timer: {
     fontSize: 14,
     fontVariant: ['tabular-nums'],
-    color: '#444',
+    color: theme.colors.textSecondary,
   },
   spacer: {
     flex: 1,
@@ -116,6 +119,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stopButton: {
-    backgroundColor: '#D11A2A',
+    backgroundColor: theme.colors.danger,
   },
-});
+}));

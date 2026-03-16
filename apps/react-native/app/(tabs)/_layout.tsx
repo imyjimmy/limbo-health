@@ -12,6 +12,7 @@ import { InlineRecorderBar } from '../../components/audio/InlineRecorderBar';
 import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
 import { BinderService } from '../../core/binder/BinderService';
 import { emitDirectoryChanged } from '../../core/binder/DirectoryEvents';
+import { createThemedStyles, useThemedStyles } from '../../theme';
 
 export default function TabLayout() {
   return (
@@ -30,6 +31,7 @@ function TabLayoutInner() {
   const { status: bioStatus, hasProfile } = useBioProfile();
   const { masterConversationKey } = useCryptoContext();
   const { showToast } = useToast();
+  const styles = useThemedStyles(createStyles);
   const [activeAudioContext, setActiveAudioContext] = useState<{
     binderId: string;
     dirPath: string;
@@ -193,7 +195,7 @@ function TabLayoutInner() {
   if (bioStatus === 'loading') {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={styles.loadingIndicator.color} />
       </View>
     );
   }
@@ -274,7 +276,7 @@ function TabLayoutInner() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   screen: {
     flex: 1,
   },
@@ -282,7 +284,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.backgroundSubtle,
+  },
+  loadingIndicator: {
+    color: theme.colors.secondary,
   },
   inlineRecorderWrap: {
     position: 'absolute',
@@ -290,4 +295,4 @@ const styles = StyleSheet.create({
     right: 12,
     bottom: 74,
   },
-});
+}));

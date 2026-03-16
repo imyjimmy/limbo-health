@@ -15,7 +15,6 @@ import {
   Pressable,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -29,6 +28,7 @@ import { fetchHospitalSystems, fetchRecordsRequestPacket } from '../core/records
 import { generateRecordsRequestPdf } from '../core/recordsWorkflow/pdf';
 import { useCamera } from '../hooks/useCamera';
 import { useBioProfile } from '../providers/BioProfileProvider';
+import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 import { formatMailingAddress } from '../types/bio';
 import type {
   HospitalSystemOption,
@@ -49,6 +49,8 @@ function formatMethodLabel(method: string): string {
 export default function RecordsRequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const { capture } = useCamera();
   const { status: bioStatus, profile, hasProfile } = useBioProfile();
   const [currentStep, setCurrentStep] = useState(0);
@@ -112,7 +114,7 @@ export default function RecordsRequestScreen() {
   if (bioStatus === 'loading') {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={theme.colors.secondary} />
       </View>
     );
   }
@@ -329,7 +331,7 @@ export default function RecordsRequestScreen() {
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search hospital systems"
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={theme.colors.inputPlaceholder}
               style={styles.searchInput}
               autoCapitalize="words"
               returnKeyType="search"
@@ -337,7 +339,7 @@ export default function RecordsRequestScreen() {
 
             {systemsLoading ? (
               <View style={styles.inlineLoading}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={theme.colors.secondary} />
                 <Text style={styles.inlineLoadingText}>Loading systems...</Text>
               </View>
             ) : systemsError ? (
@@ -382,7 +384,7 @@ export default function RecordsRequestScreen() {
                 <Text style={styles.selectionSummaryName}>{selectedSystem.name}</Text>
                 {packetLoading && (
                   <View style={styles.inlineLoading}>
-                    <ActivityIndicator size="small" color="#2563EB" />
+                    <ActivityIndicator size="small" color={theme.colors.secondary} />
                     <Text style={styles.inlineLoadingText}>Loading workflow packet...</Text>
                   </View>
                 )}
@@ -643,16 +645,16 @@ export default function RecordsRequestScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   screen: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.backgroundSubtle,
   },
   loadingScreen: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.backgroundSubtle,
   },
   content: {
     paddingHorizontal: 20,
@@ -668,7 +670,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   backButtonText: {
-    color: '#2563EB',
+    color: theme.colors.secondary,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -676,34 +678,34 @@ const styles = StyleSheet.create({
     minWidth: 56,
   },
   headerTitle: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 17,
     fontWeight: '700',
   },
   stepperCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 28,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     gap: 10,
   },
   eyebrow: {
-    color: '#0F766E',
+    color: theme.colors.primary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
   heroTitle: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 30,
     fontWeight: '800',
     lineHeight: 34,
     letterSpacing: -0.8,
   },
   heroSubtitle: {
-    color: '#475569',
+    color: theme.colors.textSecondary,
     fontSize: 16,
     lineHeight: 23,
   },
@@ -711,32 +713,32 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   sectionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.surface,
     borderRadius: 28,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
     gap: 16,
   },
   sectionTitle: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 22,
     fontWeight: '700',
     lineHeight: 28,
   },
   sectionBody: {
-    color: '#475569',
+    color: theme.colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
   summaryCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 20,
     padding: 16,
     gap: 8,
   },
   summaryLabel: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -744,7 +746,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   summaryValue: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '600',
     lineHeight: 22,
@@ -760,7 +762,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0F766E',
+    backgroundColor: theme.colors.primary,
     borderRadius: 18,
     paddingHorizontal: 18,
     paddingVertical: 16,
@@ -769,7 +771,7 @@ const styles = StyleSheet.create({
     opacity: 0.86,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: theme.colors.primaryForeground,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -777,18 +779,18 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: theme.colors.secondarySoft,
     borderRadius: 18,
     paddingHorizontal: 18,
     paddingVertical: 16,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: theme.colors.secondary,
   },
   secondaryButtonPressed: {
     opacity: 0.88,
   },
   secondaryButtonText: {
-    color: '#1D4ED8',
+    color: theme.colors.secondary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -799,13 +801,13 @@ const styles = StyleSheet.create({
     flex: 0,
   },
   searchInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.inputBackground,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#CBD5E1',
+    borderColor: theme.colors.inputBorder,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 16,
   },
   inlineLoading: {
@@ -814,24 +816,24 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   inlineLoadingText: {
-    color: '#475569',
+    color: theme.colors.textSecondary,
     fontSize: 14,
   },
   errorCard: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: theme.colors.dangerSoft,
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: theme.colors.danger,
     gap: 6,
   },
   errorTitle: {
-    color: '#991B1B',
+    color: theme.colors.danger,
     fontSize: 15,
     fontWeight: '700',
   },
   errorBody: {
-    color: '#B91C1C',
+    color: theme.colors.danger,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -842,15 +844,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 20,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
   },
   systemCardSelected: {
-    borderColor: '#0F766E',
-    backgroundColor: '#F0FDFA',
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primarySoft,
   },
   systemCardPressed: {
     opacity: 0.86,
@@ -860,41 +862,41 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   systemName: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '700',
     lineHeight: 22,
   },
   systemMeta: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 13,
   },
   emptyStateText: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 14,
     textAlign: 'center',
     paddingVertical: 8,
   },
   selectionSummary: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 20,
     padding: 16,
     gap: 8,
   },
   selectionSummaryTitle: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
   selectionSummaryName: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 18,
     fontWeight: '700',
   },
   selectionSummaryMeta: {
-    color: '#475569',
+    color: theme.colors.textSecondary,
     fontSize: 14,
   },
   badgeRow: {
@@ -903,51 +905,51 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   methodBadge: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: theme.colors.secondarySoft,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   methodBadgeText: {
-    color: '#1D4ED8',
+    color: theme.colors.secondary,
     fontSize: 12,
     fontWeight: '700',
   },
   errorInlineText: {
-    color: '#B91C1C',
+    color: theme.colors.danger,
     fontSize: 14,
   },
   requirementCard: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: theme.colors.warningSoft,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: theme.colors.warning,
     gap: 8,
   },
   requirementTitle: {
-    color: '#92400E',
+    color: theme.colors.warning,
     fontSize: 18,
     fontWeight: '700',
   },
   requirementBody: {
-    color: '#78350F',
+    color: theme.colors.warning,
     fontSize: 15,
     fontWeight: '600',
   },
   requirementFootnote: {
-    color: '#92400E',
+    color: theme.colors.warning,
     fontSize: 14,
     lineHeight: 20,
   },
   previewCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 20,
     padding: 16,
     gap: 10,
   },
   previewTitle: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -955,27 +957,27 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 210,
     borderRadius: 18,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: theme.colors.border,
   },
   previewMeta: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 13,
   },
   reviewSection: {
     gap: 8,
   },
   reviewHeader: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 16,
     fontWeight: '700',
   },
   reviewText: {
-    color: '#0F172A',
+    color: theme.colors.text,
     fontSize: 15,
     lineHeight: 22,
   },
   reviewMuted: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -983,22 +985,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: theme.colors.border,
   },
   linkText: {
-    color: '#1D4ED8',
+    color: theme.colors.secondary,
     fontSize: 15,
     fontWeight: '600',
     flex: 1,
     marginRight: 10,
   },
   linkMeta: {
-    color: '#64748B',
+    color: theme.colors.textMuted,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1008,33 +1010,33 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   instructionBullet: {
-    color: '#0F766E',
+    color: theme.colors.primary,
     fontSize: 14,
     fontWeight: '700',
     width: 14,
   },
   instructionText: {
     flex: 1,
-    color: '#334155',
+    color: theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
   },
   successCard: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: theme.colors.successSoft,
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: theme.colors.success,
     gap: 10,
   },
   successTitle: {
-    color: '#065F46',
+    color: theme.colors.success,
     fontSize: 16,
     fontWeight: '700',
   },
   successBody: {
-    color: '#047857',
+    color: theme.colors.success,
     fontSize: 14,
     lineHeight: 20,
   },
-});
+}));

@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Pressable,
-  StyleSheet,
-  Modal,
-  Text,
-} from 'react-native';
+import { View, Pressable, StyleSheet, Modal, Text } from 'react-native';
 import {
   IconBook2,
   IconBook,
@@ -21,11 +15,10 @@ import {
 } from '@tabler/icons-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ProfileAvatar } from './ProfileAvatar';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 
 const ICON_SIZE = 24;
 const PLUS_SIZE = 34;
-const INACTIVE_COLOR = '#cecece';
-const ACTIVE_COLOR = '#ffffff';
 
 type CreateAction = 'note' | 'audio' | 'photo' | 'medication';
 type ContextualCreateIconKey = 'medication' | 'bio' | 'note';
@@ -76,6 +69,8 @@ export function CustomTabBar({
   contextualCreateAction = null,
   onDocumentPress,
 }: CustomTabBarProps) {
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [menuVisible, setMenuVisible] = useState(false);
   const orderedTabKinds: TabKind[] = ['home', 'binders', 'create', 'page', 'profile'];
   const visibleRoutes = orderedTabKinds
@@ -89,12 +84,7 @@ export function CustomTabBar({
 
   return (
     <>
-      <View
-        style={[
-          styles.container
-        ]}
-      >
-         
+      <View style={styles.container}>
         <View style={styles.tabRow}>
           {visibleRoutes.map((route) => {
             const index = state.routes.indexOf(route);
@@ -103,13 +93,11 @@ export function CustomTabBar({
             if (!tabKind) return null;
 
             const onPress = () => {
-              // Center "create" tab opens menu instead of navigating
               if (tabKind === 'create') {
                 setMenuVisible(true);
                 return;
               }
 
-              // Document tab jumps to last viewed directory
               if (tabKind === 'page') {
                 onDocumentPress?.();
                 return;
@@ -145,11 +133,18 @@ export function CustomTabBar({
                   testID={`tab-${tabKind}`}
                   style={styles.tabButton}
                 >
-                  {renderTabIcon(tabKind, isActive, {
-                    profileImageUrl,
-                    profileInitials,
-                    hasNotification,
-                  })}
+                  {renderTabIcon(
+                    tabKind,
+                    isActive,
+                    {
+                      profileImageUrl,
+                      profileInitials,
+                      hasNotification,
+                    },
+                    theme.colors.tabIconActive,
+                    theme.colors.tabIconInactive,
+                    styles,
+                  )}
                 </Pressable>
               </View>
             );
@@ -157,17 +152,13 @@ export function CustomTabBar({
         </View>
       </View>
 
-      {/* Create menu modal */}
       <Modal
         visible={menuVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setMenuVisible(false)}
       >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setMenuVisible(false)}
-        >
+        <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <View style={styles.menuContainer}>
             {contextualCreateAction && (
               <Pressable
@@ -181,6 +172,7 @@ export function CustomTabBar({
                 <ContextualCreateIcon
                   action={contextualCreateAction.action}
                   icon={contextualCreateAction.icon}
+                  color={theme.colors.tabIconActive}
                 />
                 <Text style={styles.contextualMenuItemLabel}>
                   {contextualCreateAction.label}
@@ -200,7 +192,7 @@ export function CustomTabBar({
                 >
                   <item.Icon
                     size={24}
-                    color={ACTIVE_COLOR}
+                    color={theme.colors.tabIconActive}
                     strokeWidth={1.5}
                   />
                 </Pressable>
@@ -220,9 +212,12 @@ function renderTabIcon(
     profileImageUrl?: string | null;
     profileInitials: string;
     hasNotification: boolean;
-  }
+  },
+  activeColor: string,
+  inactiveColor: string,
+  styles: ReturnType<typeof createStyles>,
 ) {
-  const color = isActive ? ACTIVE_COLOR : INACTIVE_COLOR;
+  const color = isActive ? activeColor : inactiveColor;
 
   switch (tabKind) {
     case 'home':
@@ -233,9 +228,7 @@ function renderTabIcon(
       );
 
     case 'binders':
-      return (
-        <IconBook2 size={ICON_SIZE} color={color} strokeWidth={2} />
-      );
+      return <IconBook2 size={ICON_SIZE} color={color} strokeWidth={2} />;
 
     case 'page':
       return isActive ? (
@@ -269,45 +262,42 @@ function renderTabIcon(
 function ContextualCreateIcon({
   action,
   icon,
+  color,
 }: {
   action: CreateAction;
   icon?: ContextualCreateIconKey;
+  color: string;
 }) {
   const resolvedIcon = icon ?? action;
 
   switch (resolvedIcon) {
     case 'medication':
-      return <IconLogs size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
+      return <IconLogs size={22} color={color} strokeWidth={1.5} />;
     case 'bio':
-      return <IconId size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
+      return <IconId size={22} color={color} strokeWidth={1.5} />;
     case 'note':
-      return <IconContract size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
+      return <IconContract size={22} color={color} strokeWidth={1.5} />;
     default:
-      return <IconPlus size={22} color={ACTIVE_COLOR} strokeWidth={1.5} />;
+      return <IconPlus size={22} color={color} strokeWidth={1.5} />;
   }
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
-    backgroundColor: '#0f1923',
+    backgroundColor: theme.colors.tabBarBackground,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: theme.colors.tabBarBorder,
     paddingTop: 4,
     paddingBottom: 18,
-    // borderBottomWidth: 2,
-    // borderBottomColor: 'red',
   },
   tabColumn: {
-   flex: 1,
-   alignItems: 'center',
+    flex: 1,
+    alignItems: 'center',
   },
   tabRow: {
-    display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
     paddingBottom: 4,
-    // borderBottomWidth: 2,
-    // borderBottomColor: 'yellow',
   },
   tabButton: {
     alignItems: 'center',
@@ -317,7 +307,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   plusButton: {
-    borderColor: 'rgba(190, 190, 190, 0.8)',
+    borderColor: theme.colors.tabIconInactive,
     borderWidth: 2,
     borderRadius: 12,
     alignItems: 'center',
@@ -325,17 +315,17 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlayStrong,
     justifyContent: 'flex-end',
     paddingBottom: 100,
     paddingHorizontal: 80,
   },
   menuContainer: {
-    backgroundColor: '#1a2733',
+    backgroundColor: theme.colors.surfaceInverse,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: theme.colors.tabBarBorder,
   },
   menuRow: {
     flexDirection: 'row',
@@ -343,16 +333,14 @@ const styles = StyleSheet.create({
   menuItem: {
     flex: 1,
     alignItems: 'center',
-    // justifyContent: 'center',
-    // gap: 14,
     paddingVertical: 12,
     paddingHorizontal: 12,
   },
   menuItemPressed: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: theme.colors.overlayMuted,
   },
   menuItemLabel: {
-    color: '#ffffff',
+    color: theme.colors.textInverse,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -364,11 +352,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.12)',
+    borderBottomColor: theme.colors.tabBarBorder,
   },
   contextualMenuItemLabel: {
-    color: '#ffffff',
+    color: theme.colors.textInverse,
     fontSize: 14,
     fontWeight: '600',
   },
-});
+}));

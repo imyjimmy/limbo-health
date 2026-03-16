@@ -19,7 +19,7 @@ import { bech32 } from '@scure/base';
 import { useAuthContext } from '../../../providers/AuthProvider';
 import { KeyManager } from '../../../core/crypto/KeyManager';
 import ImportKeyForm from '../../../components/auth/ImportKeyForm';
-import { colors } from '../../../constants/colors';
+import { createThemedStyles, useThemedStyles } from '../../../theme';
 
 function encodeBech32(prefix: string, hexStr: string): string {
   const bytes = hexToBytes(hexStr);
@@ -34,6 +34,7 @@ function truncateKey(key: string): string {
 export default function EncryptionKeysRoute() {
   const navigation = useNavigation();
   const { state, hasStoredNostrKey } = useAuthContext();
+  const styles = useThemedStyles(createStyles);
   const keyManager = useMemo(() => new KeyManager(SecureStore), []);
 
   const hasLinkedKey = !!state.pubkey;
@@ -116,7 +117,7 @@ export default function EncryptionKeysRoute() {
           disabled={exporting}
         >
           {exporting ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={styles.exportButtonText.color} />
           ) : (
             <Text style={styles.exportButtonText}>Export private key</Text>
           )}
@@ -149,10 +150,10 @@ export default function EncryptionKeysRoute() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: colors.surface.sky,
+    backgroundColor: theme.colors.background,
   },
   contentContainer: {
     paddingHorizontal: 24,
@@ -161,14 +162,14 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: colors.base.slate,
+    color: theme.colors.textSecondary,
     lineHeight: 22,
     marginBottom: 28,
   },
   keyBox: {
-    backgroundColor: colors.surface.tealSoft,
+    backgroundColor: theme.colors.successSoft,
     borderWidth: 1,
-    borderColor: '#BEE6E0',
+    borderColor: theme.colors.success,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
   keyLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: colors.base.muted,
+    color: theme.colors.textMuted,
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -184,61 +185,61 @@ const styles = StyleSheet.create({
   keyValue: {
     fontSize: 14,
     fontFamily: 'Courier',
-    color: colors.base.ink,
+    color: theme.colors.text,
     marginBottom: 4,
   },
   keyAction: {
     fontSize: 12,
-    color: '#0F766E',
+    color: theme.colors.primary,
   },
   exportButton: {
-    backgroundColor: colors.brand.blue,
+    backgroundColor: theme.colors.secondary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 16,
   },
   exportButtonText: {
-    color: '#fff',
+    color: theme.colors.secondaryForeground,
     fontSize: 17,
     fontWeight: '600',
   },
   nsecBox: {
-    backgroundColor: colors.surface.roseSoft,
+    backgroundColor: theme.colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: theme.colors.danger,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     gap: 8,
   },
   nsecWarning: {
-    color: '#B91C1C',
+    color: theme.colors.danger,
     fontSize: 13,
     lineHeight: 18,
   },
   nsecValue: {
-    color: colors.base.ink,
+    color: theme.colors.text,
     fontSize: 12,
     fontFamily: 'Courier',
     lineHeight: 18,
   },
   nsecDismiss: {
-    color: colors.base.muted,
+    color: theme.colors.textMuted,
     fontSize: 13,
     textAlign: 'right',
   },
   importButton: {
-    backgroundColor: colors.surface.violetSoft,
+    backgroundColor: theme.colors.accent,
     borderWidth: 1,
-    borderColor: '#DCCFFF',
+    borderColor: theme.colors.accent,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
   importButtonText: {
-    color: colors.brand.violet,
+    color: theme.colors.accentForeground,
     fontSize: 17,
     fontWeight: '600',
   },
-});
+}));
