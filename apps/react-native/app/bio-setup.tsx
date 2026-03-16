@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  InputAccessoryView,
   Keyboard,
   KeyboardAvoidingView,
   LayoutChangeEvent,
@@ -27,7 +26,6 @@ import {
 const STEP_COUNT = 3;
 const FIELD_SCROLL_TOP_PADDING = 28;
 const FIELD_SCROLL_KEYBOARD_PADDING = 92;
-const NUMBER_PAD_ACCESSORY_ID = 'bio-setup-number-pad-accessory';
 
 type BioFieldKey =
   | 'fullName'
@@ -167,6 +165,12 @@ export default function BioSetupScreen() {
     });
   }, [keyboardVisible]);
 
+  const blurField = useCallback((field: BioFieldKey) => {
+    if (focusedFieldRef.current === field) {
+      focusedFieldRef.current = null;
+    }
+  }, []);
+
   const dismissKeyboard = useCallback(() => {
     focusedFieldRef.current = null;
     Keyboard.dismiss();
@@ -248,6 +252,8 @@ export default function BioSetupScreen() {
   const activeStep = steps[currentStep];
   const topBarLabel =
     currentStep > 0 ? 'Previous' : isEditingExistingProfile ? 'Back' : null;
+  const showsDateOfBirthDoneButton = isValidDateOfBirth(form.dateOfBirth.trim());
+  const showsPostalCodeDoneButton = form.postalCode.trim().length >= 5;
 
   return (
     <KeyboardAvoidingView
@@ -304,6 +310,7 @@ export default function BioSetupScreen() {
                 value={form.fullName}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
                 onFocus={() => focusField('fullName')}
+                onBlur={() => blurField('fullName')}
                 placeholder="Jane Doe"
                 placeholderTextColor="#94A3B8"
                 style={styles.input}
@@ -324,12 +331,15 @@ export default function BioSetupScreen() {
                   }))
                 }
                 onFocus={() => focusField('dateOfBirth')}
+                onBlur={() => blurField('dateOfBirth')}
+                onSubmitEditing={dismissKeyboard}
                 placeholder="MM/DD/YYYY"
                 placeholderTextColor="#94A3B8"
                 style={styles.input}
                 keyboardType="number-pad"
-                returnKeyType="done"
-                inputAccessoryViewID={Platform.OS === 'ios' ? NUMBER_PAD_ACCESSORY_ID : undefined}
+                inputAccessoryViewButtonLabel={
+                  Platform.OS === 'ios' && showsDateOfBirthDoneButton ? 'Done' : undefined
+                }
               />
             </View>
           </View>
@@ -343,6 +353,7 @@ export default function BioSetupScreen() {
                 value={form.addressLine1}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
                 onFocus={() => focusField('addressLine1')}
+                onBlur={() => blurField('addressLine1')}
                 placeholder="123 Main St"
                 placeholderTextColor="#94A3B8"
                 style={styles.input}
@@ -357,6 +368,7 @@ export default function BioSetupScreen() {
                 value={form.addressLine2}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
                 onFocus={() => focusField('addressLine2')}
+                onBlur={() => blurField('addressLine2')}
                 placeholder="Apt 4B"
                 placeholderTextColor="#94A3B8"
                 style={styles.input}
@@ -372,6 +384,7 @@ export default function BioSetupScreen() {
                   value={form.city}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
                   onFocus={() => focusField('city')}
+                  onBlur={() => blurField('city')}
                   placeholder="Austin"
                   placeholderTextColor="#94A3B8"
                   style={styles.input}
@@ -386,6 +399,7 @@ export default function BioSetupScreen() {
                   value={form.state}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
                   onFocus={() => focusField('state')}
+                  onBlur={() => blurField('state')}
                   placeholder="TX"
                   placeholderTextColor="#94A3B8"
                   style={styles.input}
@@ -407,12 +421,16 @@ export default function BioSetupScreen() {
                   }))
                 }
                 onFocus={() => focusField('postalCode')}
+                onBlur={() => blurField('postalCode')}
+                onSubmitEditing={dismissKeyboard}
                 placeholder="78701"
                 placeholderTextColor="#94A3B8"
                 style={styles.input}
                 keyboardType="number-pad"
                 textContentType="postalCode"
-                inputAccessoryViewID={Platform.OS === 'ios' ? NUMBER_PAD_ACCESSORY_ID : undefined}
+                inputAccessoryViewButtonLabel={
+                  Platform.OS === 'ios' && showsPostalCodeDoneButton ? 'Done' : undefined
+                }
               />
             </View>
           </View>
@@ -468,16 +486,6 @@ export default function BioSetupScreen() {
             </Text>
           </Pressable>
         </View>
-      ) : null}
-
-      {Platform.OS === 'ios' ? (
-        <InputAccessoryView nativeID={NUMBER_PAD_ACCESSORY_ID}>
-          <View style={styles.keyboardAccessory}>
-            <Pressable onPress={dismissKeyboard} style={styles.keyboardAccessoryButton}>
-              <Text style={styles.keyboardAccessoryButtonText}>Done</Text>
-            </Pressable>
-          </View>
-        </InputAccessoryView>
       ) : null}
     </KeyboardAvoidingView>
   );
@@ -659,24 +667,6 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
-    fontWeight: '700',
-  },
-  keyboardAccessory: {
-    backgroundColor: '#F8FAFC',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignItems: 'flex-end',
-  },
-  keyboardAccessoryButton: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  keyboardAccessoryButtonText: {
-    color: '#2563EB',
-    fontSize: 16,
     fontWeight: '700',
   },
 });
