@@ -80,7 +80,7 @@ function OAuthProviderLogo({ provider }: { provider: string }) {
 
 export default function AccountScreen() {
   const router = useRouter();
-  const { state, updateMetadata, deleteAccount } = useAuthContext();
+  const { state, hasStoredNostrKey, updateMetadata, resetLocalAppState, deleteAccount } = useAuthContext();
 
   const fallbackName = state.googleProfile?.name || '';
   const [firstName, setFirstName] = useState(
@@ -92,11 +92,12 @@ export default function AccountScreen() {
   const [displayName, setDisplayName] = useState(
     state.metadata?.display_name || state.metadata?.name || fallbackName,
   );
+  const [isResetting, setIsResetting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const oauthConnections = state.connections.filter(conn => !!conn.provider);
-  const hasNostrKey = !!state.pubkey;
-  const npub = hasNostrKey ? encodeBech32('npub', state.pubkey!) : null;
+  const hasLinkedNostrKey = !!state.pubkey;
+  const npub = hasLinkedNostrKey ? encodeBech32('npub', state.pubkey!) : null;
 
   useEffect(() => {
     if (firstName || lastName || displayName) return;
@@ -157,6 +158,34 @@ export default function AccountScreen() {
       ],
     );
   }, [deleteAccount, router]);
+
+  const handleResetLocalAppState = useCallback(() => {
+    Alert.alert(
+      'Reset Local App State',
+      'This only resets data on this device. It signs you out, removes the local encryption key, clears your saved bio profile and device-only preferences, and returns you to Welcome. It does not delete your backend account or server-side data. If this device is your only copy of the encryption key, back it up before continuing.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset Local App State',
+          style: 'destructive',
+          onPress: async () => {
+            setIsResetting(true);
+            try {
+              await resetLocalAppState();
+              router.replace('/(auth)/welcome');
+            } catch (err: any) {
+              Alert.alert(
+                'Could Not Reset Local App State',
+                err.message || 'Something went wrong. Please try again later.',
+              );
+            } finally {
+              setIsResetting(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [resetLocalAppState, router]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -255,10 +284,12 @@ export default function AccountScreen() {
             <Text style={styles.providerName}>Nostr</Text>
           </View>
           <View style={styles.connectionRight}>
-            {hasNostrKey && npub ? (
+            {hasLinkedNostrKey && npub ? (
               <>
                 <Text style={styles.connectionDetail}>{truncateNpub(npub)}</Text>
-                <Text style={styles.connectedBadge}>✓</Text>
+                <Text style={hasStoredNostrKey ? styles.connectedBadge : styles.importBadge}>
+                  {hasStoredNostrKey ? '✓' : 'Import'}
+                </Text>
               </>
             ) : (
               <Text style={styles.notConnected}>Not connected</Text>
@@ -274,6 +305,21 @@ export default function AccountScreen() {
         </View>
       </View>
 
+      <Pressable
+        style={({ pressed }) => [
+          styles.resetCard,
+          pressed && styles.resetCardPressed,
+        ]}
+        onPress={handleResetLocalAppState}
+        disabled={isResetting || isDeleting}
+      >
+        {isResetting ? (
+          <ActivityIndicator color="#f59e0b" />
+        ) : (
+          <Text style={styles.resetText}>Reset Local App State</Text>
+        )}
+      </Pressable>
+
       {/* DELETE ACCOUNT */}
       <Pressable
         style={({ pressed }) => [
@@ -281,7 +327,7 @@ export default function AccountScreen() {
           pressed && styles.deleteCardPressed,
         ]}
         onPress={handleDeleteAccount}
-        disabled={isDeleting}
+        disabled={isDeleting || isResetting}
       >
         {isDeleting ? (
           <ActivityIndicator color="#ef4444" />
@@ -395,6 +441,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  importBadge: {
+    color: '#FBBF24',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
   notConnected: {
     color: 'rgba(255,255,255,0.3)',
     fontSize: 14,
@@ -413,13 +466,28 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 32,
+    marginTop: 12,
   },
   deleteCardPressed: {
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   deleteText: {
     color: '#ef4444',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  resetCard: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 32,
+  },
+  resetCardPressed: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  resetText: {
+    color: '#f59e0b',
     fontSize: 15,
     fontWeight: '500',
   },

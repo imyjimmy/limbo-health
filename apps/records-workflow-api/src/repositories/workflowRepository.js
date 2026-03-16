@@ -609,6 +609,74 @@ export async function searchFacilities(searchTerm, limit = 20) {
   return result.rows;
 }
 
+export async function listHospitalSystems(searchTerm = '', limit = 50) {
+  const trimmed = searchTerm.trim();
+
+  if (!trimmed) {
+    const result = await query(
+      `select
+         id,
+         system_name,
+         canonical_domain,
+         state
+       from hospital_systems
+       where active = true
+       order by system_name asc
+       limit $1`,
+      [limit]
+    );
+
+    return result.rows;
+  }
+
+  const q = `%${trimmed}%`;
+  const normalizedSearch = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const normalizedLike = `%${normalizedSearch}%`;
+  const normalizedPrefix = `${normalizedSearch}%`;
+
+  const result = await query(
+    `select
+       id,
+       system_name,
+       canonical_domain,
+       state
+     from hospital_systems
+     where active = true
+       and (
+         system_name ilike $1
+         or coalesce(canonical_domain, '') ilike $1
+         or regexp_replace(lower(system_name), '[^a-z0-9]+', '', 'g') like $2
+         or regexp_replace(lower(coalesce(canonical_domain, '')), '[^a-z0-9]+', '', 'g') like $2
+       )
+     order by
+       case
+         when system_name ilike $3 then 0
+         when regexp_replace(lower(system_name), '[^a-z0-9]+', '', 'g') like $4 then 1
+         else 2
+       end,
+       system_name asc
+     limit $5`,
+    [q, normalizedLike, `${trimmed}%`, normalizedPrefix, limit]
+  );
+
+  return result.rows;
+}
+
+export async function getHospitalSystemById(systemId) {
+  const result = await query(
+    `select
+       id,
+       system_name,
+       canonical_domain,
+       state
+     from hospital_systems
+     where id = $1 and active = true`,
+    [systemId]
+  );
+
+  return result.rows[0] || null;
+}
+
 export async function getFacilityById(facilityId) {
   const result = await query(
     `select
@@ -625,6 +693,209 @@ export async function getFacilityById(facilityId) {
   );
 
   return result.rows[0] || null;
+}
+
+async function getWorkflowArtifacts(recordsWorkflowId) {
+  if (!recordsWorkflowId) {
+    return {
+      contacts: [],
+      forms: [],
+      instructions: []
+    };
+  }
+
+  const [contactsRes, formsRes, instructionsRes] = await Promise.all([
+    query(
+      `select contact_type as type, label, value
+       from workflow_contacts
+       where records_workflow_id = $1
+       order by created_at asc`,
+      [recordsWorkflowId]
+    ),
+    query(
+      `select form_name as name, form_url as url, form_format as format
+       from workflow_forms
+       where records_workflow_id = $1
+       order by created_at asc`,
+      [recordsWorkflowId]
+    ),
+    query(
+      `select
+         instruction_kind as kind,
+         sequence_no,
+         label,
+         channel,
+         value,
+         details
+       from workflow_instructions
+       where records_workflow_id = $1
+       order by sequence_no asc, created_at asc`,
+      [recordsWorkflowId]
+    )
+  ]);
+
+  return {
+    contacts: contactsRes.rows,
+    forms: formsRes.rows,
+    instructions: instructionsRes.rows
+  };
+}
+
+async function attachCachedDocumentsToForms(forms = []) {
+  const pdfUrls = Array.from(
+    new Set(
+      forms
+        .filter((form) => form?.url && form.format === 'pdf')
+        .map((form) => form.url)
+    )
+  );
+
+  if (pdfUrls.length === 0) {
+    return forms.map((form) => ({
+      ...form,
+      cached_source_document_id: null,
+      cached_content_url: null
+    }));
+  }
+
+  const result = await query(
+    `select distinct on (source_url)
+       id,
+       source_url,
+       source_type,
+       storage_path,
+       fetched_at
+     from source_documents
+     where source_url = any($1)
+       and source_type = 'pdf'
+       and storage_path is not null
+     order by source_url asc, fetched_at desc`,
+    [pdfUrls]
+  );
+
+  const byUrl = new Map(result.rows.map((row) => [row.source_url, row]));
+
+  return forms.map((form) => {
+    const cached = byUrl.get(form.url);
+    return {
+      ...form,
+      cached_source_document_id: cached?.id || null,
+      cached_content_url: cached ? `/v1/source-documents/${cached.id}/content` : null
+    };
+  });
+}
+
+function buildFormalMethods(medicalWorkflow) {
+  const formalMethods = [];
+  if (medicalWorkflow?.online_request_available) formalMethods.push('online_request');
+  if (medicalWorkflow?.portal_request_available) formalMethods.push('portal');
+  if (medicalWorkflow?.email_available) formalMethods.push('email');
+  if (medicalWorkflow?.fax_available) formalMethods.push('fax');
+  if (medicalWorkflow?.mail_available) formalMethods.push('mail');
+  if (medicalWorkflow?.phone_available) formalMethods.push('phone');
+  if (medicalWorkflow?.in_person_available) formalMethods.push('in_person');
+  return formalMethods;
+}
+
+function hasPhotoIdRequirement(instructions = []) {
+  return instructions.some((instruction) => {
+    const haystack = [instruction?.label, instruction?.details, instruction?.value]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return /photo\s*i\.?d|valid photo id|driver'?s license|state i\.?d|identification/.test(
+      haystack
+    );
+  });
+}
+
+function buildRequestPacket({
+  facility = null,
+  hospitalSystem = null,
+  portal = null,
+  workflows = [],
+  contacts = [],
+  forms = [],
+  instructions = []
+}) {
+  const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
+  const specialWorkflows = workflows.filter((workflow) => workflow.workflow_type !== 'medical_records');
+  const resolvedPortal = portal || {
+    portal_name: null,
+    portal_url: null,
+    portal_scope: 'none',
+    supports_formal_copy_request_in_portal: false
+  };
+  const formalMethods = buildFormalMethods(medicalWorkflow);
+  const hasFormalRequestPath = Boolean(medicalWorkflow?.formal_request_required || forms.length > 0);
+  const sources = workflows.map((workflow) => ({
+    url: workflow.official_page_url,
+    last_verified_at: workflow.last_verified_at
+  }));
+
+  return {
+    ...(facility
+      ? {
+          facility: {
+            id: facility.id,
+            name: facility.facility_name,
+            city: facility.city,
+            state: facility.state,
+            hospital_system: facility.hospital_system
+          }
+        }
+      : {}),
+    ...(hospitalSystem
+      ? {
+          hospital_system: {
+            id: hospitalSystem.id,
+            name: hospitalSystem.system_name,
+            domain: hospitalSystem.canonical_domain,
+            state: hospitalSystem.state
+          }
+        }
+      : {}),
+    portal: {
+      name: resolvedPortal.portal_name,
+      url: resolvedPortal.portal_url,
+      scope: resolvedPortal.portal_scope,
+      supports_formal_copy_request_in_portal:
+        resolvedPortal.supports_formal_copy_request_in_portal ?? false
+    },
+    medical_workflow: medicalWorkflow
+      ? {
+          request_scope: medicalWorkflow.request_scope,
+          formal_request_required: medicalWorkflow.formal_request_required ?? false,
+          available_methods: formalMethods
+        }
+      : null,
+    recommended_paths: [
+      {
+        type: 'portal',
+        label: 'View available records now',
+        available: resolvedPortal.portal_scope !== 'none'
+      },
+      {
+        type: 'formal_request',
+        label: 'Request complete or official copy',
+        available: hasFormalRequestPath,
+        methods: formalMethods
+      }
+    ],
+    special_cases: specialWorkflows.map((workflow) => ({
+      type: workflow.workflow_type,
+      label:
+        workflow.workflow_type === 'imaging'
+          ? 'Imaging may require a separate request'
+          : `${workflow.workflow_type} may require a separate request`
+    })),
+    contacts,
+    forms,
+    instructions,
+    requires_photo_id: hasPhotoIdRequirement(instructions),
+    sources
+  };
 }
 
 export async function getEffectiveWorkflowForFacility(facilityId) {
@@ -681,108 +952,100 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
 
   const workflows = workflowsRes.rows;
   const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
-  const specialWorkflows = workflows.filter((workflow) => workflow.workflow_type !== 'medical_records');
+  const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
+  const forms = await attachCachedDocumentsToForms(artifacts.forms);
+  const portal = portalRes.rows[0] || null;
 
-  let contacts = [];
-  let forms = [];
-  let instructions = [];
-  if (medicalWorkflow) {
-    const [contactsRes, formsRes, instructionsRes] = await Promise.all([
-      query(
-        `select contact_type as type, label, value
-         from workflow_contacts
-         where records_workflow_id = $1
-         order by created_at asc`,
-        [medicalWorkflow.id]
-      ),
-      query(
-        `select form_name as name, form_url as url, form_format as format
-         from workflow_forms
-         where records_workflow_id = $1
-         order by created_at asc`,
-        [medicalWorkflow.id]
-      ),
-      query(
-        `select
-           instruction_kind as kind,
-           sequence_no,
-           label,
-           channel,
-           value,
-           details
-         from workflow_instructions
-         where records_workflow_id = $1
-         order by sequence_no asc, created_at asc`,
-        [medicalWorkflow.id]
-      )
-    ]);
-
-    contacts = contactsRes.rows;
-    forms = formsRes.rows;
-    instructions = instructionsRes.rows;
-  }
-
-  const portal = portalRes.rows[0] || {
-    portal_name: null,
-    portal_url: null,
-    portal_scope: 'none',
-    supports_formal_copy_request_in_portal: false
-  };
-
-  const formalMethods = [];
-  if (medicalWorkflow?.online_request_available) formalMethods.push('online_request');
-  if (medicalWorkflow?.portal_request_available) formalMethods.push('portal');
-  if (medicalWorkflow?.email_available) formalMethods.push('email');
-  if (medicalWorkflow?.fax_available) formalMethods.push('fax');
-  if (medicalWorkflow?.mail_available) formalMethods.push('mail');
-  if (medicalWorkflow?.phone_available) formalMethods.push('phone');
-  if (medicalWorkflow?.in_person_available) formalMethods.push('in_person');
-
-  const sources = workflows.map((workflow) => ({
-    url: workflow.official_page_url,
-    last_verified_at: workflow.last_verified_at
-  }));
-
-  return {
-    facility: {
-      id: facility.id,
-      name: facility.facility_name,
-      city: facility.city,
-      state: facility.state,
-      hospital_system: facility.hospital_system
-    },
-    portal: {
-      name: portal.portal_name,
-      url: portal.portal_url,
-      scope: portal.portal_scope,
-      supports_formal_copy_request_in_portal:
-        portal.supports_formal_copy_request_in_portal ?? false
-    },
-    recommended_paths: [
-      {
-        type: 'portal',
-        label: 'View available records now',
-        available: portal.portal_scope !== 'none'
-      },
-      {
-        type: 'formal_request',
-        label: 'Request complete or official copy',
-        available: Boolean(medicalWorkflow?.formal_request_required),
-        methods: formalMethods
-      }
-    ],
-    special_cases: specialWorkflows.map((workflow) => ({
-      type: workflow.workflow_type,
-      label:
-        workflow.workflow_type === 'imaging'
-          ? 'Imaging may require a separate request'
-          : `${workflow.workflow_type} may require a separate request`
-    })),
-    contacts,
+  return buildRequestPacket({
+    facility,
+    portal,
+    workflows,
+    contacts: artifacts.contacts,
     forms,
-    instructions,
-    sources
-  };
+    instructions: artifacts.instructions
+  });
+}
+
+export async function getSystemRequestPacket(systemId) {
+  const hospitalSystem = await getHospitalSystemById(systemId);
+  if (!hospitalSystem) return null;
+
+  const [portalRes, workflowsRes] = await Promise.all([
+    query(
+      `select *
+       from portal_profiles
+       where hospital_system_id = $1
+         and facility_id is null
+       order by updated_at desc
+       limit 1`,
+      [systemId]
+    ),
+    query(
+      `with ranked as (
+         select
+           rw.*,
+           row_number() over (
+             partition by workflow_type
+             order by
+               case
+                 when workflow_type = 'medical_records' and formal_request_required then 0
+                 when workflow_type = 'medical_records' then 1
+                 else 0
+               end,
+               case
+                 when workflow_type = 'medical_records'
+                      and request_scope in ('mixed', 'complete_chart') then 0
+                 when workflow_type = 'medical_records' then 1
+                 else 0
+               end,
+               case
+                 when workflow_type = 'medical_records'
+                      and official_page_url ~* '(medical-records|requesting-your-record|release|authorization)'
+                 then 0
+                 when workflow_type = 'medical_records' then 1
+                 else 0
+               end,
+               updated_at desc
+           ) as rn
+         from records_workflows rw
+         where rw.hospital_system_id = $1
+           and rw.facility_id is null
+       )
+       select * from ranked where rn = 1`,
+      [systemId]
+    )
+  ]);
+
+  const workflows = workflowsRes.rows;
+  const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
+  const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
+  const forms = await attachCachedDocumentsToForms(artifacts.forms);
+  const portal = portalRes.rows[0] || null;
+
+  return buildRequestPacket({
+    hospitalSystem,
+    portal,
+    workflows,
+    contacts: artifacts.contacts,
+    forms,
+    instructions: artifacts.instructions
+  });
+}
+
+export async function getSourceDocumentById(sourceDocumentId) {
+  const result = await query(
+    `select
+       id,
+       source_url,
+       source_type,
+       storage_path,
+       fetched_at
+     from source_documents
+     where id = $1`,
+    [sourceDocumentId]
+  );
+
+  return result.rows[0] || null;
 }
 
 export async function getSystemWorkflows(systemId) {

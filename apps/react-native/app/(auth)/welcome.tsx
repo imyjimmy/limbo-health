@@ -1,9 +1,16 @@
-// app/(auth)/welcome.tsx
-// First launch screen. OAuth providers are the primary CTAs; Nostr tucked at bottom.
-
-import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { useGoogleAuth } from '../../core/auth/googleAuth';
 import { useAuthContext } from '../../providers/AuthProvider';
@@ -20,36 +27,52 @@ function GoogleLogo({ size = 20 }: { size?: number }) {
   );
 }
 
-function AppleLogo({ size = 20 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        fill="#000"
-        d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09z"
-      />
-      <Path
-        fill="#000"
-        d="M15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
-      />
-    </Svg>
-  );
-}
+const SLIDES = [
+  {
+    eyebrow: 'Private by default',
+    title: 'Own the record trail.',
+    body:
+      'Keep your medical-records requests, identity details, and binder data under your control instead of scattered across portals and forms.',
+    accent: '#0F766E',
+    pills: ['Encrypted access', 'Reusable profile', 'Device-first'],
+  },
+  {
+    eyebrow: 'Workflow over chaos',
+    title: 'Turn hospital bureaucracy into steps.',
+    body:
+      'Pick a Texas hospital system, review exactly what it requires, attach ID only when needed, and move through a guided request flow.',
+    accent: '#1D4ED8',
+    pills: ['System workflows', 'ID requirement detection', 'Official form links'],
+  },
+] as const;
 
-function GitHubLogo({ size = 20 }: { size?: number }) {
+function OnboardingArt({ color }: { color: string }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        fill="#333"
-        d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"
-      />
-    </Svg>
+    <View style={styles.artFrame}>
+      <View style={[styles.artPanelLarge, { backgroundColor: color }]} />
+      <View style={styles.artCardTop}>
+        <Text style={styles.artCardTitle}>Request packet</Text>
+        <Text style={styles.artCardBody}>Bio details, workflow steps, and hospital-ready output.</Text>
+      </View>
+      <View style={styles.artCardBottom}>
+        <View style={styles.artBadge} />
+        <View style={[styles.artBadge, styles.artBadgeWide]} />
+        <View style={styles.artDivider} />
+        <View style={styles.artLine} />
+        <View style={[styles.artLine, styles.artLineShort]} />
+      </View>
+    </View>
   );
 }
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
   const { loginWithGoogle, loginWithStoredNostr, hasStoredNostrKey } = useAuthContext();
   const { request, response, promptAsync } = useGoogleAuth();
+  const [currentSlide, setCurrentSlide] = useState(0);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [nostrLoading, setNostrLoading] = useState(false);
 
@@ -57,9 +80,10 @@ export default function WelcomeScreen() {
     if (response?.type === 'success' && response.authentication?.accessToken) {
       setGoogleLoading(true);
       loginWithGoogle(response.authentication.accessToken)
-        .then(() => router.replace('/(tabs)'))
+        .then(() => router.replace('/'))
         .catch((err) => {
-          Alert.alert('Google Login Failed', err.message);
+          const message = err instanceof Error ? err.message : 'Unable to continue with Google.';
+          Alert.alert('Google Login Failed', message);
         })
         .finally(() => setGoogleLoading(false));
     }
@@ -69,7 +93,7 @@ export default function WelcomeScreen() {
     setNostrLoading(true);
     try {
       await loginWithStoredNostr();
-      router.replace('/(tabs)');
+      router.replace('/');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to sign in with your stored key.';
       Alert.alert('Nostr Login Failed', message);
@@ -78,152 +102,415 @@ export default function WelcomeScreen() {
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Limbo Health</Text>
-        <Text style={styles.subtitle}>
-          Your medical records, encrypted and under your control.
-        </Text>
-      </View>
+  const goToSlide = (index: number) => {
+    setCurrentSlide(index);
+    scrollRef.current?.scrollTo({ x: width * index, animated: true });
+  };
 
-      <View style={styles.buttons}>
+  const renderNostrEntryPoint = () => {
+    if (hasStoredNostrKey) {
+      return (
         <Pressable
-          style={[styles.authButton, styles.googleButton, (!request || googleLoading) && styles.buttonDisabled]}
-          onPress={() => promptAsync()}
-          disabled={!request || googleLoading}
+          style={[styles.nostrButton, nostrLoading && styles.authButtonDisabled]}
+          onPress={handleNostrLogin}
+          disabled={nostrLoading}
         >
-          {googleLoading ? (
-            <ActivityIndicator color="#111" />
+          {nostrLoading ? (
+            <ActivityIndicator color={colors.brand.violet} />
           ) : (
-            <View style={styles.buttonContent}>
-              <GoogleLogo size={20} />
-              <Text style={styles.authButtonText}>Continue with Google</Text>
-            </View>
+            <Text style={styles.nostrButtonText}>Sign in with Nostr</Text>
           )}
         </Pressable>
+      );
+    }
 
-        <Pressable
-          style={[styles.authButton, styles.appleButton, styles.buttonDisabled]}
-          disabled
-        >
-          <View style={styles.buttonContent}>
-            <AppleLogo size={20} />
-            <Text style={styles.authButtonText}>Continue with Apple</Text>
-          </View>
-        </Pressable>
+    return (
+      <Pressable
+        style={styles.nostrButton}
+        onPress={() => router.push('/(auth)/import-key')}
+      >
+        <Text style={styles.nostrButtonText}>Sign in with Nostr</Text>
+      </Pressable>
+    );
+  };
 
-        <Pressable
-          style={[styles.authButton, styles.githubButton, styles.buttonDisabled]}
-          disabled
-        >
-          <View style={styles.buttonContent}>
-            <GitHubLogo size={20} />
-            <Text style={styles.authButtonText}>Continue with GitHub</Text>
-          </View>
-        </Pressable>
+  return (
+    <View style={styles.screen}>
+      <View style={[styles.topGlow, { top: insets.top + 10 }]} />
+      <View style={[styles.bottomGlow, { bottom: insets.bottom + 24 }]} />
+
+      <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
+        <Text style={styles.brand}>Limbo Health</Text>
+        <View style={styles.topBarActionSlot}>
+          <Pressable
+            onPress={() => goToSlide(2)}
+            style={[styles.skipButton, currentSlide === 2 && styles.skipButtonHidden]}
+            disabled={currentSlide === 2}
+          >
+            <Text style={styles.skipButtonText}>Skip</Text>
+          </Pressable>
+        </View>
       </View>
 
-      <View style={styles.footer}>
-        {hasStoredNostrKey ? (
-          <Pressable
-            style={[styles.nostrPill, nostrLoading && styles.buttonDisabled]}
-            onPress={handleNostrLogin}
-            disabled={nostrLoading}
-          >
-            {nostrLoading ? (
-              <ActivityIndicator color={colors.brand.violet} />
-            ) : (
-              <Text style={styles.nostrPillText}>Continue with Nostr</Text>
-            )}
-          </Pressable>
-        ) : (
-          <Pressable style={styles.nostrPill} onPress={() => router.push('/(auth)/import-key')}>
-            <Text style={styles.nostrPillText}>I have a Nostr key &gt;&gt;</Text>
-          </Pressable>
-        )}
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={(event) => {
+          const nextSlide = Math.round(event.nativeEvent.contentOffset.x / width);
+          setCurrentSlide(nextSlide);
+        }}
+      >
+        {SLIDES.map((slide, index) => (
+          <View key={slide.title} style={[styles.slide, { width }]}>
+            <View style={styles.slideInner}>
+              {index === 0 ? <OnboardingArt color={slide.accent} /> : null}
+              <Text style={styles.slideEyebrow}>{slide.eyebrow}</Text>
+              <Text style={styles.slideTitle}>{slide.title}</Text>
+              <Text style={styles.slideBody}>{slide.body}</Text>
+              <View style={styles.pillRow}>
+                {slide.pills.map((pill) => (
+                  <View key={pill} style={styles.pill}>
+                    <Text style={styles.pillText}>{pill}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        ))}
+
+        <View style={[styles.slide, { width }]}>
+          <View style={styles.slideInner}>
+            <View style={styles.finalHero}>
+              <Text style={styles.slideEyebrow}>Ready when you are</Text>
+              <Text style={styles.slideTitle}>Generate requests without starting from scratch.</Text>
+              <Text style={styles.slideBody}>
+                Sign in once, add your bio profile on the next screen, and start generating
+                request packets for Texas hospital systems.
+              </Text>
+            </View>
+
+            <Pressable
+              style={[
+                styles.authButton,
+                styles.finalPrimaryButton,
+                (!request || googleLoading) && styles.authButtonDisabled,
+              ]}
+              onPress={() => promptAsync()}
+              disabled={!request || googleLoading}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color="#0F172A" />
+              ) : (
+                <View style={styles.authButtonContent}>
+                  <GoogleLogo size={20} />
+                  <Text style={styles.authButtonText}>Continue with Google</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 18 }]}>
+        <View style={styles.secondaryFooterSlot}>
+          {currentSlide === 2 ? renderNostrEntryPoint() : null}
+        </View>
+
+        <View style={styles.paginationRow}>
+          {[0, 1, 2].map((index) => (
+            <Pressable
+              key={index}
+              onPress={() => goToSlide(index)}
+              style={[
+                styles.paginationDot,
+                currentSlide === index && styles.paginationDotActive,
+              ]}
+            />
+          ))}
+        </View>
+
+        <View style={styles.footerActionSlot}>
+          {currentSlide < 2 ? (
+            <Pressable
+              onPress={() => goToSlide(currentSlide + 1)}
+              style={({ pressed }) => [styles.nextButton, pressed && styles.nextButtonPressed]}
+            >
+              <Text style={styles.nextButtonText}>Next</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.footerNote}>Bio setup comes right after sign-in.</Text>
+          )}
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: colors.surface.sky,
-    paddingHorizontal: 24,
+    backgroundColor: '#F5F8FF',
   },
-  content: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+  topGlow: {
+    position: 'absolute',
+    right: -10,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: '#D6F5EE',
+    opacity: 0.8,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: colors.base.ink,
-    marginBottom: 12,
+  bottomGlow: {
+    position: 'absolute',
+    left: -30,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: '#DBEAFE',
+    opacity: 0.7,
   },
-  subtitle: {
-    fontSize: 17,
-    color: colors.base.slate,
-    textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
-  },
-  buttons: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 12,
-  },
-  buttonContent: {
+  topBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+    minHeight: 44,
+  },
+  topBarActionSlot: {
+    minWidth: 48,
+    minHeight: 34,
+    alignItems: 'flex-end',
     justifyContent: 'center',
-    gap: 10,
   },
-  authButton: {
-    backgroundColor: colors.base.white,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.base.border,
+  brand: {
+    color: '#0F172A',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  googleButton: {
-    backgroundColor: colors.base.white,
+  skipButton: {
+    paddingVertical: 8,
   },
-  appleButton: {
-    backgroundColor: colors.surface.violetSoft,
-    borderColor: '#D7C8FF',
+  skipButtonHidden: {
+    opacity: 0,
   },
-  githubButton: {
-    backgroundColor: colors.surface.tealSoft,
-    borderColor: '#BEE6E0',
-  },
-  authButtonText: {
-    color: colors.base.ink,
-    fontSize: 17,
+  skipButtonText: {
+    color: '#2563EB',
+    fontSize: 15,
     fontWeight: '600',
   },
-  buttonDisabled: {
-    opacity: 0.4,
+  slide: {
+    flex: 1,
   },
-  footer: {
+  slideInner: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 16,
+    justifyContent: 'center',
+  },
+  artFrame: {
+    height: 280,
+    borderRadius: 34,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    marginBottom: 26,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  artPanelLarge: {
+    position: 'absolute',
+    top: -32,
+    right: -24,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    opacity: 0.16,
+  },
+  artCardTop: {
+    backgroundColor: '#0F172A',
+    borderRadius: 24,
+    padding: 20,
+    minHeight: 122,
+    justifyContent: 'flex-end',
+  },
+  artCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  artCardBody: {
+    color: '#CBD5E1',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  artCardBottom: {
+    marginTop: 14,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    padding: 18,
+    flex: 1,
+  },
+  artBadge: {
+    width: 96,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: '#DBEAFE',
+    marginBottom: 10,
+  },
+  artBadgeWide: {
+    width: 148,
+    backgroundColor: '#D1FAE5',
+  },
+  artDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginVertical: 12,
+  },
+  artLine: {
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#E2E8F0',
+    marginBottom: 10,
+  },
+  artLineShort: {
+    width: '68%',
+  },
+  slideEyebrow: {
+    color: '#0F766E',
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  slideTitle: {
+    color: '#0F172A',
+    fontSize: 32,
+    fontWeight: '800',
+    lineHeight: 36,
+    letterSpacing: -0.8,
+    marginBottom: 12,
+  },
+  slideBody: {
+    color: '#475569',
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 20,
+  },
+  pill: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D6E3FF',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  pillText: {
+    color: '#1E3A8A',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  finalHero: {
+    marginBottom: 24,
+  },
+  authButton: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 18,
+    paddingVertical: 16,
     alignItems: 'center',
-    paddingBottom: 48,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
   },
-  nostrPill: {
+  authButtonDisabled: {
+    opacity: 0.45,
+  },
+  authButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  authButtonText: {
+    color: '#0F172A',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  finalPrimaryButton: {
+    marginTop: 4,
+  },
+  nostrButton: {
+    alignSelf: 'center',
     backgroundColor: colors.surface.violetSoft,
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#C7B1FF',
   },
-  nostrPillText: {
+  nostrButtonText: {
     color: colors.brand.violet,
     fontSize: 15,
+    fontWeight: '600',
+  },
+  footer: {
+    paddingHorizontal: 24,
+    gap: 14,
+  },
+  secondaryFooterSlot: {
+    minHeight: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerActionSlot: {
+    minHeight: 56,
+    justifyContent: 'center',
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  paginationDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#CBD5E1',
+  },
+  paginationDotActive: {
+    width: 28,
+    backgroundColor: '#0F766E',
+  },
+  nextButton: {
+    backgroundColor: '#0F766E',
+    borderRadius: 18,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  nextButtonPressed: {
+    opacity: 0.88,
+  },
+  nextButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  footerNote: {
+    textAlign: 'center',
+    color: '#64748B',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

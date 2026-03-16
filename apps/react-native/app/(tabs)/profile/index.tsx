@@ -27,6 +27,7 @@ export default function ProfileScreen() {
     .toUpperCase();
 
   const menuItems = [
+    { label: 'Bio Profile', destructive: false },
     { label: 'Account', destructive: false },
     { label: 'Encryption Keys', destructive: false },
     { label: 'Notifications', destructive: false },
@@ -38,6 +39,9 @@ export default function ProfileScreen() {
     if (label === 'Sign Out') {
       await logout?.();
       router.replace('/(auth)/welcome');
+    }
+    if (label === 'Bio Profile') {
+      router.push({ pathname: '/bio-setup', params: { returnTo: '/(tabs)/profile' } });
     }
     if (label === 'Account') router.push('/(tabs)/profile/account');
     if (label === 'Encryption Keys') router.push('/(tabs)/profile/encryption-keys');
