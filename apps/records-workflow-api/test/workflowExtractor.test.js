@@ -114,3 +114,48 @@ test('Houston Methodist fixture resolves online, PDF, MyChart, and mail/fax/emai
   assert.equal(workflow.emailAvailable, true);
   assert.ok(workflow.forms.some((form) => form.format === 'pdf'));
 });
+
+test('Cambridge Health Alliance fixture resolves MyChart plus fax, mail, and email options', () => {
+  const bundle = extractWorkflowBundle(fixture('cambridge-health-alliance.json'), {
+    isOfficialDomain: true
+  });
+  const workflow = medicalWorkflow(bundle);
+
+  assert.equal(bundle.portal.portalName, 'MyChart');
+  assert.equal(workflow.formalRequestRequired, true);
+  assert.equal(workflow.faxAvailable, true);
+  assert.equal(workflow.mailAvailable, true);
+  assert.equal(workflow.emailAvailable, true);
+  assert.ok(workflow.forms.some((form) => /authorization/i.test(form.name)));
+});
+
+test('Southcoast Health fixture resolves MyChart, online request, and authorization form workflow', () => {
+  const bundle = extractWorkflowBundle(fixture('southcoast-health-ma.json'), {
+    isOfficialDomain: true
+  });
+  const workflow = medicalWorkflow(bundle);
+
+  assert.equal(bundle.portal.portalName, 'MyChart');
+  assert.equal(workflow.onlineRequestAvailable, true);
+  assert.equal(workflow.mailAvailable, true);
+  assert.ok(
+    workflow.forms.some(
+      (form) =>
+        /authorization/i.test(form.name) && /\.pdf($|\?)/i.test(form.url)
+    )
+  );
+});
+
+test("Boston Children's fixture resolves branded portal, fax workflow, and imaging exclusion", () => {
+  const bundle = extractWorkflowBundle(fixture('boston-childrens.json'), {
+    isOfficialDomain: true
+  });
+  const workflow = medicalWorkflow(bundle);
+  const imagingWorkflow = bundle.workflows.find((row) => row.workflowType === 'imaging');
+
+  assert.equal(bundle.portal.portalName, "MyChildren's Patient Portal");
+  assert.equal(workflow.formalRequestRequired, true);
+  assert.equal(workflow.faxAvailable, true);
+  assert.ok(workflow.forms.some((form) => form.format === 'pdf'));
+  assert.ok(imagingWorkflow);
+});

@@ -1,8 +1,14 @@
+import process from 'node:process';
 import { reseedFromFile } from './services/seedService.js';
 import { closePool } from './db.js';
+import { getCliOptionValue } from './utils/cliArgs.js';
 
 async function seed() {
-  const summary = await reseedFromFile();
+  const args = process.argv.slice(2);
+  const summary = await reseedFromFile({
+    state: getCliOptionValue(args, 'state'),
+    seedFilePath: getCliOptionValue(args, 'seed-file')
+  });
   console.log('Reseed complete:', summary);
 }
 

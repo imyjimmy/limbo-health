@@ -82,8 +82,12 @@ async function finalizePdfStoragePath({
   return tempStoragePath;
 }
 
-export async function runCrawl({ systemName = null, maxDepth = config.crawl.maxDepth } = {}) {
-  const seeds = await listActiveSeeds({ systemName });
+export async function runCrawl({
+  systemName = null,
+  state = config.crawlState,
+  maxDepth = config.crawl.maxDepth
+} = {}) {
+  const seeds = await listActiveSeeds({ systemName, state });
   if (seeds.length === 0) {
     return {
       status: 'no_seeds',
@@ -102,6 +106,7 @@ export async function runCrawl({ systemName = null, maxDepth = config.crawl.maxD
         systemId: seed.hospital_system_id,
         systemName: seed.system_name,
         canonicalDomain: seed.canonical_domain,
+        state: seed.system_state,
         seeds: []
       });
     }
@@ -144,6 +149,7 @@ export async function runCrawl({ systemName = null, maxDepth = config.crawl.maxD
           await removeIfPresent(fetched.storagePath);
           details.push({
             system: system.systemName,
+            state: system.state,
             url: fetched.finalUrl,
             skipped: 'non_medical_records_pdf'
           });
@@ -221,6 +227,7 @@ export async function runCrawl({ systemName = null, maxDepth = config.crawl.maxD
         failed += 1;
         details.push({
           system: system.systemName,
+          state: system.state,
           url: item.url,
           error: error.message
         });

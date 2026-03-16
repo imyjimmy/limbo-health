@@ -1,0 +1,90 @@
+[
+  {
+    "system_name": "Mass General Brigham",
+    "state": "MA",
+    "domain": "massgeneralbrigham.org",
+    "seed_urls": [
+      "https://www.massgeneralbrigham.org/en/patient-care/patient-visitor-information/medical-records"
+    ]
+  },
+  {
+    "system_name": "Emerson Health",
+    "state": "MA",
+    "domain": "emersonhealth.org",
+    "seed_urls": [
+      "https://emersonhealth.org/patients-visitors/medical-records/",
+      "https://emersonhealth.org/patient-portal/"
+    ]
+  },
+  {
+    "system_name": "UMass Memorial Health",
+    "state": "MA",
+    "domain": "ummhealth.org",
+    "seed_urls": [
+      "https://www.ummhealth.org/patients-visitors/medical-records",
+      "https://www.ummhealth.org/patients-visitors/mychart"
+    ]
+  },
+  {
+    "system_name": "Tufts Medicine",
+    "state": "MA",
+    "domain": "tuftsmedicine.org",
+    "seed_urls": [
+      "https://www.tuftsmedicine.org/for-patients/medical-records",
+      "https://www.tuftsmedicine.org/for-patients/about-mytuftsmed"
+    ]
+  },
+  {
+    "system_name": "Baystate Health",
+    "state": "MA",
+    "domain": "baystatehealth.org",
+    "seed_urls": [
+      "https://www.baystatehealth.org/patients-and-visitors/find-your-medical-records"
+    ]
+  },
+  {
+    "system_name": "Boston Medical Center",
+    "state": "MA",
+    "domain": "bmc.org",
+    "seed_urls": [
+      "https://www.bmc.org/services/medical-records",
+      "https://www.bmc.org/mychart"
+    ]
+  },
+  {
+    "system_name": "Southcoast Health",
+    "state": "MA",
+    "domain": "southcoast.org",
+    "seed_urls": [
+      "https://www.southcoast.org/patient-information/requesting-medical-records/",
+      "https://www.southcoast.org/mychart/"
+    ]
+  },
+  {
+    "system_name": "Berkshire Health Systems",
+    "state": "MA",
+    "domain": "berkshirehealthsystems.org",
+    "seed_urls": [
+      "https://www.berkshirehealthsystems.org/patient-journey/",
+      "https://www.berkshirehealthsystems.org/secure-berkshire-patient-portal/"
+    ]
+  },
+  {
+    "system_name": "Cambridge Health Alliance",
+    "state": "MA",
+    "domain": "challiance.org",
+    "seed_urls": [
+      "https://www.challiance.org/patients-visitors/medical-records",
+      "https://mychart.challiance.org/MyChart/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Boston Children's Hospital",
+    "state": "MA",
+    "domain": "childrenshospital.org",
+    "seed_urls": [
+      "https://www.childrenshospital.org/patients-families/you-arrive/your-visit/medical-records",
+      "https://www.childrenshospital.org/patients-families/about-boston-childrens/mychildrens-patient-portal"
+    ]
+  }
+]

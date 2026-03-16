@@ -1,17 +1,18 @@
 import { query, withTransaction } from '../db.js';
+import { normalizeStateCode } from '../utils/states.js';
 
 export async function upsertHospitalSystem({ systemName, domain, state = 'TX' }, client = null) {
   const q = client || { query };
+  const normalizedState = normalizeStateCode(state) || 'TX';
   const result = await q.query(
     `insert into hospital_systems (system_name, canonical_domain, state)
      values ($1, $2, $3)
-     on conflict (system_name)
+     on conflict (system_name, state)
      do update set canonical_domain = excluded.canonical_domain,
-                   state = excluded.state,
                    active = true,
                    updated_at = now()
      returning id, system_name, canonical_domain`,
-    [systemName, domain, state]
+    [systemName, domain, normalizedState]
   );
 
   return result.rows[0];
@@ -111,7 +112,7 @@ export async function upsertSeedUrl(
   const result = await q.query(
     `insert into seed_urls (hospital_system_id, facility_id, url, seed_type, active)
      values ($1, $2, $3, $4, $5)
-     on conflict (url)
+     on conflict (hospital_system_id, url)
      do update set hospital_system_id = excluded.hospital_system_id,
                    facility_id = excluded.facility_id,
                    seed_type = excluded.seed_type,
@@ -123,9 +124,14 @@ export async function upsertSeedUrl(
   return result.rows[0].id;
 }
 
-export async function listActiveSeeds({ systemName = null } = {}) {
+export async function listActiveSeeds({ systemName = null, state = null } = {}) {
   const params = [];
   let where = 'where su.active = true and hs.active = true';
+
+  if (state) {
+    params.push(normalizeStateCode(state));
+    where += ` and hs.state = $${params.length}`;
+  }
 
   if (systemName) {
     params.push(systemName);
@@ -141,6 +147,7 @@ export async function listActiveSeeds({ systemName = null } = {}) {
        su.facility_id,
        hs.system_name,
        hs.canonical_domain,
+       hs.state as system_state,
        f.facility_name
      from seed_urls su
      join hospital_systems hs on hs.id = su.hospital_system_id
@@ -186,7 +193,7 @@ export async function insertSourceDocument(
        parser_version
      )
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     on conflict (source_url, content_hash)
+     on conflict (hospital_system_id, source_url, content_hash)
      do update set hospital_system_id = case
                      when excluded.facility_id is not null then excluded.hospital_system_id
                      else source_documents.hospital_system_id

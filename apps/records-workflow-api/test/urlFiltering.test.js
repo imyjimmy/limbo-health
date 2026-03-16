@@ -5,6 +5,7 @@ import {
   buildMedicalRecordsPdfFilenameStems,
   extractDescriptivePdfPhrase
 } from '../src/utils/pdfNaming.js';
+import { collapseWhitespace } from '../src/utils/text.js';
 import {
   isLikelyMedicalRecordsPdfLink,
   isLikelyWorkflowLink,
@@ -180,4 +181,8 @@ test('falls back to medical-records-request when no sensible phrase exists', () 
   });
 
   assert.equal(stems[0], 'unknown-health-medical-records-request-EN');
+});
+
+test('collapseWhitespace strips embedded null bytes before normalizing spaces', () => {
+  assert.equal(collapseWhitespace('Medical\u0000   records\u0000 request'), 'Medical records request');
 });

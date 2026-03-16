@@ -551,7 +551,8 @@ resource "aws_ecs_task_definition" "api" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.container_port) },
-        { name = "RAW_STORAGE_DIR", value = "/app/storage/raw" }
+        { name = "RAW_STORAGE_DIR", value = "/app/storage/raw" },
+        { name = "CRAWL_STATE", value = "TX" }
       ]
       secrets = [
         {
@@ -654,7 +655,8 @@ resource "aws_ecs_task_definition" "crawler" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.container_port) },
-        { name = "RAW_STORAGE_DIR", value = "/app/storage/raw" }
+        { name = "RAW_STORAGE_DIR", value = "/app/storage/raw" },
+        { name = "CRAWL_STATE", value = "TX" }
       ]
       secrets = [
         {

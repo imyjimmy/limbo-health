@@ -2,12 +2,13 @@ import 'dotenv/config';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { normalizeStateCode } from './utils/states.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const serviceRoot = path.resolve(__dirname, '..');
 
-function resolveFromServiceRoot(value, fallback) {
+export function resolveFromServiceRoot(value, fallback) {
   const candidate = value || fallback;
   if (path.isAbsolute(candidate)) return candidate;
   return path.resolve(serviceRoot, candidate);
@@ -20,6 +21,7 @@ export const config = {
     'postgres://postgres:postgres@localhost:5432/records_workflow',
   rawStorageDir: resolveFromServiceRoot(process.env.RAW_STORAGE_DIR, 'storage/raw'),
   seedFile: resolveFromServiceRoot(process.env.SEED_FILE, 'seeds/texas-systems.json'),
+  crawlState: normalizeStateCode(process.env.CRAWL_STATE),
   crawl: {
     maxDepth: Number.parseInt(process.env.CRAWL_MAX_DEPTH || '2', 10),
     timeoutMs: Number.parseInt(process.env.CRAWL_TIMEOUT_MS || '25000', 10),

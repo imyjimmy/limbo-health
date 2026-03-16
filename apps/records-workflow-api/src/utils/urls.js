@@ -16,6 +16,12 @@ const HTML_WORKFLOW_PATTERNS = [
   /\bmyhealthone\b/i,
   /\bhealthmark\b/i,
   /\bverisma\b/i,
+  /\bpatient gateway\b/i,
+  /\bmybilh chart\b/i,
+  /\bmytuftsmed\b/i,
+  /\bmybaystate\b/i,
+  /\bmychildren'?s\b/i,
+  /\bberkshire patient portal\b/i,
   /\bimaging\b/i,
   /\bradiology\b/i,
   /\bbilling\b/i,
@@ -33,7 +39,13 @@ const SOURCE_MEDICAL_RECORD_PATTERNS = [
   /\bmychart\b/i,
   /\bmyhealthone\b/i,
   /\bhealthmark\b/i,
-  /\bverisma\b/i
+  /\bverisma\b/i,
+  /\bpatient gateway\b/i,
+  /\bmybilh chart\b/i,
+  /\bmytuftsmed\b/i,
+  /\bmybaystate\b/i,
+  /\bmychildren'?s\b/i,
+  /\bberkshire patient portal\b/i
 ];
 
 const MEDICAL_RECORDS_REQUEST_ACTION_PATTERNS = [

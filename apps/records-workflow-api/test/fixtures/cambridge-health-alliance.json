@@ -1,0 +1,15 @@
+{
+  "title": "Medical Records",
+  "text": "How to Get Your Medical Records via MyCHArt. Patients can request 5 years worth of their medical records via MyChart. Complete a Medical Record Authorization Form. Fax to CHA Health Information Management: 617-381-7179. Mail to CHA Medical Records - 103 Garland Street Everett, MA 02149. Email us at HIM3@CHAlliance.org a scan of your hand-signed form as a PDF file.",
+  "links": [
+    {
+      "text": "MyCHArt",
+      "href": "https://mychart.challiance.org/MyChart/Authentication/Login"
+    },
+    {
+      "text": "Medical Record Authorization Form",
+      "href": "https://www.challiance.org/forms/medical-record-authorization-form.pdf"
+    }
+  ],
+  "contacts": []
+}

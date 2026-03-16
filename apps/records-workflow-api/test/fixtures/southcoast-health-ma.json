@@ -1,0 +1,19 @@
+{
+  "title": "Requesting Medical Records",
+  "text": "Helping You Access the Health Information You Need. Patients and Caregiver Requests Using MyChart. Authorization for Release of Protected Health Information. Online Medical Records Request. Attorneys, Insurance Companies and All Other Non-Patients must mail the Authorization for Release of Protected Health Information form to Southcoast Health Health Information Management - ROI 200 Mill Road, Suite 210, Fairhaven, MA 02719.",
+  "links": [
+    {
+      "text": "MyChart Login",
+      "href": "https://mychart.southcoast.org/mychart/Authentication/Login"
+    },
+    {
+      "text": "Authorization for Release of Protected Health Information",
+      "href": "https://www.southcoast.org/forms/authorization-for-release-of-protected-health-information.pdf"
+    },
+    {
+      "text": "Online Medical Records Request",
+      "href": "https://www.southcoast.org/online-medical-records-request/"
+    }
+  ],
+  "contacts": []
+}

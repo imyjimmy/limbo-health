@@ -1,4 +1,4 @@
-# Records Workflow API (Texas Medical Records)
+# Records Workflow API
 
 Postgres-backed crawler + extraction service that ingests public hospital records pages and linked forms, normalizes portal/request workflows, and exposes facility-level read APIs.
 
@@ -8,7 +8,7 @@ Postgres-backed crawler + extraction service that ingests public hospital record
   - `hospital_systems`, `facilities`, `portal_profiles`, `records_workflows`
   - `workflow_contacts`, `workflow_forms`
   - `source_documents`, `extraction_runs`, `seed_urls`
-- Seed registry from `seeds/texas-systems.json`
+- State-scoped seed registries such as `seeds/texas-systems.json` and `seeds/massachusetts-systems.json`
 - Fetch + parse pipeline for HTML and PDF
 - Deterministic extraction logic for:
   - portal detection and scope (`full`, `most_records`, `partial`, `unclear`, `none`)
@@ -33,8 +33,12 @@ Postgres-backed crawler + extraction service that ingests public hospital record
    - `npm run migrate`
 5. Seed systems/URLs:
    - `npm run seed`
+   - Massachusetts only: `npm run seed -- --state MA`
+   - Explicit file override: `npm run seed -- --seed-file seeds/massachusetts-systems.json`
 6. Crawl:
    - `npm run crawl`
+   - Massachusetts only: `npm run crawl -- --state MA`
+   - Single system within a state: `npm run crawl -- --state MA --system-name "Tufts Medicine"`
 7. Remove stale crawl artifacts without wiping current data:
    - Preview: `npm run cleanup:stale-crawl:dry-run`
    - Apply: `npm run cleanup:stale-crawl`
@@ -44,6 +48,8 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 ## Notes
 
 - Raw HTML/PDF snapshots are stored under `storage/raw`.
+- `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
+- No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
 - Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
 - Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.
@@ -53,6 +59,6 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 
 ## Tests
 
-Extractor fixture tests for Baylor, St. David's, Texas Health, UT Southwestern, Methodist, and Houston Methodist:
+Extractor fixtures cover Texas baselines plus Massachusetts portal-first, multi-channel, and PDF-heavy workflows:
 
 - `npm test`

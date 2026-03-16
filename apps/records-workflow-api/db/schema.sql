@@ -2,13 +2,19 @@ create extension if not exists pgcrypto;
 
 create table if not exists hospital_systems (
   id uuid primary key default gen_random_uuid(),
-  system_name text not null unique,
+  system_name text not null,
   canonical_domain text,
   state char(2) not null default 'TX',
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table hospital_systems
+  drop constraint if exists hospital_systems_system_name_key;
+
+create unique index if not exists hospital_systems_unique_name_state
+  on hospital_systems (system_name, state);
 
 create table if not exists facilities (
   id uuid primary key default gen_random_uuid(),
@@ -137,8 +143,10 @@ create table if not exists source_documents (
   created_at timestamptz not null default now()
 );
 
+drop index if exists source_documents_unique_fetch;
+
 create unique index if not exists source_documents_unique_fetch
-  on source_documents (source_url, content_hash);
+  on source_documents (hospital_system_id, source_url, content_hash);
 
 create table if not exists extraction_runs (
   id uuid primary key default gen_random_uuid(),
@@ -154,10 +162,16 @@ create table if not exists seed_urls (
   id uuid primary key default gen_random_uuid(),
   hospital_system_id uuid not null references hospital_systems(id),
   facility_id uuid references facilities(id),
-  url text not null unique,
+  url text not null,
   seed_type text not null check (
     seed_type in ('system_records_page', 'facility_records_page', 'portal_page', 'forms_page', 'directory_page')
   ),
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
+
+alter table seed_urls
+  drop constraint if exists seed_urls_url_key;
+
+create unique index if not exists seed_urls_unique_system_url
+  on seed_urls (hospital_system_id, url);
