@@ -1,6 +1,7 @@
-import React from 'react';
-import { ScrollView, Switch, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { InteractionManager, ScrollView, Switch, Text, View } from 'react-native';
 import { IconMoon, IconSun } from '@tabler/icons-react-native';
+import type { ThemeMode } from '../../../theme';
 import { createThemedStyles, useTheme, useThemeModePreference, useThemedStyles } from '../../../theme';
 import { getProfileChrome } from './profileChrome';
 
@@ -9,7 +10,24 @@ export default function SettingsScreen() {
   const styles = useThemedStyles(createStyles);
   const chrome = getProfileChrome(theme);
   const { resolvedMode, setModePreference } = useThemeModePreference();
-  const isDarkMode = resolvedMode === 'dark';
+  const [previewMode, setPreviewMode] = useState<ThemeMode>(resolvedMode);
+  const pendingTaskRef = useRef<ReturnType<typeof InteractionManager.runAfterInteractions> | null>(null);
+
+  useEffect(() => {
+    setPreviewMode(resolvedMode);
+  }, [resolvedMode]);
+
+  const isDarkMode = previewMode === 'dark';
+
+  const handleToggle = (nextValue: boolean) => {
+    const nextMode: ThemeMode = nextValue ? 'dark' : 'light';
+    setPreviewMode(nextMode);
+    pendingTaskRef.current?.cancel();
+    pendingTaskRef.current = InteractionManager.runAfterInteractions(() => {
+      void setModePreference(nextMode);
+      pendingTaskRef.current = null;
+    });
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -26,7 +44,7 @@ export default function SettingsScreen() {
           <View style={styles.toggleWrap}>
             <Switch
               value={isDarkMode}
-              onValueChange={(nextValue) => setModePreference(nextValue ? 'dark' : 'light')}
+              onValueChange={handleToggle}
               accessibilityLabel="Dark mode"
               accessibilityHint="Switch between light and dark appearance."
               accessibilityRole="switch"
