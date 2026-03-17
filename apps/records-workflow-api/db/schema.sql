@@ -2,13 +2,16 @@ create extension if not exists pgcrypto;
 
 create table if not exists hospital_systems (
   id uuid primary key default gen_random_uuid(),
-  system_name text not null unique,
+  system_name text not null,
   canonical_domain text,
   state char(2) not null default 'TX',
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create unique index if not exists hospital_systems_unique_name_state
+  on hospital_systems (system_name, state);
 
 create table if not exists facilities (
   id uuid primary key default gen_random_uuid(),

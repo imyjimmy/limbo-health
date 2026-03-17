@@ -5,7 +5,7 @@ export async function upsertHospitalSystem({ systemName, domain, state = 'TX' },
   const result = await q.query(
     `insert into hospital_systems (system_name, canonical_domain, state)
      values ($1, $2, $3)
-     on conflict (system_name)
+     on conflict (system_name, state)
      do update set canonical_domain = excluded.canonical_domain,
                    state = excluded.state,
                    active = true,

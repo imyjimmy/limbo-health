@@ -99,26 +99,35 @@ npm run start
 
 Do not configure `npm run crawl`, `npm run seed`, or any cron job for this service.
 
+Current startup behavior:
+
+- `records-workflow-api` now auto-applies the schema on boot.
+- If the connected Postgres database is empty, it auto-seeds the baseline hospital systems from `apps/records-workflow-api/seeds/texas-systems.json`.
+- The later dump import is still required if you want the richer crawled workflow/forms data and cached source documents, not just the baseline hospital list.
+
 ## Step 4: Attach The Raw Artifact Volume
+
+Use the Railway canvas or command palette. Railway's current volume flow creates and attaches the volume to a service in one step.
 
 UI steps:
 
-1. Open `records-workflow-api`.
-2. Go to `Volumes`.
-3. Add a volume.
-4. Mount it at:
+1. Open the project canvas.
+2. Either:
+   - right-click `records-workflow-api` and choose `Attach Volume`, or
+   - open the command palette and create a volume, then select `records-workflow-api`.
+3. Set the mount path to:
 
 ```text
 /app/storage/raw
 ```
 
-5. Name it something like `records-workflow-raw`.
+4. Save the change and deploy it if Railway stages the change for review.
 
-CLI form if you prefer:
+Important notes:
 
-```bash
-railway volume -s records-workflow-api add -m /app/storage/raw
-```
+- Railway auto-generates the volume name in the UI, typically something like `records-workflow-api-volume`.
+- Do not block on the volume name matching this doc. For this deploy, the required detail is the mount path `/app/storage/raw`.
+- Railway also provides `RAILWAY_VOLUME_NAME` and `RAILWAY_VOLUME_MOUNT_PATH` automatically at runtime.
 
 ## Step 5: Set The API Environment Variables
 

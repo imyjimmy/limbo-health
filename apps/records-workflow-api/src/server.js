@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import { config } from './config.js';
+import { ensureDatabaseReady } from './bootstrap.js';
 import { publicRouter } from './routes/v1.js';
 import { internalRouter } from './routes/internal.js';
 
@@ -41,7 +42,16 @@ export function createApp() {
   return app;
 }
 
-export function startServer(port = config.port) {
+export async function startServer(port = config.port) {
+  const bootstrap = await ensureDatabaseReady();
+  if (bootstrap.didSeed) {
+    console.log('Bootstrapped baseline records workflow data:', bootstrap.summary);
+  } else {
+    console.log(
+      `Records workflow database ready with ${bootstrap.hospitalSystemCount} hospital systems.`,
+    );
+  }
+
   const app = createApp();
   return app.listen(port, () => {
     console.log(`records-workflow-api listening on ${port}`);
@@ -53,5 +63,8 @@ const isDirectExecution =
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isDirectExecution) {
-  startServer();
+  startServer().catch((error) => {
+    console.error('Failed to start records-workflow-api:', error);
+    process.exitCode = 1;
+  });
 }

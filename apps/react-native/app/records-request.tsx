@@ -239,6 +239,7 @@ export default function RecordsRequestScreen() {
 
   const packetReadyForContinue = Boolean(selectedSystem && packet && !packetLoading && !packetError);
   const idStepCanContinue = Boolean(packet && (!packet.requiresPhotoId || idAttachment));
+  const canGeneratePdf = Boolean(packet?.forms.some((form) => form.format === 'pdf'));
 
   return (
     <KeyboardAvoidingView
@@ -563,6 +564,16 @@ export default function RecordsRequestScreen() {
               )}
             </View>
 
+            {!canGeneratePdf && (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewHeader}>PDF generation</Text>
+                <Text style={styles.reviewMuted}>
+                  No fillable hospital PDF is available for this system yet. You can still review the
+                  workflow details above and open any official links manually.
+                </Text>
+              </View>
+            )}
+
             <View style={styles.reviewSection}>
               <Text style={styles.reviewHeader}>Instructions</Text>
               {packet.instructions.slice(0, 4).map((instruction) => (
@@ -585,15 +596,20 @@ export default function RecordsRequestScreen() {
             <View style={styles.actionColumn}>
               <Pressable
                 onPress={handleGeneratePdf}
-                disabled={submitting}
+                disabled={submitting || !canGeneratePdf}
                 style={({ pressed }) => [
                   styles.primaryButton,
                   styles.fullWidthButton,
-                  (pressed || submitting) && styles.primaryButtonPressed,
+                  (pressed || submitting || !canGeneratePdf) && styles.primaryButtonPressed,
+                  !canGeneratePdf && styles.disabledButton,
                 ]}
               >
                 <Text style={styles.primaryButtonText}>
-                  {submitting ? 'Filling PDF...' : 'Generate Filled Hospital PDF'}
+                  {submitting
+                    ? 'Filling PDF...'
+                    : canGeneratePdf
+                      ? 'Generate Filled Hospital PDF'
+                      : 'No Fillable PDF Available Yet'}
                 </Text>
               </Pressable>
 

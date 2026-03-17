@@ -95,7 +95,7 @@ services:
       - ./apps/records-workflow-api:/app
       - /app/node_modules
       - ./apps/records-workflow-api/storage/raw:/app/storage/raw
-    command: sh -c "npm run migrate && npm run seed && npm run dev"
+    command: npm run dev
     networks:
       - limbo_network
 
