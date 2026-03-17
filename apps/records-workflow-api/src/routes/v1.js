@@ -9,9 +9,10 @@ import {
   searchFacilities
 } from '../repositories/workflowRepository.js';
 
-export const v1Router = Router();
+export const publicRouter = Router();
+export const v1Router = publicRouter;
 
-v1Router.get('/hospital-systems', async (req, res) => {
+publicRouter.get('/hospital-systems', async (req, res) => {
   try {
     const q = (req.query.q || '').toString().trim();
     const results = await listHospitalSystems(q);
@@ -22,7 +23,7 @@ v1Router.get('/hospital-systems', async (req, res) => {
   }
 });
 
-v1Router.get('/facilities/search', async (req, res) => {
+publicRouter.get('/facilities/search', async (req, res) => {
   try {
     const q = (req.query.q || '').toString().trim();
     if (!q) {
@@ -37,7 +38,7 @@ v1Router.get('/facilities/search', async (req, res) => {
   }
 });
 
-v1Router.get('/facilities/:facilityId/records-workflow', async (req, res) => {
+publicRouter.get('/facilities/:facilityId/records-workflow', async (req, res) => {
   try {
     const payload = await getEffectiveWorkflowForFacility(req.params.facilityId);
     if (!payload) {
@@ -50,7 +51,7 @@ v1Router.get('/facilities/:facilityId/records-workflow', async (req, res) => {
   }
 });
 
-v1Router.get('/hospital-systems/:id/records-workflows', async (req, res) => {
+publicRouter.get('/hospital-systems/:id/records-workflows', async (req, res) => {
   try {
     const workflows = await getSystemWorkflows(req.params.id);
     return res.json({ workflows });
@@ -60,7 +61,7 @@ v1Router.get('/hospital-systems/:id/records-workflows', async (req, res) => {
   }
 });
 
-v1Router.get('/hospital-systems/:id/records-request-packet', async (req, res) => {
+publicRouter.get('/hospital-systems/:id/records-request-packet', async (req, res) => {
   try {
     const payload = await getSystemRequestPacket(req.params.id);
     if (!payload) {
@@ -73,7 +74,7 @@ v1Router.get('/hospital-systems/:id/records-request-packet', async (req, res) =>
   }
 });
 
-v1Router.get('/source-documents/:id/content', async (req, res) => {
+publicRouter.get('/source-documents/:id/content', async (req, res) => {
   try {
     const sourceDocument = await getSourceDocumentById(req.params.id);
     if (!sourceDocument?.storage_path) {

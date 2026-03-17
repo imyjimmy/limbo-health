@@ -780,7 +780,9 @@ async function attachCachedDocumentsToForms(forms = []) {
     return {
       ...form,
       cached_source_document_id: cached?.id || null,
-      cached_content_url: cached ? `/v1/source-documents/${cached.id}/content` : null
+      cached_content_url: cached
+        ? `/api/records-workflow/source-documents/${cached.id}/content`
+        : null
     };
   });
 }

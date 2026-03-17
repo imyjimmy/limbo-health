@@ -75,6 +75,9 @@ services:
 
   # Records workflow API - Public records crawler and read API
   records-workflow-api:
+    build:
+      context: .
+      dockerfile: apps/records-workflow-api/Dockerfile
     environment:
       - NODE_ENV=production
       - PORT=3020
@@ -87,7 +90,7 @@ services:
     depends_on:
       - records-workflow-postgres
     restart: unless-stopped
-    command: sh -c "npm run migrate && npm run seed && npm run start"
+    command: npm run start
     volumes:
       - ./apps/records-workflow-api/storage/raw:/app/storage/raw
 

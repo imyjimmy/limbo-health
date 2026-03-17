@@ -16,9 +16,12 @@ Postgres-backed crawler + extraction service that ingests public hospital record
   - request method flags (online/portal/email/fax/mail/phone/in-person)
   - imaging/billing/amendment sub-workflows
 - Read/admin endpoints:
-  - `GET /v1/facilities/search?q=...`
-  - `GET /v1/facilities/:facility_id/records-workflow`
-  - `GET /v1/hospital-systems/:id/records-workflows`
+  - `GET /api/records-workflow/hospital-systems`
+  - `GET /api/records-workflow/facilities/search?q=...`
+  - `GET /api/records-workflow/facilities/:facility_id/records-workflow`
+  - `GET /api/records-workflow/hospital-systems/:id/records-workflows`
+  - `GET /api/records-workflow/hospital-systems/:id/records-request-packet`
+  - `GET /api/records-workflow/source-documents/:id/content`
   - `POST /internal/crawl/run`
   - `POST /internal/crawl/reseed`
   - `GET /internal/extraction-runs/:id`

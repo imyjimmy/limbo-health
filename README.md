@@ -178,6 +178,7 @@ See `railway-export/README.md` for instructions on recreating the Railway deploy
 localhost:3003/              → frontend:5173 (Vite)
 localhost:3003/api/auth/*    → auth-api:3010
 localhost:3003/api/mgit/*    → mgit-api:3003
+localhost:3003/api/records-workflow/* → records-workflow-api:3020
 localhost:3003/api/*         → scheduler-api:3005
 ```
 

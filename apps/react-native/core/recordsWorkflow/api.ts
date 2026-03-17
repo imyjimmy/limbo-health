@@ -1,9 +1,10 @@
 import { API_BASE_URL } from '../../constants/api';
 import type { HospitalSystemOption, RecordsRequestPacket } from '../../types/recordsRequest';
 
-const WORKFLOW_API_BASE_URL = (
+const WORKFLOW_API_HOST = (
   process.env.EXPO_PUBLIC_RECORDS_WORKFLOW_API_BASE_URL || API_BASE_URL
 ).replace(/\/+$/, '');
+const WORKFLOW_API_PREFIX = '/api/records-workflow';
 
 interface ApiHospitalSystem {
   id: string;
@@ -67,20 +68,51 @@ interface ApiRecordsRequestPacket {
   }[];
 }
 
+function buildWorkflowUrl(path: string): string {
+  return `${WORKFLOW_API_HOST}${WORKFLOW_API_PREFIX}${path}`;
+}
+
+function buildNonJsonError(path: string, response: Response, bodyText: string): Error {
+  const contentType = response.headers.get('content-type')?.trim() || 'unknown content type';
+  const preview = bodyText.replace(/\s+/g, ' ').trim().slice(0, 120);
+  const routeHint = `Check ${WORKFLOW_API_PREFIX} routing.`;
+
+  if (response.ok) {
+    return new Error(
+      `Records workflow API returned ${contentType} for ${path} instead of JSON. ${routeHint}${
+        preview ? ` Response started with: ${preview}` : ''
+      }`,
+    );
+  }
+
+  return new Error(
+    `Records workflow API request failed with status ${response.status} and returned ${contentType} for ${path}. ${routeHint}${
+      preview ? ` Response started with: ${preview}` : ''
+    }`,
+  );
+}
+
 async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${WORKFLOW_API_BASE_URL}${path}`);
+  const response = await fetch(buildWorkflowUrl(path));
+  const contentType = response.headers.get('content-type')?.toLowerCase() || '';
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}.`;
-    try {
+    if (contentType.includes('application/json')) {
       const data = await response.json();
       if (typeof data?.error === 'string' && data.error.trim().length > 0) {
         message = data.error;
       }
-    } catch {
-      // Ignore JSON parsing failures and fall back to the generic message.
+      throw new Error(message);
     }
-    throw new Error(message);
+
+    const bodyText = await response.text();
+    throw buildNonJsonError(path, response, bodyText);
+  }
+
+  if (!contentType.includes('application/json')) {
+    const bodyText = await response.text();
+    throw buildNonJsonError(path, response, bodyText);
   }
 
   return (await response.json()) as T;
@@ -96,13 +128,13 @@ function mapHospitalSystem(system: ApiHospitalSystem): HospitalSystemOption {
 }
 
 export async function fetchHospitalSystems(): Promise<HospitalSystemOption[]> {
-  const data = await fetchJson<{ results: ApiHospitalSystem[] }>('/v1/hospital-systems');
+  const data = await fetchJson<{ results: ApiHospitalSystem[] }>('/hospital-systems');
   return data.results.map(mapHospitalSystem);
 }
 
 export async function fetchRecordsRequestPacket(systemId: string): Promise<RecordsRequestPacket> {
   const data = await fetchJson<ApiRecordsRequestPacket>(
-    `/v1/hospital-systems/${encodeURIComponent(systemId)}/records-request-packet`,
+    `/hospital-systems/${encodeURIComponent(systemId)}/records-request-packet`,
   );
 
   return {
@@ -134,7 +166,7 @@ export async function fetchRecordsRequestPacket(systemId: string): Promise<Recor
       format: form.format,
       cachedSourceDocumentId: form.cached_source_document_id,
       cachedContentUrl: form.cached_content_url
-        ? `${WORKFLOW_API_BASE_URL}${form.cached_content_url}`
+        ? `${WORKFLOW_API_HOST}${form.cached_content_url}`
         : null,
     })),
     instructions: data.instructions.map((instruction) => ({
