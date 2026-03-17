@@ -1,61 +1,56 @@
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Switch, Text, View } from 'react-native';
 import { IconMoon, IconSun } from '@tabler/icons-react-native';
 import { createThemedStyles, useTheme, useThemeModePreference, useThemedStyles } from '../../../theme';
 import { getProfileChrome } from './profileChrome';
-
-type AppearanceOption = {
-  key: 'light' | 'dark';
-};
-
-const APPEARANCE_OPTIONS: AppearanceOption[] = [
-  { key: 'light' },
-  { key: 'dark' },
-];
 
 export default function SettingsScreen() {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const chrome = getProfileChrome(theme);
   const { resolvedMode, setModePreference } = useThemeModePreference();
+  const isDarkMode = resolvedMode === 'dark';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.sectionLabel}>APPEARANCE</Text>
       <View style={styles.card}>
-        {APPEARANCE_OPTIONS.map((option, index) => {
-          const isSelected = resolvedMode === option.key;
-          const Icon = option.key === 'light' ? IconSun : IconMoon;
-          return (
-            <Pressable
-              key={option.key}
-              onPress={() => setModePreference(option.key)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isSelected }}
-              accessibilityLabel={`${option.key} mode`}
-              style={({ pressed }) => [
-                styles.optionRow,
-                index < APPEARANCE_OPTIONS.length - 1 && styles.optionRowBorder,
-                pressed && styles.optionRowPressed,
-              ]}
-            >
-              <View style={[styles.iconWrap, isSelected && styles.iconWrapActive]}>
-                <Icon
-                  size={22}
-                  strokeWidth={1.8}
-                  color={isSelected ? theme.colors.primary : chrome.secondaryText}
-                />
-              </View>
-              <View style={[styles.selectionDot, isSelected && styles.selectionDotActive]}>
-                {isSelected ? <View style={styles.selectionDotInner} /> : null}
-              </View>
-            </Pressable>
-          );
-        })}
+        <View style={styles.toggleRow}>
+          <View style={styles.modeIconWrap}>
+            <IconSun
+              size={20}
+              strokeWidth={1.8}
+              color={!isDarkMode ? theme.colors.primary : chrome.secondaryText}
+            />
+          </View>
+          <View style={styles.toggleWrap}>
+            <Switch
+              value={isDarkMode}
+              onValueChange={(nextValue) => setModePreference(nextValue ? 'dark' : 'light')}
+              accessibilityLabel="Dark mode"
+              accessibilityHint="Switch between light and dark appearance."
+              accessibilityRole="switch"
+              accessibilityState={{ checked: isDarkMode }}
+              trackColor={{
+                false: theme.colors.secondarySoft,
+                true: theme.colors.primarySoft,
+              }}
+              thumbColor={isDarkMode ? theme.colors.primary : theme.colors.surface}
+              ios_backgroundColor={chrome.subtleSurface}
+            />
+          </View>
+          <View style={styles.modeIconWrap}>
+            <IconMoon
+              size={20}
+              strokeWidth={1.8}
+              color={isDarkMode ? theme.colors.primary : chrome.secondaryText}
+            />
+          </View>
+        </View>
       </View>
 
       <Text style={styles.helperText}>
-        Changes apply immediately across the mobile app.
+        Changes apply immediately across the mobile app and are saved on this device.
       </Text>
     </ScrollView>
   );
@@ -86,48 +81,24 @@ const createStyles = createThemedStyles((theme) => {
       backgroundColor: chrome.cardBackground,
       borderRadius: 12,
     },
-    optionRow: {
+    toggleRow: {
       alignItems: 'center',
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
+      gap: 12,
+      minHeight: 56,
       paddingHorizontal: 16,
       paddingVertical: 16,
     },
-    optionRowBorder: {
-      borderBottomWidth: 1,
-      borderBottomColor: chrome.divider,
-    },
-    optionRowPressed: {
-      backgroundColor: chrome.cardPressed,
-    },
-    iconWrap: {
+    modeIconWrap: {
       alignItems: 'center',
-      backgroundColor: chrome.subtleSurface,
-      borderRadius: 999,
-      height: 40,
       justifyContent: 'center',
-      width: 40,
+      width: 24,
     },
-    iconWrapActive: {
-      backgroundColor: theme.colors.primarySoft,
-    },
-    selectionDot: {
+    toggleWrap: {
       alignItems: 'center',
-      borderColor: chrome.divider,
-      borderRadius: 999,
-      borderWidth: 2,
-      height: 22,
       justifyContent: 'center',
-      width: 22,
-    },
-    selectionDotActive: {
-      borderColor: theme.colors.primary,
-    },
-    selectionDotInner: {
-      backgroundColor: theme.colors.primary,
-      borderRadius: 999,
-      height: 10,
-      width: 10,
+      minHeight: 32,
     },
     helperText: {
       color: chrome.secondaryText,

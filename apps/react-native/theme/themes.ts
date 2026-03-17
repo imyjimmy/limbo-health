@@ -43,6 +43,12 @@ export interface ThemeColors {
   chromeSurfacePressed: string;
   chromeBorder: string;
   chromeTextMuted: string;
+  logoPanelBackground: string;
+  logoPanelBorder: string;
+  logoTileBackground: string;
+  logoTileBorder: string;
+  logoFallbackBackground: string;
+  logoFallbackText: string;
   primarySoft: string;
   secondarySoft: string;
   successSoft: string;
@@ -113,6 +119,12 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         chromeSurfacePressed: '#203242',
         chromeBorder: '#2D455C',
         chromeTextMuted: '#A7B8CA',
+        logoPanelBackground: '#EDF3F8',
+        logoPanelBorder: '#D7E2EC',
+        logoTileBackground: '#FFFFFF',
+        logoTileBorder: '#D5DFE8',
+        logoFallbackBackground: '#E6EDF4',
+        logoFallbackText: '#31465A',
         primarySoft: '#D6F5EE',
         secondarySoft: '#DBEAFE',
         successSoft: '#DCFCE7',
@@ -167,6 +179,12 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         chromeSurfacePressed: '#1B2D3C',
         chromeBorder: '#2C455B',
         chromeTextMuted: '#AFC2D4',
+        logoPanelBackground: '#D4DEE8',
+        logoPanelBorder: '#BFCFDB',
+        logoTileBackground: '#FFFFFF',
+        logoTileBorder: '#D5DFE8',
+        logoFallbackBackground: '#E6EDF4',
+        logoFallbackText: '#31465A',
         primarySoft: '#103E3A',
         secondarySoft: '#182B4E',
         successSoft: '#163322',
@@ -225,6 +243,12 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         chromeSurfacePressed: '#342A27',
         chromeBorder: '#5A463E',
         chromeTextMuted: '#CEB8AB',
+        logoPanelBackground: '#F7EEE4',
+        logoPanelBorder: '#E1D2C4',
+        logoTileBackground: '#FFFDF9',
+        logoTileBorder: '#E6D7C8',
+        logoFallbackBackground: '#F1E6DA',
+        logoFallbackText: '#5E4A43',
         primarySoft: '#FCE2DA',
         secondarySoft: '#F4D9D3',
         successSoft: '#E3EEDC',
@@ -279,6 +303,12 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         chromeSurfacePressed: '#312725',
         chromeBorder: '#5A463E',
         chromeTextMuted: '#D1BDAF',
+        logoPanelBackground: '#E1D4C8',
+        logoPanelBorder: '#CCB9AA',
+        logoTileBackground: '#FFFDF9',
+        logoTileBorder: '#E6D7C8',
+        logoFallbackBackground: '#F1E6DA',
+        logoFallbackText: '#5E4A43',
         primarySoft: '#4E2923',
         secondarySoft: '#3D211D',
         successSoft: '#20311A',
