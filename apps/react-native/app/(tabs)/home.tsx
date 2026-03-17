@@ -69,6 +69,7 @@ function LogoMarqueeRow({
   startOffsetPx = 0,
   style,
 }: LogoMarqueeRowProps) {
+  const styles = useThemedStyles(createStyles);
   const translateX = useRef(new Animated.Value(0)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
   const loopDistance = useMemo(

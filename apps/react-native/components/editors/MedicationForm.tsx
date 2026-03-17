@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { EditorProps } from '../registry/componentRegistry';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 import { DOSAGE_PRESETS, FREQUENCY_PRESETS } from '../../core/medication/options';
 import {
   buildMedicationMarkdown,
@@ -35,6 +36,8 @@ export function MedicationForm({
   onSave,
   onCancel,
 }: EditorProps) {
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   // Derive initial values from existing doc in edit mode
   const initialFields = useMemo(() => {
     if (mode !== 'edit' || !doc) return null;
@@ -131,7 +134,7 @@ export function MedicationForm({
         </Text>
         <TouchableOpacity onPress={handleSave} disabled={saving || !canSave} testID="medication-save">
           {saving ? (
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={theme.colors.secondary} />
           ) : (
             <Text style={[styles.saveText, !canSave && styles.saveTextDisabled]}>Save</Text>
           )}
@@ -150,7 +153,7 @@ export function MedicationForm({
             value={name}
             onChangeText={setName}
             placeholder="Tylenol (Acetaminophen)"
-            placeholderTextColor="#9AA0A6"
+            placeholderTextColor={theme.colors.inputPlaceholder}
             autoCapitalize="words"
             returnKeyType="next"
             testID="medication-name-input"
@@ -224,7 +227,7 @@ export function MedicationForm({
               value={dosage}
               onChangeText={setDosage}
               placeholder="Type custom dosage"
-              placeholderTextColor="#9AA0A6"
+              placeholderTextColor={theme.colors.inputPlaceholder}
               autoCapitalize="none"
               returnKeyType="next"
               testID="medication-dosage-input"
@@ -257,7 +260,7 @@ export function MedicationForm({
             value={frequency}
             onChangeText={setFrequency}
             placeholder="Every 6 hours as needed"
-            placeholderTextColor="#9AA0A6"
+            placeholderTextColor={theme.colors.inputPlaceholder}
             autoCapitalize="none"
             returnKeyType="next"
             testID="medication-frequency-input"
@@ -271,7 +274,7 @@ export function MedicationForm({
             value={startDate}
             onChangeText={setStartDate}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor="#9AA0A6"
+            placeholderTextColor={theme.colors.inputPlaceholder}
             autoCapitalize="none"
             keyboardType="numbers-and-punctuation"
             returnKeyType="next"
@@ -286,7 +289,7 @@ export function MedicationForm({
             value={stopDate}
             onChangeText={setStopDate}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor="#9AA0A6"
+            placeholderTextColor={theme.colors.inputPlaceholder}
             autoCapitalize="none"
             keyboardType="numbers-and-punctuation"
             returnKeyType="done"
@@ -298,10 +301,10 @@ export function MedicationForm({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -310,27 +313,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E4E5E7',
-    backgroundColor: '#FAFAFA',
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
   cancelText: {
     fontSize: 16,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   headerPath: {
     flex: 1,
     marginHorizontal: 10,
     textAlign: 'center',
     fontSize: 13,
-    color: '#889099',
+    color: theme.colors.textMuted,
   },
   saveText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#007AFF',
+    color: theme.colors.secondary,
   },
   saveTextDisabled: {
-    color: '#B8BDC6',
+    color: theme.colors.textMuted,
   },
   body: {
     flex: 1,
@@ -340,7 +343,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111',
+    color: theme.colors.text,
     marginBottom: 18,
   },
   fieldGroup: {
@@ -349,27 +352,27 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#5C6570',
+    color: theme.colors.textSecondary,
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#D8DDE3',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 11,
     fontSize: 16,
-    color: '#111',
-    backgroundColor: '#FFF',
+    color: theme.colors.text,
+    backgroundColor: theme.colors.inputBackground,
   },
   selectInput: {
     borderWidth: 1,
-    borderColor: '#D8DDE3',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    backgroundColor: '#FFF',
+    backgroundColor: theme.colors.inputBackground,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -377,23 +380,23 @@ const styles = StyleSheet.create({
   },
   inlinePicker: {
     borderWidth: 1,
-    borderColor: '#D8DDE3',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 8,
-    backgroundColor: '#FFF',
+    backgroundColor: theme.colors.surface,
   },
   selectInputText: {
     fontSize: 16,
-    color: '#111',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   selectInputPlaceholder: {
-    color: '#9AA0A6',
+    color: theme.colors.inputPlaceholder,
     fontWeight: '400',
   },
   selectChevron: {
-    color: '#7f8792',
+    color: theme.colors.textMuted,
     fontSize: 16,
   },
   frequencyRow: {
@@ -404,40 +407,40 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     borderWidth: 1,
-    borderColor: '#D8DDE3',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: '#FFF',
+    backgroundColor: theme.colors.surface,
   },
   presetChipSelected: {
-    borderColor: '#87B8F9',
-    backgroundColor: '#EAF3FF',
+    borderColor: theme.colors.secondary,
+    backgroundColor: theme.colors.secondarySoft,
   },
   presetText: {
-    color: '#4F5A67',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
   },
   presetTextSelected: {
-    color: '#0B63CE',
+    color: theme.colors.secondary,
     fontWeight: '600',
   },
   pickerRow: {
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e8e8e8',
+    borderTopColor: theme.colors.border,
   },
   pickerRowSelected: {
-    backgroundColor: '#EAF3FF',
+    backgroundColor: theme.colors.secondarySoft,
   },
   pickerRowText: {
     fontSize: 15,
-    color: '#222',
+    color: theme.colors.text,
   },
   pickerRowTextSelected: {
-    color: '#0B63CE',
+    color: theme.colors.secondary,
     fontWeight: '600',
   },
-});
+}));

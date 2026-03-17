@@ -13,6 +13,7 @@
     "editor:dev": "npx vite --config ./editor-web/vite.config.ts -w build",
     "editor:build": "npx vite --config ./editor-web/vite.config.ts build && npm run editor:post-build",
     "editor:post-build": "node ./node_modules/@10play/tentap-editor/scripts/buildEditor.js ./editor-web/build/index.html",
+    "check:theme-colors": "node ../../scripts/check-react-native-no-raw-colors.js",
     "test": "jest"
   },
   "jest": {

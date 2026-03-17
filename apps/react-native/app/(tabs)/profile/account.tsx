@@ -16,9 +16,11 @@ import { useRouter } from 'expo-router';
 import { bech32 } from '@scure/base';
 import { hexToBytes } from '@noble/hashes/utils.js';
 import Svg, { Path } from 'react-native-svg';
+import { GoogleLogo } from '../../../components/branding/GoogleLogo';
 import { useAuthContext } from '../../../providers/AuthProvider';
 import type { OAuthConnection } from '../../../types/auth';
 import { createThemedStyles, useTheme, useThemedStyles } from '../../../theme';
+import { getProfileChrome } from './profileChrome';
 
 function encodeBech32(prefix: string, hexStr: string): string {
   const bytes = hexToBytes(hexStr);
@@ -42,17 +44,6 @@ function connectionDetail(conn: OAuthConnection): string {
   if (conn.email) return conn.email;
   if (conn.providerId) return conn.providerId;
   return 'Connected';
-}
-
-function GoogleLogo({ size = 18 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 48 48">
-      <Path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-      <Path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-      <Path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.09 24.09 0 0 0 0 21.56l7.98-6.19z" />
-      <Path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-    </Svg>
-  );
 }
 
 function NostrLogo({ size = 18, color }: { size?: number; color: string }) {
@@ -85,6 +76,7 @@ export default function AccountScreen() {
   const { state, hasStoredNostrKey, updateMetadata, resetLocalAppState, deleteAccount } = useAuthContext();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
+  const chrome = getProfileChrome(theme);
 
   const fallbackName = state.googleProfile?.name || '';
   const [firstName, setFirstName] = useState(
@@ -206,7 +198,7 @@ export default function AccountScreen() {
             onBlur={handleNameSave}
             onSubmitEditing={handleNameSave}
             placeholder="First name"
-            placeholderTextColor={theme.colors.inputPlaceholder}
+            placeholderTextColor={chrome.secondaryText}
             returnKeyType="next"
             maxLength={50}
             autoCorrect={false}
@@ -222,7 +214,7 @@ export default function AccountScreen() {
             onBlur={handleNameSave}
             onSubmitEditing={handleNameSave}
             placeholder="Last name"
-            placeholderTextColor={theme.colors.inputPlaceholder}
+            placeholderTextColor={chrome.secondaryText}
             returnKeyType="done"
             maxLength={50}
             autoCorrect={false}
@@ -240,7 +232,7 @@ export default function AccountScreen() {
           onBlur={handleNameSave}
           onSubmitEditing={handleNameSave}
           placeholder="How others see you"
-          placeholderTextColor={theme.colors.inputPlaceholder}
+          placeholderTextColor={chrome.secondaryText}
           returnKeyType="done"
           maxLength={100}
           autoCorrect={false}
@@ -344,155 +336,159 @@ export default function AccountScreen() {
   );
 }
 
-const createStyles = createThemedStyles((theme) => ({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.headerBackground,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 48,
-  },
-  sectionLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    marginTop: 24,
-    marginLeft: 4,
-  },
-  card: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 12,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  nameLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 15,
-    width: 50,
-  },
-  nameInput: {
-    color: theme.colors.headerText,
-    fontSize: 16,
-    flex: 1,
-  },
-  displayNameInput: {
-    color: theme.colors.headerText,
-    fontSize: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  rowSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: theme.colors.overlayMuted,
-    marginLeft: 16,
-  },
-  connectionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  connectionRowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.overlayMuted,
-  },
-  providerName: {
-    color: theme.colors.headerText,
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  providerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  genericProviderLogo: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: theme.colors.overlay,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  genericProviderLogoText: {
-    color: theme.colors.headerText,
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 12,
-  },
-  connectionRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 1,
-  },
-  connectionDetail: {
-    color: theme.colors.textMuted,
-    fontSize: 14,
-    flexShrink: 1,
-  },
-  connectedBadge: {
-    color: theme.colors.success,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  importBadge: {
-    color: theme.colors.warning,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  notConnected: {
-    color: theme.colors.inputPlaceholder,
-    fontSize: 14,
-  },
-  comingSoon: {
-    color: theme.colors.inputPlaceholder,
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  disabledIndicator: {
-    color: theme.colors.textMuted,
-    fontSize: 14,
-  },
-  deleteCard: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  deleteCardPressed: {
-    backgroundColor: theme.colors.overlayMuted,
-  },
-  deleteText: {
-    color: theme.colors.danger,
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  resetCard: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 32,
-  },
-  resetCardPressed: {
-    backgroundColor: theme.colors.overlayMuted,
-  },
-  resetText: {
-    color: theme.colors.warning,
-    fontSize: 15,
-    fontWeight: '500',
-  },
-}));
+const createStyles = createThemedStyles((theme) => {
+  const chrome = getProfileChrome(theme);
+
+  return {
+    container: {
+      flex: 1,
+      backgroundColor: chrome.pageBackground,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 48,
+    },
+    sectionLabel: {
+      color: chrome.secondaryText,
+      fontSize: 13,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+      marginBottom: 8,
+      marginTop: 24,
+      marginLeft: 4,
+    },
+    card: {
+      backgroundColor: chrome.cardBackground,
+      borderRadius: 12,
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    nameLabel: {
+      color: chrome.secondaryText,
+      fontSize: 15,
+      width: 50,
+    },
+    nameInput: {
+      color: chrome.primaryText,
+      fontSize: 16,
+      flex: 1,
+    },
+    displayNameInput: {
+      color: chrome.primaryText,
+      fontSize: 16,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    rowSeparator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: chrome.divider,
+      marginLeft: 16,
+    },
+    connectionRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    connectionRowBorder: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: chrome.divider,
+    },
+    providerName: {
+      color: chrome.primaryText,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    providerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    genericProviderLogo: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: chrome.subtleSurface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    genericProviderLogoText: {
+      color: chrome.primaryText,
+      fontSize: 10,
+      fontWeight: '700',
+      lineHeight: 12,
+    },
+    connectionRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexShrink: 1,
+    },
+    connectionDetail: {
+      color: chrome.secondaryText,
+      fontSize: 14,
+      flexShrink: 1,
+    },
+    connectedBadge: {
+      color: theme.colors.success,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    importBadge: {
+      color: theme.colors.warning,
+      fontSize: 12,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    notConnected: {
+      color: chrome.secondaryText,
+      fontSize: 14,
+    },
+    comingSoon: {
+      color: chrome.secondaryText,
+      fontSize: 14,
+      fontStyle: 'italic',
+    },
+    disabledIndicator: {
+      color: chrome.secondaryText,
+      fontSize: 14,
+    },
+    deleteCard: {
+      backgroundColor: chrome.cardBackground,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 12,
+    },
+    deleteCardPressed: {
+      backgroundColor: chrome.cardPressed,
+    },
+    deleteText: {
+      color: theme.colors.danger,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+    resetCard: {
+      backgroundColor: chrome.cardBackground,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 32,
+    },
+    resetCardPressed: {
+      backgroundColor: chrome.cardPressed,
+    },
+    resetText: {
+      color: theme.colors.warning,
+      fontSize: 15,
+      fontWeight: '500',
+    },
+  };
+});

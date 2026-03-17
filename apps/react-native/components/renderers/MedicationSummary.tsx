@@ -13,6 +13,7 @@ import {
   LayoutAnimation,
 } from 'react-native';
 import type { RendererProps } from '../registry/componentRegistry';
+import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 import {
   buildMedicationMarkdown,
   parseMedicationEntry,
@@ -37,6 +38,8 @@ export function MedicationSummary({
   saving = false,
   saveRef,
 }: RendererProps) {
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const title = extractTitle(doc);
   const medicationEntry = parseMedicationEntry(doc.value);
   const fields = medicationEntry?.fields;
@@ -130,7 +133,7 @@ export function MedicationSummary({
           value={draft.name}
           onChangeText={(name) => setDraft((prev) => ({ ...prev, name }))}
           placeholder="Medication Name"
-          placeholderTextColor="#8a95a4"
+          placeholderTextColor={theme.colors.inputPlaceholder}
           autoCapitalize="words"
         />
       ) : (
@@ -216,7 +219,7 @@ export function MedicationSummary({
                 value={draft.dosage}
                 onChangeText={(dosage) => setDraft((prev) => ({ ...prev, dosage }))}
                 placeholder="Type custom dosage"
-                placeholderTextColor="#8a95a4"
+                placeholderTextColor={theme.colors.inputPlaceholder}
                 autoCapitalize="none"
               />
             ) : null}
@@ -262,7 +265,7 @@ export function MedicationSummary({
               value={draft.frequency}
               onChangeText={(frequency) => setDraft((prev) => ({ ...prev, frequency }))}
               placeholder="Or type custom frequency"
-              placeholderTextColor="#8a95a4"
+              placeholderTextColor={theme.colors.inputPlaceholder}
               autoCapitalize="none"
             />
           </>
@@ -289,7 +292,7 @@ export function MedicationSummary({
             value={draft.startDate}
             onChangeText={(startDate) => setDraft((prev) => ({ ...prev, startDate }))}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor="#8a95a4"
+            placeholderTextColor={theme.colors.inputPlaceholder}
             autoCapitalize="none"
             keyboardType="numbers-and-punctuation"
           />
@@ -316,7 +319,7 @@ export function MedicationSummary({
             value={draft.stopDate}
             onChangeText={(stopDate) => setDraft((prev) => ({ ...prev, stopDate }))}
             placeholder="YYYY-MM-DD (optional)"
-            placeholderTextColor="#8a95a4"
+            placeholderTextColor={theme.colors.inputPlaceholder}
             autoCapitalize="none"
             keyboardType="numbers-and-punctuation"
           />
@@ -337,82 +340,82 @@ export function MedicationSummary({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   medicationSummary: {
     gap: 10,
   },
   medicationName: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1b2635',
+    color: theme.colors.text,
   },
   medicationNameShell: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d6deea',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.surface,
   },
   medicationNameInput: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1b2635',
+    color: theme.colors.text,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d6deea',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.colors.inputBackground,
   },
   medicationRow: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#dde4ed',
+    borderColor: theme.colors.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#f8fbff',
+    backgroundColor: theme.colors.surfaceSubtle,
   },
   medicationLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#5a6a82',
+    color: theme.colors.textSecondary,
     textTransform: 'uppercase',
     marginBottom: 3,
   },
   medicationValue: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#14243a',
+    color: theme.colors.text,
   },
   medicationValueShell: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d3dce9',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
     minHeight: 40,
     justifyContent: 'center',
   },
   medicationInput: {
     fontSize: 16,
-    color: '#14243a',
+    color: theme.colors.text,
     fontWeight: '500',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d3dce9',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.inputBackground,
   },
   selectInput: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d3dce9',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.inputBackground,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -420,23 +423,23 @@ const styles = StyleSheet.create({
   },
   inlinePicker: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#d3dce9',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 8,
     overflow: 'hidden',
     marginBottom: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.surface,
   },
   selectInputText: {
     fontSize: 16,
-    color: '#14243a',
+    color: theme.colors.text,
     fontWeight: '500',
   },
   selectInputPlaceholder: {
-    color: '#8a95a4',
+    color: theme.colors.inputPlaceholder,
     fontWeight: '400',
   },
   selectChevron: {
-    color: '#7f8792',
+    color: theme.colors.textMuted,
     fontSize: 16,
   },
   frequencyRow: {
@@ -447,40 +450,40 @@ const styles = StyleSheet.create({
   },
   presetChip: {
     borderWidth: 1,
-    borderColor: '#D8DDE3',
+    borderColor: theme.colors.inputBorder,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: '#FFF',
+    backgroundColor: theme.colors.surface,
   },
   presetChipSelected: {
-    borderColor: '#87B8F9',
-    backgroundColor: '#EAF3FF',
+    borderColor: theme.colors.secondary,
+    backgroundColor: theme.colors.secondarySoft,
   },
   presetText: {
-    color: '#4F5A67',
+    color: theme.colors.textSecondary,
     fontSize: 13,
     fontWeight: '500',
   },
   presetTextSelected: {
-    color: '#0B63CE',
+    color: theme.colors.secondary,
     fontWeight: '600',
   },
   pickerRow: {
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e8e8e8',
+    borderTopColor: theme.colors.border,
   },
   pickerRowSelected: {
-    backgroundColor: '#EAF3FF',
+    backgroundColor: theme.colors.secondarySoft,
   },
   pickerRowText: {
     fontSize: 15,
-    color: '#222',
+    color: theme.colors.text,
   },
   pickerRowTextSelected: {
-    color: '#0B63CE',
+    color: theme.colors.secondary,
     fontWeight: '600',
   },
-});
+}));

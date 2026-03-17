@@ -3,10 +3,11 @@ import {
   PDFDocument,
   PDFTextField,
   StandardFonts,
-  rgb,
+  rgb as pdfRgb,
   type PDFField,
 } from 'pdf-lib';
 import { decode as decodeBase64, encode as encodeBase64 } from '../crypto/base64';
+import { ACTIVE_THEME_NAME, resolveTheme } from '../../theme';
 import type { BioProfile } from '../../types/bio';
 import type {
   RecordsRequestIdAttachment,
@@ -19,6 +20,8 @@ interface GenerateRecordsRequestPdfInput {
   packet: RecordsRequestPacket;
   idAttachment: RecordsRequestIdAttachment | null;
 }
+
+const pdfTheme = resolveTheme(ACTIVE_THEME_NAME, 'light');
 
 function normalizeFieldName(value: string): string {
   return value
@@ -53,6 +56,17 @@ function setTextFieldValue(field: PDFField, value: string) {
   if (!(field instanceof PDFTextField)) return false;
   field.setText(value);
   return true;
+}
+
+function hexToPdfColor(hexColor: string) {
+  const normalized = hexColor.replace('#', '');
+  const value = normalized.length === 3
+    ? normalized.split('').map((part) => part + part).join('')
+    : normalized;
+  const red = Number.parseInt(value.slice(0, 2), 16) / 255;
+  const green = Number.parseInt(value.slice(2, 4), 16) / 255;
+  const blue = Number.parseInt(value.slice(4, 6), 16) / 255;
+  return pdfRgb(red, green, blue);
 }
 
 function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
@@ -155,7 +169,7 @@ async function appendIdPage(pdf: PDFDocument, idAttachment: RecordsRequestIdAtta
     x: margin,
     y: titleY,
     size: 16,
-    color: rgb(0.06, 0.09, 0.16),
+    color: hexToPdfColor(pdfTheme.colors.text),
   });
   page.drawImage(image, {
     x: drawX,

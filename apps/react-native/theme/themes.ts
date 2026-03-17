@@ -39,6 +39,10 @@ export interface ThemeColors {
   tabIconInactive: string;
   headerBackground: string;
   headerText: string;
+  chromeSurface: string;
+  chromeSurfacePressed: string;
+  chromeBorder: string;
+  chromeTextMuted: string;
   primarySoft: string;
   secondarySoft: string;
   successSoft: string;
@@ -105,6 +109,10 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         tabIconInactive: '#CECECE',
         headerBackground: '#0F1923',
         headerText: '#FFFFFF',
+        chromeSurface: '#162430',
+        chromeSurfacePressed: '#203242',
+        chromeBorder: '#2D455C',
+        chromeTextMuted: '#A7B8CA',
         primarySoft: '#D6F5EE',
         secondarySoft: '#DBEAFE',
         successSoft: '#DCFCE7',
@@ -155,6 +163,10 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         tabIconInactive: '#7D94A8',
         headerBackground: '#0B131B',
         headerText: '#E5EEF8',
+        chromeSurface: '#13202C',
+        chromeSurfacePressed: '#1B2D3C',
+        chromeBorder: '#2C455B',
+        chromeTextMuted: '#AFC2D4',
         primarySoft: '#103E3A',
         secondarySoft: '#182B4E',
         successSoft: '#163322',
@@ -209,6 +221,10 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         tabIconInactive: '#D0BDAA',
         headerBackground: '#1E1A19',
         headerText: '#F9F1E4',
+        chromeSurface: '#2A221F',
+        chromeSurfacePressed: '#342A27',
+        chromeBorder: '#5A463E',
+        chromeTextMuted: '#CEB8AB',
         primarySoft: '#FCE2DA',
         secondarySoft: '#F4D9D3',
         successSoft: '#E3EEDC',
@@ -259,6 +275,10 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         tabIconInactive: '#A98D80',
         headerBackground: '#141110',
         headerText: '#F9F1E4',
+        chromeSurface: '#241D1B',
+        chromeSurfacePressed: '#312725',
+        chromeBorder: '#5A463E',
+        chromeTextMuted: '#D1BDAF',
         primarySoft: '#4E2923',
         secondarySoft: '#3D211D',
         successSoft: '#20311A',

@@ -1,8 +1,10 @@
 import { Stack } from 'expo-router/stack';
 import { useTheme } from '../../../theme';
+import { getProfileChrome } from './profileChrome';
 
 export default function ProfileLayout() {
   const theme = useTheme();
+  const chrome = getProfileChrome(theme);
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" options={{ title: 'Profile' }} />
@@ -12,9 +14,20 @@ export default function ProfileLayout() {
           headerShown: true,
           title: 'Account',
           headerBackButtonDisplayMode: 'default',
-          headerStyle: { backgroundColor: theme.colors.headerBackground },
-          headerTintColor: theme.colors.secondary,
-          headerTitleStyle: { color: theme.colors.headerText },
+          headerStyle: { backgroundColor: chrome.headerBackground },
+          headerTintColor: chrome.primaryText,
+          headerTitleStyle: { color: chrome.primaryText },
+        }}
+      />
+      <Stack.Screen
+        name="settings"
+        options={{
+          headerShown: true,
+          title: 'Settings',
+          headerBackButtonDisplayMode: 'default',
+          headerStyle: { backgroundColor: chrome.headerBackground },
+          headerTintColor: chrome.primaryText,
+          headerTitleStyle: { color: chrome.primaryText },
         }}
       />
       <Stack.Screen
@@ -23,9 +36,9 @@ export default function ProfileLayout() {
           headerShown: true,
           title: 'My Personal Info',
           headerBackButtonDisplayMode: 'default',
-          headerStyle: { backgroundColor: theme.colors.headerBackground },
-          headerTintColor: theme.colors.secondary,
-          headerTitleStyle: { color: theme.colors.headerText },
+          headerStyle: { backgroundColor: chrome.headerBackground },
+          headerTintColor: chrome.primaryText,
+          headerTitleStyle: { color: chrome.primaryText },
         }}
       />
       <Stack.Screen
@@ -34,6 +47,9 @@ export default function ProfileLayout() {
           headerShown: true,
           title: 'Encryption Keys',
           headerBackButtonDisplayMode: 'default',
+          headerStyle: { backgroundColor: chrome.headerBackground },
+          headerTintColor: chrome.primaryText,
+          headerTitleStyle: { color: chrome.primaryText },
         }}
       />
     </Stack>

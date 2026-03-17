@@ -12,6 +12,7 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import { resolveResult } from '../core/camera/cameraResult';
+import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 
 type TimerOption = 0 | 5 | 10;
 const TIMER_OPTIONS: { label: string; value: TimerOption }[] = [
@@ -22,6 +23,8 @@ const TIMER_OPTIONS: { label: string; value: TimerOption }[] = [
 
 export default function CameraScreen() {
   const router = useRouter();
+  const theme = useTheme();
+  const styles = useThemedStyles(createStyles);
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<'front' | 'back'>('back');
@@ -177,7 +180,7 @@ export default function CameraScreen() {
         {/* Shutter + flip row */}
         <View style={styles.shutterRow}>
           {/* Empty space to balance the flip button */}
-          <View style={{ width: 44 }} />
+          <View style={styles.shutterSpacer} />
 
           {/* Shutter button */}
           <Pressable
@@ -208,10 +211,10 @@ export default function CameraScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = createThemedStyles((theme) => ({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.headerBackground,
   },
   camera: {
     flex: 1,
@@ -222,12 +225,12 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: theme.colors.overlayStrong,
   },
   countdownText: {
     fontSize: 120,
     fontWeight: '200',
-    color: '#fff',
+    color: theme.colors.headerText,
   },
 
   // Top bar
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
     right: 24,
   },
   cancelText: {
-    color: '#fff',
+    color: theme.colors.headerText,
     fontSize: 17,
     fontWeight: '500',
   },
@@ -250,7 +253,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingBottom: 40,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: theme.colors.overlayStrong,
   },
 
   // Timer picker
@@ -267,15 +270,15 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   timerOptionActive: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: theme.colors.overlay,
   },
   timerLabel: {
-    color: 'rgba(255,255,255,0.6)',
+    color: theme.colors.tabIconInactive,
     fontSize: 15,
     fontWeight: '600',
   },
   timerLabelActive: {
-    color: '#ffd60a',
+    color: theme.colors.warning,
   },
 
   // Shutter row
@@ -286,21 +289,24 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 40,
   },
+  shutterSpacer: {
+    width: 44,
+  },
   shutterOuter: {
     width: 72,
     height: 72,
     borderRadius: 36,
     borderWidth: 4,
-    borderColor: '#fff',
+    borderColor: theme.colors.headerText,
     padding: 3,
   },
   shutterInner: {
     flex: 1,
     borderRadius: 30,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.headerText,
   },
   shutterDisabled: {
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: theme.colors.overlay,
   },
 
   // Flip button
@@ -308,38 +314,38 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: theme.colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
   },
   flipIcon: {
-    color: '#fff',
+    color: theme.colors.headerText,
     fontSize: 24,
   },
 
   // Permission screen
   permissionContainer: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
   permissionText: {
-    color: '#fff',
+    color: theme.colors.text,
     fontSize: 17,
     textAlign: 'center',
     marginBottom: 16,
   },
   permissionButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.primary,
     borderRadius: 12,
     paddingHorizontal: 24,
     paddingVertical: 14,
   },
   permissionButtonText: {
-    color: '#000',
+    color: theme.colors.primaryForeground,
     fontSize: 17,
     fontWeight: '600',
   },
-});
+}));

@@ -20,6 +20,7 @@ import { useAuthContext } from '../../../providers/AuthProvider';
 import { KeyManager } from '../../../core/crypto/KeyManager';
 import ImportKeyForm from '../../../components/auth/ImportKeyForm';
 import { createThemedStyles, useThemedStyles } from '../../../theme';
+import { getProfileChrome } from './profileChrome';
 
 function encodeBech32(prefix: string, hexStr: string): string {
   const bytes = hexToBytes(hexStr);
@@ -150,96 +151,100 @@ export default function EncryptionKeysRoute() {
   );
 }
 
-const createStyles = createThemedStyles((theme) => ({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  contentContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 48,
-  },
-  description: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    lineHeight: 22,
-    marginBottom: 28,
-  },
-  keyBox: {
-    backgroundColor: theme.colors.successSoft,
-    borderWidth: 1,
-    borderColor: theme.colors.success,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  keyLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.textMuted,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  keyValue: {
-    fontSize: 14,
-    fontFamily: 'Courier',
-    color: theme.colors.text,
-    marginBottom: 4,
-  },
-  keyAction: {
-    fontSize: 12,
-    color: theme.colors.primary,
-  },
-  exportButton: {
-    backgroundColor: theme.colors.secondary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  exportButtonText: {
-    color: theme.colors.secondaryForeground,
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  nsecBox: {
-    backgroundColor: theme.colors.dangerSoft,
-    borderWidth: 1,
-    borderColor: theme.colors.danger,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
-  nsecWarning: {
-    color: theme.colors.danger,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  nsecValue: {
-    color: theme.colors.text,
-    fontSize: 12,
-    fontFamily: 'Courier',
-    lineHeight: 18,
-  },
-  nsecDismiss: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    textAlign: 'right',
-  },
-  importButton: {
-    backgroundColor: theme.colors.accent,
-    borderWidth: 1,
-    borderColor: theme.colors.accent,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  importButtonText: {
-    color: theme.colors.accentForeground,
-    fontSize: 17,
-    fontWeight: '600',
-  },
-}));
+const createStyles = createThemedStyles((theme) => {
+  const chrome = getProfileChrome(theme);
+
+  return {
+    container: {
+      flex: 1,
+      backgroundColor: chrome.pageBackground,
+    },
+    contentContainer: {
+      paddingHorizontal: 24,
+      paddingTop: 40,
+      paddingBottom: 48,
+    },
+    description: {
+      fontSize: 16,
+      color: chrome.secondaryText,
+      lineHeight: 22,
+      marginBottom: 28,
+    },
+    keyBox: {
+      backgroundColor: chrome.cardBackground,
+      borderWidth: 1,
+      borderColor: chrome.divider,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+    },
+    keyLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: chrome.secondaryText,
+      marginBottom: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    keyValue: {
+      fontSize: 14,
+      fontFamily: 'Courier',
+      color: chrome.primaryText,
+      marginBottom: 4,
+    },
+    keyAction: {
+      fontSize: 12,
+      color: theme.colors.primary,
+    },
+    exportButton: {
+      backgroundColor: theme.colors.secondary,
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    exportButtonText: {
+      color: theme.colors.secondaryForeground,
+      fontSize: 17,
+      fontWeight: '600',
+    },
+    nsecBox: {
+      backgroundColor: chrome.cardBackground,
+      borderWidth: 1,
+      borderColor: theme.colors.danger,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      gap: 8,
+    },
+    nsecWarning: {
+      color: theme.colors.danger,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    nsecValue: {
+      color: chrome.primaryText,
+      fontSize: 12,
+      fontFamily: 'Courier',
+      lineHeight: 18,
+    },
+    nsecDismiss: {
+      color: chrome.secondaryText,
+      fontSize: 13,
+      textAlign: 'right',
+    },
+    importButton: {
+      backgroundColor: theme.colors.accent,
+      borderWidth: 1,
+      borderColor: theme.colors.accent,
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    importButtonText: {
+      color: theme.colors.accentForeground,
+      fontSize: 17,
+      fontWeight: '600',
+    },
+  };
+});

@@ -1,6 +1,6 @@
 // components/editor/NoteEditor.tsx
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -87,6 +87,26 @@ export function NoteEditor({
   // When editing, hide the editor until existing content is loaded to avoid "Write something..." flash
   const isEditing = !!initialDoc?.value;
   const [editorReady, setEditorReady] = useState(!isEditing);
+  const editorThemePayload = useMemo(
+    () => ({
+      background: theme.colors.editorBackground,
+      text: theme.colors.editorText,
+      quoteBorder: theme.colors.editorQuoteBorder,
+      quoteText: theme.colors.editorQuoteText,
+      codeBackground: theme.colors.editorCodeBackground,
+      preBackground: theme.colors.editorPreBackground,
+      selection: theme.colors.secondarySoft,
+    }),
+    [
+      theme.colors.editorBackground,
+      theme.colors.editorCodeBackground,
+      theme.colors.editorPreBackground,
+      theme.colors.editorQuoteBorder,
+      theme.colors.editorQuoteText,
+      theme.colors.editorText,
+      theme.colors.secondarySoft,
+    ],
+  );
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardWillShow', () => setKeyboardVisible(true));
@@ -108,9 +128,17 @@ export function NoteEditor({
   const loadCountRef = useRef(0);
   const hasSetContent = useRef(false);
   const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const applyEditorTheme = useCallback(() => {
+    if (!editor.webviewRef.current) return;
+    editor.injectJS(`
+      window.__applyLimboEditorTheme && window.__applyLimboEditorTheme(${JSON.stringify(editorThemePayload)});
+      true;
+    `);
+  }, [editor, editorThemePayload]);
 
   const handleEditorLoad = useCallback(() => {
     loadCountRef.current += 1;
+    applyEditorTheme();
     if (hasSetContent.current) return;
     if (!initialMarkdownBody) return;
 
@@ -131,7 +159,11 @@ export function NoteEditor({
         setEditorReady(true);
       }
     }, 400);
-  }, [editor, initialMarkdownBody]);
+  }, [applyEditorTheme, editor, initialMarkdownBody]);
+
+  useEffect(() => {
+    applyEditorTheme();
+  }, [applyEditorTheme]);
 
   const { capture } = useCamera();
 

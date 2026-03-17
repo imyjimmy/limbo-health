@@ -21,12 +21,14 @@ import {
   validateBioProfile,
 } from '../../../types/bio';
 import { createThemedStyles, useTheme, useThemedStyles } from '../../../theme';
+import { getProfileChrome } from './profileChrome';
 
 export default function PersonalInfoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
+  const chrome = getProfileChrome(theme);
   const { status, profile, suggestedProfile, saveProfile } = useBioProfile();
   const [form, setForm] = useState<BioProfile>(emptyBioProfile());
   const [didHydrate, setDidHydrate] = useState(false);
@@ -91,7 +93,7 @@ export default function PersonalInfoScreen() {
               value={form.fullName}
               onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
               placeholder="Jane Doe"
-              placeholderTextColor={theme.colors.inputPlaceholder}
+              placeholderTextColor={chrome.secondaryText}
               style={styles.fieldInput}
               autoCapitalize="words"
               autoCorrect={false}
@@ -113,7 +115,7 @@ export default function PersonalInfoScreen() {
                 }))
               }
               placeholder="MM/DD/YYYY"
-              placeholderTextColor={theme.colors.inputPlaceholder}
+              placeholderTextColor={chrome.secondaryText}
               style={styles.fieldInput}
               keyboardType="number-pad"
               textContentType="birthdate"
@@ -129,7 +131,7 @@ export default function PersonalInfoScreen() {
               value={form.addressLine1}
               onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
               placeholder="123 Main St"
-              placeholderTextColor={theme.colors.inputPlaceholder}
+              placeholderTextColor={chrome.secondaryText}
               style={styles.fieldInput}
               autoCapitalize="words"
               autoCorrect={false}
@@ -145,7 +147,7 @@ export default function PersonalInfoScreen() {
               value={form.addressLine2}
               onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
               placeholder="Apt 4B"
-              placeholderTextColor={theme.colors.inputPlaceholder}
+              placeholderTextColor={chrome.secondaryText}
               style={styles.fieldInput}
               autoCapitalize="words"
               autoCorrect={false}
@@ -161,7 +163,7 @@ export default function PersonalInfoScreen() {
               value={form.city}
               onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
               placeholder="Austin"
-              placeholderTextColor={theme.colors.inputPlaceholder}
+              placeholderTextColor={chrome.secondaryText}
               style={styles.fieldInput}
               autoCapitalize="words"
               autoCorrect={false}
@@ -178,7 +180,7 @@ export default function PersonalInfoScreen() {
                 value={form.state}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
                 placeholder="TX"
-                placeholderTextColor={theme.colors.inputPlaceholder}
+                placeholderTextColor={chrome.secondaryText}
                 style={styles.fieldInput}
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -200,7 +202,7 @@ export default function PersonalInfoScreen() {
                   }))
                 }
                 placeholder="78701"
-                placeholderTextColor={theme.colors.inputPlaceholder}
+                placeholderTextColor={chrome.secondaryText}
                 style={styles.fieldInput}
                 keyboardType="number-pad"
                 textContentType="postalCode"
@@ -228,87 +230,91 @@ export default function PersonalInfoScreen() {
   );
 }
 
-const createStyles = createThemedStyles((theme) => ({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.headerBackground,
-  },
-  loadingScreen: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.headerBackground,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 0,
-  },
-  sectionLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    marginTop: 24,
-    marginLeft: 4,
-  },
-  card: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 12,
-  },
-  helperText: {
-    color: theme.colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  fieldBlock: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 8,
-  },
-  fieldLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  fieldInput: {
-    color: theme.colors.headerText,
-    fontSize: 16,
-    padding: 0,
-  },
-  rowSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: theme.colors.overlayMuted,
-    marginLeft: 16,
-  },
-  inlineRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  inlineField: {
-    flex: 1,
-  },
-  inlineDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: theme.colors.overlayMuted,
-  },
-  saveButton: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 54,
-    marginTop: 28,
-  },
-  saveButtonPressed: {
-    opacity: 0.82,
-  },
-  saveButtonText: {
-    color: theme.colors.primaryForeground,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-}));
+const createStyles = createThemedStyles((theme) => {
+  const chrome = getProfileChrome(theme);
+
+  return {
+    container: {
+      flex: 1,
+      backgroundColor: chrome.pageBackground,
+    },
+    loadingScreen: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: chrome.pageBackground,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      gap: 0,
+    },
+    sectionLabel: {
+      color: chrome.secondaryText,
+      fontSize: 13,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+      marginBottom: 8,
+      marginTop: 24,
+      marginLeft: 4,
+    },
+    card: {
+      backgroundColor: chrome.cardBackground,
+      borderRadius: 12,
+    },
+    helperText: {
+      color: chrome.secondaryText,
+      fontSize: 15,
+      lineHeight: 22,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    fieldBlock: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 8,
+    },
+    fieldLabel: {
+      color: chrome.secondaryText,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    fieldInput: {
+      color: chrome.primaryText,
+      fontSize: 16,
+      padding: 0,
+    },
+    rowSeparator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: chrome.divider,
+      marginLeft: 16,
+    },
+    inlineRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
+    inlineField: {
+      flex: 1,
+    },
+    inlineDivider: {
+      width: StyleSheet.hairlineWidth,
+      backgroundColor: chrome.divider,
+    },
+    saveButton: {
+      backgroundColor: theme.colors.primary,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 54,
+      marginTop: 28,
+    },
+    saveButtonPressed: {
+      opacity: 0.82,
+    },
+    saveButtonText: {
+      color: theme.colors.primaryForeground,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+  };
+});
