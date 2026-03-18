@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from '../config.js';
 import { sha256 } from '../utils/hash.js';
+import { ensureRawStorageStateDir } from '../utils/rawStorage.js';
 import { parseHtmlDocument } from '../parsers/htmlParser.js';
 import { parsePdfDocument } from '../parsers/pdfParser.js';
 
@@ -13,7 +14,11 @@ function detectSourceType(url, contentType) {
   return 'html';
 }
 
-export async function fetchAndParseDocument({ url, timeoutMs = config.crawl.timeoutMs }) {
+export async function fetchAndParseDocument({
+  url,
+  timeoutMs = config.crawl.timeoutMs,
+  state = null
+}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -33,11 +38,12 @@ export async function fetchAndParseDocument({ url, timeoutMs = config.crawl.time
     const bodyBuffer = Buffer.from(await response.arrayBuffer());
     const contentHash = sha256(bodyBuffer);
 
-    await fs.mkdir(config.rawStorageDir, { recursive: true });
-
-    const extension = sourceType === 'pdf' ? 'pdf' : 'html';
-    const storagePath = path.join(config.rawStorageDir, `${contentHash}.${extension}`);
-    await fs.writeFile(storagePath, bodyBuffer);
+    let storagePath = null;
+    if (sourceType === 'pdf') {
+      const stateStorageDir = await ensureRawStorageStateDir(state);
+      storagePath = path.join(stateStorageDir, `${contentHash}.pdf`);
+      await fs.writeFile(storagePath, bodyBuffer);
+    }
 
     let parsed;
     if (sourceType === 'pdf') {

@@ -4,7 +4,13 @@ const PORTAL_SIGNATURES = [
   { name: 'MyChart', pattern: /\bmychart\b/i },
   { name: 'MyHealthONE', pattern: /\bmyhealthone\b/i },
   { name: 'HealthMark', pattern: /\bhealthmark\b/i },
-  { name: 'Verisma', pattern: /\bverisma\b/i }
+  { name: 'Verisma', pattern: /\bverisma\b/i },
+  { name: 'Patient Gateway', pattern: /\bpatient gateway\b/i },
+  { name: 'MyBILH Chart', pattern: /\bmybilh chart\b/i },
+  { name: 'myTuftsMed', pattern: /\bmytuftsmed\b/i },
+  { name: 'MyBaystate', pattern: /\bmybaystate\b/i },
+  { name: "MyChildren's Patient Portal", pattern: /\bmychildren'?s\b/i },
+  { name: 'Berkshire Patient Portal', pattern: /\bberkshire patient portal\b/i }
 ];
 
 const FORM_PATTERNS = [/authorization for release/i, /authorization to disclose/i, /release of information/i, /\bROI\b/i];

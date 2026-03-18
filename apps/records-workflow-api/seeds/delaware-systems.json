@@ -1,0 +1,134 @@
+[
+  {
+    "system_name": "Bayhealth",
+    "state": "DE",
+    "domain": "bayhealth.org",
+    "seed_urls": [
+      "https://www.bayhealth.org/patients/medical-records",
+      "https://www.bayhealth.org/patients/mychart-information"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Bayhealth Hospital, Kent Campus",
+        "city": "Dover",
+        "state": "DE"
+      },
+      {
+        "facility_name": "Bayhealth Hospital, Sussex Campus",
+        "city": "Milford",
+        "state": "DE"
+      }
+    ]
+  },
+  {
+    "system_name": "Beebe Healthcare",
+    "state": "DE",
+    "domain": "beebehealthcare.org",
+    "seed_urls": [
+      "https://www.beebehealthcare.org/patients-visitors/health-information-management",
+      "https://www.beebehealthcare.org/mychart"
+    ]
+  },
+  {
+    "system_name": "ChristianaCare",
+    "state": "DE",
+    "domain": "christianacare.org",
+    "seed_urls": [
+      "https://christianacare.org/us/en/visit-us/for-patients/medical-records",
+      "https://christianacare.org/us/en/patient-portal.html"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Christiana Hospital",
+        "city": "Newark",
+        "state": "DE"
+      },
+      {
+        "facility_name": "Wilmington Hospital",
+        "city": "Wilmington",
+        "state": "DE"
+      }
+    ]
+  },
+  {
+    "system_name": "Dover Behavioral Health System",
+    "state": "DE",
+    "domain": "doverbehavioral.com",
+    "seed_urls": [
+      "https://doverbehavioral.com/"
+    ]
+  },
+  {
+    "system_name": "Encompass Health Rehabilitation Hospital of Middletown",
+    "state": "DE",
+    "domain": "encompasshealth.com",
+    "seed_urls": [
+      "https://www.encompasshealth.com/locations/middletown-rehab"
+    ]
+  },
+  {
+    "system_name": "MeadowWood Behavioral Health Hospital",
+    "state": "DE",
+    "domain": "meadowwoodhospital.com",
+    "seed_urls": [
+      "https://www.meadowwoodhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Nemours Children's Hospital, Delaware",
+    "state": "DE",
+    "domain": "nemours.org",
+    "seed_urls": [
+      "https://www.nemours.org/patientfamily/nemours-mychart/medrecordrequest.html",
+      "https://www.nemours.org/patientfamily/nemours-app.html"
+    ]
+  },
+  {
+    "system_name": "PAM Health Rehabilitation Hospital of Dover",
+    "state": "DE",
+    "domain": "pamhealth.com",
+    "seed_urls": [
+      "https://pamhealth.com/hospitals/pam-health-rehabilitation-hospital-of-dover/"
+    ]
+  },
+  {
+    "system_name": "Rockford Center",
+    "state": "DE",
+    "domain": "rockfordcenter.com",
+    "seed_urls": [
+      "https://rockfordcenter.com/"
+    ]
+  },
+  {
+    "system_name": "Saint Francis Hospital",
+    "state": "DE",
+    "domain": "trinityhealthma.org",
+    "seed_urls": [
+      "https://www.trinityhealthma.org/location/saint-francis-hospital/medical-records-request"
+    ]
+  },
+  {
+    "system_name": "Select Specialty Hospital - Wilmington",
+    "state": "DE",
+    "domain": "selectspecialtyhospitals.com",
+    "seed_urls": [
+      "https://www.selectspecialtyhospitals.com/locations-and-tours/de/wilmington/wilmington"
+    ]
+  },
+  {
+    "system_name": "SUN Behavioral Delaware",
+    "state": "DE",
+    "domain": "sunbehavioral.com",
+    "seed_urls": [
+      "https://sunbehavioral.com/facilities/"
+    ]
+  },
+  {
+    "system_name": "TidalHealth Nanticoke",
+    "state": "DE",
+    "domain": "tidalhealth.org",
+    "seed_urls": [
+      "https://www.tidalhealth.org/medical-care/financial-admin-services/medical-records"
+    ]
+  }
+]

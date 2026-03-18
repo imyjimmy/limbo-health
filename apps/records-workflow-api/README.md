@@ -1,4 +1,4 @@
-# Records Workflow API (Texas Medical Records)
+# Records Workflow API
 
 Postgres-backed crawler + extraction service that ingests public hospital records pages and linked forms, normalizes portal/request workflows, and exposes facility-level read APIs.
 
@@ -8,7 +8,7 @@ Postgres-backed crawler + extraction service that ingests public hospital record
   - `hospital_systems`, `facilities`, `portal_profiles`, `records_workflows`
   - `workflow_contacts`, `workflow_forms`
   - `source_documents`, `extraction_runs`, `seed_urls`
-- Seed registry from `seeds/texas-systems.json`
+- State-scoped seed registries such as `seeds/texas-systems.json` and `seeds/massachusetts-systems.json`
 - Fetch + parse pipeline for HTML and PDF
 - Deterministic extraction logic for:
   - portal detection and scope (`full`, `most_records`, `partial`, `unclear`, `none`)
@@ -36,20 +36,39 @@ Postgres-backed crawler + extraction service that ingests public hospital record
    - `npm run migrate`
 5. Seed systems/URLs:
    - `npm run seed`
+   - Massachusetts only: `npm run seed -- --state MA`
+   - Explicit file override: `npm run seed -- --seed-file seeds/massachusetts-systems.json`
 6. Crawl:
    - `npm run crawl`
-7. Run API:
+   - Massachusetts only: `npm run crawl -- --state MA`
+   - Single system within a state: `npm run crawl -- --state MA --system-name "Tufts Medicine"`
+7. Reset crawl-derived state for a single state before a clean recrawl:
+   - Massachusetts only: `npm run reset:crawl-state -- --state MA --include-derived`
+8. Remove stale crawl artifacts without wiping current data:
+   - Preview: `npm run cleanup:stale-crawl:dry-run`
+   - Apply: `npm run cleanup:stale-crawl`
+9. Repartition existing raw PDFs into state subdirectories:
+   - Preview: `npm run repartition:raw-storage-state`
+   - Apply: `npm run repartition:raw-storage-state -- --apply`
+10. Run API:
    - `npm run start`
 
 ## Notes
 
-- Raw HTML/PDF snapshots are stored under `storage/raw` by content hash.
+- Raw PDF snapshots are stored under `storage/raw/<state>/` such as `storage/raw/tx/` and `storage/raw/ma/`. HTML pages are parsed and persisted to the database but are no longer written to disk.
+- `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
+- No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
+- Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
+- `npm run reset:crawl-state -- --state MA --include-derived` performs a clean, state-scoped reset of crawl-derived Massachusetts data without touching Texas seeds or data.
+- `npm run repartition:raw-storage-state -- --apply` performs a one-time move of existing PDF artifacts into state subdirectories and updates `source_documents.storage_path` without refetching anything.
+- Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
+- Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.
 - Crawler depth defaults to `2` and only follows workflow-relevant links.
 - Facility-level workflows override system-level workflows at read time.
 - Browser automation/login flows are intentionally out of scope.
 
 ## Tests
 
-Extractor fixture tests for Baylor, St. David's, Texas Health, UT Southwestern, Methodist, and Houston Methodist:
+Extractor fixtures cover Texas baselines plus Massachusetts portal-first, multi-channel, and PDF-heavy workflows:
 
 - `npm test`

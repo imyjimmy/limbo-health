@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Texas medical-records workflow crawler and read API",
+  "description": "State-aware medical-records workflow crawler and read API",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -11,7 +11,11 @@
     "migrate": "node src/migrate.js",
     "seed": "node src/seed.js",
     "crawl": "node src/crawl.js",
-    "test": "node --test"
+    "reset:crawl-state": "node src/resetCrawlState.js",
+    "repartition:raw-storage-state": "node src/repartitionRawStorageByState.js",
+    "cleanup:stale-crawl": "node src/cleanupStaleCrawlData.js --apply",
+    "cleanup:stale-crawl:dry-run": "node src/cleanupStaleCrawlData.js",
+    "test": "node --test --experimental-test-module-mocks"
   },
   "dependencies": {
     "cheerio": "^1.0.0",

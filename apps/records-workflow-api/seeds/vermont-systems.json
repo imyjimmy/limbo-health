@@ -1,0 +1,146 @@
+[
+  {
+    "system_name": "Brattleboro Memorial Hospital",
+    "state": "VT",
+    "domain": "bmhvt.org",
+    "seed_urls": [
+      "https://www.bmhvt.org/patients-visitors/patient-information/"
+    ]
+  },
+  {
+    "system_name": "Brattleboro Retreat",
+    "state": "VT",
+    "domain": "brattlebororetreat.org",
+    "seed_urls": [
+      "https://www.brattlebororetreat.org/request-records"
+    ]
+  },
+  {
+    "system_name": "Central Vermont Medical Center",
+    "state": "VT",
+    "domain": "cvmc.org",
+    "seed_urls": [
+      "https://www.cvmc.org/locations/medical-records",
+      "https://www.cvmc.org/mychart"
+    ]
+  },
+  {
+    "system_name": "Copley Hospital",
+    "state": "VT",
+    "domain": "copleyvt.org",
+    "seed_urls": [
+      "https://www.copleyvt.org/for-patients-and-visitors/medical-records/",
+      "https://www.copleyvt.org/for-patients-and-visitors/patient-portal/"
+    ]
+  },
+  {
+    "system_name": "Gifford Health Care",
+    "state": "VT",
+    "domain": "giffordhealthcare.org",
+    "seed_urls": [
+      "https://giffordhealthcare.org/patients/request-medical-records/",
+      "https://giffordhealthcare.org/patient-portal/"
+    ]
+  },
+  {
+    "system_name": "Grace Cottage Family Health & Hospital",
+    "state": "VT",
+    "domain": "gracecottage.org",
+    "seed_urls": [
+      "https://gracecottage.org/patients-visitors/medical-records/",
+      "https://gracecottage.org/patients-visitors/your-visit/patient-portal/"
+    ]
+  },
+  {
+    "system_name": "Mt. Ascutney Hospital and Health Center",
+    "state": "VT",
+    "domain": "mtascutneyhospital.org",
+    "seed_urls": [
+      "https://www.mtascutneyhospital.org/your-visit/medical-information",
+      "https://www.mtascutneyhospital.org/your-visit/mymahhc-patient-portal"
+    ]
+  },
+  {
+    "system_name": "North Country Hospital",
+    "state": "VT",
+    "domain": "northcountryhospital.org",
+    "seed_urls": [
+      "https://northcountryhospital.org/portal/"
+    ]
+  },
+  {
+    "system_name": "Northeastern Vermont Regional Hospital",
+    "state": "VT",
+    "domain": "nvrh.org",
+    "seed_urls": [
+      "https://nvrh.org/patients-visitors/medical-records/",
+      "https://nvrh.org/patients-visitors/my-portal/"
+    ]
+  },
+  {
+    "system_name": "Northwestern Medical Center",
+    "state": "VT",
+    "domain": "northwesternmedicalcenter.org",
+    "seed_urls": [
+      "https://www.northwesternmedicalcenter.org/request-medical-records/"
+    ]
+  },
+  {
+    "system_name": "Porter Medical Center",
+    "state": "VT",
+    "domain": "portermedical.org",
+    "seed_urls": [
+      "https://www.portermedical.org/patients-visitors/medical-records/"
+    ]
+  },
+  {
+    "system_name": "Rutland Regional Medical Center",
+    "state": "VT",
+    "domain": "rrmc.org",
+    "seed_urls": [
+      "https://www.rrmc.org/"
+    ]
+  },
+  {
+    "system_name": "Southwestern Vermont Health Care",
+    "state": "VT",
+    "domain": "svhealthcare.org",
+    "seed_urls": [
+      "https://svhealthcare.org/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Southwestern Vermont Medical Center",
+        "city": "Bennington",
+        "state": "VT"
+      }
+    ]
+  },
+  {
+    "system_name": "Springfield Hospital",
+    "state": "VT",
+    "domain": "springfieldhospital.org",
+    "seed_urls": [
+      "https://springfieldhospital.org/medical-records/",
+      "https://springfieldhospital.org/springfield-hospital-patient-portal-frequently-asked-questions/"
+    ]
+  },
+  {
+    "system_name": "The University of Vermont Medical Center",
+    "state": "VT",
+    "domain": "uvmhealth.org",
+    "seed_urls": [
+      "https://www.uvmhealth.org/patients-visitors/request-medical-records",
+      "https://www.uvmhealth.org/medcenter/mychart"
+    ]
+  },
+  {
+    "system_name": "White River Junction VA Medical Center",
+    "state": "VT",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/white-river-junction-health-care/medical-records-office/",
+      "https://www.va.gov/white-river-junction-health-care/locations/white-river-junction-va-medical-center/"
+    ]
+  }
+]

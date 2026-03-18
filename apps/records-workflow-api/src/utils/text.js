@@ -1,5 +1,9 @@
+export function stripNullBytes(value) {
+  return (value || '').replace(/\u0000/g, '');
+}
+
 export function collapseWhitespace(value) {
-  return (value || '').replace(/\s+/g, ' ').trim();
+  return stripNullBytes(value).replace(/\s+/g, ' ').trim();
 }
 
 export function splitSentences(text) {

@@ -8,6 +8,7 @@ export const internalRouter = Router();
 internalRouter.post('/crawl/run', async (req, res) => {
   try {
     const summary = await runCrawl({
+      state: req.body?.state || null,
       systemName: req.body?.system_name || null,
       maxDepth: Number.isInteger(req.body?.max_depth)
         ? req.body.max_depth
@@ -21,9 +22,12 @@ internalRouter.post('/crawl/run', async (req, res) => {
   }
 });
 
-internalRouter.post('/crawl/reseed', async (_req, res) => {
+internalRouter.post('/crawl/reseed', async (req, res) => {
   try {
-    const summary = await reseedFromFile();
+    const summary = await reseedFromFile({
+      state: req.body?.state || null,
+      seedFilePath: req.body?.seed_file || null
+    });
     return res.json({ status: 'ok', summary });
   } catch (error) {
     console.error('Reseed failed:', error);

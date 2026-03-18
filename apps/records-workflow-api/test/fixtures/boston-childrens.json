@@ -1,0 +1,19 @@
+{
+  "title": "Medical Records",
+  "text": "The Medical Records Department keeps patient information for both inpatients and outpatients at Boston Children's Hospital. MyChildren's Patient Portal is a secure, easy-to-use way for parents to access some of their children's medical information. You must submit permission before we can release your child's health information. Complete, sign, and mail or fax the Authorization for the release of medical record information. Fax: 617-730-0327 or 617-730-0329. Due to the large volume of requests, once the Medical Records Department receives your authorization to release information, it will take approximately 10 business days for the record to be produced. Requests for medical records do not include Radiology imaging. For release of X-rays or other radiological images, fax your request to the Department of Radiology Image Service Center.",
+  "links": [
+    {
+      "text": "MyChildren's Patient Portal",
+      "href": "https://mychart.childrenshospital.org/MyChart/Authentication/Login"
+    },
+    {
+      "text": "Authorization for the release of medical record information",
+      "href": "https://www.childrenshospital.org/sites/default/files/2022-03/authorization-for-release-of-medical-information.pdf"
+    },
+    {
+      "text": "Authorization for release of radiology images",
+      "href": "https://www.childrenshospital.org/sites/default/files/2024-01/authorization-for-release-of-radiology-images.pdf"
+    }
+  ],
+  "contacts": []
+}
