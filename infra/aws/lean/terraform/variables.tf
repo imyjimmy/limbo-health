@@ -70,16 +70,14 @@ variable "host_project_root" {
   default     = "/opt/limbo-health"
 }
 
-variable "backup_bucket_name" {
-  description = "Optional explicit S3 bucket name for backups. Leave null to auto-generate."
+variable "data_volume_id" {
+  description = "Persistent EBS volume ID that stores Limbo application data."
   type        = string
-  default     = null
 }
 
-variable "backup_retention_days" {
-  description = "Retention window for S3 backups."
-  type        = number
-  default     = 30
+variable "backup_bucket_name" {
+  description = "Persistent S3 bucket name used for backups and deployment artifacts."
+  type        = string
 }
 
 variable "domain_name" {
@@ -100,9 +98,14 @@ variable "alarm_email" {
   default     = null
 }
 
+variable "ssm_parameter_path_prefix" {
+  description = "SSM parameter path prefix that stores the rendered app env for the EC2 host."
+  type        = string
+  default     = "/limbo-health/prod/lean"
+}
+
 variable "tags" {
   description = "Additional tags applied to all resources."
   type        = map(string)
   default     = {}
 }
-

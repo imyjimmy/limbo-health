@@ -1,6 +1,6 @@
-# Terraform: Lean AWS Deployment for Limbo Health
+# Terraform: Lean AWS App Stack for Limbo Health
 
-This stack provisions the cheapest production-credible AWS foundation described in [aws-railway-replacement-spec.md](/Users/imyjimmy/dev/pleb-emr/limbo-health/docs/specs/aws-railway-replacement-spec.md).
+This stack provisions the ephemeral app infrastructure described in [aws-railway-replacement-spec.md](/Users/imyjimmy/dev/pleb-emr/limbo-health/docs/specs/aws-railway-replacement-spec.md).
 
 ## What It Provisions
 
@@ -8,13 +8,12 @@ This stack provisions the cheapest production-credible AWS foundation described 
 - one public subnet in a single AZ
 - one internet gateway and public route table
 - one EC2 instance with SSM Session Manager access
-- one additional gp3 EBS volume mounted for persistent app data
 - one Elastic IP
-- one S3 backup bucket with versioning and lifecycle retention
 - one security group for ports `80` and `443`
 - CloudWatch alarms for CPU, status checks, memory, and disk
 - optional Route 53 `A` record
 - optional SNS email notifications for alarms
+- IAM access for the existing S3 artifact/backup bucket and SSM env parameters
 
 ## What It Deliberately Does Not Provision
 
@@ -24,15 +23,19 @@ This stack provisions the cheapest production-credible AWS foundation described 
 - no NAT gateway
 - no EFS
 - no RDS
+- no persistent EBS data volume
+- no backup/artifact S3 bucket
 
-Those are later scale-up steps, not the day-1 target.
+Persistent data resources live in the separate data stack at [infra/aws/lean/data/terraform/README.md](/Users/imyjimmy/dev/pleb-emr/limbo-health/infra/aws/lean/data/terraform/README.md).
 
 ## Prerequisites
 
 - Terraform `>= 1.6`
 - AWS CLI authenticated to the target account
 - Route 53 hosted zone ID only if you want Terraform to manage DNS
-- application secrets ready for the EC2 host env file
+- persistent data volume ID
+- persistent backup/artifact S3 bucket name
+- application secrets already synced to SSM Parameter Store
 
 ## Apply
 
@@ -46,6 +49,13 @@ terraform apply tfplan
 
 If your DNS is managed outside AWS, leave `route53_zone_id = null` in `terraform.tfvars` and point your existing DNS provider at the Elastic IP after apply.
 
+This app stack is intended to be reversible:
+
+- `terraform apply` creates the disposable Limbo app infrastructure
+- `terraform destroy` removes it again
+- persistent data survives because it lives in the separate data stack
+- the easier top-level wrappers are [apply-infrastructure.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/apply-infrastructure.sh) and [destroy-infrastructure.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/destroy-infrastructure.sh)
+
 ## After Apply
 
 1. Start an SSM session with the output command:
@@ -54,9 +64,9 @@ If your DNS is managed outside AWS, leave `route53_zone_id = null` in `terraform
 aws ssm start-session --target <instance-id> --region us-east-1
 ```
 
-2. Copy or clone the repository onto the instance at `/opt/limbo-health`.
+2. Publish the current source bundle to the persistent artifact bucket.
 
-3. Populate `deploy/aws/lean/.env.aws` on the instance from `deploy/aws/lean/env.aws.example`.
+3. Render `deploy/aws/lean/.env.aws` from SSM onto the instance.
 
 4. Run the host bootstrap:
 
@@ -65,7 +75,7 @@ cd /opt/limbo-health
 ./deploy/aws/lean/bootstrap-host.sh
 ```
 
-5. Deploy the stack:
+5. Deploy the app containers:
 
 ```bash
 cd /opt/limbo-health

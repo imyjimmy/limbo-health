@@ -1,0 +1,10 @@
+aws_region       = "us-east-1"
+project_name     = "limbo-health"
+environment      = "prod"
+availability_zone = "us-east-1a"
+data_volume_size = 100
+backup_bucket_name = "limbo-health-prod-123456789012-backups"
+
+tags = {
+  Owner = "limbo-health"
+}

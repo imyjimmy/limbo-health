@@ -9,8 +9,8 @@ output "instance_public_ip" {
 }
 
 output "backup_bucket_name" {
-  description = "S3 bucket used for backups."
-  value       = aws_s3_bucket.backups.bucket
+  description = "Persistent S3 bucket used for backups and deployment artifacts."
+  value       = var.backup_bucket_name
 }
 
 output "ssm_start_session_command" {
@@ -32,4 +32,3 @@ output "route53_record_fqdn" {
   description = "Route53 record created for the app, if enabled."
   value       = var.route53_zone_id == null ? null : aws_route53_record.app[0].fqdn
 }
-

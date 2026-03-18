@@ -18,17 +18,61 @@ This directory contains the host-side assets for the single-EC2 AWS deployment d
 - [env.aws.example](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/env.aws.example)
 - [bootstrap-host.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/bootstrap-host.sh)
 - [deploy.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/deploy.sh)
+- [apply-infrastructure.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/apply-infrastructure.sh)
+- [destroy-infrastructure.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/destroy-infrastructure.sh)
+- [sync-secrets-to-ssm.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/sync-secrets-to-ssm.sh)
+- [publish-source-bundle.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/publish-source-bundle.sh)
+- [fetch-source-bundle.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/fetch-source-bundle.sh)
+- [render-env-from-ssm.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/render-env-from-ssm.sh)
 - [backup-databases-to-s3.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/backup-databases-to-s3.sh)
 - [backup-storage-to-s3.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/backup-storage-to-s3.sh)
 - [backup-all.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/backup-all.sh)
 
+## Top-Level Operations
+
+`apply-infrastructure.sh` is the main deploy entrypoint. It:
+- applies the persistent data stack
+- syncs `deploy/aws/lean/.env.aws` into SSM Parameter Store
+- publishes a source bundle into the persistent S3 bucket
+- applies the disposable app stack
+- tells the EC2 host to fetch the code bundle, render `.env.aws`, bootstrap itself, and start Docker Compose
+
+`destroy-infrastructure.sh` is the inverse app-stack operation. It:
+- destroys the disposable app stack
+- deletes published source bundles under `artifacts/source/`
+- deletes the synced SSM parameter path
+- leaves the persistent data stack intact
+
+That means the EBS data volume and S3 bucket survive delete, while the EC2 host, networking, alarms, Elastic IP, and app-side IAM are removed.
+
 ## Deploy Flow
 
 1. Copy [env.aws.example](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/env.aws.example) to `deploy/aws/lean/.env.aws` and fill in the real values.
-2. Run [bootstrap-host.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/bootstrap-host.sh).
-3. Import application MySQL data and records-workflow PostgreSQL data.
-4. Copy repo storage, uploads, users, and records raw artifacts into `$LIMBO_DATA_DIR`.
-5. Run [deploy.sh](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/deploy.sh).
+2. Run:
+
+```bash
+AWS_PROFILE=limbo-prod AWS_REGION=us-east-1 ./deploy/aws/lean/apply-infrastructure.sh
+```
+
+3. Import or sync the persistent application data separately:
+   - MySQL dump if still in transitional dual-DB mode
+   - records-workflow PostgreSQL dump
+   - repo storage
+   - scheduler uploads
+   - records raw artifacts
+
+## Delete Flow
+
+To remove the app infrastructure but preserve data:
+
+```bash
+AWS_PROFILE=limbo-prod AWS_REGION=us-east-1 ./deploy/aws/lean/destroy-infrastructure.sh
+```
+
+This intentionally does not delete:
+- the persistent EBS data volume
+- the persistent S3 bucket
+- any application data already stored in those persistent resources
 
 ## Credentials And Secrets Needed
 

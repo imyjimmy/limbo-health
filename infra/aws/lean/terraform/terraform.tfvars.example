@@ -2,10 +2,12 @@ aws_region       = "us-east-1"
 project_name     = "limbo-health"
 environment      = "prod"
 instance_type    = "t4g.large"
+data_volume_id   = "vol-0123456789abcdef0"
+backup_bucket_name = "limbo-health-prod-123456789012-backups"
 domain_name      = "limbo.health"
 route53_zone_id  = null
 alarm_email      = null
-data_volume_size = 100
+ssm_parameter_path_prefix = "/limbo-health/prod/lean"
 
 tags = {
   Owner = "limbo-health"
