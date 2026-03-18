@@ -1,0 +1,12 @@
+aws_region       = "us-east-1"
+project_name     = "limbo-health"
+environment      = "prod"
+instance_type    = "t4g.large"
+domain_name      = "limbo.health"
+route53_zone_id  = null
+alarm_email      = null
+data_volume_size = 100
+
+tags = {
+  Owner = "limbo-health"
+}

@@ -20,6 +20,7 @@ This directory keeps planning docs, specs, diagrams, and working notes out of th
 
 ### Specs
 
+- [AWS lean replacement spec](specs/aws-railway-replacement-spec.md)
 - [Mobile app requirements](specs/limbo-health-mobile-requirements.md)
 - [Medical repository structure](specs/medical-repo-structure.md)
 - [NOSTR storage service spec](specs/nostr-storage-service-spec.md)
