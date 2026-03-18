@@ -1,0 +1,136 @@
+[
+  {
+    "system_name": "Brown University Health",
+    "state": "RI",
+    "domain": "brownhealth.org",
+    "seed_urls": [
+      "https://www.brownhealth.org/patients-visitors/request-medical-records",
+      "https://www.brownhealth.org/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Bradley Hospital",
+        "city": "Riverside",
+        "state": "RI"
+      },
+      {
+        "facility_name": "The Miriam Hospital",
+        "city": "Providence",
+        "state": "RI"
+      },
+      {
+        "facility_name": "Newport Hospital",
+        "city": "Newport",
+        "state": "RI"
+      },
+      {
+        "facility_name": "Rhode Island Hospital",
+        "city": "Providence",
+        "state": "RI"
+      }
+    ]
+  },
+  {
+    "system_name": "Care New England Health System",
+    "state": "RI",
+    "domain": "carenewengland.org",
+    "seed_urls": [
+      "https://www.carenewengland.org/patient-resources/",
+      "https://www.carenewengland.org/mychart"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Butler Hospital",
+        "city": "Providence",
+        "state": "RI"
+      },
+      {
+        "facility_name": "Kent Hospital",
+        "city": "Warwick",
+        "state": "RI"
+      },
+      {
+        "facility_name": "Women & Infants Hospital",
+        "city": "Providence",
+        "state": "RI"
+      }
+    ]
+  },
+  {
+    "system_name": "CharterCARE Health Partners",
+    "state": "RI",
+    "domain": "chartercare.org",
+    "seed_urls": [
+      "https://www.chartercare.org/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Our Lady of Fatima Hospital",
+        "city": "North Providence",
+        "state": "RI"
+      },
+      {
+        "facility_name": "Roger Williams Medical Center",
+        "city": "Providence",
+        "state": "RI"
+      }
+    ]
+  },
+  {
+    "system_name": "Eleanor Slater Hospital",
+    "state": "RI",
+    "domain": "bhddh.ri.gov",
+    "seed_urls": [
+      "https://bhddh.ri.gov/"
+    ]
+  },
+  {
+    "system_name": "Encompass Health Rehabilitation Hospital of Johnston",
+    "state": "RI",
+    "domain": "encompasshealth.com",
+    "seed_urls": [
+      "https://www.encompasshealth.com/"
+    ]
+  },
+  {
+    "system_name": "Landmark Medical Center",
+    "state": "RI",
+    "domain": "landmarkmedical.org",
+    "seed_urls": [
+      "https://www.landmarkmedical.org/"
+    ]
+  },
+  {
+    "system_name": "Providence VA Medical Center",
+    "state": "RI",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/providence-health-care/"
+    ]
+  },
+  {
+    "system_name": "Rehabilitation Hospital of Rhode Island",
+    "state": "RI",
+    "domain": "rehabhospitalri.com",
+    "seed_urls": [
+      "https://www.rehabhospitalri.com/"
+    ]
+  },
+  {
+    "system_name": "South County Health",
+    "state": "RI",
+    "domain": "southcountyhealth.org",
+    "seed_urls": [
+      "https://www.southcountyhealth.org/patients-visitors/patient-resources-tools/request-medical-records",
+      "https://www.southcountyhealth.org/"
+    ]
+  },
+  {
+    "system_name": "Westerly Hospital",
+    "state": "RI",
+    "domain": "westerlyhospital.org",
+    "seed_urls": [
+      "https://www.westerlyhospital.org/"
+    ]
+  }
+]

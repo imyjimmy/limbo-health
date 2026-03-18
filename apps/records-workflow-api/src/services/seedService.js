@@ -10,7 +10,11 @@ import { normalizeStateCode } from '../utils/states.js';
 
 export const STATE_SEED_FILES = {
   TX: 'seeds/texas-systems.json',
-  MA: 'seeds/massachusetts-systems.json'
+  MA: 'seeds/massachusetts-systems.json',
+  NH: 'seeds/new-hampshire-systems.json',
+  RI: 'seeds/rhode-island-systems.json',
+  DE: 'seeds/delaware-systems.json',
+  VT: 'seeds/vermont-systems.json'
 };
 
 function inferSeedType(url) {

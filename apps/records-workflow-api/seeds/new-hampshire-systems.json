@@ -1,0 +1,247 @@
+[
+  {
+    "system_name": "Dartmouth Health",
+    "state": "NH",
+    "domain": "dartmouth-health.org",
+    "seed_urls": [
+      "https://www.dartmouth-health.org/patients/medical-records-release-forms",
+      "https://www.dartmouth-health.org/patient-login"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Alice Peck Day Memorial Hospital",
+        "city": "Lebanon",
+        "state": "NH"
+      },
+      {
+        "facility_name": "Cheshire Medical Center",
+        "city": "Keene",
+        "state": "NH"
+      },
+      {
+        "facility_name": "Dartmouth Hitchcock Medical Center",
+        "city": "Lebanon",
+        "state": "NH"
+      },
+      {
+        "facility_name": "Hampstead Hospital",
+        "city": "Hampstead",
+        "state": "NH"
+      },
+      {
+        "facility_name": "New London Hospital",
+        "city": "New London",
+        "state": "NH"
+      },
+      {
+        "facility_name": "Valley Regional Hospital",
+        "city": "Claremont",
+        "state": "NH"
+      }
+    ]
+  },
+  {
+    "system_name": "Concord Hospital",
+    "state": "NH",
+    "domain": "concordhospital.org",
+    "seed_urls": [
+      "https://www.concordhospital.org/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Concord Hospital",
+        "city": "Concord",
+        "state": "NH"
+      },
+      {
+        "facility_name": "Concord Hospital Franklin",
+        "city": "Franklin",
+        "state": "NH"
+      },
+      {
+        "facility_name": "Concord Hospital Laconia",
+        "city": "Laconia",
+        "state": "NH"
+      }
+    ]
+  },
+  {
+    "system_name": "Androscoggin Valley Hospital",
+    "state": "NH",
+    "domain": "avhnh.org",
+    "seed_urls": [
+      "https://avhnh.org/"
+    ]
+  },
+  {
+    "system_name": "Catholic Medical Center",
+    "state": "NH",
+    "domain": "catholicmc.com",
+    "seed_urls": [
+      "https://catholicmc.com/patients-visitors/medical-records.dot",
+      "https://catholicmc.com/patients-visitors/"
+    ]
+  },
+  {
+    "system_name": "Cottage Hospital",
+    "state": "NH",
+    "domain": "cottagehospital.org",
+    "seed_urls": [
+      "https://www.cottagehospital.org/"
+    ]
+  },
+  {
+    "system_name": "Elliot Hospital",
+    "state": "NH",
+    "domain": "elliothospital.org",
+    "seed_urls": [
+      "https://www.elliothospital.org/"
+    ]
+  },
+  {
+    "system_name": "Encompass Health Rehabilitation Hospital of Concord",
+    "state": "NH",
+    "domain": "encompasshealth.com",
+    "seed_urls": [
+      "https://www.encompasshealth.com/"
+    ]
+  },
+  {
+    "system_name": "Exeter Hospital",
+    "state": "NH",
+    "domain": "exeterhospital.com",
+    "seed_urls": [
+      "https://www.exeterhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Frisbie Memorial Hospital",
+    "state": "NH",
+    "domain": "frisbiehospital.com",
+    "seed_urls": [
+      "https://frisbiehospital.com/patients-and-visitors/patient-resources/medical-records.dot"
+    ]
+  },
+  {
+    "system_name": "Huggins Hospital",
+    "state": "NH",
+    "domain": "hugginshospital.org",
+    "seed_urls": [
+      "https://www.hugginshospital.org/"
+    ]
+  },
+  {
+    "system_name": "Littleton Regional Healthcare",
+    "state": "NH",
+    "domain": "littletonhealthcare.org",
+    "seed_urls": [
+      "https://littletonhealthcare.org/patients-and-visitors/patient-services/"
+    ]
+  },
+  {
+    "system_name": "MaineHealth Memorial Hospital",
+    "state": "NH",
+    "domain": "mainehealth.org",
+    "seed_urls": [
+      "https://www.mainehealth.org/mainehealth-memorial-hospital"
+    ]
+  },
+  {
+    "system_name": "Monadnock Community Hospital",
+    "state": "NH",
+    "domain": "monadnockcommunityhospital.com",
+    "seed_urls": [
+      "https://monadnockcommunityhospital.com/"
+    ]
+  },
+  {
+    "system_name": "New Hampshire Hospital",
+    "state": "NH",
+    "domain": "dhhs.nh.gov",
+    "seed_urls": [
+      "https://www.dhhs.nh.gov/programs-services/health-care/new-hampshire-hospital"
+    ]
+  },
+  {
+    "system_name": "Northeast Rehabilitation Hospital",
+    "state": "NH",
+    "domain": "northeastrehab.com",
+    "seed_urls": [
+      "https://www.northeastrehab.com/"
+    ]
+  },
+  {
+    "system_name": "Parkland Medical Center",
+    "state": "NH",
+    "domain": "parklandmedicalcenter.com",
+    "seed_urls": [
+      "https://parklandmedicalcenter.com/patients-and-visitors/request-for-medical-records.dot",
+      "https://parklandmedicalcenter.com/my-health-resources/"
+    ]
+  },
+  {
+    "system_name": "Portsmouth Regional Hospital",
+    "state": "NH",
+    "domain": "portsmouthhospital.com",
+    "seed_urls": [
+      "https://www.portsmouthhospital.com/patient-resources/medical-records",
+      "https://www.portsmouthhospital.com/my-health-resources/"
+    ]
+  },
+  {
+    "system_name": "Southern New Hampshire Medical Center",
+    "state": "NH",
+    "domain": "snhhealth.org",
+    "seed_urls": [
+      "https://www.snhhealth.org/"
+    ]
+  },
+  {
+    "system_name": "Speare Memorial Hospital",
+    "state": "NH",
+    "domain": "spearehospital.com",
+    "seed_urls": [
+      "https://spearehospital.com/"
+    ]
+  },
+  {
+    "system_name": "St. Joseph Hospital",
+    "state": "NH",
+    "domain": "stjosephhospital.com",
+    "seed_urls": [
+      "https://stjosephhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Upper Connecticut Valley Hospital",
+    "state": "NH",
+    "domain": "ucvh.org",
+    "seed_urls": [
+      "https://www.ucvh.org/"
+    ]
+  },
+  {
+    "system_name": "VA Manchester Healthcare System",
+    "state": "NH",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/manchester-health-care/"
+    ]
+  },
+  {
+    "system_name": "Weeks Medical Center",
+    "state": "NH",
+    "domain": "weeksmedical.org",
+    "seed_urls": [
+      "https://weeksmedical.org/"
+    ]
+  },
+  {
+    "system_name": "Wentworth-Douglass Hospital",
+    "state": "NH",
+    "domain": "wdhospital.org",
+    "seed_urls": [
+      "https://www.wdhospital.org/wdh/patients-and-visitors/medical-records"
+    ]
+  }
+]
