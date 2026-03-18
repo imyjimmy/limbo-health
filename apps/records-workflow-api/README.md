@@ -44,16 +44,20 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 8. Remove stale crawl artifacts without wiping current data:
    - Preview: `npm run cleanup:stale-crawl:dry-run`
    - Apply: `npm run cleanup:stale-crawl`
-9. Run API:
+9. Repartition existing raw PDFs into state subdirectories:
+   - Preview: `npm run repartition:raw-storage-state`
+   - Apply: `npm run repartition:raw-storage-state -- --apply`
+10. Run API:
    - `npm run start`
 
 ## Notes
 
-- Raw PDF snapshots are stored under `storage/raw`. HTML pages are parsed and persisted to the database but are no longer written to disk.
+- Raw PDF snapshots are stored under `storage/raw/<state>/` such as `storage/raw/tx/` and `storage/raw/ma/`. HTML pages are parsed and persisted to the database but are no longer written to disk.
 - `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
 - No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
 - `npm run reset:crawl-state -- --state MA --include-derived` performs a clean, state-scoped reset of crawl-derived Massachusetts data without touching Texas seeds or data.
+- `npm run repartition:raw-storage-state -- --apply` performs a one-time move of existing PDF artifacts into state subdirectories and updates `source_documents.storage_path` without refetching anything.
 - Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
 - Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.
 - Crawler depth defaults to `2` and only follows workflow-relevant links.

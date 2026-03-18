@@ -48,3 +48,52 @@ test('fetchAndParseDocument does not write html files to raw storage', async () 
     await fs.rm(rawDir, { recursive: true, force: true });
   }
 });
+
+test('fetchAndParseDocument writes pdf files into a state subdirectory', async () => {
+  const rawDir = await fs.mkdtemp(path.join(os.tmpdir(), 'records-workflow-pdf-'));
+  const originalRawStorageDir = process.env.RAW_STORAGE_DIR;
+
+  process.env.RAW_STORAGE_DIR = rawDir;
+
+  test.mock.method(global, 'fetch', async () => ({
+    url: 'https://example.org/forms/request.pdf',
+    status: 200,
+    headers: {
+      get(name) {
+        return name.toLowerCase() === 'content-type' ? 'application/pdf' : null;
+      }
+    },
+    arrayBuffer: async () => Buffer.from('%PDF-1.4 mock pdf body', 'utf8')
+  }));
+
+  test.mock.module('../src/parsers/pdfParser.js', {
+    namedExports: {
+      parsePdfDocument: async () => ({
+        title: 'Authorization Form',
+        text: 'Authorization for release of information',
+        links: []
+      })
+    }
+  });
+
+  try {
+    const { fetchAndParseDocument } = await importFresh('../src/crawler/fetcher.js');
+    const result = await fetchAndParseDocument({ url: 'https://example.org/forms/request.pdf', state: 'MA' });
+
+    assert.equal(result.sourceType, 'pdf');
+    assert.equal(path.basename(path.dirname(result.storagePath)), 'ma');
+    assert.match(path.basename(result.storagePath), /\.pdf$/);
+
+    const stored = await fs.readFile(result.storagePath, 'utf8');
+    assert.equal(stored, '%PDF-1.4 mock pdf body');
+  } finally {
+    test.mock.restoreAll();
+    test.mock.reset();
+    if (originalRawStorageDir == null) {
+      delete process.env.RAW_STORAGE_DIR;
+    } else {
+      process.env.RAW_STORAGE_DIR = originalRawStorageDir;
+    }
+    await fs.rm(rawDir, { recursive: true, force: true });
+  }
+});

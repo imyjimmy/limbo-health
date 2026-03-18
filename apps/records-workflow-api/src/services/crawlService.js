@@ -7,6 +7,7 @@ import { config } from '../config.js';
 import { listActiveSeeds, saveExtractionResult } from '../repositories/workflowRepository.js';
 import { sha256 } from '../utils/hash.js';
 import { buildMedicalRecordsPdfFilenameStem } from '../utils/pdfNaming.js';
+import { ensureRawStorageStateDir } from '../utils/rawStorage.js';
 import { isMedicalRecordsRequestDocument } from '../utils/urls.js';
 
 function normalizeForVisited(url) {
@@ -47,6 +48,7 @@ async function fileMatchesHash(filePath, expectedHash) {
 async function finalizePdfStoragePath({
   tempStoragePath,
   contentHash,
+  state,
   systemName,
   facilityName,
   url,
@@ -60,11 +62,12 @@ async function finalizePdfStoragePath({
     title,
     text
   });
+  const stateStorageDir = await ensureRawStorageStateDir(state);
 
   let sequence = 1;
   while (true) {
     const stem = sequence === 1 ? baseStem : `${baseStem}-${sequence}`;
-    const candidatePath = path.join(config.rawStorageDir, `${stem}.pdf`);
+    const candidatePath = path.join(stateStorageDir, `${stem}.pdf`);
 
     if (candidatePath === tempStoragePath) {
       return candidatePath;
@@ -136,7 +139,7 @@ export async function runCrawl({
       visited.add(normalized);
 
       try {
-        const fetched = await fetchAndParseDocument({ url: item.url });
+        const fetched = await fetchAndParseDocument({ url: item.url, state: system.state });
         crawled += 1;
 
         if (
@@ -163,6 +166,7 @@ export async function runCrawl({
           storagePath = await finalizePdfStoragePath({
             tempStoragePath: fetched.storagePath,
             contentHash: fetched.contentHash,
+            state: system.state,
             systemName: system.systemName,
             facilityName: item.facilityName,
             url: fetched.finalUrl,

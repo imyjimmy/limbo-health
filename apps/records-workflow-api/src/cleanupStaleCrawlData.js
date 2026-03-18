@@ -3,6 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { closePool, query, withTransaction } from './db.js';
 import { config } from './config.js';
+import { toRawStorageRelativePath } from './utils/rawStorage.js';
 
 function usage() {
   console.log(
@@ -14,20 +15,17 @@ function usage() {
   );
 }
 
-function basenameFromStoragePath(storagePath) {
-  return path.basename(storagePath || '');
-}
-
 async function listStaleSourceDocuments() {
   const result = await query(
     `with ranked as (
        select
+         hospital_system_id,
          id,
          source_url,
          storage_path,
          fetched_at,
          row_number() over (
-           partition by source_url
+           partition by hospital_system_id, source_url
            order by fetched_at desc, created_at desc, id desc
          ) as rn
        from source_documents
@@ -51,7 +49,7 @@ async function listReferencedRawFiles() {
 
   return new Set(
     result.rows
-      .map((row) => basenameFromStoragePath(row.storage_path))
+      .map((row) => toRawStorageRelativePath(row.storage_path))
       .filter(Boolean)
   );
 }
@@ -79,14 +77,33 @@ async function listStaleExtractionRuns() {
   return result.rows;
 }
 
+async function walkRawFiles(rootDir) {
+  const entries = await fs.readdir(rootDir, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    if (entry.name === '.gitkeep' || entry.name === '.DS_Store') {
+      continue;
+    }
+
+    const fullPath = path.join(rootDir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await walkRawFiles(fullPath)));
+      continue;
+    }
+
+    if (entry.isFile()) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
 async function listRawFilesOnDisk() {
   await fs.mkdir(config.rawStorageDir, { recursive: true });
-  const entries = await fs.readdir(config.rawStorageDir, { withFileTypes: true });
-
-  return entries
-    .filter((entry) => entry.isFile() && entry.name !== '.gitkeep')
-    .map((entry) => entry.name)
-    .sort();
+  const files = await walkRawFiles(config.rawStorageDir);
+  return files.sort();
 }
 
 async function deleteStaleSourceDocuments(ids) {
@@ -126,8 +143,8 @@ async function deleteStaleExtractionRuns(ids) {
 async function deleteOrphanRawFiles(orphanFiles) {
   let deleted = 0;
 
-  for (const filename of orphanFiles) {
-    await fs.unlink(path.join(config.rawStorageDir, filename));
+  for (const orphanFile of orphanFiles) {
+    await fs.unlink(orphanFile.filePath);
     deleted += 1;
   }
 
@@ -146,9 +163,9 @@ async function main() {
   const staleExtractionRuns = await listStaleExtractionRuns();
   const staleIds = staleDocuments.map((row) => row.id);
   const staleExtractionRunIds = staleExtractionRuns.map((row) => row.id);
-  const staleFileBasenames = new Set(
+  const staleFilePaths = new Set(
     staleDocuments
-      .map((row) => basenameFromStoragePath(row.storage_path))
+      .map((row) => toRawStorageRelativePath(row.storage_path))
       .filter(Boolean)
   );
 
@@ -161,7 +178,12 @@ async function main() {
 
   const referencedFiles = await listReferencedRawFiles();
   const rawFilesOnDisk = await listRawFilesOnDisk();
-  const orphanRawFiles = rawFilesOnDisk.filter((filename) => !referencedFiles.has(filename));
+  const orphanRawFiles = rawFilesOnDisk
+    .map((filePath) => ({
+      filePath,
+      relativePath: toRawStorageRelativePath(filePath)
+    }))
+    .filter((entry) => entry.relativePath && !referencedFiles.has(entry.relativePath));
 
   let deletedRawFiles = 0;
   if (apply) {
@@ -177,8 +199,8 @@ async function main() {
     deleted_extraction_runs: deletedExtractionRuns,
     deleted_raw_files: deletedRawFiles,
     stale_source_urls_sample: staleDocuments.slice(0, 10).map((row) => row.source_url),
-    stale_raw_files_sample: orphanRawFiles.slice(0, 10),
-    affected_raw_files_sample: [...staleFileBasenames].slice(0, 10)
+    stale_raw_files_sample: orphanRawFiles.slice(0, 10).map((entry) => entry.relativePath),
+    affected_raw_files_sample: [...staleFilePaths].slice(0, 10)
   };
 
   console.log(JSON.stringify(summary, null, 2));
