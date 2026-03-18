@@ -1,4 +1,5 @@
 import { collapseWhitespace } from './text.js';
+import { inferFacilityNameFromDocument } from './facilityAliases.js';
 
 const GENERIC_TITLE_PATTERNS = [
   /^patient identification$/i,
@@ -27,7 +28,8 @@ const DESCRIPTIVE_TITLE_PATTERNS = [
   /\bhealth\b/i,
   /\bprotected health information\b/i,
   /\bphi\b/i,
-  /\bautorizaci[oó]n\b/i
+  /\bautorizaci[oó]n\b/i,
+  /\bautoriza[cç][aã]o\b/i
 ];
 
 const PHRASE_PATTERNS = [
@@ -45,9 +47,12 @@ const PHRASE_PATTERNS = [
   /\b(autorizaci[oó]n para la divulgaci[oó]n de informaci[oó]n m[eé]dica)/i,
   /\b(autorizaci[oó]n para el uso y divulgaci[oó]n de informaci[oó]n de salud protegida)/i,
   /\b(autorizaci[oó]n para divulgar informaci[oó]n de salud protegida)/i,
+  /\b(autoriza[cç][aã]o para divulga[cç][aã]o de informa[cç][oõ]es(?: de sa[úu]de)?(?: protegidas? ou privilegiadas?)?)/i,
+  /\b(autoriza[cç][aã]o para o uso e divulga[cç][aã]o de informa[cç][oõ]es de sa[úu]de protegidas?)/i,
   /\b(hipaa authorization(?:\s+for[^.:]{0,140})?)[:.]?/i,
   /\b(authorization(?:\s+(?:for|to))?[^.:]{0,140}\b(?:medical|health|patient|protected)\b[^.:]{0,100}\b(?:information|records?|phi)\b)\b/i,
-  /\b(autorizaci[oó]n[^.:]{0,140}\b(?:informaci[oó]n|registros?)\b[^.:]{0,100}\b(?:m[eé]dica|de salud)\b)\b/i
+  /\b(autorizaci[oó]n[^.:]{0,140}\b(?:informaci[oó]n|registros?)\b[^.:]{0,100}\b(?:m[eé]dica|de salud)\b)\b/i,
+  /\b(autoriza[cç][aã]o[^.:]{0,160}\b(?:informa[cç][oõ]es|registros?)\b[^.:]{0,120}\b(?:m[eé]dicas?|de sa[úu]de)\b)\b/i
 ];
 
 export function slugifyLabel(value) {
@@ -72,7 +77,7 @@ function cleanPhraseSource(value) {
       .replace(/\bheal\s+th\b/gi, 'health')
       .replace(/\bmedi\s+cal\b/gi, 'medical')
       .replace(/\bdisclo\s*sure\b/gi, 'disclosure')
-      .replace(/\binfo\s*rma(?:tion)?\b/gi, 'information')
+      .replace(/\binfo\s*rma(?:tion)?\b(?![A-Za-zÀ-ÿ])/gi, 'information')
       .replace(/[“”"]/g, '')
   );
 }
@@ -81,9 +86,9 @@ function sanitizePhrase(value) {
   const normalized = collapseWhitespace(
     (value || '')
       .replace(/^[^A-Za-zÀ-ÿ]+/, '')
-      .replace(/\s*\((english|spanish|espa[nñ]ol)\)\s*/gi, ' ')
-      .replace(/(^|[\s-])(english|spanish|espa[nñ]ol)(?=$|[\s-])/gi, '$1')
-      .replace(/[-\s]+(english|spanish|espa[nñ]ol)$/gi, '')
+      .replace(/\s*\((english|spanish|espa[nñ]ol|portuguese|portugu[eê]s)\)\s*/gi, ' ')
+      .replace(/(^|[\s-])(english|spanish|espa[nñ]ol|portuguese|portugu[eê]s)(?=$|[\s-])/gi, '$1')
+      .replace(/[-\s]+(english|spanish|espa[nñ]ol|portuguese|portugu[eê]s)$/gi, '')
       .replace(/\s+Page\s+\d+\s+of\s+\d+/gi, '')
       .replace(/\s+/g, ' ')
       .trim()
@@ -96,7 +101,11 @@ function sanitizePhrase(value) {
       if (/^[A-Z0-9]{2,5}$/.test(word)) return word;
       if (!/[A-Za-zÀ-ÿ]/.test(word)) return word;
       const lower = word.toLowerCase();
-      if (index > 0 && index < words.length - 1 && /^(for|and|of|to|the|or|de|la|el|y|para)$/.test(lower)) {
+      if (
+        index > 0 &&
+        index < words.length - 1 &&
+        /^(for|and|of|to|the|or|de|la|el|y|para|e|do|da|dos|das)$/.test(lower)
+      ) {
         return lower;
       }
       return `${lower.slice(0, 1).toUpperCase()}${lower.slice(1)}`;
@@ -140,6 +149,17 @@ export function detectDocumentLanguageCode({ url = '', title = '', text = '' }) 
   const haystack = `${url} ${title} ${text}`.toLowerCase();
 
   if (
+    /\bportuguese\b/.test(haystack) ||
+    /\bportugu[eê]s\b/.test(haystack) ||
+    /\bautoriza[cç][aã]o\b/.test(haystack) ||
+    /\bdivulga[cç][aã]o\b/.test(haystack) ||
+    /\binforma[cç][oõ]es(?:\s+m[eé]dicas?)?\b/.test(haystack) ||
+    /\bsa[úu]de\b/.test(haystack)
+  ) {
+    return 'PT';
+  }
+
+  if (
     /\bspanish\b/.test(haystack) ||
     /\bespanol\b/.test(haystack) ||
     /\bespa[nñ]ol\b/.test(haystack) ||
@@ -181,23 +201,27 @@ export function extractDescriptivePdfPhrase({ title = '', text = '' }) {
   return null;
 }
 
-export function buildMedicalRecordsPdfFilenameStems({
+export function buildMedicalRecordsPdfFilenameStem({
   systemName,
   facilityName,
   url,
   title,
   text
 }) {
-  const label = facilityName || systemName;
+  const label = facilityName || inferFacilityNameFromDocument({ systemName, url, title }) || systemName;
   const facilitySlug = slugifyLabel(label);
   const languageCode = detectDocumentLanguageCode({ url, title, text });
   const phrase = extractDescriptivePdfPhrase({ title, text }) || 'medical-records-request';
   const phraseSlug = slugifyLabel(phrase);
-  const baseStem = `${facilitySlug}-${phraseSlug}-${languageCode}`;
+  return `${facilitySlug}-${phraseSlug}-${languageCode}`;
+}
+
+export function buildMedicalRecordsPdfFilenameStems(args, { limit = 6 } = {}) {
+  const baseStem = buildMedicalRecordsPdfFilenameStem(args);
   const candidateStems = [baseStem];
 
   let sequence = 2;
-  while (candidateStems.length < 6) {
+  while (candidateStems.length < Math.max(1, limit)) {
     candidateStems.push(`${baseStem}-${sequence}`);
     sequence += 1;
   }

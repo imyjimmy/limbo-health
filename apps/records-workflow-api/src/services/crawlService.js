@@ -6,7 +6,7 @@ import { extractWorkflowBundle } from '../extractors/workflowExtractor.js';
 import { config } from '../config.js';
 import { listActiveSeeds, saveExtractionResult } from '../repositories/workflowRepository.js';
 import { sha256 } from '../utils/hash.js';
-import { buildMedicalRecordsPdfFilenameStems } from '../utils/pdfNaming.js';
+import { buildMedicalRecordsPdfFilenameStem } from '../utils/pdfNaming.js';
 import { isMedicalRecordsRequestDocument } from '../utils/urls.js';
 
 function normalizeForVisited(url) {
@@ -53,7 +53,7 @@ async function finalizePdfStoragePath({
   title,
   text
 }) {
-  const candidateStems = buildMedicalRecordsPdfFilenameStems({
+  const baseStem = buildMedicalRecordsPdfFilenameStem({
     systemName,
     facilityName,
     url,
@@ -61,7 +61,9 @@ async function finalizePdfStoragePath({
     text
   });
 
-  for (const stem of candidateStems) {
+  let sequence = 1;
+  while (true) {
+    const stem = sequence === 1 ? baseStem : `${baseStem}-${sequence}`;
     const candidatePath = path.join(config.rawStorageDir, `${stem}.pdf`);
 
     if (candidatePath === tempStoragePath) {
@@ -77,9 +79,9 @@ async function finalizePdfStoragePath({
       await removeIfPresent(tempStoragePath);
       return candidatePath;
     }
-  }
 
-  return tempStoragePath;
+    sequence += 1;
+  }
 }
 
 export async function runCrawl({

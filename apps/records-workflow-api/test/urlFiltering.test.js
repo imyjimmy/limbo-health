@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   buildMedicalRecordsPdfFilenameStems,
+  detectDocumentLanguageCode,
   extractDescriptivePdfPhrase
 } from '../src/utils/pdfNaming.js';
 import { collapseWhitespace } from '../src/utils/text.js';
@@ -145,16 +146,20 @@ test('builds base filename stems with descriptive phrase and language code', () 
 });
 
 test('uses the first phrase to disambiguate forms before numeric suffixes', () => {
-  const stems = buildMedicalRecordsPdfFilenameStems({
-    systemName: 'CHRISTUS Health',
-    url: 'https://www.christushealth.org/-/media/christus-health/plan-care/files/mychristus/snm/patientrequestforhealthinformation.ashx',
-    title: '',
-    text:
-      'HIM.0009_v3_04.2019 Patient Request for Health Information The undersigned patient or personal representative hereby requests:'
-  });
+  const stems = buildMedicalRecordsPdfFilenameStems(
+    {
+      systemName: 'CHRISTUS Health',
+      url: 'https://www.christushealth.org/-/media/christus-health/plan-care/files/mychristus/snm/patientrequestforhealthinformation.ashx',
+      title: '',
+      text:
+        'HIM.0009_v3_04.2019 Patient Request for Health Information The undersigned patient or personal representative hereby requests:'
+    },
+    { limit: 8 }
+  );
 
   assert.equal(stems[0], 'christus-health-patient-request-for-health-information-EN');
   assert.equal(stems[1], 'christus-health-patient-request-for-health-information-EN-2');
+  assert.equal(stems[6], 'christus-health-patient-request-for-health-information-EN-7');
 });
 
 test('keeps parenthetical qualifiers when they are part of the form name', () => {
@@ -181,6 +186,47 @@ test('falls back to medical-records-request when no sensible phrase exists', () 
   });
 
   assert.equal(stems[0], 'unknown-health-medical-records-request-EN');
+});
+
+test('detects Portuguese documents as PT', () => {
+  const language = detectDocumentLanguageCode({
+    url: 'https://www.massgeneralbrigham.org/content/dam/mgb-global/en/patient-care/patient-and-visitor-information/medical-records/documents/mcl/medical-records-release-mcl-portuguese.pdf',
+    title: 'Partners Medical Records Release Form',
+    text:
+      'AUTORIZAÇÃO PARA DIVULGAÇÃO DE INFORMAÇÕES DE SAÚDE PROTEGIDAS OU PRIVILEGIADAS.'
+  });
+
+  assert.equal(language, 'PT');
+});
+
+test('infers a Mass General facility from the source URL when facilityName is missing', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'Mass General Brigham',
+    url: 'https://www.massgeneralbrigham.org/content/dam/mgb-global/en/patient-care/patient-and-visitor-information/medical-records/documents/sh/medical-records-release-slm-spanish.pdf',
+    title: "Brigham and Women's Faulkner Hospital Medical Records Release Form - Spanish",
+    text:
+      'AUTORIZACIÓN PARA EXPEDIR INFORMACIÓN MÉDICA PROTEGIDA (AMPARADA POR LEY) AUTHORIZATION FOR RELEASE OF PROTECTED OR PRIVILEGED HEALTH INFORMATION'
+  });
+
+  assert.equal(
+    stems[0],
+    'salem-hospital-authorization-for-release-of-protected-or-privileged-health-information-ES'
+  );
+});
+
+test('builds readable Portuguese stems for Mass General documents with inferred facilities', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'Mass General Brigham',
+    url: 'https://www.massgeneralbrigham.org/content/dam/mgb-global/en/patient-care/patient-and-visitor-information/medical-records/documents/sh/medical-records-release-slm-portuguese.pdf',
+    title: 'Partners Medical Records Release Form',
+    text:
+      'AUTORIZAÇÃO PARA DIVULGAÇÃO DE INFORMAÇÕES DE SAÚDE PROTEGIDAS OU PRIVILEGIADAS.'
+  });
+
+  assert.equal(
+    stems[0],
+    'salem-hospital-autorizacao-para-divulgacao-de-informacoes-de-saude-protegidas-ou-privilegiadas-PT'
+  );
 });
 
 test('collapseWhitespace strips embedded null bytes before normalizing spaces', () => {

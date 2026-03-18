@@ -39,10 +39,12 @@ Postgres-backed crawler + extraction service that ingests public hospital record
    - `npm run crawl`
    - Massachusetts only: `npm run crawl -- --state MA`
    - Single system within a state: `npm run crawl -- --state MA --system-name "Tufts Medicine"`
-7. Remove stale crawl artifacts without wiping current data:
+7. Reset crawl-derived state for a single state before a clean recrawl:
+   - Massachusetts only: `npm run reset:crawl-state -- --state MA --include-derived`
+8. Remove stale crawl artifacts without wiping current data:
    - Preview: `npm run cleanup:stale-crawl:dry-run`
    - Apply: `npm run cleanup:stale-crawl`
-8. Run API:
+9. Run API:
    - `npm run start`
 
 ## Notes
@@ -51,6 +53,7 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 - `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
 - No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
+- `npm run reset:crawl-state -- --state MA --include-derived` performs a clean, state-scoped reset of crawl-derived Massachusetts data without touching Texas seeds or data.
 - Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
 - Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.
 - Crawler depth defaults to `2` and only follows workflow-relevant links.
