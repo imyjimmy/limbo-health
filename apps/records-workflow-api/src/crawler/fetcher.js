@@ -33,11 +33,12 @@ export async function fetchAndParseDocument({ url, timeoutMs = config.crawl.time
     const bodyBuffer = Buffer.from(await response.arrayBuffer());
     const contentHash = sha256(bodyBuffer);
 
-    await fs.mkdir(config.rawStorageDir, { recursive: true });
-
-    const extension = sourceType === 'pdf' ? 'pdf' : 'html';
-    const storagePath = path.join(config.rawStorageDir, `${contentHash}.${extension}`);
-    await fs.writeFile(storagePath, bodyBuffer);
+    let storagePath = null;
+    if (sourceType === 'pdf') {
+      await fs.mkdir(config.rawStorageDir, { recursive: true });
+      storagePath = path.join(config.rawStorageDir, `${contentHash}.pdf`);
+      await fs.writeFile(storagePath, bodyBuffer);
+    }
 
     let parsed;
     if (sourceType === 'pdf') {

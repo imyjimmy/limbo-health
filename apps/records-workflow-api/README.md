@@ -49,7 +49,7 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 
 ## Notes
 
-- Raw HTML/PDF snapshots are stored under `storage/raw`.
+- Raw PDF snapshots are stored under `storage/raw`. HTML pages are parsed and persisted to the database but are no longer written to disk.
 - `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
 - No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
