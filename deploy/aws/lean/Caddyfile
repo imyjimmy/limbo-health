@@ -1,0 +1,24 @@
+{$PUBLIC_HOSTNAME} {
+  encode zstd gzip
+
+  @legacyV1 path /v1 /v1/*
+  header @legacyV1 Content-Type application/json
+  respond @legacyV1 "{\"error\":\"Records workflow routes moved to /api/records-workflow/*.\"}" 410
+
+  @mgit path /api/mgit /api/mgit/*
+  reverse_proxy @mgit mgit-api:3003
+
+  @auth path /api/auth /api/auth/*
+  reverse_proxy @auth auth-api:3010
+
+  @recordsWorkflow path /api/records-workflow /api/records-workflow/*
+  reverse_proxy @recordsWorkflow records-workflow-api:3020
+
+  @webrtc path /api/webrtc /api/webrtc/*
+  reverse_proxy @webrtc scheduler-api:3005
+
+  @api path /api /api/*
+  reverse_proxy @api scheduler-api:3005
+
+  reverse_proxy frontend:80
+}

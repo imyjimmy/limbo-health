@@ -1,0 +1,79 @@
+#!/bin/bash
+set -euxo pipefail
+
+dnf update -y
+dnf install -y curl docker git jq unzip amazon-cloudwatch-agent
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker installation failed." >&2
+  exit 1
+fi
+
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+if ! docker compose version >/dev/null 2>&1; then
+  case "$(uname -m)" in
+    x86_64)
+      COMPOSE_ARCH="x86_64"
+      ;;
+    aarch64|arm64)
+      COMPOSE_ARCH="aarch64"
+      ;;
+    *)
+      echo "Unsupported architecture for Docker Compose: $(uname -m)" >&2
+      exit 1
+      ;;
+  esac
+
+  install -d /usr/local/lib/docker/cli-plugins
+  curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$${COMPOSE_ARCH}" \
+    -o /usr/local/lib/docker/cli-plugins/docker-compose
+  chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+fi
+
+docker compose version
+
+mkdir -p "${data_mount_point}" "${host_project_root}"
+
+ROOT_SOURCE="$(findmnt -n -o SOURCE / || true)"
+ROOT_PARENT="$(lsblk -no pkname "$${ROOT_SOURCE}" 2>/dev/null || true)"
+ATTEMPTS=0
+DATA_DEVICE=""
+
+while [[ -z "$${DATA_DEVICE}" && "$${ATTEMPTS}" -lt 60 ]]; do
+  DATA_DEVICE="$(
+    lsblk -ndo NAME,TYPE | awk '$2 == "disk" { print $1 }' | grep -v "^$${ROOT_PARENT}$$" | head -n 1 || true
+  )"
+  if [[ -z "$${DATA_DEVICE}" ]]; then
+    ATTEMPTS=$$((ATTEMPTS + 1))
+    sleep 5
+  fi
+done
+
+if [[ -n "$${DATA_DEVICE}" ]]; then
+  DATA_PATH="/dev/$${DATA_DEVICE}"
+  if ! blkid "$${DATA_PATH}" >/dev/null 2>&1; then
+    mkfs -t xfs "$${DATA_PATH}"
+  fi
+
+  UUID="$(blkid -s UUID -o value "$${DATA_PATH}")"
+  if ! grep -q "$${UUID}" /etc/fstab; then
+    echo "UUID=$${UUID} ${data_mount_point} xfs defaults,nofail 0 2" >> /etc/fstab
+  fi
+
+  mount -a
+fi
+
+mkdir -p \
+  "${data_mount_point}/mysql" \
+  "${data_mount_point}/records-workflow-postgres" \
+  "${data_mount_point}/repos" \
+  "${data_mount_point}/users" \
+  "${data_mount_point}/uploads" \
+  "${data_mount_point}/records-raw" \
+  "${data_mount_point}/caddy-data" \
+  "${data_mount_point}/caddy-config" \
+  "${data_mount_point}/backups"
+
+chown -R ec2-user:ec2-user "${data_mount_point}" "${host_project_root}"

@@ -133,6 +133,26 @@ docker-compose \
 
 ## Deployment
 
+### AWS (Lean EC2)
+
+The current AWS replacement path uses a reversible split between:
+- a persistent data stack
+- a disposable app stack
+
+Top-level operations live in [deploy/aws/lean/README.md](/Users/imyjimmy/dev/pleb-emr/limbo-health/deploy/aws/lean/README.md).
+
+Recreate app infrastructure:
+
+```bash
+AWS_PROFILE=limbo-prod AWS_REGION=us-east-1 ./deploy/aws/lean/apply-infrastructure.sh
+```
+
+Delete app infrastructure while preserving data:
+
+```bash
+AWS_PROFILE=limbo-prod AWS_REGION=us-east-1 ./deploy/aws/lean/destroy-infrastructure.sh
+```
+
 ### Railway (Production)
 
 The production deployment runs on Railway with the following services:

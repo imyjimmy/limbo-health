@@ -1,0 +1,142 @@
+services:
+  edge:
+    image: caddy:2.8-alpine
+    container_name: limbo-aws-edge
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${LIMBO_DATA_DIR}/caddy-data:/data
+      - ${LIMBO_DATA_DIR}/caddy-config:/config
+    depends_on:
+      - frontend
+      - auth-api
+      - mgit-api
+      - scheduler-api
+      - records-workflow-api
+
+  frontend:
+    build:
+      context: ../../..
+      dockerfile: apps/frontend/Dockerfile
+    container_name: limbo-aws-frontend
+    restart: unless-stopped
+
+  auth-api:
+    build:
+      context: ../../..
+      dockerfile: apps/auth-api/Dockerfile
+    container_name: limbo-aws-auth-api
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      NODE_ENV: production
+      PORT: 3010
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
+      NOSTR_RELAYS: ${NOSTR_RELAYS}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+
+  mgit-api:
+    build:
+      context: ../../..
+      dockerfile: apps/mgit-api/Dockerfile
+    container_name: limbo-aws-mgit-api
+    restart: unless-stopped
+    depends_on:
+      - auth-api
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_API_URL: http://auth-api:3010
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
+      MGIT_SERVER_URL: ${PUBLIC_BASE_URL}
+      REPOS_PATH: /repos
+      STAGING_CLEANUP_INTERVAL_MS: ${STAGING_CLEANUP_INTERVAL_MS}
+    volumes:
+      - ${LIMBO_DATA_DIR}/repos:/repos
+      - ${LIMBO_DATA_DIR}/users:/app/users
+
+  scheduler-api:
+    build:
+      context: ../../..
+      dockerfile: apps/scheduler-api/Dockerfile
+    container_name: limbo-aws-scheduler-api
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      NODE_ENV: production
+      PORT: 3005
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+      GOOGLE_REDIRECT_URI_ADMIN: ${GOOGLE_REDIRECT_URI_ADMIN}
+      ALBY_CLIENT_ID: ${ALBY_CLIENT_ID:-}
+      ALBY_CLIENT_SECRET: ${ALBY_CLIENT_SECRET:-}
+      NWC_CONNECTION_STRING: ${NWC_CONNECTION_STRING:-}
+      ADMIN_NOSTR_PRIVATE_KEY: ${ADMIN_NOSTR_PRIVATE_KEY:-}
+      BASE_URL: ${PUBLIC_BASE_URL}
+    volumes:
+      - ${LIMBO_DATA_DIR}/uploads:/app/uploads
+
+  mysql:
+    image: mysql:8.0
+    container_name: limbo-aws-mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ${LIMBO_DATA_DIR}/mysql:/var/lib/mysql
+      - ../../../apps/scheduler-api/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+
+  records-workflow-postgres:
+    image: postgres:16-alpine
+    container_name: limbo-aws-records-workflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${RECORDS_WORKFLOW_DB_NAME}
+      POSTGRES_USER: ${RECORDS_WORKFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${RECORDS_WORKFLOW_DB_PASSWORD}
+    volumes:
+      - ${LIMBO_DATA_DIR}/records-workflow-postgres:/var/lib/postgresql/data
+
+  records-workflow-api:
+    build:
+      context: ../../..
+      dockerfile: apps/records-workflow-api/Dockerfile
+    container_name: limbo-aws-records-workflow-api
+    restart: unless-stopped
+    depends_on:
+      - records-workflow-postgres
+    command: npm run start
+    environment:
+      NODE_ENV: production
+      PORT: 3020
+      DATABASE_URL: postgres://${RECORDS_WORKFLOW_DB_USER}:${RECORDS_WORKFLOW_DB_PASSWORD}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME}
+      RAW_STORAGE_DIR: /app/storage/raw
+    volumes:
+      - ${LIMBO_DATA_DIR}/records-raw:/app/storage/raw
