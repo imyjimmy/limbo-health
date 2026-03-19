@@ -1,0 +1,96 @@
+[
+  {
+    "system_name": "Boone Health",
+    "state": "MO",
+    "domain": "boone.health",
+    "seed_urls": [
+      "https://boone.health/patients-visitors/before-after-your-visit/request-medical-records/",
+      "https://boone.health/patients-visitors/before-after-your-visit/request-medical-records/#fl-main-content",
+      "https://boone.health/boone-health-connection/",
+      "https://boone.health/wp-content/uploads/2025/08/Authorization-for-release-of-information.pdf",
+      "https://boone.health/patients-visitors/before-after-your-visit/request-medical-records/#"
+    ]
+  },
+  {
+    "system_name": "Health & Senior Services",
+    "state": "MO",
+    "domain": "health.mo.gov",
+    "seed_urls": [
+      "https://health.mo.gov/information/hipaa/pdf/Authorization.pdf",
+      "https://health.mo.gov/atoz/fees.php"
+    ]
+  },
+  {
+    "system_name": "Medical Records-Missouri Baptist Sullivan Hospital",
+    "state": "MO",
+    "domain": "bjc.org",
+    "seed_urls": [
+      "https://www.bjc.org/locations/missouri-baptist-sullivan-hospital/medical-records",
+      "https://www.bjc.org/locations/missouri-baptist-sullivan-hospital/medical-records#main-content",
+      "https://www.mypatientchart.org/MyChart/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Missouri Baptist Medical Center",
+    "state": "MO",
+    "domain": "missouribaptist.org",
+    "seed_urls": [
+      "https://www.missouribaptist.org/Medical-Services/Therapy-Services/Therapy-Services-Post/ArtMID/641/ArticleID/203/Request-for-Access-to-Protected-Health-Information",
+      "https://www.missouribaptist.org/Medical-Services/Therapy-Services/Therapy-Services-Post/ArtMID/641/ArticleID/203/Request-for-Access-to-Protected-Health-Information#noJSNav",
+      "https://www.missouribaptist.org/Portals/0/RequestForMedicalRecords.pdf",
+      "https://www.missouribaptist.org/Portals/0/ReleaseOfInformation.pdf",
+      "https://www.missouribaptist.org/DesktopModules/DnnSharp/ActionForm/RegCore/Activate.aspx?returnurl=%2fMedical-Services%2fTherapy-Services%2fTherapy-Services-Post%2fArtMID%2f641%2fArticleID%2f203%2fRequest-for-Access-to-Protected-Health-Information"
+    ]
+  },
+  {
+    "system_name": "Moberly Regional Medical Center",
+    "state": "MO",
+    "domain": "moberlyregionalmedicalcenter.com",
+    "seed_urls": [
+      "https://www.moberlyregionalmedicalcenter.com/request-medical-records",
+      "https://www.moberlyregionalmedicalcenter.com/moberly/hospital-patient-portal.aspx",
+      "https://www.moberlyregionalmedicalcenter.com/moberly/request-medical-records.aspx",
+      "https://www.moberlyregionalmedicalcenter.com/hospital-patient-portal",
+      "https://www.moberlyregionalmedicalcenter.com/patient-portal-faq",
+      "https://www.moberlyregionalmedicalcenter.com/request-medical-records#"
+    ]
+  },
+  {
+    "system_name": "MU Health Care",
+    "state": "MO",
+    "domain": "muhealth.org",
+    "seed_urls": [
+      "https://www.muhealth.org/your-visit/medical-records",
+      "https://www.muhealth.org/your-visit/medical-records#main-content",
+      "https://www.muhealth.org/sites/default/files/PDFs/ROI-Authorization_080124.pdf",
+      "https://www.muhealth.org/sites/default/files/PDFs/ROI-Authorization-080124-Spanish.pdf",
+      "https://www.muhealth.org/sites/default/files/PDFs/Authorization-Outside-Records-05202016.pdf",
+      "https://www.muhealth.org/sites/default/files/Medical-Records_Request-Correction.pdf"
+    ]
+  },
+  {
+    "system_name": "Ozarks Healthcare",
+    "state": "MO",
+    "domain": "ozarkshealthcare.com",
+    "seed_urls": [
+      "https://www.ozarkshealthcare.com/your-visit/release-of-information/",
+      "https://www.ozarkshealthcare.com/your-visit/release-of-information/#Content",
+      "https://www.ozarkshealthcare.com/patient-portal/",
+      "https://www.ozarkshealthcare.com/your-visit/release-of-information/#SetLocation",
+      "https://www.ozarkshealthcare.com/app/files/public/531/Authorization-for-Medical-Records.pdf"
+    ]
+  },
+  {
+    "system_name": "SSM Health",
+    "state": "MO",
+    "domain": "ssmhealth.com",
+    "seed_urls": [
+      "https://www.ssmhealth.com/resources/get-my-medical-records",
+      "https://www.ssmhealth.com/resources/get-my-medical-records#main",
+      "https://www.ssmhealth.com/mychart",
+      "https://www.ssmhealth.com/resources/get-my-medical-records#",
+      "https://www.ssmhealth.com/resources/Get-My-Medical-Records",
+      "https://www.ssmhealth.com/mychart-67aa1be46ff9f2db17095928f57e2267"
+    ]
+  }
+]

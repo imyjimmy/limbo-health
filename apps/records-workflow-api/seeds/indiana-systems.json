@@ -1,0 +1,81 @@
+[
+  {
+    "system_name": "Community Health Network",
+    "state": "IN",
+    "domain": "ecommunity.com",
+    "seed_urls": [
+      "https://www.ecommunity.com/release-medical-record-information",
+      "https://www.ecommunity.com/release-medical-record-information#main-content",
+      "https://www.ecommunity.com/release-medical-record-information#mychart-login",
+      "https://www.ecommunity.com/release-medical-record-information#login",
+      "https://www.ecommunity.com/release-medical-record-information#register",
+      "https://mychart.ecommunity.com/mychart/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Healthcare Ascension",
+    "state": "IN",
+    "domain": "healthcare.ascension.org",
+    "seed_urls": [
+      "https://healthcare.ascension.org/patient-portal/indiana-ascension-st-vincent",
+      "https://healthcare.ascension.org/patient-portal"
+    ]
+  },
+  {
+    "system_name": "Indiana Regional Medical Center",
+    "state": "IN",
+    "domain": "irmc.org",
+    "seed_urls": [
+      "https://www.irmc.org/patients-and-visitors/medical-records/",
+      "https://www.irmc.org/patients-and-visitors/medical-records/#main",
+      "https://www.irmc.org/patients-and-visitors/patient-portal/",
+      "https://www.irmc.org/media/68a2e8ae6cf542f4943d030f68f68ddd/medicalrecordrelease.pdf"
+    ]
+  },
+  {
+    "system_name": "IU Health",
+    "state": "IN",
+    "domain": "iuhealth.org",
+    "seed_urls": [
+      "https://iuhealth.org/patient-family-support/medical-records",
+      "https://iuhealth.org/patient-family-support/medical-records#main-content"
+    ]
+  },
+  {
+    "system_name": "Northwest Health",
+    "state": "IN",
+    "domain": "nwhealthporter.com",
+    "seed_urls": [
+      "https://www.nwhealthporter.com/request-medical-records",
+      "https://www.nwhealthporter.com/porter-health-care-system/hospital-patient-portal.aspx",
+      "https://www.nwhealthporter.com/porter-health-care-system/request-medical-records.aspx",
+      "https://www.nwhealthporter.com/Porter-Health-Care-System/hospital-patient-portal.aspx",
+      "https://www.nwhealthporter.com/hospital-patient-portal",
+      "https://www.nwhealthporter.com/patient-portal-faq"
+    ]
+  },
+  {
+    "system_name": "Union Health, Terre Haute, IN",
+    "state": "IN",
+    "domain": "union.health",
+    "seed_urls": [
+      "https://www.union.health/patients-and-visitors/for-patients/request-medical-records",
+      "https://www.union.health/services/my-union-health-portal",
+      "https://unionhealth.patientportal.us-1.healtheintent.com/pages/home",
+      "https://www.union.health/upload/docs/UnionHealth/medical-records/Union%20Health%20Authorization%20to%20Release%20and%20Disclose%20March%202024.pdf",
+      "https://www.union.health/patients-and-visitors/for-patients/request-medical-records#footerpart1",
+      "https://www.union.health/patients-and-visitors/for-patients/request-medical-records#footerpart2"
+    ]
+  },
+  {
+    "system_name": "VA Indiana Health Care",
+    "state": "IN",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/indiana-health-care/medical-records-office/",
+      "https://www.va.gov/indiana-health-care/medical-records-office/#content",
+      "https://www.va.gov/resources/about-electronic-health-information-sharing-at-va/",
+      "https://www.va.gov/resources/about-reviewing-medical-records-online"
+    ]
+  }
+]

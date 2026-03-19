@@ -1,0 +1,81 @@
+[
+  {
+    "system_name": "HCA Virginia",
+    "state": "VA",
+    "domain": "hcavirginia.com",
+    "seed_urls": [
+      "https://www.hcavirginia.com/patient-center/medical-records.dot",
+      "https://www.myhealthone.net/mh1/public/mh1"
+    ]
+  },
+  {
+    "system_name": "VCU Health",
+    "state": "VA",
+    "domain": "vcuhealth.org",
+    "seed_urls": [
+      "https://www.vcuhealth.org/patients-and-visitors/medical-records-and-mychart/release-of-medical-information-/",
+      "https://mychart.vcuhealth.org/MyChart/Authentication/Login?"
+    ]
+  },
+  {
+    "system_name": "Sentara Healthcare",
+    "state": "VA",
+    "domain": "sentara.com",
+    "seed_urls": [
+      "https://www.sentara.com/patientguide/medical-records/request-your-medical-records",
+      "https://mychart.sentara.com/mychart/",
+      "https://www.sentara.com/Documents/a/Authorization-to-Disclose-Protected-Health-Information"
+    ]
+  },
+  {
+    "system_name": "UVA Health",
+    "state": "VA",
+    "domain": "uvahealth.com",
+    "seed_urls": [
+      "https://uvahealth.com/patients-and-visitors/health-information"
+    ]
+  },
+  {
+    "system_name": "Inova",
+    "state": "VA",
+    "domain": "inova.org",
+    "seed_urls": [
+      "https://www.inova.org/patient-and-visitor-information/medical-records-request",
+      "https://mychart.inova.org/Affiliate/Authentication/Login",
+      "https://www.inova.org/sites/default/files/Services/cancer/ilh/docs/Medical-Records-Request-Form.pdf"
+    ]
+  },
+  {
+    "system_name": "Carilion Clinic",
+    "state": "VA",
+    "domain": "carilionclinic.org",
+    "seed_urls": [
+      "https://www.carilionclinic.org/medical-records"
+    ]
+  },
+  {
+    "system_name": "Bon Secours Virginia",
+    "state": "VA",
+    "domain": "bonsecours.com",
+    "seed_urls": [
+      "https://www.bonsecours.com/patient-resources/request-medical-records"
+    ]
+  },
+  {
+    "system_name": "Riverside Health",
+    "state": "VA",
+    "domain": "riversideonline.com",
+    "seed_urls": [
+      "https://mychart.riversideonline.com/mychart/Authentication/Login",
+      "https://www.riversideonline.com/-/media/locations/documents/rrmc6724-rhs-authorization-to-disclose-health-information-_4-20.pdf"
+    ]
+  },
+  {
+    "system_name": "VA Richmond Health Care",
+    "state": "VA",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/richmond-health-care/medical-records-office/"
+    ]
+  }
+]

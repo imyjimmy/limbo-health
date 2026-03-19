@@ -68,6 +68,105 @@
     ]
   },
   {
+    "system_name": "Ascension Providence",
+    "state": "TX",
+    "seed_urls": [
+      "https://healthcare.ascension.org/locations/texas/txwac/waco-ascension-providence",
+      "https://healthcare.ascension.org/patient-portal/texas-ascension-providence"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Ascension Providence",
+        "city": "Waco",
+        "state": "TX",
+        "facility_page_url": "https://healthcare.ascension.org/locations/texas/txwac/waco-ascension-providence"
+      }
+    ]
+  },
+  {
+    "system_name": "AdventHealth Central Texas",
+    "state": "TX",
+    "domain": "adventhealth.com",
+    "seed_urls": [
+      "https://www.adventhealth.com/locations/hospitals/central-texas/medical-records",
+      "https://www.adventhealth.com/locations/hospitals/central-texas"
+    ],
+    "facilities": [
+      {
+        "facility_name": "AdventHealth Central Texas",
+        "city": "Killeen",
+        "state": "TX",
+        "facility_page_url": "https://www.adventhealth.com/locations/hospitals/central-texas"
+      }
+    ]
+  },
+  {
+    "system_name": "Texas Children's",
+    "state": "TX",
+    "domain": "texaschildrens.org",
+    "seed_urls": [
+      "https://www.texaschildrens.org/patients-families/medical-and-health-records"
+    ]
+  },
+  {
+    "system_name": "Children's Health",
+    "state": "TX",
+    "domain": "childrens.com",
+    "seed_urls": [
+      "https://www.childrens.com/patient-families/parent-resources",
+      "https://es.childrens.com/patient-families/parent-resources/medical-records-request"
+    ]
+  },
+  {
+    "system_name": "Parkland Health",
+    "state": "TX",
+    "domain": "parklandhealth.org",
+    "seed_urls": [
+      "https://www.parklandhealth.org/patient-information-tools",
+      "https://www.parklandhealth.org/contact-us"
+    ]
+  },
+  {
+    "system_name": "Harris Health",
+    "state": "TX",
+    "domain": "harrishealth.org",
+    "seed_urls": [
+      "https://www.harrishealth.org/patients-hh/Pages/medical-records.aspx"
+    ]
+  },
+  {
+    "system_name": "University Health",
+    "state": "TX",
+    "domain": "universityhealth.com",
+    "seed_urls": [
+      "https://www.universityhealth.com/patients/billing-insurance/medical-records"
+    ]
+  },
+  {
+    "system_name": "UTMB Health",
+    "state": "TX",
+    "domain": "utmbhealth.com",
+    "seed_urls": [
+      "https://www.utmbhealth.com/online-services/medical-records"
+    ]
+  },
+  {
+    "system_name": "UT MD Anderson Cancer Center",
+    "state": "TX",
+    "domain": "mdanderson.org",
+    "seed_urls": [
+      "https://www.mdanderson.org/patients-family/becoming-our-patient/services-amenities/medical-records.html"
+    ]
+  },
+  {
+    "system_name": "Cook Children's",
+    "state": "TX",
+    "domain": "cookchildrens.org",
+    "seed_urls": [
+      "https://www.cookchildrens.org/patients-families/medical-records"
+    ]
+  },
+  {
     "system_name": "Tenet Healthcare",
     "domain": "tenethealth.com",
     "seed_urls": [

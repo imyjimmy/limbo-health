@@ -49,6 +49,18 @@ Postgres-backed crawler + extraction service that ingests public hospital record
    - Apply: `npm run repartition:raw-storage-state -- --apply`
 10. Run API:
    - `npm run start`
+11. Build the official CMS national hospital roster and compare processed states against it:
+   - Build roster: `npm run build:national-roster`
+   - Audit states currently represented under `storage/raw/*`: `npm run report:national-roster-coverage`
+12. Generate import-compatible seed candidates from the CMS roster:
+   - Single state: `npm run generate:seed-candidates -- --state CT`
+   - Remaining states: `npm run generate:seed-candidates -- --all-remaining`
+13. Import only high-confidence generated seeds:
+   - Single state: `npm run import:generated-seeds -- --state CT`
+   - Remaining states: `npm run import:generated-seeds -- --all-remaining`
+14. Run the continuous nationwide rollout:
+   - Single state: `npm run crawl:rollout -- --state CT`
+   - Remaining states: `npm run crawl:rollout -- --all-remaining`
 
 ## Notes
 
@@ -58,6 +70,12 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
 - `npm run reset:crawl-state -- --state MA --include-derived` performs a clean, state-scoped reset of crawl-derived Massachusetts data without touching Texas seeds or data.
 - `npm run repartition:raw-storage-state -- --apply` performs a one-time move of existing PDF artifacts into state subdirectories and updates `source_documents.storage_path` without refetching anything.
+- `npm run build:national-roster` writes a CMS-based active-hospital roster to `data/national-roster/cms-pos-q4-2025-active-hospitals.json`.
+- `npm run report:national-roster-coverage` compares the processed raw-state footprint against that official roster and writes a phase-1 audit report to `logs/reports/<date>-national-roster-audit.json`.
+- `npm run generate:seed-candidates` writes generated seed files to `data/generated-seeds/<state>-systems.generated.json` and includes `discovery_confidence` plus evidence metadata without breaking the existing seed schema.
+- `npm run import:generated-seeds` automatically imports only high-confidence generated seed entries unless you later add broader confidence thresholds.
+- `npm run crawl:rollout` generates seeds, imports high-confidence candidates, crawls by state, audits coverage, appends to a cumulative report, and keeps going even when a state lands in `not_ready`.
+- The nationwide `--all-remaining` rollout scope now means the 50 U.S. states only; `DC` is intentionally excluded from automatic generate/import/crawl rollout targets.
 - Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
 - Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.
 - Crawler depth defaults to `2` and only follows workflow-relevant links.

@@ -13,14 +13,96 @@ const DOCUMENT_TITLE_PATTERN =
   /\b(?:authorization|request|records?|protected health information|proxy access|mychart|patient portal|consent|release)\b/i;
 const FACILITY_PATTERN =
   /\b(?:hospital|medical center|regional hospital|community hospital|memorial hospital|rehabilitation hospital|rehabilitation center|health network|health center|physicians hospital|clinic|medical campus|campus)\b/i;
+const COLLAPSED_HEADER_PHRASE_REPLACEMENTS = [
+  [
+    /\bPATIENTREQUESTFORACCESSTODESIGNATEDRECORDSET\b/gi,
+    'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET'
+  ],
+  [
+    /\bPATIENTREQUESTTOAMENDADESIGNATEDRECORDSET\b/gi,
+    'PATIENT REQUEST TO AMEND A DESIGNATED RECORD SET'
+  ],
+  [
+    /\bPATIENTRIGHTTOACCESSREQUESTFORMEDICALRECORDS\b/gi,
+    'PATIENT RIGHT TO ACCESS REQUEST FOR MEDICAL RECORDS'
+  ],
+  [
+    /\bPATIENTREQUESTTOHAVEMEDICALRECORDSTRANSFERRED\b/gi,
+    'PATIENT REQUEST TO HAVE MEDICAL RECORDS TRANSFERRED'
+  ],
+  [/\bPATIENTREQUESTFORHEALTHINFORMATION\b/gi, 'PATIENT REQUEST FOR HEALTH INFORMATION'],
+  [
+    /\bAUTHORIZATIONTORELEASEPROTECTEDHEALTHINFORMATION\b/gi,
+    'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION'
+  ],
+  [
+    /\bAUTHORIZATIONFORUSEANDDISCLOSUREOFPROTECTEDHEALTHINFORMATION\b/gi,
+    'AUTHORIZATION FOR USE AND DISCLOSURE OF PROTECTED HEALTH INFORMATION'
+  ],
+  [
+    /\bAUTHORIZATIONFORUSEANDDISCLOSUREOFHEALTHINFORMATION\b/gi,
+    'AUTHORIZATION FOR USE AND DISCLOSURE OF HEALTH INFORMATION'
+  ],
+  [
+    /\bAUTHORIZATIONFORRELEASEOFMEDICALINFORMATION\b/gi,
+    'AUTHORIZATION FOR RELEASE OF MEDICAL INFORMATION'
+  ],
+  [
+    /\bAUTHORIZATIONFORRELEASEOFPATIENTINFORMATION\b/gi,
+    'AUTHORIZATION FOR RELEASE OF PATIENT INFORMATION'
+  ],
+  [
+    /\bMYCHARTPROXYACCESSREQUESTANDAUTHORIZATIONFORM\b/gi,
+    'MYCHART PROXY ACCESS REQUEST AND AUTHORIZATION FORM'
+  ]
+];
+const COLLAPSED_HEADER_SEGMENT_REPLACEMENTS = [
+  [/\bFORPATIENTS\b/gi, 'FOR PATIENTS'],
+  [/\bPATIENTREQUEST\b/gi, 'PATIENT REQUEST'],
+  [/\bRIGHTTOACCESS\b/gi, 'RIGHT TO ACCESS'],
+  [/\bREQUESTTO\b/gi, 'REQUEST TO'],
+  [/\bREQUESTFOR\b/gi, 'REQUEST FOR'],
+  [/\bACCESSTO\b/gi, 'ACCESS TO'],
+  [/\bTOHAVEMEDICALRECORDSTRANSFERRED\b/gi, 'TO HAVE MEDICAL RECORDS TRANSFERRED'],
+  [/\bTOAMEND\b/gi, 'TO AMEND'],
+  [/\bDESIGNATEDRECORDSET\b/gi, 'DESIGNATED RECORD SET'],
+  [/\bMEDICALRECORDS\b/gi, 'MEDICAL RECORDS'],
+  [/\bHEALTHINFORMATION\b/gi, 'HEALTH INFORMATION'],
+  [/\bPROTECTEDHEALTHINFORMATION\b/gi, 'PROTECTED HEALTH INFORMATION'],
+  [/\bMYCHARTPROXYACCESS\b/gi, 'MYCHART PROXY ACCESS'],
+  [/\bPROXYACCESS\b/gi, 'PROXY ACCESS'],
+  [/\bPATIENTPORTAL\b/gi, 'PATIENT PORTAL'],
+  [/\bREQUESTANDAUTHORIZATIONFORM\b/gi, 'REQUEST AND AUTHORIZATION FORM'],
+  [/\bREQUESTANDAUTHORIZATION\b/gi, 'REQUEST AND AUTHORIZATION'],
+  [/\bAUTHORIZATIONFOR\b/gi, 'AUTHORIZATION FOR'],
+  [/\bAUTHORIZATIONTO\b/gi, 'AUTHORIZATION TO'],
+  [/\bUSEANDDISCLOSURE\b/gi, 'USE AND DISCLOSURE'],
+  [/\bRELEASEOF\b/gi, 'RELEASE OF'],
+  [/\bINFORMATIONRELEASE\b/gi, 'INFORMATION RELEASE'],
+  [/\bYEARSOLD\b/gi, 'YEARS OLD']
+];
 
 function approximateFontSize(item) {
   return Math.max(Math.abs(item?.transform?.[0] || 0), Math.abs(item?.transform?.[3] || 0), 0);
 }
 
+function expandCollapsedHeaderPhrases(value) {
+  let expanded = value || '';
+
+  for (const [pattern, replacement] of COLLAPSED_HEADER_PHRASE_REPLACEMENTS) {
+    expanded = expanded.replace(pattern, replacement);
+  }
+
+  for (const [pattern, replacement] of COLLAPSED_HEADER_SEGMENT_REPLACEMENTS) {
+    expanded = expanded.replace(pattern, replacement);
+  }
+
+  return expanded;
+}
+
 export function normalizePdfHeaderLineText(value) {
   return collapseWhitespace(
-    (value || '')
+    expandCollapsedHeaderPhrases(value || '')
       .replace(/([a-z])([A-Z])/g, '$1 $2')
       .replace(/([0-9])([A-Z])/g, '$1 $2')
       .replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')
@@ -44,12 +126,24 @@ export function isLikelyPdfHeaderDocumentTitleLine(value) {
   return Boolean(DOCUMENT_TITLE_PATTERN.test(text));
 }
 
-export function buildPdfHeaderLines({ items = [], pageHeight = 0, topRatio = 0.25 } = {}) {
+function isLikelyContinuationHeaderLine(line) {
+  if (!line?.text) return false;
+  if (isLikelyPdfHeaderAddressLine(line.text)) return false;
+  if (isLikelyPdfHeaderFieldLine(line.text)) return false;
+
+  return isLikelyPdfHeaderDocumentTitleLine(line.text) || line.fontSize >= 14;
+}
+
+export function buildPdfHeaderLines({ items = [], pageHeight = 0, topRatio = 0.15 } = {}) {
   if (!Array.isArray(items) || items.length === 0 || !pageHeight) {
     return [];
   }
 
-  const topBoundary = pageHeight * (1 - topRatio);
+  // Keep the main focus on the top 15% of page 1 while allowing a small buffer
+  // for titles that visually wrap just below the cutoff.
+  const expandedTopRatio = Math.max(topRatio, 0.18);
+  const focusBoundary = pageHeight * (1 - topRatio);
+  const expandedTopBoundary = pageHeight * (1 - expandedTopRatio);
   const positionedItems = items
     .map((item) => ({
       text: item?.str || '',
@@ -58,7 +152,7 @@ export function buildPdfHeaderLines({ items = [], pageHeight = 0, topRatio = 0.2
       fontSize: approximateFontSize(item)
     }))
     .filter((item) => item.text.trim())
-    .filter((item) => item.y >= topBoundary)
+    .filter((item) => item.y >= expandedTopBoundary)
     .sort((left, right) => {
       if (Math.abs(right.y - left.y) > 1.5) return right.y - left.y;
       return left.x - right.x;
@@ -75,7 +169,7 @@ export function buildPdfHeaderLines({ items = [], pageHeight = 0, topRatio = 0.2
     line.items.push(item);
   }
 
-  return groupedLines
+  const normalizedLines = groupedLines
     .map((line) => {
       const sortedItems = line.items.sort((left, right) => left.x - right.x);
       const rawText = sortedItems.map((item) => item.text).join('');
@@ -93,6 +187,33 @@ export function buildPdfHeaderLines({ items = [], pageHeight = 0, topRatio = 0.2
       if (Math.abs(right.y - left.y) > 1.5) return right.y - left.y;
       return left.x - right.x;
     });
+
+  const headerLines = normalizedLines.filter((line) => line.y >= focusBoundary);
+  const titleAnchorIndex = headerLines.findIndex(
+    (line) => isLikelyPdfHeaderDocumentTitleLine(line.text) || line.fontSize >= 18
+  );
+
+  if (titleAnchorIndex === -1) {
+    return headerLines;
+  }
+
+  let lastIncludedY = headerLines[titleAnchorIndex].y;
+  let continuationLines = 0;
+
+  for (const line of normalizedLines) {
+    if (line.y >= focusBoundary) continue;
+    if (continuationLines >= 2) break;
+    if (!isLikelyContinuationHeaderLine(line)) continue;
+    if (lastIncludedY - line.y > 48) break;
+    headerLines.push(line);
+    lastIncludedY = line.y;
+    continuationLines += 1;
+  }
+
+  return headerLines.sort((left, right) => {
+    if (Math.abs(right.y - left.y) > 1.5) return right.y - left.y;
+    return left.x - right.x;
+  });
 }
 
 export function buildPdfHeaderText(headerLines = []) {

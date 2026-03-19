@@ -203,6 +203,17 @@ test('detects Portuguese documents as PT', () => {
   assert.equal(language, 'PT');
 });
 
+test('prefers english header language over multilingual footer boilerplate', () => {
+  const language = detectDocumentLanguageCode({
+    title: '',
+    headerText: 'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET',
+    text:
+      'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET ATTENTION: If you do not speak English... ATENCIÓN: Si habla español, tiene a su disposición servicios gratuitos de asistencia lingüística.'
+  });
+
+  assert.equal(language, 'EN');
+});
+
 test('infers a Mass General facility from the source URL when facilityName is missing', () => {
   const stems = buildMedicalRecordsPdfFilenameStems({
     systemName: 'Mass General Brigham',
@@ -297,6 +308,30 @@ test('builds mychart proxy stems from header title lines', () => {
   assert.equal(
     stems[0],
     'the-university-of-vermont-medical-center-for-patients-18-and-older-mychart-proxy-access-request-and-authorization-form-EN'
+  );
+});
+
+test('normalizes collapsed all-caps providence header titles before phrase matching', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'Providence Washington',
+    url: '',
+    title: '01-243978 Providence 970392 Print',
+    text:
+      'PATIENT REQUEST TO AMEND A DESIGNATED RECORD SET This form must be complete and legible in order to be processed.',
+    headerLines: [
+      { text: 'PATIENTREQUESTTOAMENDADESIGNATEDRECORDSET', y: 724.84, x: 58.08, fontSize: 20.96 },
+      {
+        text: 'This form must be complete and legible in order to be processed.',
+        y: 686.68,
+        x: 100.44,
+        fontSize: 15.37
+      }
+    ]
+  });
+
+  assert.equal(
+    stems[0],
+    'providence-washington-patient-request-to-amend-a-designated-record-set-EN'
   );
 });
 

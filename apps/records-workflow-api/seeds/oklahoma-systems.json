@@ -1,0 +1,34 @@
+[
+  {
+    "system_name": "Memorial Health System of Southwest Oklahoma",
+    "state": "OK",
+    "domain": "memorialhealthswok.com",
+    "seed_urls": [
+      "https://www.memorialhealthswok.com/medical-records-and-imaging/",
+      "https://www.memorialhealthswok.com/my-memorial-health/",
+      "https://www.memorialhealthswok.com/medical-records-and-imaging/#",
+      "https://www.memorialhealthswok.com/medical-records-and-imaging/#form"
+    ]
+  },
+  {
+    "system_name": "Oklahoma Surgical Hospital",
+    "state": "OK",
+    "domain": "oklahomasurgicalhospital.com",
+    "seed_urls": [
+      "https://www.oklahomasurgicalhospital.com/patients-visitors/medical-records/",
+      "https://www.oklahomasurgicalhospital.com/myosh/",
+      "https://www.oklahomasurgicalhospital.com/wp-content/uploads/2024/01/Authorization-For-Release-of-Medical-Records-1.24.pdf"
+    ]
+  },
+  {
+    "system_name": "OU Health",
+    "state": "OK",
+    "domain": "ouhealth.com",
+    "seed_urls": [
+      "https://www.ouhealth.com/ou-health-patients-families/request-medical-records/",
+      "https://www.ouhealth.com/ou-health-patients-families/patient-portals/",
+      "https://mychart.ouhealth.com/MyChart/openscheduling",
+      "https://www.ouhealth.com/ou-health-patients-families/request-medical-records/request-medical-records-ou-health-physicians-tul/"
+    ]
+  }
+]

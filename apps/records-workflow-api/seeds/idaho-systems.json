@@ -1,0 +1,43 @@
+[
+  {
+    "system_name": "Eastern Idaho Regional Medical Center",
+    "state": "ID",
+    "domain": "eirmc.com",
+    "seed_urls": [
+      "https://www.eirmc.com/patient-resources/medical-records"
+    ]
+  },
+  {
+    "system_name": "Kootenai Health",
+    "state": "ID",
+    "domain": "kh.org",
+    "seed_urls": [
+      "https://www.kh.org/patient-and-visitor-information/medical-records/"
+    ]
+  },
+  {
+    "system_name": "St. Joseph Regional Medical Center",
+    "state": "ID",
+    "domain": "sjrmc.org",
+    "seed_urls": [
+      "https://www.sjrmc.org/medical-records"
+    ]
+  },
+  {
+    "system_name": "Intermountain Health",
+    "state": "ID",
+    "domain": "intermountainhealthcare.org",
+    "seed_urls": [
+      "https://intermountainhealthcare.org/for-patients/medical-records/utah-idaho"
+    ]
+  },
+  {
+    "system_name": "Treasure Valley Hospital",
+    "state": "ID",
+    "domain": "treasurevalleyhospital.com",
+    "seed_urls": [
+      "https://treasurevalleyhospital.com/request-records/",
+      "https://scasurgery.iqhealth.com/"
+    ]
+  }
+]

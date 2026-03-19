@@ -1,0 +1,51 @@
+[
+  {
+    "system_name": "LifeBridge Health",
+    "state": "MD",
+    "domain": "lifebridgehealth.org",
+    "seed_urls": [
+      "https://www.lifebridgehealth.org/patients/medical-records",
+      "https://www.lifebridgehealth.org/patients/medical-records#main-content",
+      "https://www.lifebridgehealth.org/patients/patient-portal"
+    ]
+  },
+  {
+    "system_name": "MedStar Health",
+    "state": "MD",
+    "domain": "medstarhealth.org",
+    "seed_urls": [
+      "https://www.medstarhealth.org/services/medical-records",
+      "https://www.medstarhealth.org/services/medical-records#content",
+      "https://www.medstarhealth.org/patient-portal",
+      "https://www.medstarhealth.org/services/medical-records#null",
+      "https://medstarhealth.consumeridp.us-1.healtheintent.com/saml2/sso/login?authenticationRequestId=a748b38d-57d1-41df-bdd1-cc79577b7754",
+      "https://www.medstarhealth.org/-/media/project/mho/medstar/pdf/ms100400-roi-form-english-2021.pdf"
+    ]
+  },
+  {
+    "system_name": "Mercy Medical Center",
+    "state": "MD",
+    "domain": "mdmercy.com",
+    "seed_urls": [
+      "https://mdmercy.com/patients-and-visitors/medical-records",
+      "https://mdmercy.com/patients-and-visitors/medical-records#main",
+      "https://mdmercy.com/patients-and-visitors/medical-records#primary-nav",
+      "https://mdmercy.com/patients-and-visitors/mychart-mercy",
+      "https://mdmercy.com/mychart",
+      "https://mdmercy.com/-/media/files/patients-and-visitors/record-request-through-mychart.pdf"
+    ]
+  },
+  {
+    "system_name": "University of Maryland Medical System",
+    "state": "MD",
+    "domain": "umms.org",
+    "seed_urls": [
+      "https://www.umms.org/patients-visitors/medical-records",
+      "https://www.umms.org/patients-visitors/medical-records#main",
+      "https://www.umms.org/patient-portal",
+      "https://mychart.umms.org/MyChart/Authentication/Login?",
+      "https://mychart.umms.org/MyChart/accesscheck.asp",
+      "https://www.umms.org/patients-visitors/medical-records#FPI"
+    ]
+  }
+]

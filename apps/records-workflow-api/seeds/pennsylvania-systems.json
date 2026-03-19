@@ -1,0 +1,40 @@
+[
+  {
+    "system_name": "Healthcare Services in Western PA",
+    "state": "PA",
+    "domain": "independence.health",
+    "seed_urls": [
+      "https://www.independence.health/patients-visitors/patient-information/medical-records/",
+      "https://www.independence.health/about-us/patient-privacy-rights/health-information-exchange/",
+      "https://www.independence.health/patients-visitors/patient-information/patient-portal/",
+      "https://www.independence.health/patients-visitors/patient-information/patient-portal/patient-portal-butler-clarion-area/",
+      "https://www.independence.health/patients-visitors/patient-information/patient-portal/patient-portal-westmoreland-area/"
+    ]
+  },
+  {
+    "system_name": "Lehigh Valley Health Network",
+    "state": "PA",
+    "domain": "lvhn.org",
+    "seed_urls": [
+      "https://www.lvhn.org/patients-and-visitors/medical-records",
+      "https://www.lvhn.org/patients-and-visitors/medical-records#main-content",
+      "https://my.lvhn.org/MyChart/Scheduling?linksource=lvhn-org",
+      "https://my.lvhn.org/mychart/openscheduling?linksource=lvhn-org",
+      "https://www.lvhn.org/sites/default/files/2024-10/Consent_for_Release_of_Protected_Health_Information.pdf",
+      "https://www.lvhn.org/sites/default/files/2023-05/Medical-records-instructions-for-completing-form-English-23.pdf"
+    ]
+  },
+  {
+    "system_name": "Penn State Health",
+    "state": "PA",
+    "domain": "pennstatehealth.org",
+    "seed_urls": [
+      "https://www.pennstatehealth.org/patients-visitors/billing-medical-records/request-medical-records",
+      "https://www.pennstatehealth.org/patients-visitors/billing-medical-records/request-medical-records#main-content",
+      "https://www.pennstatehealth.org/patient-portal",
+      "https://www.pennstatehealth.org/patients-visitors/billing-medical-records/pay-bill",
+      "https://www.pennstatehealth.org/patients-visitors/billing-medical-records/hospital-price-transparency",
+      "https://www.pennstatehealth.org/patients-visitors/billing-medical-records/my-health-patient-portal/how-enroll-patient-portal"
+    ]
+  }
+]

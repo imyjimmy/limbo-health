@@ -1,0 +1,47 @@
+[
+  {
+    "system_name": "CHRISTUS Central Louisiana Surgical Hospital",
+    "state": "LA",
+    "domain": "clshospital.com",
+    "seed_urls": [
+      "https://clshospital.com/patient-visitor-information/medical-records-request/",
+      "https://clshospital.com/patient-visitor-information/medical-records-request/#content",
+      "https://clshospital.com/wp-content/uploads/2023/03/HIM-Access-to-Copies-of-Medical-Record.pdf"
+    ]
+  },
+  {
+    "system_name": "Lake Charles Memorial Health System",
+    "state": "LA",
+    "domain": "lcmh.com",
+    "seed_urls": [
+      "https://www.lcmh.com/patients-visitors/medical-records/",
+      "https://www.lcmh.com/patients-visitors/mychart/",
+      "https://www.lcmh.com/patients-visitors/mychart/faq/"
+    ]
+  },
+  {
+    "system_name": "Lake Regional Medical Center",
+    "state": "LA",
+    "domain": "fmolhs.org",
+    "seed_urls": [
+      "https://www.fmolhs.org/locations/greater-baton-rouge/greater-baton-rouge-patients-and-guests/greater-baton-rouge-medical-records",
+      "https://www.fmolhs.org/locations/greater-baton-rouge/greater-baton-rouge-patients-and-guests/greater-baton-rouge-medical-records#hero-content",
+      "https://www.fmolhs.org/patients-guests/patients-resources/mychart",
+      "https://www.fmolhs.org/locations/greater-baton-rouge/greater-baton-rouge-patients-and-guests/greater-baton-rouge-medical-records#",
+      "https://www.fmolhs.org/-/media/files/release-of-information-11-19.pdf",
+      "https://mychart.fmolhs.org/MyChart/Authentication/Login?"
+    ]
+  },
+  {
+    "system_name": "Ochsner LSU Health",
+    "state": "LA",
+    "domain": "ochsnerlsuhs.org",
+    "seed_urls": [
+      "https://www.ochsnerlsuhs.org/patients-visitors/medical-records",
+      "https://www.ochsnerlsuhs.org/patients-visitors/myochsner",
+      "https://www.ochsnerlsuhs.org/content/uploads/1448-Authorization-for-Use-and-Disclosure-of-Health-Info-Patient-Form-OLHS-Kings-Hwy-7-10-20-1.pdf",
+      "https://www.ochsnerlsuhs.org/content/uploads/8224-Authorization-for-Use-and-Disclosure-of-Protected-Health-Info-Patient-Form-St-Mary-7-10-2020.pdf",
+      "https://www.ochsnerlsuhs.org/content/uploads/8078-Authorization-for-Use-and-Disclosure-Of-Health-Info-Patient-Form-Monroe-Medical-Center-7-10-2020.pdf"
+    ]
+  }
+]

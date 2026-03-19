@@ -1,0 +1,65 @@
+[
+  {
+    "system_name": "MercyCare Primary & Urgent Care Clinics",
+    "state": "IA",
+    "domain": "mercycare.org",
+    "seed_urls": [
+      "https://www.mercycare.org/patients/patient-info/medicalrecords/",
+      "https://www.mercycare.org/patients/patient-info/medicalrecords/#Content",
+      "https://mychart.mercycare.org/mychart/",
+      "https://mychart.mercycare.org/mychart/scheduling/onmyway?dispGroups=2",
+      "https://www.mercycare.org/patients/patient-info/medical-records-amendment-request/",
+      "https://www.mercycare.org/patients/patient-info/mychart/"
+    ]
+  },
+  {
+    "system_name": "The Iowa Clinic",
+    "state": "IA",
+    "domain": "iowaclinic.com",
+    "seed_urls": [
+      "https://www.iowaclinic.com/for-patients/payment-billing/medical-records/",
+      "https://www.iowaclinic.com/for-patients/payment-billing/medical-records/#content",
+      "https://www.iowaclinic.com/for-patients/patient-portal/",
+      "https://www.iowaclinic.com/for-patients/payment-billing/medical-records/#send-from",
+      "https://www.iowaclinic.com/for-patients/payment-billing/medical-records/#send-to",
+      "https://www.iowaclinic.com/for-patients/payment-billing/medical-records/#provider-request"
+    ]
+  },
+  {
+    "system_name": "UnityPoint Health",
+    "state": "IA",
+    "domain": "unitypoint.org",
+    "seed_urls": [
+      "https://www.unitypoint.org/patients-and-visitors/medical-records",
+      "https://www.unitypoint.org/patients-and-visitors/medical-records#main",
+      "https://www.unitypoint.org/patients-and-visitors/medical-records#access",
+      "https://www.unitypoint.org/patients-and-visitors/medical-records#ContactUs",
+      "https://www.unitypoint.org/patients-and-visitors/medical-records#FAQs",
+      "https://www.unitypoint.org/patients-and-visitors/medical-records#f1aeb7dd-e88a-442e-b79f-85f56ea7349b__tab__0"
+    ]
+  },
+  {
+    "system_name": "University of Iowa Health Care",
+    "state": "IA",
+    "domain": "uihc.org",
+    "seed_urls": [
+      "https://uihc.org/medical-records-request",
+      "https://uihc.org/medical-records-request#main-content",
+      "https://mychart.uihealthcare.org/mychart/Authentication/Login?",
+      "https://uihc.org/get-know-mychart",
+      "https://mychart.uihealthcare.org/mychart/Authentication/Login",
+      "https://uihc.org/mychart-care-companion"
+    ]
+  },
+  {
+    "system_name": "Wayne County Hospital",
+    "state": "IA",
+    "domain": "waynecountyhospital.org",
+    "seed_urls": [
+      "https://waynecountyhospital.org/patients-visitors/medical-records/",
+      "https://waynecountyhospital.org/wchpatientportal/",
+      "https://waynecountyhospital.org/patients-visitors/medical-records/#",
+      "https://waynecountyhospital.org/wp-content/uploads/2023/04/ROI.pdf"
+    ]
+  }
+]

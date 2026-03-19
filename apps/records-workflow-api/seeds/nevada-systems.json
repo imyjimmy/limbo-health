@@ -1,0 +1,71 @@
+[
+  {
+    "system_name": "Dignity Health",
+    "state": "NV",
+    "domain": "dignityhealth.org",
+    "seed_urls": [
+      "https://www.dignityhealth.org/las-vegas/patients-and-visitors/for-patients/medical-record-requests",
+      "https://www.dignityhealth.org/las-vegas/patients-and-visitors/for-patients/medical-record-requests#maincontent",
+      "https://www.dignityhealth.org/las-vegas/patients-and-visitors/for-patients/medical-record-requests#",
+      "https://www.dignityhealth.org/my-portal",
+      "https://www.dignityhealth.org/las-vegas/patients-and-visitors/for-patients/medical-record-requests#1443853438",
+      "https://www.dignityhealth.org/las-vegas/patients-and-visitors/for-patients/medical-record-requests#-1579484751"
+    ]
+  },
+  {
+    "system_name": "Health Records Online",
+    "state": "NV",
+    "domain": "northernnevadahealth.com",
+    "seed_urls": [
+      "https://northernnevadahealth.com/patients-visitors/health-records-online/",
+      "https://cernerhealth.com/oauth/authenticate?redirect_uri=https%3A%2F%2Fcernerhealth.com%2Fsaml%2Fsso%2Fresponse%3Fmessage_id%3D_77fd5f09-d012-42ec-ae5b-6563b608d750%26issuer%3Dhttps%253A%252F%252Fwest.uhs.patientportal.us-1.healtheintent.com%252Fsession-api%252Fprotocol%252Fsaml2%252Fmetadata&sign_in_only=on&client_id=87fabc224cef4c98823e7c7d544ae250",
+      "https://northernnevadahealth.com/wp-content/uploads/2025/05/Consent-for-Release-of-Health-Information_Revised-05082024-3.docx",
+      "https://cernerhealth.com/oauth/authenticate?redirect_uri=https%3A%2F%2Fcernerhealth.com%2Fsaml%2Fsso%2Fresponse%3Fmessage_id%3D_e84d9070-637f-4f42-8eb0-fa457945aa4c%26issuer%3Dhttps%253A%252F%252Fasp-west.uhs.patientportal.us-1.healtheintent.com%252Fsession-api%252Fprotocol%252Fsaml2%252Fmetadata&sign_in_only=on&client_id=2c7c64de59e440298dbd5930a5379c12"
+    ]
+  },
+  {
+    "system_name": "Northeastern Nevada Regional ...",
+    "state": "NV",
+    "domain": "nnrhospital.com",
+    "seed_urls": [
+      "https://www.nnrhospital.com/medical-records",
+      "https://www.nnrhospital.com/medical-records#main-content",
+      "https://www.nnrhospital.com/patient-portal"
+    ]
+  },
+  {
+    "system_name": "State of Nevada Self-Help Center",
+    "state": "NV",
+    "domain": "selfhelp.nvcourts.gov",
+    "seed_urls": [
+      "https://selfhelp.nvcourts.gov/pro/medical-records",
+      "https://selfhelp.nvcourts.gov/pro/medical-records#mainContent",
+      "https://selfhelp.nvcourts.gov/pro/medical-records#navWrap",
+      "https://selfhelp.nvcourts.gov/pro/medical-records#docs",
+      "https://selfhelp.nvcourts.gov/pro/medical-records#forms",
+      "https://selfhelp.nvcourts.gov/pro/medical-records#file"
+    ]
+  },
+  {
+    "system_name": "VA Southern Nevada Health Care",
+    "state": "NV",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/southern-nevada-health-care/medical-records-office/",
+      "https://www.va.gov/southern-nevada-health-care/medical-records-office/#content",
+      "https://www.va.gov/resources/about-electronic-health-information-sharing-at-va/",
+      "https://www.va.gov/resources/about-reviewing-medical-records-online"
+    ]
+  },
+  {
+    "system_name": "Valley Health System, Las Vegas, NV",
+    "state": "NV",
+    "domain": "valleyhealthsystemlv.com",
+    "seed_urls": [
+      "https://www.valleyhealthsystemlv.com/patients-services/medical-records-request",
+      "https://www.valleyhealthsystemlv.com/patients-services/medical-records-request#skip-target",
+      "https://www.valleyhealthsystemlv.com/patients-services/medical-records-request#",
+      "https://www.valleyhealthsystemlv.com/sites/valleyhealthsystemlv.com/files/VHS_Authorization_for_Release_of_Protected_Health_Information%5B99%5D.pdf"
+    ]
+  }
+]

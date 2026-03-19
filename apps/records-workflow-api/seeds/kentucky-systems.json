@@ -1,0 +1,54 @@
+[
+  {
+    "system_name": "Baptist Health",
+    "state": "KY",
+    "domain": "baptisthealth.com",
+    "seed_urls": [
+      "https://www.baptisthealth.com/patients-visitors/after-your-visit/medical-records",
+      "https://www.baptisthealth.com/patients-visitors/after-your-visit/medical-records#main",
+      "https://www.baptisthealth.com/patients-visitors/after-your-visit/medical-records#nav",
+      "https://www.baptisthealth.com/patients-visitors/after-your-visit/medical-records#search-toggle-desktop",
+      "https://www.baptisthealth.com/patients-visitors/after-your-visit/medical-records#search-toggle-mobile",
+      "https://www.baptisthealth.com/mychart"
+    ]
+  },
+  {
+    "system_name": "Norton Healthcare",
+    "state": "KY",
+    "domain": "nortonhealthcare.com",
+    "seed_urls": [
+      "https://nortonhealthcare.com/patient-resources/medical-record-request/",
+      "https://nortonhealthcare.com/patient-resources/medical-record-request/#primary",
+      "https://nortonhealthcare.com/patient-resources/medical-record-request/#",
+      "https://nortonhealthcare.com/patient-resources/mynortonchart/",
+      "https://mychart.nortonhealthcare.org/mychart/",
+      "https://mychart.nortonhealthcare.org/"
+    ]
+  },
+  {
+    "system_name": "University Health Service (UHS)",
+    "state": "KY",
+    "domain": "ukhealthcare.uky.edu",
+    "seed_urls": [
+      "https://ukhealthcare.uky.edu/patients-visitors/patients/medical-records",
+      "https://ukhealthcare.uky.edu/patients-visitors/patients/medical-records#main-content",
+      "https://ukhealthcare.uky.edu/mychart",
+      "https://mychart.uky.edu/MyChart/Authentication/Login",
+      "https://mychart.uky.edu/MyChart/signup",
+      "https://mychart.uky.edu/"
+    ]
+  },
+  {
+    "system_name": "UofL Health",
+    "state": "KY",
+    "domain": "uoflhealth.org",
+    "seed_urls": [
+      "https://uoflhealth.org/patients-visitors/medical-records-requests/",
+      "https://uoflhealth.org/patients-visitors/patient-portal/",
+      "https://uoflhealth.org/patients-visitors/patient-portal",
+      "https://uoflhealth.org/wp-content/uploads/2025/06/ROI-Authorization-Form-9-20-24.pdf",
+      "https://uoflhealth.org/uofl-health-release-of-information-roi-form/",
+      "https://uoflhealth.org/uofl-health-release-of-information-roi-form-radiology-images/"
+    ]
+  }
+]

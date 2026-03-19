@@ -11,6 +11,7 @@ test('resolveSeedFilePath prefers explicit file, resolves states, and preserves 
 
   assert.match(resolveSeedFilePath({}), /seeds\/texas-systems\.json$/);
   assert.match(resolveSeedFilePath({ state: 'MA' }), /seeds\/massachusetts-systems\.json$/);
+  assert.match(resolveSeedFilePath({ state: 'AL' }), /seeds\/alabama-systems\.json$/);
   assert.match(
     resolveSeedFilePath({ state: 'MA', seedFilePath: 'seeds/custom-systems.json' }),
     /seeds\/custom-systems\.json$/

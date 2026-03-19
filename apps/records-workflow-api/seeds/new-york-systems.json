@@ -1,0 +1,41 @@
+[
+  {
+    "system_name": "NewYork-Presbyterian Hudson Valley Hospital",
+    "state": "NY",
+    "domain": "nyp.org",
+    "seed_urls": [
+      "https://www.nyp.org/patients-visitors/medical-records/contact-locations",
+      "https://www.nyp.org/patients-visitors/medical-records/contact-locations#nyp-main-content",
+      "https://www.nyp.org/patientportal",
+      "https://www.nyp.org/patients-visitors/medical-records/contact-locations#",
+      "https://www.nyp.org/patients-visitors/medical-records",
+      "https://www.nyp.org/patients-visitors/medical-records/medical-group-medical-records"
+    ]
+  },
+  {
+    "system_name": "Northwell Health",
+    "state": "NY",
+    "domain": "northwell.edu",
+    "seed_urls": [
+      "https://www.northwell.edu/manage-your-care/medical-records",
+      "https://www.northwell.edu/manage-your-care/medical-records#main-content",
+      "https://www.northwell.edu/manage-your-care/medical-records#search-nav",
+      "https://www.northwell.edu/patient-portal",
+      "https://www.northwell.edu/manage-your-care/medical-records#",
+      "https://www.northwell.edu/manage-your-care/medical-records#need-to-know"
+    ]
+  },
+  {
+    "system_name": "NYC Health + Hospitals",
+    "state": "NY",
+    "domain": "nychealthandhospitals.org",
+    "seed_urls": [
+      "https://www.nychealthandhospitals.org/medical-records/",
+      "https://mychart.nychealthandhospitals.org/MyChart/Authentication/Login",
+      "https://mychart.nychealthandhospitals.org/MyChart/accesscheck.asp",
+      "https://mychart.nychealthandhospitals.org/MyChart/app/release-of-information",
+      "https://www.nychealthandhospitals.org/medical-records/unique-circumstances",
+      "https://www.nychealthandhospitals.org/medical-records/request-for-access-to-patient-health-information/"
+    ]
+  }
+]

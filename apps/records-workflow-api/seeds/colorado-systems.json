@@ -1,0 +1,62 @@
+[
+  {
+    "system_name": "Boulder Community Health",
+    "state": "CO",
+    "domain": "bch.org",
+    "seed_urls": [
+      "https://www.bch.org/patient-visitors/patient-services/medical-records/",
+      "https://www.bch.org/patient-visitors/patient-services/mybch-patient-portal-epic-ehr/",
+      "https://www.bch.org/patient-visitors/patient-services/medical-records/#locations",
+      "https://www.bch.org/patient-visitors/patient-services/medical-records/#request",
+      "https://www.bch.org/patient-visitors/patient-services/medical-records/#privacy",
+      "https://www.bch.org/patient-visitors/patient-services/medical-records/#amend"
+    ]
+  },
+  {
+    "system_name": "Children's Hospital Colorado",
+    "state": "CO",
+    "domain": "childrenscolorado.org",
+    "seed_urls": [
+      "https://www.childrenscolorado.org/your-visit/medical-records/",
+      "https://www.childrenscolorado.org/your-visit/medical-records/#",
+      "https://www.childrenscolorado.org/your-visit/medical-records/#utility-contact",
+      "https://www.childrenscolorado.org/your-visit/medical-records/#utility-locations",
+      "https://mychart.childrenscolorado.org/MyChart/",
+      "https://www.childrenscolorado.org/your-visit/my-chart/"
+    ]
+  },
+  {
+    "system_name": "Colorado Health Network",
+    "state": "CO",
+    "domain": "coloradohealthnetwork.org",
+    "seed_urls": [
+      "https://coloradohealthnetwork.org/wp-content/uploads/2021/02/Clinical-Services-ROI-Signature-Required.pdf"
+    ]
+  },
+  {
+    "system_name": "Denver Health",
+    "state": "CO",
+    "domain": "denverhealth.org",
+    "seed_urls": [
+      "https://www.denverhealth.org/patients-visitors/medical-records/requesting-your-medical-records",
+      "https://www.denverhealth.org/patients-visitors/medical-records/requesting-your-medical-records#main-content",
+      "https://www.denverhealth.org/mychart",
+      "https://mychart.denverhealth.org/MyChart/",
+      "https://mychart.denverhealth.org/mychart/openscheduling/standalone?vt=21001,21002,21003,21004&dept=10203003,10204003,10205003,10206003,10231002,10208003,10202004,10207005,10227001,10305010,10309044,10202003,10305003,10207004,10202005,10302009,10207003,10229051,10305006,10202006,10204004,10205004,10231005,10207006,10309014,10305004,10229054,10229054,10247001",
+      "https://mychart.denverhealth.org/mychart/openscheduling/standalone?vt=21004&dept=10203003,10204003,10205003,10206003,10231002,10208003,10202004,10207005,10227001,10305010,10309044,10202003,10305003,10207004,10202005,10302009,10207003,10229051,10305006,10202006,10204004,10205004,10231005,10207006,10309014,10305004,10229054,10229054"
+    ]
+  },
+  {
+    "system_name": "List of Forms and Contact Details Required to Request Medical ...",
+    "state": "CO",
+    "domain": "getcodeshealth.com",
+    "seed_urls": [
+      "https://www.getcodeshealth.com/blogs/request-medical-records-colorado",
+      "https://www.getcodeshealth.com/blogs/request-medical-records-colorado#",
+      "https://www.getcodeshealth.com/blogs/request-medical-records-phoenix",
+      "https://www.getcodeshealth.com/blogs/request-medical-records-houston",
+      "https://www.getcodeshealth.com/blogs/request-medical-records-chicago",
+      "https://www.getcodeshealth.com/blogs/request-medical-records-los-angeles"
+    ]
+  }
+]

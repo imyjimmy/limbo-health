@@ -1,0 +1,43 @@
+[
+  {
+    "system_name": "Central Maine Healthcare",
+    "state": "ME",
+    "domain": "cmhc.org",
+    "seed_urls": [
+      "https://www.cmhc.org/patients-and-visitors/request-your-medical-records/",
+      "https://www.cmhc.org/patients-and-visitors/request-your-medical-records/#genesis-nav-primary",
+      "https://www.cmhc.org/patients-and-visitors/request-your-medical-records/#genesis-content",
+      "https://www.cmhc.org/patients-and-visitors/request-your-medical-records/#genesis-sidebar-primary",
+      "https://www.cmhc.org/patients-and-visitors/patient-portal/",
+      "https://www.cmhc.org/patients-visitors/patient-portal/"
+    ]
+  },
+  {
+    "system_name": "MaineHealth",
+    "state": "ME",
+    "domain": "mainehealth.org",
+    "seed_urls": [
+      "https://www.mainehealth.org/patients-visitors/medical-records"
+    ]
+  },
+  {
+    "system_name": "MaineGeneral",
+    "state": "ME",
+    "domain": "mainegeneral.org",
+    "seed_urls": [
+      "https://www.mainegeneral.org/patients-visitors/medical-records/"
+    ]
+  },
+  {
+    "system_name": "Northern Light Health",
+    "state": "ME",
+    "domain": "northernlighthealth.org",
+    "seed_urls": [
+      "https://northernlighthealth.org/HIM",
+      "https://northernlighthealth.org/myNorthernLightHealth/Home",
+      "https://northernlighthealth.org/getattachment/HIM/900090445-Authorization-to-Release-Healthcare-Information-10-1-25.pdf.aspx?lang=en-US",
+      "https://northernlighthealth.org/getattachment/HIM/23-106-Patient-Amendments-to-Health-Information-ATTACHMENT-Medical-Record-Amendment-Request-Interactive-Form-2-3-2026-(3).docx.aspx?lang=en-US",
+      "https://northernlighthealth.org/HIM/Health-Information-Management-at-Northern-Light-Ma"
+    ]
+  }
+]

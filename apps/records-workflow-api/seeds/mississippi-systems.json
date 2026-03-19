@@ -1,0 +1,97 @@
+[
+  {
+    "system_name": "Memorial Health System",
+    "state": "MS",
+    "domain": "wearememorial.com",
+    "seed_urls": [
+      "https://wearememorial.com/patients/medical-records/",
+      "https://wearememorial.com/patients/medical-records/#header",
+      "https://wearememorial.com/patients/medical-records/#content",
+      "https://wearememorial.com/patients/medical-records/#footer",
+      "https://wearememorial.com/patients/patient-portal/",
+      "https://wearememorial.com/patients/medical-records/#"
+    ]
+  },
+  {
+    "system_name": "Merit Health",
+    "state": "MS",
+    "domain": "merithealthriveroaks.com",
+    "seed_urls": [
+      "https://www.merithealthriveroaks.com/request-medical-records",
+      "https://www.merithealthriveroaks.com/merit-river-oaks/hospital-patient-portal.aspx",
+      "https://www.merithealthriveroaks.com/merit-river-oaks/request-medical-records.aspx",
+      "https://www.merithealthriveroaks.com/hospital-patient-portal",
+      "https://www.merithealthriveroaks.com/patient-portal-faq",
+      "https://www.merithealthriveroaks.com/request-medical-records#"
+    ]
+  },
+  {
+    "system_name": "Mississippi Authority for Release of Medical Information",
+    "state": "MS",
+    "domain": "uslegalforms.com",
+    "seed_urls": [
+      "https://www.uslegalforms.com/forms/ms-spec-00426/authority-for-release-of-medical-information",
+      "https://www.uslegalforms.com/forms/ms-spec-00460-1/medical-consent-for-release-of-information",
+      "https://www.uslegalforms.com/forms/ms-spec-01505bg/hipaa-health-insurance-portability-and",
+      "https://www.uslegalforms.com/forms/ms-spec-1340759bg/authorization-for-release-of-information"
+    ]
+  },
+  {
+    "system_name": "Mississippi Medical Release Form",
+    "state": "MS",
+    "domain": "opendocs.com",
+    "seed_urls": [
+      "https://opendocs.com/wp-content/uploads/Mississippi-Medical-Release-Form.pdf"
+    ]
+  },
+  {
+    "system_name": "North Mississippi Health Services",
+    "state": "MS",
+    "domain": "nmhs.net",
+    "seed_urls": [
+      "https://www.nmhs.net/Patients-and-Visitors/Patient-Information/Medical-Records-Request",
+      "https://www.nmhs.net/Patients-and-Visitors/Patient-Information/myConnection",
+      "https://apps.apple.com/us/app/mychart/id382952264",
+      "https://play.google.com/store/apps/details?id=epic.mychart.android&pcampaignid=web_share",
+      "https://www.nmhs.net/Health-Information-Privacy"
+    ]
+  },
+  {
+    "system_name": "Singing River Health System",
+    "state": "MS",
+    "domain": "singingriverhealthsystem.com",
+    "seed_urls": [
+      "https://singingriverhealthsystem.com/patients-and-visitors/billing-and-records/medical-records-request/",
+      "https://singingriverhealthsystem.com/patients-and-visitors/billing-and-records/medical-records-request/#js-wrapper-inner",
+      "https://mychart.mysrhs.com/mychart/Authentication/Login?",
+      "https://singingriverhealthsystem.com/wp-content/uploads/2019/11/Medical-Records-Request-Form.pdf",
+      "https://singingriverhealthsystem.com/patients-and-visitors/billing-and-records/medical-records-request/#"
+    ]
+  },
+  {
+    "system_name": "St. Dominic Health",
+    "state": "MS",
+    "domain": "fmolhs.org",
+    "seed_urls": [
+      "https://www.fmolhs.org/locations/greater-jackson/st-dominic-health-patients-and-guests/medical-records",
+      "https://www.fmolhs.org/locations/greater-jackson/st-dominic-health-patients-and-guests/medical-records#hero-content",
+      "https://www.fmolhs.org/patients-guests/patients-resources/mychart",
+      "https://www.fmolhs.org/locations/greater-jackson/st-dominic-health-patients-and-guests/medical-records#",
+      "https://www.fmolhs.org/-/media/files/consent-for-release-of-information-sdhim768_02_2020_03_05.pdf",
+      "https://mychart.fmolhs.org/MyChart/Authentication/Login?"
+    ]
+  },
+  {
+    "system_name": "University of Mississippi Medical Center",
+    "state": "MS",
+    "domain": "umc.edu",
+    "seed_urls": [
+      "https://www.umc.edu/Healthcare/Patients-and-Visitors/Request-Medical-Records.html",
+      "https://www.umc.edu/Healthcare/Patients-and-Visitors/Request-Medical-Records.html#content-anchor",
+      "https://www.umc.edu/mychart",
+      "https://www.umc.edu/mychart/",
+      "https://www.umc.edu/Healthcare/Patients-and-Visitors/MyChart.html",
+      "https://www.umc.edu/Healthcare/Patients-and-Visitors/Release-Form.html"
+    ]
+  }
+]

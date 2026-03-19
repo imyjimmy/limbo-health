@@ -2,20 +2,29 @@ import fs from 'node:fs/promises';
 import { config, resolveFromServiceRoot } from '../config.js';
 import { withTransaction } from '../db.js';
 import {
+  findHospitalSystemByDomain,
+  findHospitalSystemByFacilityIdentity,
   upsertFacility,
   upsertHospitalSystem,
   upsertSeedUrl
 } from '../repositories/workflowRepository.js';
-import { normalizeStateCode } from '../utils/states.js';
+import { getStateName, normalizeStateCode } from '../utils/states.js';
 
-export const STATE_SEED_FILES = {
-  TX: 'seeds/texas-systems.json',
-  MA: 'seeds/massachusetts-systems.json',
-  NH: 'seeds/new-hampshire-systems.json',
-  RI: 'seeds/rhode-island-systems.json',
-  DE: 'seeds/delaware-systems.json',
-  VT: 'seeds/vermont-systems.json'
-};
+export function buildStateSeedRelativePath(state) {
+  const normalizedState = normalizeStateCode(state);
+  const stateName = getStateName(normalizedState);
+
+  if (!normalizedState || !stateName) {
+    throw new Error(`No seed file configured for state: ${state}`);
+  }
+
+  const slug = stateName
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return `seeds/${slug}-systems.json`;
+}
 
 function inferSeedType(url) {
   if (/mychart|myhealthone|mybilh|mytuftsmed|mybaystate|mychildren|portal|gateway/i.test(url)) {
@@ -49,10 +58,7 @@ export function resolveSeedFilePath(input = {}) {
   }
 
   if (state) {
-    const mapped = STATE_SEED_FILES[state];
-    if (!mapped) {
-      throw new Error(`No seed file configured for state: ${state}`);
-    }
+    const mapped = buildStateSeedRelativePath(state);
     return resolveFromServiceRoot(mapped, mapped);
   }
 
@@ -69,8 +75,10 @@ async function readSeedFile(input = {}) {
   return parsed;
 }
 
-export async function reseedFromFile(input = {}) {
-  const systems = await readSeedFile(input);
+export async function reseedSystems(systems = []) {
+  if (!Array.isArray(systems)) {
+    throw new Error('systems must be an array');
+  }
 
   const summary = {
     systems: 0,
@@ -80,11 +88,30 @@ export async function reseedFromFile(input = {}) {
 
   for (const system of systems) {
     await withTransaction(async (client) => {
+      const normalizedState = normalizeStateCode(system.state) || 'TX';
+      const candidateFacilities = (system.facilities || []).map((facility) => ({
+        facilityName: facility.facility_name,
+        city: facility.city || null,
+        state: normalizeStateCode(facility.state) || normalizedState
+      }));
+
+      const matchedByDomain = system.domain
+        ? await findHospitalSystemByDomain({ domain: system.domain, state: normalizedState }, client)
+        : null;
+      const matchedByFacility =
+        matchedByDomain ||
+        (candidateFacilities.length > 0
+          ? await findHospitalSystemByFacilityIdentity(
+              { state: normalizedState, facilities: candidateFacilities },
+              client
+            )
+          : null);
+
       const upserted = await upsertHospitalSystem(
         {
-          systemName: system.system_name,
+          systemName: matchedByDomain?.system_name || matchedByFacility?.system_name || system.system_name,
           domain: system.domain,
-          state: normalizeStateCode(system.state) || 'TX'
+          state: normalizedState
         },
         client
       );
@@ -98,7 +125,7 @@ export async function reseedFromFile(input = {}) {
             hospitalSystemId: upserted.id,
             facilityName: facility.facility_name,
             city: facility.city || null,
-            state: normalizeStateCode(facility.state) || 'TX',
+            state: normalizeStateCode(facility.state) || normalizedState,
             facilityType: facility.facility_type || null,
             facilityPageUrl: facility.facility_page_url || null,
             externalFacilityId: facility.external_facility_id || null
@@ -116,7 +143,7 @@ export async function reseedFromFile(input = {}) {
             hospitalSystemId: upserted.id,
             facilityName: system.system_name,
             city: null,
-            state: normalizeStateCode(system.state) || 'TX',
+            state: normalizedState,
             facilityType: 'system_default',
             facilityPageUrl: null,
             externalFacilityId: null
@@ -153,4 +180,9 @@ export async function reseedFromFile(input = {}) {
   }
 
   return summary;
+}
+
+export async function reseedFromFile(input = {}) {
+  const systems = await readSeedFile(input);
+  return reseedSystems(systems);
 }

@@ -1,0 +1,70 @@
+[
+  {
+    "system_name": "MultiCare",
+    "state": "WA",
+    "domain": "multicare.org",
+    "seed_urls": [
+      "https://www.multicare.org/patient-resources/medical-records/",
+      "https://mychart.multicare.org/mymulticare/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Providence Washington",
+    "state": "WA",
+    "domain": "providence.org",
+    "seed_urls": [
+      "https://www.providence.org/about/medical-records-authorization/medical-records-wa"
+    ]
+  },
+  {
+    "system_name": "UW Medicine",
+    "state": "WA",
+    "domain": "uwmedicine.org",
+    "seed_urls": [
+      "https://www.uwmedicine.org/patient-resources/access-medical-records-images"
+    ]
+  },
+  {
+    "system_name": "Virginia Mason Franciscan Health",
+    "state": "WA",
+    "domain": "vmfh.org",
+    "seed_urls": [
+      "https://www.vmfh.org/patient-and-visitor-information/patient-information/requesting-medical-records"
+    ]
+  },
+  {
+    "system_name": "Seattle Children's",
+    "state": "WA",
+    "domain": "seattlechildrens.org",
+    "seed_urls": [
+      "https://www.seattlechildrens.org/clinics/health-info-management/",
+      "https://mychart.seattlechildrens.org/MyChart/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Overlake Medical Center & Clinics",
+    "state": "WA",
+    "domain": "overlakehospital.org",
+    "seed_urls": [
+      "https://www.overlakehospital.org/visit/medical-records",
+      "https://www.overlakehospital.org/sites/default/files/inline-files/Medical%20Records%20Authorization%20for%20Disclosure.pdf"
+    ]
+  },
+  {
+    "system_name": "PeaceHealth Washington",
+    "state": "WA",
+    "domain": "peacehealth.org",
+    "seed_urls": [
+      "https://www.peacehealth.org/about-us/medical-records",
+      "https://www.peacehealth.org/hospitals/st-joseph-medical-center"
+    ]
+  },
+  {
+    "system_name": "Washington State Hospitals",
+    "state": "WA",
+    "domain": "dshs.wa.gov",
+    "seed_urls": [
+      "https://www.dshs.wa.gov/bha/division-state-hospitals/medical-records"
+    ]
+  }
+]

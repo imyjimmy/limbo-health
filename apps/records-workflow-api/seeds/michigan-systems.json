@@ -1,0 +1,54 @@
+[
+  {
+    "system_name": "MyMichigan Health",
+    "state": "MI",
+    "domain": "mymichigan.org",
+    "seed_urls": [
+      "https://www.mymichigan.org/patients-visitors/patient-information/medical-records/",
+      "https://www.mymichigan.org/patients-visitors/patient-information/medical-records/#Content",
+      "https://my.midmichigan.net/",
+      "https://my.midmichigan.net/mychart/openscheduling/?serviceareas=10",
+      "https://www.mymichigan.org/mychart/",
+      "https://www.mymichigan.org/app/files/public/4abbbbb4-2aea-4bdb-8a43-f095673838ac/EMR00060-Release-Protected-Health-Information.pdf"
+    ]
+  },
+  {
+    "system_name": "Trinity Health Michigan",
+    "state": "MI",
+    "domain": "trinityhealthmichigan.org",
+    "seed_urls": [
+      "https://www.trinityhealthmichigan.org/tools-and-resources/medical-records",
+      "https://www.trinityhealthmichigan.org/tools-and-resources/medical-records#block-hg-webdv-child-content",
+      "https://www.trinityhealthmichigan.org/mychart",
+      "https://www.trinityhealthmichigan.org/tools-and-resources/medical-records#",
+      "https://www.trinityhealthmichigan.org/sites/default/files/hg_features/mercury_standard_layout/3055f5b49819a7af41e3060e9b8a5689.pdf",
+      "https://www.trinityhealthmichigan.org/sites/default/files/hg_features/mercury_standard_layout/b48037e7c9b8d9fe07e05fec3fdd850f.pdf"
+    ]
+  },
+  {
+    "system_name": "UM Health-Sparrow",
+    "state": "MI",
+    "domain": "uofmhealthsparrow.org",
+    "seed_urls": [
+      "https://www.uofmhealthsparrow.org/patient-resources/medical-records",
+      "https://www.uofmhealthsparrow.org/patient-resources/medical-records#main-content",
+      "https://mychart.sparrow.org/MyChart/GuestEstimates",
+      "https://www.uofmhealthsparrow.org/patient-resources/medical-records#paragraph-st-stripe-id-301236",
+      "https://www.uofmhealthsparrow.org/patient-resources/medical-records#paragraph-st-stripe-id-301251",
+      "https://www.uofmhealthsparrow.org/patient-resources/medical-records#paragraph-st-stripe-id-95726"
+    ]
+  },
+  {
+    "system_name": "University of Michigan Health-West",
+    "state": "MI",
+    "domain": "uofmhealthwest.org",
+    "seed_urls": [
+      "https://uofmhealthwest.org/patients-visitors/obtain-medical-records/",
+      "https://uofmhealthwest.org/patients-visitors/obtain-medical-records/#content",
+      "https://uofmhealthwest.org/patients-visitors/mychart/",
+      "https://mychart.metrohealth.net/mychart/guestestimates#new_tab",
+      "https://uofmhealthwest.org/patients-visitors/healthwise-health-information/",
+      "https://mychart.metrohealth.net/mychart/recoverlogin.asp"
+    ]
+  }
+]

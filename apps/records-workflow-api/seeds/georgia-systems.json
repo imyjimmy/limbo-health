@@ -1,0 +1,50 @@
+[
+  {
+    "system_name": "Appling Healthcare",
+    "state": "GA",
+    "domain": "ahcs.org",
+    "seed_urls": [
+      "https://ahcs.org/requesting-your-medical-records/",
+      "https://ahcs.org/patient-portal/",
+      "https://www.ahcs.org/patient-portal/",
+      "https://ahcs.org/wp-content/uploads/2026/02/UPDATED-HIM-MROI-2.pdf"
+    ]
+  },
+  {
+    "system_name": "Medical Records Requests at Emory Healthcare",
+    "state": "GA",
+    "domain": "emoryhealthcare.org",
+    "seed_urls": [
+      "https://www.emoryhealthcare.org/patients-visitors/medical-records",
+      "https://www.emoryhealthcare.org/patients-visitors/medical-records#header",
+      "https://www.emoryhealthcare.org/patients-visitors/medical-records#content",
+      "https://www.emoryhealthcare.org/patients-visitors/medical-records#footer",
+      "https://www.emoryhealthcare.org/patients-visitors/patient-resources/patient-portal",
+      "https://www.emoryhealthcare.org/-/media/Project/EH/Emory/ui/pdfs/medical-records/authorization-form-revised-english-2-2026.pdf"
+    ]
+  },
+  {
+    "system_name": "Northeast Georgia Health System",
+    "state": "GA",
+    "domain": "nghs.com",
+    "seed_urls": [
+      "https://www.nghs.com/medical-records",
+      "https://www.nghs.com/medical-records#content",
+      "https://www.nghs.com/mychart-info",
+      "https://mychart.nghs.com/mychart/Authentication/Login",
+      "https://mychart.nghs.com/mychart/app/activation",
+      "https://www.nghs.com/wp-content/uploads/2025/03/ROI-English.pdf"
+    ]
+  },
+  {
+    "system_name": "VA Atlanta Health Care",
+    "state": "GA",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/atlanta-health-care/medical-records-office/",
+      "https://www.va.gov/atlanta-health-care/medical-records-office/#content",
+      "https://www.va.gov/resources/about-electronic-health-information-sharing-at-va/",
+      "https://www.va.gov/resources/about-reviewing-medical-records-online"
+    ]
+  }
+]

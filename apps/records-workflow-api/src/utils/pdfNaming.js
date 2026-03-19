@@ -46,6 +46,8 @@ const PHRASE_PATTERNS = [
   /\b((?:proxy access request(?:\s*(?:and|&)\s*authorization form)?)|(?:request(?:\s*(?:and|&)\s*authorization form)? for proxy access))/i,
   /\b(consent for patient portal access)\b/i,
   /\b(patient request for health information)/i,
+  /\b(patient request for access to designated record set)/i,
+  /\b(patient request to amend a designated record set)/i,
   /\b(patient request to have medical records transferred)/i,
   /\b(patient right to access request for medical records)/i,
   /\b(request for health information)/i,
@@ -178,33 +180,47 @@ function extractPhraseFromSource(value) {
   return null;
 }
 
-export function detectDocumentLanguageCode({ url = '', title = '', text = '' }) {
-  const haystack = `${url} ${title} ${text}`.toLowerCase();
+export function detectDocumentLanguageCode({ url = '', title = '', headerText = '', text = '' }) {
+  const priorityHaystack = collapseWhitespace(`${url} ${title} ${headerText}`).toLowerCase();
+  const bodyHaystack = text.toLowerCase();
 
-  if (
-    /\bportuguese\b/.test(haystack) ||
-    /\bportugu[eê]s\b/.test(haystack) ||
-    /\bautoriza[cç][aã]o\b/.test(haystack) ||
-    /\bdivulga[cç][aã]o\b/.test(haystack) ||
-    /\binforma[cç][oõ]es(?:\s+m[eé]dicas?)?\b/.test(haystack) ||
-    /\bsa[úu]de\b/.test(haystack)
-  ) {
-    return 'PT';
+  const detectExplicitLanguageCode = (haystack) => {
+    if (
+      /\bportuguese\b/.test(haystack) ||
+      /\bportugu[eê]s\b/.test(haystack) ||
+      /\bautoriza[cç][aã]o\b/.test(haystack) ||
+      /\bdivulga[cç][aã]o\b/.test(haystack) ||
+      /\binforma[cç][oõ]es(?:\s+m[eé]dicas?)?\b/.test(haystack) ||
+      /\bsa[úu]de\b/.test(haystack)
+    ) {
+      return 'PT';
+    }
+
+    if (
+      /\bspanish\b/.test(haystack) ||
+      /\bespanol\b/.test(haystack) ||
+      /\bespa[nñ]ol\b/.test(haystack) ||
+      /\bautorizaci[oó]n\b/.test(haystack) ||
+      /\bdivulgaci[oó]n\b/.test(haystack) ||
+      /\binformaci[oó]n m[eé]dica\b/.test(haystack) ||
+      /\bregistros? m[eé]dicos?\b/.test(haystack)
+    ) {
+      return 'ES';
+    }
+
+    return null;
+  };
+
+  const priorityLanguageCode = detectExplicitLanguageCode(priorityHaystack);
+  if (priorityLanguageCode) {
+    return priorityLanguageCode;
   }
 
-  if (
-    /\bspanish\b/.test(haystack) ||
-    /\bespanol\b/.test(haystack) ||
-    /\bespa[nñ]ol\b/.test(haystack) ||
-    /\bautorizaci[oó]n\b/.test(haystack) ||
-    /\bdivulgaci[oó]n\b/.test(haystack) ||
-    /\binformaci[oó]n m[eé]dica\b/.test(haystack) ||
-    /\bregistros? m[eé]dicos?\b/.test(haystack)
-  ) {
-    return 'ES';
+  if (/[a-zà-ÿ]/i.test(priorityHaystack)) {
+    return 'EN';
   }
 
-  return 'EN';
+  return detectExplicitLanguageCode(bodyHaystack) || 'EN';
 }
 
 function buildHeaderPhraseSource(headerLines = [], headerText = '') {
@@ -354,7 +370,8 @@ export function buildMedicalRecordsPdfFilenameStem({
   const languageCode = detectDocumentLanguageCode({
     url,
     title,
-    text: collapseWhitespace(`${normalizedHeaderText} ${text}`)
+    headerText: normalizedHeaderText,
+    text
   });
   const phrase =
     extractDescriptivePdfPhrase({

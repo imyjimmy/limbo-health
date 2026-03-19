@@ -1,0 +1,71 @@
+[
+  {
+    "system_name": "Blue Mountain Hospital",
+    "state": "UT",
+    "domain": "bmhutah.org",
+    "seed_urls": [
+      "https://www.bmhutah.org/patients-visitors/medical-records/",
+      "https://www.bmhutah.org/documents/content/Newest-with-instructions.pdf",
+      "https://www.bmhutah.org/documents/content/To-BMH.pdf"
+    ]
+  },
+  {
+    "system_name": "Castleview Hospital",
+    "state": "UT",
+    "domain": "castleviewhospital.net",
+    "seed_urls": [
+      "https://www.castleviewhospital.net/medical-records",
+      "https://www.castleviewhospital.net/patient-portal"
+    ]
+  },
+  {
+    "system_name": "Intermountain Healthcare",
+    "state": "UT",
+    "domain": "intermountainhealthcare.org",
+    "seed_urls": [
+      "https://intermountainhealthcare.org/for-patients/medical-records",
+      "https://intermountainhealthcare.org/for-patients/medical-records/utah-idaho",
+      "https://mychart.intermountainhealth.org/"
+    ]
+  },
+  {
+    "system_name": "MountainStar Healthcare",
+    "state": "UT",
+    "domain": "mountainstar.com",
+    "seed_urls": [
+      "https://www.mountainstar.com/locations/lakeview-hospital/for-patients/medical-records",
+      "https://www.mountainstar.com/patient-resources/patient-rights-and-responsibilities",
+      "https://www.myhealthone.net/mh1/public/mh1"
+    ]
+  },
+  {
+    "system_name": "University of Utah Health",
+    "state": "UT",
+    "domain": "healthcare.utah.edu",
+    "seed_urls": [
+      "https://healthcare.utah.edu/patient-family-services/medical-records-information-release",
+      "https://mychart.med.utah.edu/mychart/Authentication/Login",
+      "https://healthcare.utah.edu/media/16446"
+    ]
+  },
+  {
+    "system_name": "CommonSpirit Holy Cross Hospitals",
+    "state": "UT",
+    "domain": "mountain.commonspirit.org",
+    "seed_urls": [
+      "https://www.mountain.commonspirit.org/patient-tools/medical-records",
+      "https://www.commonspirit.org/patient-resources/medical-records"
+    ]
+  },
+  {
+    "system_name": "Utah State Hospital Access to Records Request Form",
+    "state": "UT",
+    "domain": "ush.utah.gov",
+    "seed_urls": [
+      "https://ush.utah.gov/medical-records/",
+      "https://ush.utah.gov/wp-content/uploads/Access-to-Records-Request-Form-3-19.pdf",
+      "https://ush.utah.gov/wp-content/uploads/Authorization-Form-3-19.pdf",
+      "https://ush.utah.gov/wp-content/uploads/Access-to-Deceased-Individuals-Records-Request-Form-3-19.pdf"
+    ]
+  }
+]

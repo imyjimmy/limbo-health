@@ -1,0 +1,65 @@
+[
+  {
+    "system_name": "Altru Health System",
+    "state": "ND",
+    "domain": "altru.org",
+    "seed_urls": [
+      "https://www.altru.org/patients-visitors/medical-records/north-dakota-health-information-network",
+      "https://www.altru.org/patients-visitors/medical-records/north-dakota-health-information-network#main-content",
+      "https://mychart.altru.org/myhealth/",
+      "https://www.altru.org/patients-visitors/medical-records",
+      "https://mychart.altru.org/myhealth/Authentication/Login?",
+      "https://www.altru.org/patients-visitors/medical-records/north-dakota-health-information-network#"
+    ]
+  },
+  {
+    "system_name": "CHI Health",
+    "state": "ND",
+    "domain": "chihealth.com",
+    "seed_urls": [
+      "https://www.chihealth.com/patients-visitors/medical-records",
+      "https://www.chihealth.com/patients-visitors/medical-records#maincontent",
+      "https://mychart.chihealth.com/prd/Authentication/Login",
+      "https://www.chihealth.com/patients-visitors/medical-records#",
+      "https://www.chihealth.com/content/dam/chihealthcom/documents/patients-and-visitors/medical-records/medical-records-release-english.pdf",
+      "https://www.chihealth.com/content/dam/chihealthcom/documents/patients-and-visitors/medical-records/Authorization%20for%20Use%20or%20Disclosure%20of%20_%20Access%20to%20Protected%20Health%20Information%20-%20(Spanish)%20-%20Form.pdf"
+    ]
+  },
+  {
+    "system_name": "CHI Mercy Health",
+    "state": "ND",
+    "domain": "mercyhospitalvalleycity.org",
+    "seed_urls": [
+      "https://www.mercyhospitalvalleycity.org/release-of-information/",
+      "https://www.mercyhospitalvalleycity.org/release-of-information/#",
+      "https://www.mercyhospitalvalleycity.org/wp-content/uploads/2022/06/Release-of-Information-Form.pdf",
+      "https://www.mercyhospitalvalleycity.org/wp-content/uploads/2024/06/CommonSpirit-Health_Patient-Access-to-Their-PHI-Form-Lisbon-5.28.21.pdf"
+    ]
+  },
+  {
+    "system_name": "CHI St. Alexius Health",
+    "state": "ND",
+    "domain": "chistalexiushealth.org",
+    "seed_urls": [
+      "https://www.chistalexiushealth.org/patients-and-visitors/medical-records",
+      "https://www.chistalexiushealth.org/patients-and-visitors/medical-records#maincontent",
+      "https://www.chistalexiushealth.org/patients-and-visitors/medical-records#",
+      "https://www.chistalexiushealth.org/patients-and-visitors/patient-portals",
+      "https://www.chistalexiushealth.org/content/dam/stalexiushealthorg/documents/patients-visitors/medical-records/AuthorizedforReleaseofInformation_forfamilymember.pdf",
+      "https://www.chistalexiushealth.org/content/dam/stalexiushealthorg/documents/patients-visitors/medical-records/ReleaseofPersonalRecords.pdf"
+    ]
+  },
+  {
+    "system_name": "Sanford Health",
+    "state": "ND",
+    "domain": "sanfordhealth.org",
+    "seed_urls": [
+      "https://www.sanfordhealth.org/patients-and-visitors/patient-information/release-of-information",
+      "https://www.sanfordhealth.org/patients-and-visitors/patient-information/release-of-information#main-content",
+      "https://www.sanfordhealth.org/patients-and-visitors/patient-information/release-of-information#",
+      "https://www.mysanfordchart.org/mychart/",
+      "https://www.mysanfordchart.org/MyChart/Authentication/Login?postloginurl=documents%2freleased%3ffrom%3dlandingpage&litemode=true",
+      "https://www.sanfordhealth.org/-/media/org/files/patients-and-visitors/release-of-information/roi-authorization.pdf"
+    ]
+  }
+]

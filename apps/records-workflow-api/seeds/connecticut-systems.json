@@ -1,0 +1,128 @@
+[
+  {
+    "system_name": "Connecticut Children's",
+    "state": "CT",
+    "domain": "connecticutchildrens.org",
+    "seed_urls": [
+      "https://www.connecticutchildrens.org/patients-families/medical-records",
+      "https://www.connecticutchildrens.org/patients-families/medical-records#main-content",
+      "https://www.connecticutchildrens.org/mychart",
+      "https://www.connecticutchildrens.org/patients-families/medical-records#",
+      "https://www.connecticutchildrens.org/sites/default/files/2025-05/authorization-for-release-of-protected-health-information-english-pc-18-367.pdf",
+      "https://www.connecticutchildrens.org/sites/default/files/2025-05/authorization-for-release-of-protected-health-information-spanish-pc-18-367.pdf"
+    ]
+  },
+  {
+    "system_name": "Hartford HealthCare",
+    "state": "CT",
+    "domain": "hartfordhealthcare.org",
+    "seed_urls": [
+      "https://hartfordhealthcare.org/patients-visitors/patients/medical-records",
+      "https://hartfordhealthcare.org/mychart",
+      "https://mychartplus.org/MyChart/scheduling/onmyway/?selrfvid=82799&depid=104080001,101194001,101195001,104079001,111104001",
+      "https://mychartplus.org/MyChart/scheduling/onmyway/?selrfvid=82799&depid=101057055",
+      "https://mychartplus.org/MyChart/scheduling/onmyway/?selrfvid=82802",
+      "https://hartfordhealthcare.org/patients-visitors/patients/medical-records#"
+    ]
+  },
+  {
+    "system_name": "Hartford HealthCare",
+    "state": "CT",
+    "domain": "hartfordhealthcaremedicalgroup.org",
+    "seed_urls": [
+      "https://hartfordhealthcaremedicalgroup.org/patient-resources/medical-records",
+      "https://hartfordhealthcare.org/mychart",
+      "https://mychartplus.org/MyChart/scheduling/onmyway/?selrfvid=82799&depid=104080001,101194001,101195001,104079001,111104001",
+      "https://mychartplus.org/MyChart/scheduling/onmyway/?selrfvid=82799&depid=101057055",
+      "https://mychartplus.org/MyChart/scheduling/onmyway/?selrfvid=82802",
+      "https://hartfordhealthcaremedicalgroup.org/patient-resources/medical-records#"
+    ]
+  },
+  {
+    "system_name": "Hartford Hospital",
+    "state": "CT",
+    "domain": "hartfordhospital.org",
+    "seed_urls": [
+      "https://hartfordhospital.org/patients-and-visitors/for-patients/medical-records",
+      "https://hartfordhospital.org/patient-portal",
+      "https://hartfordhospital.org/patients-and-visitors/for-patients/medical-records/medical-records",
+      "https://hartfordhospital.org/patients-and-visitors/for-visitors/medical-records/medical-records",
+      "https://hartfordhospital.org/patients-and-visitors/for-patients/medical-records#"
+    ]
+  },
+  {
+    "system_name": "The Hospital of Central Connecticut",
+    "state": "CT",
+    "domain": "thocc.org",
+    "seed_urls": [
+      "https://thocc.org/patients-visitors/patients/medical-records",
+      "https://thocc.org/mychartplus",
+      "https://thocc.org/patients-visitors/patients/medical-records/medical-records",
+      "https://thocc.org/patients-visitors/patients/medical-records#"
+    ]
+  },
+  {
+    "system_name": "Trinity Health Of New England",
+    "state": "CT",
+    "domain": "trinityhealthofne.org",
+    "seed_urls": [
+      "https://www.trinityhealthofne.org/for-patients/request-medical-records",
+      "https://www.trinityhealthofne.org/for-patients/request-medical-records#block-hg-webdv-child-content",
+      "https://www.trinityhealthofne.org/mychart",
+      "https://www.trinityhealthofne.org/for-patients/request-medical-records#",
+      "https://www.trinityhealthofne.org/mychart/patient-rights-and-responsibilities",
+      "https://www.trinityhealthofne.org/for-patients/medical-records-contact-us"
+    ]
+  },
+  {
+    "system_name": "UConn Health",
+    "state": "CT",
+    "domain": "uconnhealth.org",
+    "seed_urls": [
+      "https://www.uconnhealth.org/patients-visitors/patient-resources",
+      "https://www.uconnhealth.org/patients-visitors/mychart-patient-portal",
+      "https://www.uconnhealth.org/patients-visitors/patient-resources/request-medical-dental-imaging-records",
+      "https://mychart.uconn.edu/MyChart/Authentication/Login?",
+      "https://www.uconnhealth.org/-/media/uch-consumer/consumer-files/patient-and-visitors/medical-records/hch-901-consent-and-conditions-of-treatment-february-2024.pdf"
+    ]
+  },
+  {
+    "system_name": "UConn Health",
+    "state": "CT",
+    "domain": "health.uconn.edu",
+    "seed_urls": [
+      "https://health.uconn.edu/search/medical+records",
+      "https://health.uconn.edu/plan-your-visit/patient-resources/medical-records-health-information-management",
+      "https://health.uconn.edu/access-mychart/visit-notes",
+      "https://health.uconn.edu/access-mychart/telemedicine-resources",
+      "https://health.uconn.edu/access-mychart",
+      "https://www.uconnhealth.org/patients-visitors/mychart-patient-portal"
+    ]
+  },
+  {
+    "system_name": "Waterbury Hospital Medical Records",
+    "state": "CT",
+    "domain": "waterburyhospital.org",
+    "seed_urls": [
+      "https://www.waterburyhospital.org/patients-and-visitors/your-medical-records/waterbury-hospital-medical-records/",
+      "https://www.waterburyhospital.org/patients-and-visitors/your-medical-records/waterbury-hospital-medical-records/#main",
+      "https://www.waterburyhospital.org/link/5b7c1da31f5246a9920455b953f0edfe.aspx",
+      "https://www.waterburyhospital.org/link/f4b8e23c0a084c59bfb4a08db2abe270.aspx",
+      "https://www.waterburyhospital.org/patients-and-visitors/your-medical-records/",
+      "https://www.waterburyhospital.org/globalassets/waterbury/patient-and-visitor/authorization-to-disclose-health-information-2016.docx"
+    ]
+  },
+  {
+    "system_name": "Yale New Haven Health",
+    "state": "CT",
+    "domain": "ynhhs.org",
+    "seed_urls": [
+      "https://www.ynhhs.org/online-tools/Request-Medical-Records",
+      "https://www.ynhhs.org/online-tools/Request-Medical-Records#main",
+      "https://mychart.ynhhs.org/MyChart-PRD/",
+      "https://mychart.ynhhs.org/",
+      "https://mychart.ynhhs.org/MyChart-PRD/Billing/Summary",
+      "https://mychart.ynhhs.org/MyChart-PRD/Authentication/Login"
+    ]
+  }
+]

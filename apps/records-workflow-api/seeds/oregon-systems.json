@@ -1,0 +1,35 @@
+[
+  {
+    "system_name": "Oregon State Hospital",
+    "state": "OR",
+    "domain": "oregon.gov",
+    "seed_urls": [
+      "https://www.oregon.gov/OHA/OSH/Pages/Medical-Records-Request.aspx",
+      "https://www.oregon.gov/OHA/OSH/Pages/Medical-Records-Request.aspx#main"
+    ]
+  },
+  {
+    "system_name": "Legacy Health",
+    "state": "OR",
+    "domain": "legacyhealth.org",
+    "seed_urls": [
+      "https://www.legacyhealth.org/patients-and-visitors/about-your-care/medical-records"
+    ]
+  },
+  {
+    "system_name": "OHSU Health",
+    "state": "OR",
+    "domain": "ohsu.edu",
+    "seed_urls": [
+      "https://www.ohsu.edu/health/medical-records"
+    ]
+  },
+  {
+    "system_name": "St. Anthony Hospital",
+    "state": "OR",
+    "domain": "sahpendleton.org",
+    "seed_urls": [
+      "https://www.sahpendleton.org/patients-and-visitors/medical-records"
+    ]
+  }
+]

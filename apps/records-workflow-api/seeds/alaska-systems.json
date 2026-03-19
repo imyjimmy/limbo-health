@@ -1,0 +1,39 @@
+[
+  {
+    "system_name": "Alaska Native Medical Center",
+    "state": "AK",
+    "domain": "anmc.org",
+    "seed_urls": [
+      "https://anmc.org/contact-us/health-records-request/",
+      "https://anmc.org/contact-us/health-records-request/#",
+      "https://anmc.org/files/HIPPA-Authorization_Fillable_FINAL.pdf",
+      "https://anmc.org/files/Request-for-Amendment-to-Health-Record_2-17-21.pdf",
+      "http://anmc.org/files/Revocation-of-Authorization-for-Disclosure-of-Health-Information.pdf",
+      "http://anmc.org/files/Accounting-of-Disclosure-of-Protected-Health-Information.pdf"
+    ]
+  },
+  {
+    "system_name": "Alaska Regional Hospital",
+    "state": "AK",
+    "domain": "alaskaregional.com",
+    "seed_urls": [
+      "https://www.alaskaregional.com/patient-resources/medical-records",
+      "https://www.alaskaregional.com/patient-resources/medical-records#maincontent",
+      "https://www.alaskaregional.com/about-us/managing-your-care-with-mychart",
+      "https://mychart.mountainstarhealth.com/",
+      "https://apps.apple.com/us/app/mychart/id382952264",
+      "https://play.google.com/store/apps/details?id=epic.mychart.android&hl=en"
+    ]
+  },
+  {
+    "system_name": "Health Records",
+    "state": "AK",
+    "domain": "searhc.org",
+    "seed_urls": [
+      "https://searhc.org/records/",
+      "https://searhc.org/wp-content/uploads/AuthorizationToDiscloseProtectedHealthInfo041219e.pdf",
+      "https://searhc.org/wp-content/uploads/PatientRequestForAccessToPersonalHealthInfo041219e.pdf",
+      "https://searhc.org/wp-content/uploads/Authorization-to-Disclose-BH-Protected-Health-Information-8.25.20-1.pdf"
+    ]
+  }
+]

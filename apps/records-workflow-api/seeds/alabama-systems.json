@@ -1,0 +1,54 @@
+[
+  {
+    "system_name": "Baldwin Health",
+    "state": "AL",
+    "domain": "baldwinhealth.com",
+    "seed_urls": [
+      "https://www.baldwinhealth.com/request-medical-records",
+      "https://www.baldwinhealth.com/sbrmc/hospital-patient-portal.aspx",
+      "https://www.baldwinhealth.com/sbrmc/request-medical-records.aspx",
+      "https://www.baldwinhealth.com/hospital-patient-portal",
+      "https://www.baldwinhealth.com/patient-portal-faq",
+      "https://www.baldwinhealth.com/request-medical-records#"
+    ]
+  },
+  {
+    "system_name": "Baptist Health",
+    "state": "AL",
+    "domain": "baptisthealthal.com",
+    "seed_urls": [
+      "https://www.baptisthealthal.com/for-patient-and-visitors/request-medical-records",
+      "https://www.baptisthealthal.com/patient-portal",
+      "https://www.baptisthealthal.com/for-patient-and-visitors/request-medical-records#",
+      "https://www.baptisthealthal.com/-/media/speedway/files/medical-records/brookwood-baptist-authorization-protected-health-info-2021.pdf?la=en",
+      "https://www.baptisthealthal.com/-/media/speedway/files/medical-records/citizens-baptist-authorization-of-protectected-health-info-2021.pdf?la=en",
+      "https://www.baptisthealthal.com/-/media/speedway/files/medical-records/princeton-baptist-authorization-of-protected-health-info-2021.pdf?la=en"
+    ]
+  },
+  {
+    "system_name": "Baptist Health Montgomery",
+    "state": "AL",
+    "domain": "baptistfirst.org",
+    "seed_urls": [
+      "https://www.baptistfirst.org/patients-visitors/after-your-visit/medical-records",
+      "https://www.baptistfirst.org/patients-visitors/after-your-visit/medical-records#block-hg-webdv-child-content",
+      "https://www.baptistfirst.org/patients-visitors/after-your-visit/medical-records#",
+      "https://www.baptistfirst.org/patient-portal",
+      "https://www.baptistfirst.org/sites/default/files/2024-12/Authorization%20to%20Request%20Medical%20Records_COR_80001_121924.pdf",
+      "https://www.baptistfirst.org/sites/default/files/2024-07/Request%20for%20Amendment%20of%20Protected%20Health%20Information%20Form.pdf"
+    ]
+  },
+  {
+    "system_name": "East Alabama Health",
+    "state": "AL",
+    "domain": "eastalabamahealth.org",
+    "seed_urls": [
+      "https://www.eastalabamahealth.org/patient-and-guests/request-medical-records",
+      "https://www.eastalabamahealth.org/patient-and-guests/request-medical-records#block-hg-webdv-child-content",
+      "https://www.eastalabamahealth.org/patient-and-guests/request-medical-records#",
+      "https://www.eastalabamahealth.org/my-eah",
+      "https://www.eastalabamahealth.org/sites/default/files/hg_features/mercury_standard_layout/461867942cebf78a36f94bcd2d7a06a9.pdf",
+      "https://www.eastalabamahealth.org/sites/default/files/hg_features/mercury_standard_layout/bc782bb4a805991efddf8bed9865378d.pdf"
+    ]
+  }
+]
