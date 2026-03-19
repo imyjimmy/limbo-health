@@ -1,0 +1,1364 @@
+{
+  "generated_at": "2026-03-19T00:14:32.855Z",
+  "scope": "records-workflow-api crawl coverage and confidence snapshot",
+  "pdf_repair_summary": {
+    "repaired_states": [
+      {
+        "state": "TX",
+        "total": 23,
+        "renamed_or_path_normalized": 23
+      },
+      {
+        "state": "MA",
+        "total": 58,
+        "renamed_or_path_normalized": 58
+      },
+      {
+        "state": "NH",
+        "total": 14,
+        "renamed_or_path_normalized": 9
+      },
+      {
+        "state": "RI",
+        "total": 12,
+        "renamed_or_path_normalized": 9
+      },
+      {
+        "state": "VT",
+        "total": 14,
+        "renamed_or_path_normalized": 14
+      }
+    ],
+    "stale_app_storage_paths_remaining": 0
+  },
+  "coverage_by_state": [
+    {
+      "state": "DE",
+      "hospital_systems": 13,
+      "source_documents": 170,
+      "workflows": 177,
+      "seed_urls": 17,
+      "pdf_source_documents": 0
+    },
+    {
+      "state": "MA",
+      "hospital_systems": 10,
+      "source_documents": 285,
+      "workflows": 357,
+      "seed_urls": 18,
+      "pdf_source_documents": 58
+    },
+    {
+      "state": "NH",
+      "hospital_systems": 24,
+      "source_documents": 178,
+      "workflows": 204,
+      "seed_urls": 28,
+      "pdf_source_documents": 14
+    },
+    {
+      "state": "RI",
+      "hospital_systems": 10,
+      "source_documents": 87,
+      "workflows": 96,
+      "seed_urls": 13,
+      "pdf_source_documents": 12
+    },
+    {
+      "state": "TX",
+      "hospital_systems": 25,
+      "source_documents": 427,
+      "workflows": 494,
+      "seed_urls": 29,
+      "pdf_source_documents": 23
+    },
+    {
+      "state": "VT",
+      "hospital_systems": 16,
+      "source_documents": 159,
+      "workflows": 171,
+      "seed_urls": 25,
+      "pdf_source_documents": 14
+    }
+  ],
+  "confidence_by_state": [
+    {
+      "state": "DE",
+      "workflows": 177,
+      "low_confidence": 9,
+      "medium_confidence": 9,
+      "high_confidence": 159
+    },
+    {
+      "state": "MA",
+      "workflows": 357,
+      "low_confidence": 7,
+      "medium_confidence": 19,
+      "high_confidence": 331
+    },
+    {
+      "state": "NH",
+      "workflows": 204,
+      "low_confidence": 22,
+      "medium_confidence": 6,
+      "high_confidence": 176
+    },
+    {
+      "state": "RI",
+      "workflows": 96,
+      "low_confidence": 7,
+      "medium_confidence": 0,
+      "high_confidence": 89
+    },
+    {
+      "state": "TX",
+      "workflows": 494,
+      "low_confidence": 47,
+      "medium_confidence": 28,
+      "high_confidence": 419
+    },
+    {
+      "state": "VT",
+      "workflows": 171,
+      "low_confidence": 12,
+      "medium_confidence": 7,
+      "high_confidence": 152
+    }
+  ],
+  "low_confidence_workflows": [
+    {
+      "state": "DE",
+      "system_name": "Beebe Healthcare",
+      "workflow_type": "other",
+      "official_page_url": "https://www.beebehealthcare.org/mychart",
+      "confidence": "low"
+    },
+    {
+      "state": "DE",
+      "system_name": "Beebe Healthcare",
+      "workflow_type": "other",
+      "official_page_url": "https://www.beebehealthcare.org/patients-visitors/health-information-management",
+      "confidence": "low"
+    },
+    {
+      "state": "DE",
+      "system_name": "ChristianaCare",
+      "workflow_type": "other",
+      "official_page_url": "https://christianacare.org/us/es/visit-us/for-patients/medical-records",
+      "confidence": "low"
+    },
+    {
+      "state": "DE",
+      "system_name": "Nemours Children's Hospital, Delaware",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.nemours.org/mychart-ext/signup",
+      "confidence": "low"
+    },
+    {
+      "state": "DE",
+      "system_name": "Nemours Children's Hospital, Delaware",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.nemours.org/mychart-ext/signup?activationCodeFlow=true",
+      "confidence": "low"
+    },
+    {
+      "state": "DE",
+      "system_name": "Nemours Children's Hospital, Delaware",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.nemours.org/mychart-ext/video-visit-logout",
+      "confidence": "low"
+    },
+    {
+      "state": "DE",
+      "system_name": "SUN Behavioral Delaware",
+      "workflow_type": "other",
+      "official_page_url": "https://sunbehavioral.com/facilities/",
+      "confidence": "low"
+    },
+    {
+      "state": "DE",
+      "system_name": "Select Specialty Hospital - Wilmington",
+      "workflow_type": "other",
+      "official_page_url": "https://www.selectspecialtyhospitals.com/locations-and-tours/de/wilmington/wilmington",
+      "confidence": "low"
+    },
+    {
+      "state": "DE",
+      "system_name": "TidalHealth Nanticoke",
+      "workflow_type": "other",
+      "official_page_url": "https://www.tidalhealth.org/medical-care/financial-admin-services/medical-records",
+      "confidence": "low"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Children's Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.childrenshospital.org/sites/default/files/media_migration/2ec10486-f1da-4a95-9978-662322c236d7.docx",
+      "confidence": "low"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Children's Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/boston-childrens-hospital-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/boston-mc-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "MA",
+      "system_name": "Cambridge Health Alliance",
+      "workflow_type": "other",
+      "official_page_url": "https://central.mychart.org/MyChart/app/account-recovery",
+      "confidence": "low"
+    },
+    {
+      "state": "MA",
+      "system_name": "Cambridge Health Alliance",
+      "workflow_type": "other",
+      "official_page_url": "https://central.mychart.org/mychartcentral/Faqs?lang=en-us&option=Faq",
+      "confidence": "low"
+    },
+    {
+      "state": "MA",
+      "system_name": "Mass General Brigham",
+      "workflow_type": "other",
+      "official_page_url": "https://login.massgeneralbrighamhealthplan.org/oauth2/v1/authorize?state=OVBWKzhpRmZMeUFZTkx6aDQxUWd6Tmc5NlNGWDZkeVRTZWpKSTM0SW5Ec041cWEwYVlGMkFlclVKVXRxZ1MzMQ&nonce=0PzWE6hQKs6mMqj7ymIgjFFu5R0ZvyJM&client_id=0oag7iq80cN4d7NkB297&redirect_uri=https%3A%2F%2Fauthn.massgeneralbrigham.org%2Foauth2%2Fv1%2Fauthorize%2Fcallback&response_type=code&scope=email+openid+profile",
+      "confidence": "low"
+    },
+    {
+      "state": "MA",
+      "system_name": "Southcoast Health",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/southcoast-health-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Androscoggin Valley Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://avhnh.org/wp-content/uploads/sites/2/2021/12/imagingradioad1009-1.mp3",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Concord Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.concordhospital.org/",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Cottage Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.cottagehospital.org/",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Frisbie Memorial Hospital",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcahealthcare.com/legal/surprise-billing-protections",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Frisbie Memorial Hospital",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcahealthcare.com/patients/myhealthone-downtime",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Frisbie Memorial Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/hca-healthcare-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Huggins Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://portal.hugginshospital.org/vpn/index.html",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "New Hampshire Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.dhhs.nh.gov/programs-services/health-care/new-hampshire-hospital",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Parkland Medical Center",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcahealthcare.com/legal/surprise-billing-protections",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Parkland Medical Center",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcahealthcare.com/patients/myhealthone-downtime",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Parkland Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/hca-healthcare-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Portsmouth Regional Hospital",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcadam.com/api/public/content/46695a9ba25e4b9aa6376f53cef033ac?v=b53c28b5",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Portsmouth Regional Hospital",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcadam.com/api/public/content/e109b112b80f42fc8291acbe0b1435fa?v=829b113e",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Portsmouth Regional Hospital",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcahealthcare.com/legal/surprise-billing-protections",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Portsmouth Regional Hospital",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcahealthcare.com/patients/myhealthone-downtime",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Portsmouth Regional Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/hca-healthcare-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Speare Memorial Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://spearehospital.com/wp-content/uploads/2018/12/Radiology-biopsies-at-Speare.jpg",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Speare Memorial Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://spearehospital.com/wp-content/uploads/2018/12/Radiology-procedures-at-Speare.jpg",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Speare Memorial Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://spearehospital.com/wp-content/uploads/2018/12/Radiology-reading-an-xray.jpg",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Speare Memorial Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://spearehospital.com/wp-content/uploads/2019/12/southern-nh-radiology-consultants-title-banner-vert.jpg",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "VA Manchester Healthcare System",
+      "workflow_type": "other",
+      "official_page_url": "https://www.va.gov/manchester-health-care/",
+      "confidence": "low"
+    },
+    {
+      "state": "NH",
+      "system_name": "Wentworth-Douglass Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.massgeneralbrigham.org/en/patient-care/patient-visitor-information/financial-assistance",
+      "confidence": "low"
+    },
+    {
+      "state": "RI",
+      "system_name": "Brown University Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.brownhealth.org/sites/default/files/2024-10/Authorization-Release-PHI-Bradley-10152024-V2.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "RI",
+      "system_name": "Brown University Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.brownhealth.org/sites/default/files/2024-10/Authorization-Release-PHI-RIH-SP-10152024-V3.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "RI",
+      "system_name": "Brown University Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.brownhealth.org/sites/default/files/2025-09/Saint-Annes-Authorization-for-Use-and-Disclosure-of-Protected-Health-Information-Spanish-optimized.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "RI",
+      "system_name": "Brown University Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.brownhealth.org/sites/default/files/2025-11/Authorization-Release-PHI-Gateway-10152024-PT.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "RI",
+      "system_name": "Providence VA Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://www.va.gov/providence-health-care/",
+      "confidence": "low"
+    },
+    {
+      "state": "RI",
+      "system_name": "Rehabilitation Hospital of Rhode Island",
+      "workflow_type": "other",
+      "official_page_url": "https://www.rehabhospitalri.com/",
+      "confidence": "low"
+    },
+    {
+      "state": "RI",
+      "system_name": "Westerly Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://www.westerlyhospital.org/-/media/Files/YNHHS/PDF/Billing-Fin-Asst/non-participating_2026.ashx",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Baptist Health System (San Antonio)",
+      "workflow_type": "other",
+      "official_page_url": "https://www.baptisthealthsystem.com/patients/request-medical-records",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Baylor Scott & White Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://requestmanager.healthmark-group.com/register",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Baylor Scott & White Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.bswhealth.com/-/media/project/bsw/sites/bswhealth/documents/patient-tools/authorization-for-release-of-medical-information-from-bswh-spanish.pdf?sc_lang=en&hash=4D48A4DC1D48A34F446342240EA26522",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Baylor Scott & White Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.bswhealth.com/-/media/project/bsw/sites/bswhealth/documents/patient-tools/authorization-for-release-of-medical-information-to-bswh-spanish.pdf?sc_lang=en&hash=AD8B86B6D77F9FA4967F7B8FDDD034F3",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Baylor Scott & White Health",
+      "workflow_type": "other",
+      "official_page_url": "https://my.bswhealth.com/login",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "CHI St. Luke's Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.commonspirit.org/patient-resources/stlukes-health-medical-records",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "CHI St. Luke's Health",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/st-lukes-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "CHRISTUS Health",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.christushealth.org/-/media/christus-health/plan-care/files/mychristus/st-vincent/stvincenthipaaauthorizationadultandchild.ashx",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Exceptional Community Hospitals",
+      "workflow_type": "other",
+      "official_page_url": "https://ehc24.com/wp-content/uploads/2025/04/Release_of_Medical_Information.docx",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA Gulf Coast Division (HCA Houston Healthcare)",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcadam.com/api/public/content/46695a9ba25e4b9aa6376f53cef033ac?v=b53c28b5",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA Gulf Coast Division (HCA Houston Healthcare)",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcadam.com/api/public/content/e109b112b80f42fc8291acbe0b1435fa?v=829b113e",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA Gulf Coast Division (HCA Houston Healthcare)",
+      "workflow_type": "other",
+      "official_page_url": "https://myhealthone.com/mh1/public/mh1/overview/!ut/p/z0/04_Sj9CPykssy0xPLMnMz0vMAfIjo8ziPQwdTTw9DQy93H1NnQwcjc0NXHzNDAwMvM30C7IdFQEcMIDI/",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA Gulf Coast Division (HCA Houston Healthcare)",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/hca-healthcare-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA Medical City Healthcare (North Texas Division)",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcadam.com/api/public/content/46695a9ba25e4b9aa6376f53cef033ac?v=b53c28b5",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA Medical City Healthcare (North Texas Division)",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcadam.com/api/public/content/e109b112b80f42fc8291acbe0b1435fa?v=829b113e",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA Medical City Healthcare (North Texas Division)",
+      "workflow_type": "other",
+      "official_page_url": "https://myhealthone.com/mh1/public/mh1/overview/!ut/p/z0/04_Sj9CPykssy0xPLMnMz0vMAfIjo8ziPQwdTTw9DQy93H1NnQwcjc0NXHzNDAwMvM30C7IdFQEcMIDI/",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA Medical City Healthcare (North Texas Division)",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/hca-healthcare-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "HCA San Antonio Division (Methodist Healthcare of San Antonio)",
+      "workflow_type": "other",
+      "official_page_url": "https://myhealthone.com/mh1/public/mh1/overview/!ut/p/z0/04_Sj9CPykssy0xPLMnMz0vMAfIjo8ziPQwdTTw9DQy93H1NnQwcjc0NXHzNDAwMvM30C7IdFQEcMIDI/",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://powerforms.docusign.net/239cf238-e55a-43e8-826e-cc8c82b14b11?env=na3&acct=defbb313-54b1-4842-9ba9-1fce6b003fba&accountId=defbb313-54b1-4842-9ba9-1fce6b003fba",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://powerforms.docusign.net/3df8940e-9b0d-4f8b-878f-ebae048e5982?env=na3&acct=defbb313-54b1-4842-9ba9-1fce6b003fba&accountId=defbb313-54b1-4842-9ba9-1fce6b003fba",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://powerforms.docusign.net/4a303f51-d620-41a5-afe5-235e372cdfb6?env=na3&acct=defbb313-54b1-4842-9ba9-1fce6b003fba&accountId=defbb313-54b1-4842-9ba9-1fce6b003fba",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://powerforms.docusign.net/5bbb97d8-87b5-4414-8a05-72c5ac800a9f?env=na3&acct=defbb313-54b1-4842-9ba9-1fce6b003fba&accountId=defbb313-54b1-4842-9ba9-1fce6b003fba",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://powerforms.docusign.net/718b2e67-a9d9-43c0-8d0c-59e24c2d0d57?env=na3&acct=defbb313-54b1-4842-9ba9-1fce6b003fba&accountId=defbb313-54b1-4842-9ba9-1fce6b003fba",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://powerforms.docusign.net/a85ae5a7-db86-42b8-a15d-139089b5e840?env=na3&acct=defbb313-54b1-4842-9ba9-1fce6b003fba&accountId=defbb313-54b1-4842-9ba9-1fce6b003fba",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://powerforms.docusign.net/ba0394ea-a7f2-47d8-8525-714d6a1ba15e?env=na3&acct=defbb313-54b1-4842-9ba9-1fce6b003fba&accountId=defbb313-54b1-4842-9ba9-1fce6b003fba",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://powerforms.docusign.net/f9118f7b-afa2-4c96-9617-2f96f9137bc3?env=na3&acct=defbb313-54b1-4842-9ba9-1fce6b003fba&accountId=defbb313-54b1-4842-9ba9-1fce6b003fba",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Memorial Hermann Health System",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://memorialhermann.org/-/media/memorial-hermann/org/files/patients-and-visitors/patient-services/patient-request-to-have-medical-records-transferred-spanish.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Methodist Health System",
+      "workflow_type": "other",
+      "official_page_url": "https://tr.mhd.com/builder",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "St. David's HealthCare",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcadam.com/api/public/content/46695a9ba25e4b9aa6376f53cef033ac?v=b53c28b5",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "St. David's HealthCare",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.hcadam.com/api/public/content/e109b112b80f42fc8291acbe0b1435fa?v=829b113e",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "St. David's HealthCare",
+      "workflow_type": "other",
+      "official_page_url": "https://myhealthone.com/mh1/public/mh1/overview/!ut/p/z0/04_Sj9CPykssy0xPLMnMz0vMAfIjo8ziPQwdTTw9DQy93H1NnQwcjc0NXHzNDAwMvM30C7IdFQEcMIDI/",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "St. David's HealthCare",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/hca-healthcare-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://verisma.com/privacy-policy/",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://vra.verisma.com/build",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://vra.verisma.com/patient/",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://forms.office.com/pages/responsepage.aspx?id=mKldfKtxI0WkeWhP1Mupf2HxUHheiWJGredTNeS47-1UMFE4M1EySVE3V0U1TzhYNzE4UEFUT0IwUC4u&route=shorturl",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.texashealth.org/MyChart/OpenId?op=MYCHART-FORGEROCK+CIAM+SSO+INTEGRATION+TOKEN+RETRIEVAL&forceAuthn=False",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://track.verisma.com/",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://www.texashealth.org/-/media/Project/THR/shared/Body-Images/Tall-Images/Billing-Statement-Example-Large.jpg",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "The Hospitals of Providence",
+      "workflow_type": "other",
+      "official_page_url": "https://www.thehospitalsofprovidence.com/patients/request-medical-records",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Health East Texas",
+      "workflow_type": "other",
+      "official_page_url": "https://uthealtheasttexas.com/patients-and-visitors/mychart-faqs/",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Health East Texas",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/ardenthealth-uthealth-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Southwestern Medical Center",
+      "workflow_type": "billing",
+      "official_page_url": "https://d38sso7f6qz01j.cloudfront.net/documents/Authorization_to_Disclose_Protected_Health_Information_FILLABLE.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Southwestern Medical Center",
+      "workflow_type": "imaging",
+      "official_page_url": "https://d38sso7f6qz01j.cloudfront.net/documents/Authorization_to_Disclose_Protected_Health_Information_FILLABLE.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Southwestern Medical Center",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://d38sso7f6qz01j.cloudfront.net/documents/Authorization_to_Disclose_Protected_Health_Information_FILLABLE.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Southwestern Medical Center",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://d38sso7f6qz01j.cloudfront.net/documents/Authorization_to_Disclose_Protected_Health_Information_FILLABLESP.pdf",
+      "confidence": "low"
+    },
+    {
+      "state": "TX",
+      "system_name": "United Surgical Partners International (USPI)",
+      "workflow_type": "other",
+      "official_page_url": "https://www.uspi.com/",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Brattleboro Retreat",
+      "workflow_type": "other",
+      "official_page_url": "https://login.microsoftonline.com/5d71f9ce-26a9-4b03-b3b0-c682a7dbe24b/saml2?SAMLRequest=fJFNa8MwDIb%2FSvDd%2BXDSfJikUCiDwnbZxg67DMWR20BidZYD%2B%2FlLMwrbZUdJPO%2BrV2oZ5umqD0u4uGf8XJBD9DVPjvU26MTinSbgkbWDGVkHo18OT49axam%2BegpkaBK%2FkP8JYEYfRnIiOh078VE0jbUwWIl1k8mirEDWu8LILKuGxpbKQgoiekPPK9OJVWIFmRc8OQ7gwtpKVSnTXGb1q8p1luu0jFVZvYvouGYZHdzcOnEJ4co6SSY6jy6eR%2BOJyQZy0%2BgwNjQnu6HKbGNQqhIaWfSrZp%2F3qTRlraAaelRFn9wSKhE9kDe43awTFiZGsW9vI73t5vd3t9GQc2hC3HsIYcKePHkMHiHE5M%2FtpneHfqq%2Fv9h%2FAwAA%2F%2F8DAA%3D%3D&RelayState=ReturnUrl%3Dhttps%253A%252F%252Ficonnect.brattlebororetreat.org%253Fredirect%253D%252F%26OriginalDomain%3Dhttps%253A%252F%252Fapis.flex-live.net",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Central Vermont Medical Center",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.uvmhealth.org/",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Central Vermont Medical Center",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.uvmhealth.org/locations",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Gifford Health Care",
+      "workflow_type": "other",
+      "official_page_url": "https://www.swellbox.com/gifford-hc-wizard.html",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Grace Cottage Family Health & Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://gracecottage.org/wp-content/uploads/2024/05/medical-record-release-updated-5-28-2024.docx",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Porter Medical Center",
+      "workflow_type": "amendment",
+      "official_page_url": "https://www.uvmhealth.org/patients-visitors/request-medical-records",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Porter Medical Center",
+      "workflow_type": "imaging",
+      "official_page_url": "https://www.uvmhealth.org/patients-visitors/request-medical-records",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Porter Medical Center",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://www.uvmhealth.org/patients-visitors/request-medical-records",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Rutland Regional Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://www.rrmc.org/",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Southwestern Vermont Health Care",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://svmc.org/",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "Springfield Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://springfieldhospital.org/wp-content/uploads/2024/01/Release-Form-1-26-24.docx",
+      "confidence": "low"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uvmhealth.org/MyChart/app/activation",
+      "confidence": "low"
+    }
+  ],
+  "medium_confidence_workflows": [
+    {
+      "state": "DE",
+      "system_name": "Bayhealth",
+      "workflow_type": "other",
+      "official_page_url": "https://epmychart.bayhealth.org/MyChart/GuestEstimates/",
+      "confidence": "medium"
+    },
+    {
+      "state": "DE",
+      "system_name": "Bayhealth",
+      "workflow_type": "other",
+      "official_page_url": "https://epmychart.bayhealth.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "DE",
+      "system_name": "Bayhealth",
+      "workflow_type": "other",
+      "official_page_url": "https://epmychart.bayhealth.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "DE",
+      "system_name": "Bayhealth",
+      "workflow_type": "other",
+      "official_page_url": "https://epmychart.bayhealth.org/MyChart/billing/guestpay/",
+      "confidence": "medium"
+    },
+    {
+      "state": "DE",
+      "system_name": "Bayhealth",
+      "workflow_type": "other",
+      "official_page_url": "https://epmychart.bayhealth.org/MyChart/openscheduling",
+      "confidence": "medium"
+    },
+    {
+      "state": "DE",
+      "system_name": "Nemours Children's Hospital, Delaware",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.nemours.org/MyChartPRD/Billing/GuestPay/PayasGuest",
+      "confidence": "medium"
+    },
+    {
+      "state": "DE",
+      "system_name": "Nemours Children's Hospital, Delaware",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.nemours.org/MyChartPRD/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "DE",
+      "system_name": "Nemours Children's Hospital, Delaware",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.nemours.org/MyChartPRD/app/account-recovery/recovery-choice",
+      "confidence": "medium"
+    },
+    {
+      "state": "DE",
+      "system_name": "Nemours Children's Hospital, Delaware",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.nemours.org/MyChartPRD/guestestimates",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Baystate Health",
+      "workflow_type": "other",
+      "official_page_url": "https://mybaystate.baystatehealth.org/",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Children's Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.childrenshospital.org/MyChart/Billing/GuestPay",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Children's Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.childrenshospital.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Children's Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.childrenshospital.org/MyChart/app/account-recovery/recovery-choice",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Children's Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.childrenshospital.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Children's Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.childrenshospital.org/MyChart/billing/guestpay",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.bmc.org/MyChart//Billing/GuestPay/PayasGuest",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.bmc.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.bmc.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Boston Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.bmc.org/MyChart/billing/guestpay/payasguest?cleared=1&mobile=0",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Cambridge Health Alliance",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.challiance.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Cambridge Health Alliance",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.challiance.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Cambridge Health Alliance",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.challiance.org/Mychart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Mass General Brigham",
+      "workflow_type": "other",
+      "official_page_url": "https://patientgateway.massgeneralbrigham.org/",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Mass General Brigham",
+      "workflow_type": "other",
+      "official_page_url": "https://patientgateway.massgeneralbrigham.org/MyChart-PRD/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Mass General Brigham",
+      "workflow_type": "other",
+      "official_page_url": "https://patientgateway.massgeneralbrigham.org/MyChart-PRD/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Mass General Brigham",
+      "workflow_type": "other",
+      "official_page_url": "https://patientgateway.massgeneralbrigham.org/MyChart-PRD/passwordreset.asp",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Southcoast Health",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.southcoast.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "MA",
+      "system_name": "Southcoast Health",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.southcoast.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "NH",
+      "system_name": "Littleton Regional Healthcare",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://littletonhealthcare.org/wp-content/uploads/2022/05/AFFIDAVIT-OF-SURVIVING-SPOUSE-OR-NEXT-OF-KIN-SEEKING-ACCESS-TO-MEDICAL-RECORDS.pdf",
+      "confidence": "medium"
+    },
+    {
+      "state": "NH",
+      "system_name": "Littleton Regional Healthcare",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://littletonhealthcare.org/wp-content/uploads/2024/01/How-to-Fill-Out-a-Release-of-Information.pdf",
+      "confidence": "medium"
+    },
+    {
+      "state": "NH",
+      "system_name": "MaineHealth Memorial Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.mainehealth.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "NH",
+      "system_name": "MaineHealth Memorial Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.mainehealth.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "NH",
+      "system_name": "MaineHealth Memorial Hospital",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.mainehealth.org/MyChart/billing/guestpay/payasguest",
+      "confidence": "medium"
+    },
+    {
+      "state": "NH",
+      "system_name": "Speare Memorial Hospital",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://spearehospital.com/wp-content/uploads/2017/04/smh-medical-records-release_04_10_2017.pdf",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Ascension Seton",
+      "workflow_type": "medical_records",
+      "official_page_url": "https://healthcare.ascension.org/patient-portal",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Ascension Seton",
+      "workflow_type": "other",
+      "official_page_url": "https://healthcare.ascension.org/billing",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Ascension Seton",
+      "workflow_type": "other",
+      "official_page_url": "https://healthcare.ascension.org/medical-records",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "CHRISTUS Health",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.christushealth.org/mychart/Billing/GuestPay/PayasGuest",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "CHRISTUS Health",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.christushealth.org/mychart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "CHRISTUS Health",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.christushealth.org/mychart/app/account-recovery",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "CHRISTUS Health",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.christushealth.org/mychart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.houstonmethodist.org/MyChart-PROD/GuestEstimates/",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.houstonmethodist.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.houstonmethodist.org/MyChart/app/account-recovery/recovery-choice",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.houstonmethodist.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Houston Methodist",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.houstonmethodist.org/MyChart/billing/guestpay/payasguest",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Memorial Hermann Health System",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.memorialhermann.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Methodist Health System",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.methodisthealthsystem.org/MyChart/Billing/GuestPay/PayasGuest",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Methodist Health System",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.methodisthealthsystem.org/MyChart/GuestEstimates/",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Methodist Health System",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.methodisthealthsystem.org/MyChart/GuestEstimates/?&&&&&&",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Methodist Health System",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.methodisthealthsystem.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Methodist Health System",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.methodisthealthsystem.org/MyChart/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "billing",
+      "official_page_url": "https://mychart.texashealth.org/MyChart/billing/guestpay/payasguest",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.texashealth.org/MyChart/GuestEstimates",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.texashealth.org/MyChart/GuestEstimates/SelectLocation?svcArea=WP-24X6h5E3AWOEG3LJ16tLYYkQ-3D-3D-24rpZkBZJAqIXZHVcgzpKcfU1LDwr5dDdoNrhHU0s2b-2Fc-3D&isMultiSA=False&template=",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.texashealth.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.texashealth.org/MyChart/app/on-demand-video-visits",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "Texas Health Resources",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.texashealth.org/MyChart/openscheduling",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Health East Texas",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uthealtheasttexas.com/UTHET//Billing/GuestPay/PayasGuest",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Health East Texas",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uthealtheasttexas.com/UTHET/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Health East Texas",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uthealtheasttexas.com/UTHET/app/activation",
+      "confidence": "medium"
+    },
+    {
+      "state": "TX",
+      "system_name": "UT Health East Texas",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uthealtheasttexas.com/UTHET/billing/guestpay/payasguest",
+      "confidence": "medium"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uvmhealth.org/MyChart//GuestEstimates",
+      "confidence": "medium"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uvmhealth.org/MyChart//billing/GuestPay",
+      "confidence": "medium"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uvmhealth.org/MyChart/Authentication/AccountRecovery",
+      "confidence": "medium"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uvmhealth.org/MyChart/Billing/GuestPay/PayAsGuest?cleared=1",
+      "confidence": "medium"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uvmhealth.org/MyChart/GuestEstimates",
+      "confidence": "medium"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uvmhealth.org/MyChart/Help/Cookies",
+      "confidence": "medium"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "workflow_type": "other",
+      "official_page_url": "https://mychart.uvmhealth.org/MyChart/billing/GuestPay",
+      "confidence": "medium"
+    }
+  ],
+  "known_errors": [
+    {
+      "state": "NH",
+      "system_name": "Exeter Hospital",
+      "kind": "crawl_fetch_failure",
+      "detail": "Persistent TLS failure: unsafe legacy renegotiation disabled",
+      "source_url": "https://www.exeterhospital.com/"
+    },
+    {
+      "state": "VT",
+      "system_name": "The University of Vermont Medical Center",
+      "kind": "orphan_pdf_not_in_db",
+      "detail": "MyChart proxy access request over-18 PDF exists on disk but does not have a source_documents row",
+      "source_url": "https://www.uvmhealth.org/sites/default/files/2024-04/uvmhn-mychart-proxy-access-request-over-18-form-037035.pdf"
+    }
+  ],
+  "notes": [
+    "All latest extraction_runs are success; there are no persisted partial or failed extraction_runs in the database.",
+    "The most common low-confidence pattern is portal or third-party workflow noise being stored as workflow_type=other.",
+    "DE currently has no stored PDFs; its crawl is HTML-only in the current corpus."
+  ]
+}

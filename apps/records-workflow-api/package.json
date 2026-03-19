@@ -11,6 +11,7 @@
     "migrate": "node src/migrate.js",
     "seed": "node src/seed.js",
     "crawl": "node src/crawl.js",
+    "repair:pdf-names": "node src/repairPdfNames.js",
     "reset:crawl-state": "node src/resetCrawlState.js",
     "repartition:raw-storage-state": "node src/repartitionRawStorageByState.js",
     "cleanup:stale-crawl": "node src/cleanupStaleCrawlData.js --apply",

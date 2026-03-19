@@ -1,13 +1,10 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import { fetchAndParseDocument } from '../crawler/fetcher.js';
 import { expandCandidateLinks, isOfficialDomain } from '../crawler/linkExpander.js';
 import { extractWorkflowBundle } from '../extractors/workflowExtractor.js';
 import { config } from '../config.js';
 import { listActiveSeeds, saveExtractionResult } from '../repositories/workflowRepository.js';
-import { sha256 } from '../utils/hash.js';
-import { buildMedicalRecordsPdfFilenameStem } from '../utils/pdfNaming.js';
-import { ensureRawStorageStateDir } from '../utils/rawStorage.js';
+import { assignPdfStoragePath } from '../utils/pdfStorage.js';
 import { isMedicalRecordsRequestDocument } from '../utils/urls.js';
 
 function normalizeForVisited(url) {
@@ -27,63 +24,6 @@ async function removeIfPresent(filePath) {
     if (error?.code !== 'ENOENT') {
       throw error;
     }
-  }
-}
-
-async function fileExists(filePath) {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function fileMatchesHash(filePath, expectedHash) {
-  if (!(await fileExists(filePath))) return false;
-  const buffer = await fs.readFile(filePath);
-  return sha256(buffer) === expectedHash;
-}
-
-async function finalizePdfStoragePath({
-  tempStoragePath,
-  contentHash,
-  state,
-  systemName,
-  facilityName,
-  url,
-  title,
-  text
-}) {
-  const baseStem = buildMedicalRecordsPdfFilenameStem({
-    systemName,
-    facilityName,
-    url,
-    title,
-    text
-  });
-  const stateStorageDir = await ensureRawStorageStateDir(state);
-
-  let sequence = 1;
-  while (true) {
-    const stem = sequence === 1 ? baseStem : `${baseStem}-${sequence}`;
-    const candidatePath = path.join(stateStorageDir, `${stem}.pdf`);
-
-    if (candidatePath === tempStoragePath) {
-      return candidatePath;
-    }
-
-    if (!(await fileExists(candidatePath))) {
-      await fs.rename(tempStoragePath, candidatePath);
-      return candidatePath;
-    }
-
-    if (await fileMatchesHash(candidatePath, contentHash)) {
-      await removeIfPresent(tempStoragePath);
-      return candidatePath;
-    }
-
-    sequence += 1;
   }
 }
 
@@ -163,15 +103,17 @@ export async function runCrawl({
 
         let storagePath = fetched.storagePath;
         if (fetched.sourceType === 'pdf') {
-          storagePath = await finalizePdfStoragePath({
-            tempStoragePath: fetched.storagePath,
+          storagePath = await assignPdfStoragePath({
+            currentStoragePath: fetched.storagePath,
             contentHash: fetched.contentHash,
             state: system.state,
             systemName: system.systemName,
             facilityName: item.facilityName,
             url: fetched.finalUrl,
             title: fetched.title,
-            text: fetched.extractedText
+            text: fetched.extractedText,
+            headerText: fetched.parsed?.headerText || '',
+            headerLines: fetched.parsed?.headerLines || []
           });
         }
 

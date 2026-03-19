@@ -1,5 +1,10 @@
 import { collapseWhitespace } from './text.js';
 import { inferFacilityNameFromDocument } from './facilityAliases.js';
+import {
+  buildPdfHeaderText,
+  isLikelyPdfHeaderAddressLine,
+  isLikelyPdfHeaderFieldLine
+} from './pdfHeader.js';
 
 const GENERIC_TITLE_PATTERNS = [
   /^patient identification$/i,
@@ -28,11 +33,18 @@ const DESCRIPTIVE_TITLE_PATTERNS = [
   /\bhealth\b/i,
   /\bprotected health information\b/i,
   /\bphi\b/i,
+  /\bproxy\b/i,
+  /\bmychart\b/i,
+  /\bportal\b/i,
+  /\bconsent\b/i,
   /\bautorizaci[oó]n\b/i,
   /\bautoriza[cç][aã]o\b/i
 ];
 
 const PHRASE_PATTERNS = [
+  /\b((?:for patients [^.:]{0,50}\s+)?my\s*chart proxy access(?:\s+request(?:\s*(?:and|&)\s*authorization form)?)?(?:\s+authorization form)?)/i,
+  /\b((?:proxy access request(?:\s*(?:and|&)\s*authorization form)?)|(?:request(?:\s*(?:and|&)\s*authorization form)? for proxy access))/i,
+  /\b(consent for patient portal access)\b/i,
   /\b(patient request for health information)/i,
   /\b(patient request to have medical records transferred)/i,
   /\b(patient right to access request for medical records)/i,
@@ -78,8 +90,29 @@ function cleanPhraseSource(value) {
       .replace(/\bmedi\s+cal\b/gi, 'medical')
       .replace(/\bdisclo\s*sure\b/gi, 'disclosure')
       .replace(/\binfo\s*rma(?:tion)?\b(?![A-Za-zÀ-ÿ])/gi, 'information')
+      .replace(/\bmy\s+chart\b/gi, 'MyChart')
+      .replace(/\bolder\b/gi, 'older')
+      .replace(/\byears?\s*old\b/gi, 'years old')
       .replace(/[“”"]/g, '')
   );
+}
+
+function isLikelyHeaderTitleStarter(line) {
+  return (
+    /^for patients\b/i.test(line) ||
+    /\b(?:authori[sz](?:ation|e)|request|medical records|my\s*chart|proxy access|portal|consent|autorizaci[oó]n|autoriza[cç][aã]o)\b/i.test(
+      line
+    )
+  );
+}
+
+function isLikelyHeaderTitleContinuation(line) {
+  if (!line) return false;
+  if (/^requirements?$/i.test(line)) return false;
+  if (/^by signing this form\b/i.test(line)) return false;
+  if (/^i understand\b/i.test(line)) return false;
+  if (/^page\b/i.test(line)) return false;
+  return isLikelyHeaderTitleStarter(line);
 }
 
 function sanitizePhrase(value) {
@@ -174,7 +207,93 @@ export function detectDocumentLanguageCode({ url = '', title = '', text = '' }) 
   return 'EN';
 }
 
-export function extractDescriptivePdfPhrase({ title = '', text = '' }) {
+function buildHeaderPhraseSource(headerLines = [], headerText = '') {
+  const normalizedLines = headerLines
+    .map((line) => ({
+      text: collapseWhitespace(line?.text || ''),
+      fontSize: Number(line?.fontSize || 0)
+    }))
+    .filter((line) => line.text)
+    .filter((line) => !isLikelyPdfHeaderFieldLine(line.text))
+    .filter((line) => !isLikelyPdfHeaderAddressLine(line.text));
+
+  if (normalizedLines.length > 0) {
+    const headerTitleStart = normalizedLines.findIndex((line) => isLikelyHeaderTitleStarter(line.text));
+    if (headerTitleStart >= 0) {
+      const titleLines = [];
+
+      for (const line of normalizedLines.slice(headerTitleStart, headerTitleStart + 4)) {
+        if (titleLines.length === 0) {
+          titleLines.push(line);
+          continue;
+        }
+
+        const previous = titleLines[titleLines.length - 1];
+        const keepsTitleBlock =
+          isLikelyHeaderTitleContinuation(line.text) &&
+          (!previous.fontSize ||
+            !line.fontSize ||
+            line.fontSize >= previous.fontSize * 0.8 ||
+            /^for patients\b/i.test(previous.text));
+
+        if (!keepsTitleBlock) {
+          break;
+        }
+
+        titleLines.push(line);
+      }
+
+      return cleanPhraseSource(titleLines.map((line) => line.text).join(' '));
+    }
+  }
+
+  if (!Array.isArray(headerLines) || headerLines.length === 0) {
+    return cleanPhraseSource(headerText);
+  }
+
+  return '';
+}
+
+function extractPhraseFromUrl(url = '') {
+  if (!url) return null;
+
+  try {
+    const parsedUrl = new URL(url);
+    const pathname = decodeURIComponent(parsedUrl.pathname || '');
+    const basename = pathname.split('/').filter(Boolean).pop() || '';
+    const candidate = sanitizePhrase(
+      cleanPhraseSource(
+        basename
+          .replace(/\.[a-z0-9]+$/i, '')
+          .replace(/[-_]+/g, ' ')
+          .replace(/\b\d{4,}\b/g, ' ')
+      )
+    );
+
+    if (!candidate) return null;
+
+    const phrase = extractPhraseFromSource(candidate);
+    if (phrase) {
+      return phrase;
+    }
+
+    if (!isMachineTitle(candidate) && isDescriptivePhrase(candidate)) {
+      return candidate;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+export function extractDescriptivePdfPhrase({
+  url = '',
+  title = '',
+  text = '',
+  headerText = '',
+  headerLines = []
+}) {
   const cleanedTitle = sanitizePhrase(cleanPhraseSource(title));
   if (cleanedTitle && !isGenericTitle(cleanedTitle)) {
     const titlePhrase = extractPhraseFromSource(cleanedTitle);
@@ -185,6 +304,17 @@ export function extractDescriptivePdfPhrase({ title = '', text = '' }) {
     if (!isMachineTitle(cleanedTitle) && isDescriptivePhrase(cleanedTitle)) {
       return cleanedTitle;
     }
+  }
+
+  const cleanedHeaderText = buildHeaderPhraseSource(headerLines, headerText);
+  const headerPhrase = extractPhraseFromSource(cleanedHeaderText);
+  if (headerPhrase) {
+    return headerPhrase;
+  }
+
+  const headerSentence = sanitizePhrase(cleanedHeaderText.split(/[.:]/, 1)[0] || '');
+  if (isDescriptivePhrase(headerSentence)) {
+    return headerSentence;
   }
 
   const cleanedText = cleanPhraseSource(text);
@@ -198,6 +328,11 @@ export function extractDescriptivePdfPhrase({ title = '', text = '' }) {
     return firstSentence;
   }
 
+  const urlPhrase = extractPhraseFromUrl(url);
+  if (urlPhrase) {
+    return urlPhrase;
+  }
+
   return null;
 }
 
@@ -206,12 +341,30 @@ export function buildMedicalRecordsPdfFilenameStem({
   facilityName,
   url,
   title,
-  text
+  text,
+  headerText = '',
+  headerLines = []
 }) {
-  const label = facilityName || inferFacilityNameFromDocument({ systemName, url, title }) || systemName;
+  const normalizedHeaderText = buildPdfHeaderText(headerLines) || headerText;
+  const label =
+    facilityName ||
+    inferFacilityNameFromDocument({ systemName, url, title, headerLines }) ||
+    systemName;
   const facilitySlug = slugifyLabel(label);
-  const languageCode = detectDocumentLanguageCode({ url, title, text });
-  const phrase = extractDescriptivePdfPhrase({ title, text }) || 'medical-records-request';
+  const languageCode = detectDocumentLanguageCode({
+    url,
+    title,
+    text: collapseWhitespace(`${normalizedHeaderText} ${text}`)
+  });
+  const phrase =
+    extractDescriptivePdfPhrase({
+      url,
+      title,
+      text,
+      headerText: normalizedHeaderText,
+      headerLines
+    }) ||
+    'medical-records-request';
   const phraseSlug = slugifyLabel(phrase);
   return `${facilitySlug}-${phraseSlug}-${languageCode}`;
 }

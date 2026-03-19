@@ -6,6 +6,10 @@ import {
   detectDocumentLanguageCode,
   extractDescriptivePdfPhrase
 } from '../src/utils/pdfNaming.js';
+import {
+  buildPdfHeaderLines,
+  inferFacilityNameFromHeaderLines
+} from '../src/utils/pdfHeader.js';
 import { collapseWhitespace } from '../src/utils/text.js';
 import {
   isLikelyMedicalRecordsPdfLink,
@@ -227,6 +231,123 @@ test('builds readable Portuguese stems for Mass General documents with inferred 
     stems[0],
     'salem-hospital-autorizacao-para-divulgacao-de-informacoes-de-saude-protegidas-ou-privilegiadas-PT'
   );
+});
+
+test('extracts Vermont facility names from page-one header lines', () => {
+  const facilityName = inferFacilityNameFromHeaderLines({
+    systemName: 'The University of Vermont Medical Center',
+    headerLines: [
+      { text: 'Porter Medical Center MRN:', y: 774.12, x: 264.12, fontSize: 9.96 },
+      { text: '115 Porter Drive Name:', y: 761.88, x: 275.88, fontSize: 9.96 },
+      { text: 'Middlebury, VT 05753', y: 749.64, x: 264.12, fontSize: 9.96 },
+      {
+        text: 'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION',
+        y: 724.68,
+        x: 54,
+        fontSize: 12.18
+      },
+      {
+        text: 'BY SIGNING THIS FORM, YOU AUTHORIZE THE SPECIFIED UNIVERSITY OF VERMONT HEALTH NETWORK ENTITY, OR ITS AGENTS TO RELEASE INFORMATION.',
+        y: 708,
+        x: 52.2,
+        fontSize: 9.96
+      }
+    ]
+  });
+
+  assert.equal(facilityName, 'Porter Medical Center');
+});
+
+test('builds Vermont stems from page-one header context instead of system fallback', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'The University of Vermont Medical Center',
+    url: 'https://www.uvmhealth.org/sites/default/files/2024-04/pmc-authorization-to-release-protected-health-information-form-037347.pdf',
+    title: '',
+    text:
+      'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION BY SIGNING THIS FORM, YOU AUTHORIZE THE SPECIFIED UNIVERSITY OF VERMONT HEALTH NETWORK ENTITY, OR ITS AGENTS TO RELEASE INFORMATION.',
+    headerLines: [
+      { text: 'Porter Medical Center MRN:', y: 774.12, x: 264.12, fontSize: 9.96 },
+      { text: '115 Porter Drive Name:', y: 761.88, x: 275.88, fontSize: 9.96 },
+      { text: 'Middlebury, VT 05753', y: 749.64, x: 264.12, fontSize: 9.96 },
+      {
+        text: 'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION',
+        y: 724.68,
+        x: 54,
+        fontSize: 12.18
+      }
+    ]
+  });
+
+  assert.equal(stems[0], 'porter-medical-center-authorization-to-release-protected-health-information-EN');
+});
+
+test('builds mychart proxy stems from header title lines', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'The University of Vermont Medical Center',
+    url: 'https://www.uvmhealth.org/sites/default/files/2024-04/uvmhn-mychart-proxy-access-request-over-18-form-037035.pdf',
+    title: '',
+    text: 'Proxy access request.',
+    headerLines: [
+      { text: 'FOR PATIENTS 18 AND OLDER', y: 753, x: 403.8, fontSize: 12.18 },
+      { text: 'MyChart Proxy Access', y: 702, x: 156.96, fontSize: 26 },
+      { text: 'Request & Authorization Form', y: 664.19, x: 106.66, fontSize: 26 }
+    ]
+  });
+
+  assert.equal(
+    stems[0],
+    'the-university-of-vermont-medical-center-for-patients-18-and-older-mychart-proxy-access-request-and-authorization-form-EN'
+  );
+});
+
+test('keeps age qualifiers in mychart proxy stems when the header uses My Chart spacing', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'The University of Vermont Medical Center',
+    url: 'https://www.uvmhealth.org/sites/default/files/2024-04/uvmhn-mychart-proxy-access-request-patients-12-17-form-037038.pdf',
+    title: '',
+    text: 'Proxy access request.',
+    headerLines: [
+      { text: 'FOR PATIENTS 12-17 YEARS OLD', y: 747.48, x: 394.56, fontSize: 12.18 },
+      { text: 'My Chart Proxy Access', y: 690, x: 165.24, fontSize: 26 },
+      { text: 'Request & Authorization Form', y: 652.19, x: 114.82, fontSize: 26 }
+    ]
+  });
+
+  assert.equal(
+    stems[0],
+    'the-university-of-vermont-medical-center-for-patients-12-17-years-old-mychart-proxy-access-request-and-authorization-form-EN'
+  );
+});
+
+test('falls back to the pdf url slug when header lines do not expose a title', () => {
+  const phrase = extractDescriptivePdfPhrase({
+    url: 'https://www.northwesternmedicalcenter.org/pdf/patient-portal-terms-and-conditions/',
+    headerLines: [{ text: 'Northwestern Medical Center', fontSize: 11.66 }],
+    text: ''
+  });
+
+  assert.equal(phrase, 'Patient Portal Terms and Conditions');
+});
+
+test('groups top-of-page pdf text items into clean header lines', () => {
+  const lines = buildPdfHeaderLines({
+    pageHeight: 792,
+    items: [
+      { str: 'Porter Medical Center', transform: [9.96, 0, 0, 9.96, 264.12, 774.12] },
+      { str: 'MRN:', transform: [9.96, 0, 0, 9.96, 417.96, 775.32] },
+      { str: '115 ', transform: [9.96, 0, 0, 9.96, 275.88, 761.88] },
+      { str: 'Porter Drive', transform: [9.96, 0, 0, 9.96, 293.28, 761.88] },
+      { str: 'Name:', transform: [9.96, 0, 0, 9.96, 417.96, 760.44] },
+      {
+        str: 'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION',
+        transform: [11.04, 0, 0, 11.04, 54, 724.68]
+      }
+    ]
+  });
+
+  assert.equal(lines[0].text, 'Porter Medical Center');
+  assert.equal(lines[1].text, '115 Porter Drive');
+  assert.equal(lines[2].text, 'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION');
 });
 
 test('collapseWhitespace strips embedded null bytes before normalizing spaces', () => {
