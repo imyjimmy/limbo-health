@@ -2,6 +2,19 @@ function joinUrl(baseUrl, path) {
   return `${baseUrl.replace(/\/+$/, '')}${path}`;
 }
 
+export class OpenAiApiError extends Error {
+  constructor(message, { status = null, payload = null } = {}) {
+    super(message);
+    this.name = 'OpenAiApiError';
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
+export function isOpenAiApiError(error) {
+  return error instanceof OpenAiApiError;
+}
+
 export async function extractPdfFormUnderstandingWithOpenAI({
   apiKey,
   baseUrl,
@@ -50,8 +63,12 @@ export async function extractPdfFormUnderstandingWithOpenAI({
     const payload = await response.json().catch(() => null);
 
     if (!response.ok) {
-      throw new Error(
+      throw new OpenAiApiError(
         `OpenAI request failed with status ${response.status}: ${payload?.error?.message || 'Unknown error.'}`,
+        {
+          status: response.status,
+          payload,
+        },
       );
     }
 

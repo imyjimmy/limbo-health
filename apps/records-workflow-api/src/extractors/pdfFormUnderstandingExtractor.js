@@ -1,166 +1,106 @@
 import { config } from '../config.js';
-import { extractPdfFormUnderstandingWithOpenAI } from '../providers/openaiPdfFormUnderstandingClient.js';
+import { extractPdfFormUnderstandingWithOpenAI, isOpenAiApiError } from '../providers/openaiPdfFormUnderstandingClient.js';
 import {
   buildUnsupportedAutofillPayload,
-  MIN_AUTOFILL_CONFIDENCE,
   normalizePdfFormUnderstanding,
   PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,
   PDF_FORM_UNDERSTANDING_EXTRACTOR_VERSION,
 } from '../utils/pdfFormUnderstanding.js';
+import {
+  DEFAULT_MAX_INPUT_TOKENS,
+  DEFAULT_PROMPT_PROFILE,
+  PDF_FORM_UNDERSTANDING_RESPONSE_SCHEMA,
+  PDF_FORM_UNDERSTANDING_SYSTEM_PROMPT,
+  preparePdfFormUnderstandingRequest,
+} from '../utils/pdfFormUnderstandingPrompt.js';
 
-const PDF_FORM_UNDERSTANDING_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    mode: { type: 'string', enum: ['acroform', 'overlay'] },
-    template_id: { type: 'string' },
-    confidence: { type: 'number' },
-    questions: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          id: { type: 'string' },
-          label: { type: 'string' },
-          kind: { type: 'string', enum: ['single_select', 'multi_select', 'short_text'] },
-          required: { type: 'boolean' },
-          help_text: { type: 'string' },
-          confidence: { type: 'number' },
-          bindings: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                type: {
-                  type: 'string',
-                  enum: [
-                    'field_text',
-                    'field_checkbox',
-                    'field_radio',
-                    'overlay_text',
-                    'overlay_mark',
-                  ],
-                },
-                field_name: { type: 'string' },
-                checked: { type: 'boolean' },
-                value: { type: 'string' },
-                page_index: { type: 'integer' },
-                x: { type: 'number' },
-                y: { type: 'number' },
-                max_width: { type: 'number' },
-                font_size: { type: 'number' },
-                mark: { type: 'string', enum: ['x', 'check'] },
-                size: { type: 'number' },
-              },
-              required: ['type'],
-            },
-          },
-          options: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                id: { type: 'string' },
-                label: { type: 'string' },
-                confidence: { type: 'number' },
-                bindings: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    additionalProperties: false,
-                    properties: {
-                      type: {
-                        type: 'string',
-                        enum: [
-                          'field_text',
-                          'field_checkbox',
-                          'field_radio',
-                          'overlay_text',
-                          'overlay_mark',
-                        ],
-                      },
-                      field_name: { type: 'string' },
-                      checked: { type: 'boolean' },
-                      value: { type: 'string' },
-                      page_index: { type: 'integer' },
-                      x: { type: 'number' },
-                      y: { type: 'number' },
-                      max_width: { type: 'number' },
-                      font_size: { type: 'number' },
-                      mark: { type: 'string', enum: ['x', 'check'] },
-                      size: { type: 'number' },
-                    },
-                    required: ['type'],
-                  },
-                },
-              },
-              required: ['label', 'confidence', 'bindings'],
-            },
-          },
-        },
-        required: ['label', 'kind', 'required', 'confidence', 'bindings', 'options'],
+function buildPartialResponse(reason, metadata = {}) {
+  return {
+    extractorName: PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,
+    extractorVersion: PDF_FORM_UNDERSTANDING_EXTRACTOR_VERSION,
+    status: 'partial',
+    structuredOutput: {
+      form_understanding: buildUnsupportedAutofillPayload(),
+      metadata: {
+        reason,
+        ...metadata,
       },
     },
-  },
-  required: ['mode', 'confidence', 'questions'],
-};
-
-function trimPage(page) {
-  return {
-    pageIndex: page.pageIndex,
-    width: page.width,
-    height: page.height,
-    words: (page.words || []).slice(0, 320),
-    widgets: (page.widgets || []).slice(0, 120),
-    lineCandidates: (page.lineCandidates || []).slice(0, 160),
-    checkboxCandidates: (page.checkboxCandidates || []).slice(0, 160),
   };
 }
 
-function buildUserPrompt({ parsedPdf, hospitalSystemName, facilityName, formName, sourceUrl }) {
-  const pages = (parsedPdf.pages || []).slice(0, 4).map(trimPage);
+function classifyOpenAiFailure(error) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error?.message === 'string' && error.message.trim()
+        ? error.message
+        : 'Unknown OpenAI extraction error.';
+  const status =
+    (isOpenAiApiError(error) ? error.status : null) ??
+    (Number.isFinite(error?.status) ? Number(error.status) : null);
+  const lowerMessage = message.toLowerCase();
 
-  return JSON.stringify(
-    {
-      task: 'Extract only additional, user-answerable questions from this medical-records request PDF.',
-      rules: [
-        'Only return questions that the user must answer beyond already-collected bio fields.',
-        'Exclude name, date of birth, mailing address, signatures, photo-ID upload, and pure instructions.',
-        'Supported question kinds: single_select, multi_select, short_text.',
-        'Use exact AcroForm field names when widgets exist.',
-        'For flat PDFs, use overlay bindings with explicit page_index, x, and y coordinates in PDF coordinate space.',
-        `Only include questions and bindings you judge at or above confidence ${MIN_AUTOFILL_CONFIDENCE}.`,
-        'If there are no high-confidence additional questions, return an empty questions array.',
-      ],
-      context: {
-        hospitalSystemName,
-        facilityName,
-        formName,
-        sourceUrl,
-      },
-      pdf: {
-        title: parsedPdf.title || '',
-        headerText: parsedPdf.headerText || '',
-        text: parsedPdf.text || '',
-        pages,
-      },
-    },
-    null,
-    2,
-  );
+  if (status === 400 && lowerMessage.includes('invalid schema for response_format')) {
+    return {
+      error_category: 'schema_invalid',
+      retryable: false,
+      openai_status: status,
+      error: message,
+    };
+  }
+
+  if (status === 429 && lowerMessage.includes('request too large')) {
+    return {
+      error_category: 'request_too_large',
+      retryable: false,
+      openai_status: status,
+      error: message,
+    };
+  }
+
+  if (status === 429) {
+    return {
+      error_category: 'rate_limit',
+      retryable: true,
+      openai_status: status,
+      error: message,
+    };
+  }
+
+  if (lowerMessage.includes('abort') || lowerMessage.includes('timeout')) {
+    return {
+      error_category: 'timeout',
+      retryable: true,
+      openai_status: status,
+      error: message,
+    };
+  }
+
+  if (status != null && status >= 500) {
+    return {
+      error_category: 'upstream_error',
+      retryable: true,
+      openai_status: status,
+      error: message,
+    };
+  }
+
+  return {
+    error_category: 'openai_request_failed',
+    retryable: false,
+    openai_status: status,
+    error: message,
+  };
 }
 
-const SYSTEM_PROMPT = [
-  'You extract interactive questions from hospital medical-record request PDFs.',
-  'Work only from the grounded PDF layout data provided.',
-  'Return only additional user-input questions that should become workflow steps in a mobile app.',
-  'Do not include basic bio fields, signatures, dates to sign, instructions, or photo-ID requirements.',
-  'Every returned option or short-text question must include precise bindings that let the app write the answer back into the same PDF.',
-  'If confidence is below threshold, omit the question entirely instead of guessing.',
-].join(' ');
+export function preparePdfFormUnderstandingExtraction(options) {
+  return preparePdfFormUnderstandingRequest({
+    ...options,
+    promptProfile: options.promptProfile || DEFAULT_PROMPT_PROFILE,
+    maxInputTokens: options.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS,
+  });
+}
 
 export async function extractPdfFormUnderstanding({
   parsedPdf,
@@ -168,33 +108,32 @@ export async function extractPdfFormUnderstanding({
   facilityName = null,
   formName,
   sourceUrl,
+  promptProfile = DEFAULT_PROMPT_PROFILE,
+  maxInputTokens = DEFAULT_MAX_INPUT_TOKENS,
+  preparedRequest = null,
 }) {
   if (!parsedPdf?.pages?.length) {
-    return {
-      extractorName: PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,
-      extractorVersion: PDF_FORM_UNDERSTANDING_EXTRACTOR_VERSION,
-      status: 'partial',
-      structuredOutput: {
-        form_understanding: buildUnsupportedAutofillPayload(),
-        metadata: {
-          reason: 'missing_pdf_pages',
-        },
-      },
-    };
+    return buildPartialResponse('missing_pdf_pages');
   }
 
   if (!config.openai.apiKey || !config.openai.pdfFormUnderstandingModel) {
-    return {
-      extractorName: PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,
-      extractorVersion: PDF_FORM_UNDERSTANDING_EXTRACTOR_VERSION,
-      status: 'partial',
-      structuredOutput: {
-        form_understanding: buildUnsupportedAutofillPayload(),
-        metadata: {
-          reason: 'openai_not_configured',
-        },
-      },
-    };
+    return buildPartialResponse('openai_not_configured');
+  }
+
+  const requestPlan =
+    preparedRequest ||
+    preparePdfFormUnderstandingExtraction({
+      parsedPdf,
+      hospitalSystemName,
+      facilityName,
+      formName,
+      sourceUrl,
+      promptProfile,
+      maxInputTokens,
+    });
+
+  if (requestPlan.promptMetadata.prompt_over_budget) {
+    return buildPartialResponse('prompt_budget_exceeded', requestPlan.promptMetadata);
   }
 
   try {
@@ -203,15 +142,9 @@ export async function extractPdfFormUnderstanding({
       baseUrl: config.openai.baseUrl,
       model: config.openai.pdfFormUnderstandingModel,
       timeoutMs: config.openai.timeoutMs,
-      systemPrompt: SYSTEM_PROMPT,
-      userPrompt: buildUserPrompt({
-        parsedPdf,
-        hospitalSystemName,
-        facilityName,
-        formName,
-        sourceUrl,
-      }),
-      schema: PDF_FORM_UNDERSTANDING_SCHEMA,
+      systemPrompt: PDF_FORM_UNDERSTANDING_SYSTEM_PROMPT,
+      userPrompt: requestPlan.userPrompt,
+      schema: PDF_FORM_UNDERSTANDING_RESPONSE_SCHEMA,
     });
 
     const formUnderstanding = normalizePdfFormUnderstanding(output);
@@ -223,12 +156,14 @@ export async function extractPdfFormUnderstanding({
       structuredOutput: {
         form_understanding: formUnderstanding,
         metadata: {
+          ...requestPlan.promptMetadata,
           response_id: responseId,
           usage,
         },
       },
     };
   } catch (error) {
+    const classified = classifyOpenAiFailure(error);
     return {
       extractorName: PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,
       extractorVersion: PDF_FORM_UNDERSTANDING_EXTRACTOR_VERSION,
@@ -236,8 +171,9 @@ export async function extractPdfFormUnderstanding({
       structuredOutput: {
         form_understanding: buildUnsupportedAutofillPayload(),
         metadata: {
+          ...requestPlan.promptMetadata,
           reason: 'openai_request_failed',
-          error: error instanceof Error ? error.message : 'Unknown OpenAI extraction error.',
+          ...classified,
         },
       },
     };
