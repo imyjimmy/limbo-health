@@ -53,13 +53,48 @@ function isSpanishFormName(name: string): boolean {
   return /espanol|español|spanish/i.test(name);
 }
 
+function normalizeFormDescriptor(form: RecordsWorkflowForm): string {
+  return normalizeFieldName(`${form.name} ${form.url} ${form.cachedContentUrl || ''}`);
+}
+
+function getSemanticFormScore(form: RecordsWorkflowForm): number {
+  const descriptor = normalizeFormDescriptor(form);
+  let score = 0;
+
+  if (
+    descriptor.includes('authorization for release of medical information from') ||
+    descriptor.includes('release of medical information from')
+  ) {
+    score += 140;
+  }
+
+  if (
+    descriptor.includes('authorization for release of medical information to') ||
+    descriptor.includes('release of medical information to')
+  ) {
+    score -= 120;
+  }
+
+  if (descriptor.includes(' from bswh') || descriptor.includes(' from bswhealth')) {
+    score += 60;
+  }
+
+  if (descriptor.includes(' to bswh') || descriptor.includes(' to bswhealth')) {
+    score -= 60;
+  }
+
+  return score;
+}
+
 function sortPdfForms(forms: RecordsWorkflowForm[]): RecordsWorkflowForm[] {
   return [...forms]
     .filter((form) => form.format === 'pdf')
     .sort((a, b) => {
       const score = (form: RecordsWorkflowForm) =>
+        getSemanticFormScore(form) +
         (form.cachedContentUrl ? 100 : 0) +
-        (!isSpanishFormName(form.name) ? 10 : 0);
+        (!isSpanishFormName(form.name) ? 10 : 0) +
+        form.autofill.questions.length;
 
       return score(b) - score(a);
     });
@@ -69,10 +104,22 @@ function matchesAny(fieldName: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(fieldName));
 }
 
+function matchesExactFieldName(fieldName: string, names: string[]) {
+  return names.includes(fieldName);
+}
+
 function setTextFieldValue(field: PDFField, value: string) {
   if (!(field instanceof PDFTextField)) return false;
   field.setText(value);
   return true;
+}
+
+function buildCurrentDateValue() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const year = String(now.getFullYear());
+  return `${month}/${day}/${year}`;
 }
 
 function hexToPdfColor(hexColor: string) {
@@ -97,6 +144,9 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
   const cityState = [bioProfile.city.trim(), bioProfile.state.trim()]
     .filter(Boolean)
     .join(', ');
+  const cityStateZip = [cityState, bioProfile.postalCode.trim()].filter(Boolean).join(' ');
+  const fullMailingAddress = [addressLine, cityStateZip].filter(Boolean).join(', ');
+  const today = buildCurrentDateValue();
 
   let filledCount = 0;
 
@@ -119,6 +169,16 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
 
     if (
       matchesAny(normalized, [
+        /\bprinted name of patient or legal representative\b/,
+        /\bprinted name\b/,
+      ])
+    ) {
+      filledCount += setTextFieldValue(field, bioProfile.fullName.trim()) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      matchesAny(normalized, [
         /\bstreet address\b/,
         /\bmailing address\b/,
         /\bdireccion postal\b/,
@@ -128,8 +188,34 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
       continue;
     }
 
+    if (
+      matchesExactFieldName(normalized, [
+        'street',
+        'street address city state zip',
+      ])
+    ) {
+      const value = normalized === 'street address city state zip' ? fullMailingAddress : addressLine;
+      filledCount += setTextFieldValue(field, value) ? 1 : 0;
+      continue;
+    }
+
     if (matchesAny(normalized, [/\bcity state\b/, /\bciudad y estado\b/])) {
       filledCount += setTextFieldValue(field, cityState) ? 1 : 0;
+      continue;
+    }
+
+    if (matchesExactFieldName(normalized, ['city', 'patient city'])) {
+      filledCount += setTextFieldValue(field, bioProfile.city.trim()) ? 1 : 0;
+      continue;
+    }
+
+    if (matchesExactFieldName(normalized, ['state', 'patient state'])) {
+      filledCount += setTextFieldValue(field, bioProfile.state.trim()) ? 1 : 0;
+      continue;
+    }
+
+    if (matchesExactFieldName(normalized, ['city state zip'])) {
+      filledCount += setTextFieldValue(field, cityStateZip) ? 1 : 0;
       continue;
     }
 
@@ -145,6 +231,11 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
       continue;
     }
 
+    if (matchesExactFieldName(normalized, ['relationship to patient'])) {
+      filledCount += setTextFieldValue(field, 'Self') ? 1 : 0;
+      continue;
+    }
+
     if (
       matchesAny(normalized, [
         /\bdate of birth\b/,
@@ -153,6 +244,11 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
       ])
     ) {
       filledCount += setTextFieldValue(field, bioProfile.dateOfBirth.trim()) ? 1 : 0;
+      continue;
+    }
+
+    if (matchesExactFieldName(normalized, ['date'])) {
+      filledCount += setTextFieldValue(field, today) ? 1 : 0;
     }
   }
 
@@ -565,3 +661,10 @@ export async function generateRecordsRequestPdf(input: GenerateRecordsRequestPdf
     usedCachedTemplate: Boolean(selectedForm.cachedContentUrl),
   };
 }
+
+export const __testing__ = {
+  buildCurrentDateValue,
+  fillBioFields,
+  getSemanticFormScore,
+  sortPdfForms,
+};

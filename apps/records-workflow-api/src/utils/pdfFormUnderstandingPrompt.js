@@ -10,6 +10,37 @@ const REGION_KEYWORDS = [
   'records requested',
   'what kind of records',
   'purpose',
+  'continued care',
+  'released to',
+  'release to',
+  'release the following information',
+  'record copy delivery',
+  'delivery',
+  'fax',
+  'mail',
+  'email',
+  'provider',
+  'clinic visits',
+  'hospital visits',
+  'patient designee',
+  'health care entity',
+  'insurance company',
+  'attorney',
+  'summary abstract',
+  'clinic notes',
+  'discharge summary',
+  'history and physical',
+  'operative reports',
+  'progress notes',
+  'radiology',
+  'laboratory',
+  'billing record',
+  'complete chart',
+  'immunization',
+  'alcohol',
+  'genetics',
+  'hiv',
+  'mental health',
   'date range',
   'from',
   'to',
@@ -17,6 +48,75 @@ const REGION_KEYWORDS = [
   'initial',
   'check all that apply',
   'circle one',
+];
+
+const BIO_WIDGET_PATTERNS = [
+  /\bpatient name\b/,
+  /\bdate of birth\b/,
+  /\bdob\b/,
+  /\bsocial security\b/,
+  /\bssn\b/,
+  /\blast 4\b/,
+  /\bpatient street\b/,
+  /\bpatient city\b/,
+  /\bpatient zip\b/,
+  /\bpatient telephone\b/,
+  /\bpatient email\b/,
+  /\bacct\b/,
+  /\bmrn\b/,
+];
+
+const SIGNATURE_WIDGET_PATTERNS = [
+  /\bsignature\b/,
+  /\bprinted name of patient or legal representative\b/,
+  /\brelationship to patient\b/,
+  /\bauthority to act for patient\b/,
+];
+
+const QUESTION_WIDGET_PATTERNS = [
+  /^patient$/,
+  /^healthcareentity$/,
+  /^insuranceco$/,
+  /^attorney$/,
+  /^continuedcare$/,
+  /^personaluse$/,
+  /^othercheck$/,
+  /\bexpiration\b/,
+  /\breleased to\b/,
+  /\brelease to\b/,
+  /\bindividual organization\b/,
+  /\bcontinued care\b/,
+  /\blegal\b/,
+  /\binsurance\b/,
+  /\bpersonal use\b/,
+  /\bdelivery\b/,
+  /\bfax\b/,
+  /\bmail\b/,
+  /\bmybswhealth\b/,
+  /\bclinic visits\b/,
+  /\bhospital visits\b/,
+  /\bspecify provider\b/,
+  /\btreatment date\b/,
+  /\balcohol\b/,
+  /\bgenetics\b/,
+  /\bhiv\b/,
+  /\bmental health\b/,
+  /\bsummary\b/,
+  /\bclinic notes\b/,
+  /\bconsultations\b/,
+  /\blab\b/,
+  /\blaboratory\b/,
+  /\bradiology\b/,
+  /\bdischarge summary\b/,
+  /\bmedication\b/,
+  /\bbilling record\b/,
+  /\bhistory\b/,
+  /\boperative\b/,
+  /\bcomplete chart\b/,
+  /\bimmunization\b/,
+  /\bprogress notes\b/,
+  /\brelease info\b/,
+  /\bother\b/,
 ];
 
 function matchesRegionKeyword(text) {
@@ -31,8 +131,8 @@ function matchesRegionKeyword(text) {
 export const PDF_FORM_PROMPT_PROFILES = {
   expanded: {
     maxPages: 4,
-    maxWidgets: 28,
-    maxCheckboxCandidates: 28,
+    maxWidgets: 40,
+    maxCheckboxCandidates: 32,
     maxLineCandidates: 28,
     maxKeywordAnchors: 16,
     maxLabelSnippets: 28,
@@ -46,8 +146,8 @@ export const PDF_FORM_PROMPT_PROFILES = {
   },
   compact: {
     maxPages: 3,
-    maxWidgets: 20,
-    maxCheckboxCandidates: 20,
+    maxWidgets: 32,
+    maxCheckboxCandidates: 24,
     maxLineCandidates: 20,
     maxKeywordAnchors: 12,
     maxLabelSnippets: 20,
@@ -61,8 +161,8 @@ export const PDF_FORM_PROMPT_PROFILES = {
   },
   minimal: {
     maxPages: 2,
-    maxWidgets: 12,
-    maxCheckboxCandidates: 12,
+    maxWidgets: 20,
+    maxCheckboxCandidates: 16,
     maxLineCandidates: 12,
     maxKeywordAnchors: 8,
     maxLabelSnippets: 12,
@@ -106,12 +206,28 @@ function truncate(value, maxChars) {
   return normalized.length <= maxChars ? normalized : `${normalized.slice(0, maxChars - 1)}...`;
 }
 
+function normalizeWidgetText(widget) {
+  return compactWhitespace(`${widget?.fieldName || ''} ${widget?.fieldLabel || ''}`).toLowerCase();
+}
+
 function sortWords(words) {
   return [...words].sort((left, right) => {
     const yDelta = Number(left.y || 0) - Number(right.y || 0);
     if (Math.abs(yDelta) > 4) return yDelta;
     return Number(left.x || 0) - Number(right.x || 0);
   });
+}
+
+function sortByVisualOrder(items) {
+  return [...items].sort((left, right) => {
+    const yDelta = Number(right?.y || 0) - Number(left?.y || 0);
+    if (Math.abs(yDelta) > 4) return yDelta;
+    return Number(left?.x || 0) - Number(right?.x || 0);
+  });
+}
+
+function matchesAnyPattern(value, patterns) {
+  return patterns.some((pattern) => pattern.test(value));
 }
 
 function toRect(item, padX, padY) {
@@ -186,6 +302,35 @@ function buildSnippet(words, maxChars) {
   };
 }
 
+function countNearbyKeywordWords(page, item, profile) {
+  const rect = toRect(item, Math.max(profile.anchorPadX - 12, 24), Math.max(profile.anchorPadY - 8, 16));
+  let count = 0;
+
+  for (const word of page.words || []) {
+    if (!intersectsWord(word, rect)) continue;
+
+    const text = compactWhitespace(word?.text || '').toLowerCase();
+    if (text && matchesRegionKeyword(text)) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function buildNearbyText(page, item, profile, maxChars = 180) {
+  const rect = toRect(item, Math.max(profile.anchorPadX, 72), Math.max(profile.anchorPadY, 20));
+  const nearbyWords = sortWords((page.words || []).filter((word) => intersectsWord(word, rect)));
+
+  return truncate(
+    nearbyWords
+      .map((word) => compactWhitespace(word?.text || ''))
+      .filter(Boolean)
+      .join(' '),
+    maxChars,
+  ).toLowerCase();
+}
+
 function buildLabelSnippets(page, anchors, profile) {
   const snippets = [];
   const seenText = new Set();
@@ -214,7 +359,11 @@ function buildLabelSnippets(page, anchors, profile) {
 function toWidgetPayload(widget) {
   return {
     field_name: normalizeString(widget?.fieldName) || null,
+    field_label: normalizeString(widget?.fieldLabel) || null,
     field_type: normalizeString(widget?.fieldType) || null,
+    choice_values: Array.isArray(widget?.choiceValues)
+      ? widget.choiceValues.map((value) => normalizeString(value)).filter(Boolean)
+      : [],
     x: Number(widget?.x || 0),
     y: Number(widget?.y || 0),
     width: Number(widget?.width || 0),
@@ -230,6 +379,200 @@ function toCandidatePayload(candidate) {
     height: Number(candidate?.height || candidate?.size || 0),
     shape: normalizeString(candidate?.shape) || null,
   };
+}
+
+function scoreWidget(page, widget) {
+  const widgetType = normalizeString(widget?.fieldType).toLowerCase();
+  const normalizedText = normalizeWidgetText(widget);
+  const nearbyText = buildNearbyText(page, widget, {
+    anchorPadX: 72,
+    anchorPadY: 24,
+  });
+  const semanticText = compactWhitespace(`${nearbyText} ${normalizedText}`).toLowerCase();
+  const pageHeight = Math.max(Number(page?.height || 0), 1);
+  const relativeHeight = 1 - Number(widget?.y || 0) / pageHeight;
+  const keywordHits = countNearbyKeywordWords(page, widget, {
+    anchorPadX: 64,
+    anchorPadY: 24,
+  });
+
+  let score = 0;
+
+  if (widgetType === 'button') {
+    return -500;
+  }
+
+  if (widgetType === 'signature') {
+    return -250;
+  }
+
+  if (widgetType === 'checkbox' || widgetType === 'radio') {
+    score += 80;
+  } else if (widgetType === 'text' || widgetType === 'choice') {
+    score += 20;
+  }
+
+  if (matchesAnyPattern(semanticText, QUESTION_WIDGET_PATTERNS)) {
+    score += 60;
+  }
+
+  if (matchesAnyPattern(normalizedText, QUESTION_WIDGET_PATTERNS)) {
+    score += 10;
+  }
+
+  if (matchesAnyPattern(semanticText, BIO_WIDGET_PATTERNS)) {
+    score -= 45;
+  }
+
+  if (matchesAnyPattern(normalizedText, BIO_WIDGET_PATTERNS)) {
+    score -= 10;
+  }
+
+  if (matchesAnyPattern(semanticText, SIGNATURE_WIDGET_PATTERNS)) {
+    score -= 120;
+  }
+
+  if (matchesAnyPattern(normalizedText, SIGNATURE_WIDGET_PATTERNS)) {
+    score -= 20;
+  }
+
+  score += keywordHits * 24;
+  score += Math.round(relativeHeight * 25);
+  return score;
+}
+
+function scoreCandidate(page, candidate, profile) {
+  const pageHeight = Math.max(Number(page?.height || 0), 1);
+  const relativeHeight = 1 - Number(candidate?.y || 0) / pageHeight;
+  const keywordHits = countNearbyKeywordWords(page, candidate, profile);
+  const width = Number(candidate?.width || candidate?.size || 0);
+
+  return keywordHits * 30 + Math.round(relativeHeight * 18) + Math.min(Math.round(width / 24), 8);
+}
+
+function getVerticalBandKey(page, item) {
+  const pageHeight = Math.max(Number(page?.height || 0), 1);
+  const normalizedY = Number(item?.y || 0) / pageHeight;
+
+  if (normalizedY >= 0.72) return 'top';
+  if (normalizedY >= 0.52) return 'upper';
+  if (normalizedY >= 0.32) return 'middle';
+  return 'lower';
+}
+
+function isCheckboxWidget(widget) {
+  return normalizeString(widget?.fieldType).toLowerCase() === 'checkbox';
+}
+
+function buildCheckboxRows(entries) {
+  const rows = [];
+
+  for (const entry of sortByVisualOrder(entries.map((candidate) => candidate.widget)).map((widget) =>
+    entries.find((entry) => entry.widget === widget),
+  )) {
+    if (!entry) continue;
+
+    const y = Number(entry.widget?.y || 0);
+    const existingRow = rows.find((row) => Math.abs(row.anchorY - y) <= 14);
+
+    if (existingRow) {
+      existingRow.entries.push(entry);
+      continue;
+    }
+
+    rows.push({
+      anchorY: y,
+      entries: [entry],
+    });
+  }
+
+  for (const row of rows) {
+    row.entries.sort((left, right) => Number(left.widget?.x || 0) - Number(right.widget?.x || 0));
+  }
+
+  return rows;
+}
+
+function selectWidgets(page, profile) {
+  const entries = [...(page.widgets || [])]
+    .map((widget, index) => ({
+      widget,
+      index,
+      score: scoreWidget(page, widget),
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) return right.score - left.score;
+      return left.index - right.index;
+    });
+
+  const groupedEntries = new Map();
+  for (const entry of entries) {
+    const bandKey = getVerticalBandKey(page, entry.widget);
+    const bandEntries = groupedEntries.get(bandKey) || [];
+    bandEntries.push(entry);
+    groupedEntries.set(bandKey, bandEntries);
+  }
+
+  const activeBandKeys = ['top', 'upper', 'middle', 'lower'].filter((bandKey) =>
+    groupedEntries.has(bandKey),
+  );
+  const guaranteedPerBand = Math.max(
+    1,
+    Math.ceil(profile.maxWidgets / Math.max(activeBandKeys.length, 1) / 2),
+  );
+  const selectedEntries = [];
+  const selectedIndexes = new Set();
+
+  for (const bandKey of activeBandKeys) {
+    const bandEntries = groupedEntries.get(bandKey) || [];
+    for (const entry of bandEntries.slice(0, guaranteedPerBand)) {
+      if (selectedIndexes.has(entry.index)) continue;
+      selectedEntries.push(entry);
+      selectedIndexes.add(entry.index);
+    }
+  }
+
+  const checkboxRows = buildCheckboxRows(entries.filter((entry) => isCheckboxWidget(entry.widget)));
+
+  for (const row of checkboxRows) {
+    if (!row.entries.some((entry) => selectedIndexes.has(entry.index))) {
+      continue;
+    }
+
+    for (const entry of row.entries) {
+      if (selectedEntries.length >= profile.maxWidgets) break;
+      if (selectedIndexes.has(entry.index)) continue;
+      selectedEntries.push(entry);
+      selectedIndexes.add(entry.index);
+    }
+  }
+
+  for (const entry of entries) {
+    if (selectedEntries.length >= profile.maxWidgets) break;
+    if (selectedIndexes.has(entry.index)) continue;
+    selectedEntries.push(entry);
+    selectedIndexes.add(entry.index);
+  }
+
+  return sortByVisualOrder(selectedEntries.map((entry) => entry.widget));
+}
+
+function selectCandidates(page, candidates, limit, profile) {
+  return sortByVisualOrder(
+    [...(candidates || [])]
+      .map((candidate, index) => ({
+        candidate,
+        index,
+        score: scoreCandidate(page, candidate, profile),
+      }))
+      .sort((left, right) => {
+        if (right.score !== left.score) return right.score - left.score;
+        return left.index - right.index;
+      })
+      .slice(0, limit)
+      .map((entry) => entry.candidate),
+  );
 }
 
 function scorePage(page) {
@@ -256,12 +599,21 @@ function scorePage(page) {
 }
 
 function buildPagePayload(page, profile) {
-  const widgets = (page.widgets || []).slice(0, profile.maxWidgets);
-  const checkboxCandidates = (page.checkboxCandidates || [])
-    .slice(0, profile.maxCheckboxCandidates);
-  const lineCandidates = (page.lineCandidates || [])
+  const widgets = selectWidgets(page, profile);
+  const checkboxCandidates = selectCandidates(
+    page,
+    page.checkboxCandidates || [],
+    profile.maxCheckboxCandidates,
+    profile,
+  );
+  const lineCandidates = selectCandidates(
+    page,
+    (page.lineCandidates || [])
     .filter((candidate) => Number(candidate?.width || 0) >= profile.minLineWidth)
-    .slice(0, profile.maxLineCandidates);
+    .slice(0, Math.max(profile.maxLineCandidates * 2, profile.maxLineCandidates)),
+    profile.maxLineCandidates,
+    profile,
+  );
   const keywordAnchors = findKeywordAnchors(page.words || [], profile.maxKeywordAnchors);
   const anchors = [...widgets, ...checkboxCandidates, ...lineCandidates, ...keywordAnchors];
 

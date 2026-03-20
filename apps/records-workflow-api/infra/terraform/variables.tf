@@ -16,6 +16,18 @@ variable "environment" {
   default     = "dev"
 }
 
+variable "api_domain_name" {
+  description = "Optional public DNS name for the API (required for real HTTPS phone traffic). Example: records.limbo.health"
+  type        = string
+  default     = ""
+}
+
+variable "route53_zone_id" {
+  description = "Optional Route53 hosted zone ID used to create an ALIAS record for api_domain_name."
+  type        = string
+  default     = ""
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC."
   type        = string
@@ -157,10 +169,41 @@ variable "enable_scheduled_crawl" {
   default     = true
 }
 
+variable "crawl_state" {
+  description = "Default state scope for the API/crawler runtime."
+  type        = string
+  default     = "TX"
+}
+
 variable "crawl_schedule_expression" {
   description = "EventBridge schedule expression for crawler task."
   type        = string
   default     = "rate(30 days)"
+}
+
+variable "openai_api_key" {
+  description = "Optional OpenAI API key for PDF form understanding extraction."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "openai_pdf_form_model" {
+  description = "Optional OpenAI model id used for PDF form understanding extraction."
+  type        = string
+  default     = ""
+}
+
+variable "openai_api_base_url" {
+  description = "Optional OpenAI API base URL override."
+  type        = string
+  default     = "https://api.openai.com/v1"
+}
+
+variable "openai_timeout_ms" {
+  description = "Timeout for OpenAI requests made by records-workflow-api."
+  type        = number
+  default     = 30000
 }
 
 variable "tags" {

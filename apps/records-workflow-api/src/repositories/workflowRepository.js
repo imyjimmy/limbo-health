@@ -743,10 +743,20 @@ export async function listHospitalSystems(searchTerm = '', limit = 50) {
     return result.rows;
   }
 
+  const connectorInsensitive = (value) =>
+    value
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/\band\b/g, ' ')
+      .replace(/[^a-z0-9]+/g, '');
+
   const q = `%${trimmed}%`;
   const normalizedSearch = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const connectorInsensitiveSearch = connectorInsensitive(trimmed);
   const normalizedLike = `%${normalizedSearch}%`;
   const normalizedPrefix = `${normalizedSearch}%`;
+  const connectorInsensitiveLike = `%${connectorInsensitiveSearch}%`;
+  const connectorInsensitivePrefix = `${connectorInsensitiveSearch}%`;
 
   const result = await query(
     `select
@@ -761,16 +771,57 @@ export async function listHospitalSystems(searchTerm = '', limit = 50) {
          or coalesce(canonical_domain, '') ilike $1
          or regexp_replace(lower(system_name), '[^a-z0-9]+', '', 'g') like $2
          or regexp_replace(lower(coalesce(canonical_domain, '')), '[^a-z0-9]+', '', 'g') like $2
+         or regexp_replace(
+           regexp_replace(
+             regexp_replace(lower(system_name), '&', ' and ', 'g'),
+             '(^|[^a-z0-9])and([^a-z0-9]|$)',
+             '',
+             'g'
+           ),
+           '[^a-z0-9]+',
+           '',
+           'g'
+         ) like $5
+         or regexp_replace(
+           regexp_replace(
+             regexp_replace(lower(coalesce(canonical_domain, '')), '&', ' and ', 'g'),
+             '(^|[^a-z0-9])and([^a-z0-9]|$)',
+             '',
+             'g'
+           ),
+           '[^a-z0-9]+',
+           '',
+           'g'
+         ) like $5
        )
      order by
        case
          when system_name ilike $3 then 0
          when regexp_replace(lower(system_name), '[^a-z0-9]+', '', 'g') like $4 then 1
-         else 2
+         when regexp_replace(
+           regexp_replace(
+             regexp_replace(lower(system_name), '&', ' and ', 'g'),
+             '(^|[^a-z0-9])and([^a-z0-9]|$)',
+             '',
+             'g'
+           ),
+           '[^a-z0-9]+',
+           '',
+           'g'
+         ) like $6 then 2
+         else 3
        end,
        system_name asc
-     limit $5`,
-    [q, normalizedLike, `${trimmed}%`, normalizedPrefix, limit]
+     limit $7`,
+    [
+      q,
+      normalizedLike,
+      `${trimmed}%`,
+      normalizedPrefix,
+      connectorInsensitiveLike,
+      connectorInsensitivePrefix,
+      limit,
+    ]
   );
 
   return result.rows;

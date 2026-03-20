@@ -14,19 +14,64 @@ describe('hospital-system search query builder', () => {
   });
 
   it.each([
-    ['Mass General Brigham', '%Mass General Brigham%', '%massgeneralbrigham%', 'massgeneralbrigham%'],
-    ['Baylor Scott & White', '%Baylor Scott & White%', '%baylorscottwhite%', 'baylorscottwhite%'],
-    ["St. David's", "%St. David's%", '%stdavids%', 'stdavids%'],
+    [
+      'Mass General Brigham',
+      '%Mass General Brigham%',
+      '%massgeneralbrigham%',
+      'massgeneralbrigham%',
+      '%massgeneralbrigham%',
+      'massgeneralbrigham%',
+    ],
+    [
+      'Baylor Scott & White',
+      '%Baylor Scott & White%',
+      '%baylorscottwhite%',
+      'baylorscottwhite%',
+      '%baylorscottwhite%',
+      'baylorscottwhite%',
+    ],
+    [
+      'Baylor Scott and White',
+      '%Baylor Scott and White%',
+      '%baylorscottandwhite%',
+      'baylorscottandwhite%',
+      '%baylorscottwhite%',
+      'baylorscottwhite%',
+    ],
+    [
+      'BSW',
+      '%BSW%',
+      '%bsw%',
+      'bsw%',
+      '%bsw%',
+      'bsw%',
+    ],
+    ["St. David's", "%St. David's%", '%stdavids%', 'stdavids%', '%stdavids%', 'stdavids%'],
   ])(
     'normalizes %s before querying Postgres',
-    async (searchTerm, expectedLike, expectedNormalizedLike, expectedNormalizedPrefix) => {
+    async (
+      searchTerm,
+      expectedLike,
+      expectedNormalizedLike,
+      expectedNormalizedPrefix,
+      expectedConnectorInsensitiveLike,
+      expectedConnectorInsensitivePrefix,
+    ) => {
       vi.mocked(query).mockResolvedValue({ rows: [] });
 
       await expect(listHospitalSystems(searchTerm)).resolves.toEqual([]);
 
       expect(query).toHaveBeenCalledWith(
         expect.stringContaining('from hospital_systems'),
-        [expectedLike, expectedNormalizedLike, `${searchTerm}%`, expectedNormalizedPrefix, 50],
+        [
+          expectedLike,
+          expectedNormalizedLike,
+          `${searchTerm}%`,
+          expectedNormalizedPrefix,
+          expectedConnectorInsensitiveLike,
+          expectedConnectorInsensitivePrefix,
+          50,
+        ],
       );
     },
   );
