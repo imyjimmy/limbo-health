@@ -20,6 +20,7 @@ The current automated pipeline works well once it has a good seed file and acces
 
 1. Public hospital pages are bot-protected.
 2. The crawler finds partial workflow data, but a human can quickly navigate to the real records page or direct PDF.
+3. The crawler reaches a real records PDF, but the PDF is scan-heavy or image-only, so the parser extracts little or no machine-readable text even though a human can clearly read the form.
 
 In those cases, the human should be able to supply the missing source material and let the system handle the structured ingestion and storage.
 
@@ -135,6 +136,7 @@ System should:
 - attempt normal PDF parsing
 - if parsing succeeds, use the existing naming path
 - if parsing fails, still allow import using trusted HTML/title/context
+- if the PDF is visually readable to a human but machine text extraction is weak or blank, allow import based on trusted navigation context from the source page
 - rename the file into the canonical storage format
 - insert a `source_documents` row of type `pdf`
 - create an `extraction_runs` row, even if status is `partial`
@@ -312,10 +314,12 @@ These are optional. The MVP can launch without schema changes if provenance is s
 Manual imports should follow these rules:
 
 - a parse failure must not block ingestion
+- weak or blank machine text extraction must not block ingestion when a human-confirmed navigation path proves the PDF is the records form
 - file naming still uses the canonical storage format
 - the source URL should be preserved whenever known
 - human-supplied HTML/page context can be used as semantic context for naming and categorization
 - manual language hints from the filename are hints, not absolute truth
+- OCR is not required for the MVP; scanned or image-only PDFs should still be ingestible as human-confirmed documents
 
 ## Approval Model
 
@@ -346,6 +350,7 @@ This is the minimum version that helps with UW, MultiCare, Virginia Mason, and s
 - suspicious filename repair UI
 - hash-named file repair UI
 - PDF parse failure review
+- scanned/image-only PDF review with a human-confirmed import path
 
 ### Phase 3: Better Guidance
 
@@ -367,6 +372,7 @@ Keep it simple.
 - seed editing and DB reseeding can drift if JSON and DB updates are not clearly synchronized
 - manual imports can create duplicates if source URL and content hash matching are weak
 - operators may accidentally attach a document to the wrong system or facility
+- scanned PDFs can appear "empty" to the parser even when the document is obviously correct to a human
 
 ## Mitigations
 
@@ -375,10 +381,13 @@ Keep it simple.
 - dedupe on `hospital_system_id + source_url + content_hash`
 - keep import provenance in metadata
 - make recrawls targeted and state-scoped
+- allow human-confirmed source-page context to override parser weakness for ingestion decisions
+- reserve OCR as a later enhancement, not a prerequisite for import
 
 ## Acceptance Criteria
 
 - an operator can take a blocked public records page reached manually and get its HTML/PDF into the DB without shell work
+- an operator can take a scanned or image-only records PDF that the parser cannot read and still import it using trusted page/link context
 - an operator can reseed a state without editing JSON in a text editor
 - an operator can trigger a targeted recrawl for a single system
 - an operator can see which systems still have `0` PDFs and why
@@ -391,6 +400,7 @@ Build the MVP around Washington state, because it already demonstrates all of th
 - bot-protected systems
 - manual HTML assists
 - manual PDF imports
+- scanned/image-only PDFs that are human-readable but parser-weak
 - zero-PDF high-impact systems
 - naming corrections
 - targeted recrawls after manual intervention
