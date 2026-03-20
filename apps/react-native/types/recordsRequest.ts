@@ -101,6 +101,21 @@ export interface RecordsRequestIdAttachment {
   source: 'camera' | 'library';
 }
 
+export interface RecordsRequestSignaturePoint {
+  x: number;
+  y: number;
+}
+
+export interface RecordsRequestSignatureStroke {
+  points: RecordsRequestSignaturePoint[];
+}
+
+export interface RecordsRequestUserSignature {
+  width: number;
+  height: number;
+  strokes: RecordsRequestSignatureStroke[];
+}
+
 export interface RecordsRequestPacket {
   hospitalSystem: HospitalSystemOption;
   portal: {

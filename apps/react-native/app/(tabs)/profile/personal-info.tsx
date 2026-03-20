@@ -81,7 +81,8 @@ export default function PersonalInfoScreen() {
         <Text style={styles.sectionLabel}>ABOUT</Text>
         <View style={styles.card}>
           <Text style={styles.helperText}>
-            Used to prefill medical-records request packets. Stored only on this device.
+            Used to prefill medical-records request packets, including contact fields when a form
+            asks for them. Stored only on this device.
           </Text>
         </View>
 
@@ -119,6 +120,41 @@ export default function PersonalInfoScreen() {
               style={styles.fieldInput}
               keyboardType="number-pad"
               textContentType="birthdate"
+            />
+          </View>
+        </View>
+
+        <Text style={styles.sectionLabel}>CONTACT DETAILS</Text>
+        <View style={styles.card}>
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>Phone number</Text>
+            <TextInput
+              value={form.phoneNumber}
+              onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
+              placeholder="512 555 0123"
+              placeholderTextColor={chrome.secondaryText}
+              style={styles.fieldInput}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="telephoneNumber"
+            />
+          </View>
+
+          <View style={styles.rowSeparator} />
+
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>Email</Text>
+            <TextInput
+              value={form.email}
+              onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
+              placeholder="name@example.com"
+              placeholderTextColor={chrome.secondaryText}
+              style={styles.fieldInput}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="emailAddress"
             />
           </View>
         </View>

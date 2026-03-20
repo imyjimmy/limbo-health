@@ -33,6 +33,8 @@ const FIELD_SCROLL_KEYBOARD_PADDING = 92;
 type BioFieldKey =
   | 'fullName'
   | 'dateOfBirth'
+  | 'phoneNumber'
+  | 'email'
   | 'addressLine1'
   | 'addressLine2'
   | 'city'
@@ -83,7 +85,8 @@ export default function BioSetupScreen() {
       {
         eyebrow: 'Step 2 of 3',
         title: 'Basic details',
-        body: 'Add the name and date of birth hospitals use to identify your records request.',
+        body:
+          'Add the name, date of birth, and contact details that should appear on request forms when a hospital asks for them.',
       },
       {
         eyebrow: 'Step 3 of 3',
@@ -284,6 +287,8 @@ export default function BioSetupScreen() {
             <Text style={styles.introCardTitle}>What we will ask for</Text>
             <Text style={styles.introCardBody}>Full name</Text>
             <Text style={styles.introCardBody}>Date of birth</Text>
+            <Text style={styles.introCardBody}>Phone number (optional)</Text>
+            <Text style={styles.introCardBody}>Email (optional)</Text>
             <Text style={styles.introCardBody}>Mailing address</Text>
             <Text style={styles.introCardFootnote}>Stored only on this device.</Text>
           </View>
@@ -327,6 +332,40 @@ export default function BioSetupScreen() {
                 inputAccessoryViewButtonLabel={
                   Platform.OS === 'ios' && showsDateOfBirthDoneButton ? 'Done' : undefined
                 }
+              />
+            </View>
+
+            <View onLayout={registerFieldLayout('phoneNumber')}>
+              <Text style={styles.fieldLabel}>Phone number</Text>
+              <TextInput
+                value={form.phoneNumber}
+                onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
+                onFocus={() => focusField('phoneNumber')}
+                onBlur={() => blurField('phoneNumber')}
+                placeholder="512 555 0123"
+                placeholderTextColor={theme.colors.inputPlaceholder}
+                style={styles.input}
+                keyboardType="phone-pad"
+                textContentType="telephoneNumber"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+
+            <View onLayout={registerFieldLayout('email')}>
+              <Text style={styles.fieldLabel}>Email</Text>
+              <TextInput
+                value={form.email}
+                onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
+                onFocus={() => focusField('email')}
+                onBlur={() => blurField('email')}
+                placeholder="name@example.com"
+                placeholderTextColor={theme.colors.inputPlaceholder}
+                style={styles.input}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                autoCapitalize="none"
+                autoCorrect={false}
               />
             </View>
           </View>

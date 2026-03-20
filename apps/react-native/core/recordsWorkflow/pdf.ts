@@ -1,8 +1,10 @@
 import RNFS from 'react-native-fs';
 import {
+  LineCapStyle,
   PDFCheckBox,
   PDFDocument,
   PDFRadioGroup,
+  PDFSignature,
   PDFTextField,
   StandardFonts,
   rgb as pdfRgb,
@@ -13,11 +15,17 @@ import {
 import { decode as decodeBase64, encode as encodeBase64 } from '../crypto/base64';
 import type { RecordsWorkflowAutofillAnswers } from './autofill';
 import { findFlatPdfTemplate, getFlatPdfTemplateSupportMessage } from './pdfTemplates';
+import {
+  buildSignatureSvgPath,
+  getSignatureBounds,
+  hasSignatureStrokeInput,
+} from './signature';
 import { ACTIVE_THEME_NAME, resolveTheme } from '../../theme/themes';
 import type { BioProfile } from '../../types/bio';
 import type {
   RecordsRequestIdAttachment,
   RecordsRequestPacket,
+  RecordsRequestUserSignature,
   RecordsWorkflowAutofillBinding,
   RecordsWorkflowForm,
 } from '../../types/recordsRequest';
@@ -28,6 +36,16 @@ interface GenerateRecordsRequestPdfInput {
   idAttachment: RecordsRequestIdAttachment | null;
   selectedFormKey?: string | null;
   autofillAnswers?: RecordsWorkflowAutofillAnswers;
+  signature?: RecordsRequestUserSignature | null;
+}
+
+interface RecordsRequestPdfSignatureField {
+  fieldName: string;
+  pageIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 interface PreparedRecordsRequestPdfTemplate {
@@ -35,6 +53,7 @@ interface PreparedRecordsRequestPdfTemplate {
   pdfBytes: Uint8Array;
   fieldCount: number;
   flatTemplateId: string | null;
+  signatureFields: RecordsRequestPdfSignatureField[];
 }
 
 const pdfTheme = resolveTheme(ACTIVE_THEME_NAME, 'light');
@@ -184,10 +203,49 @@ function hexToPdfColor(hexColor: string) {
   return pdfRgb(red, green, blue);
 }
 
-function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
+function shouldFillPatientRecipientFields(
+  form: RecordsWorkflowForm,
+  answers: RecordsWorkflowAutofillAnswers,
+) {
+  return form.autofill.questions.some((question) => {
+    if (question.kind !== 'single_select' && question.kind !== 'multi_select') {
+      return false;
+    }
+
+    if (
+      !/\b(released to|receive the records|receive the released information|medical information be released to|recipients?)\b/i.test(
+        question.label,
+      )
+    ) {
+      return false;
+    }
+
+    const selectedOptionLabels =
+      question.kind === 'single_select'
+        ? question.options
+            .filter((option) => option.id === answers[question.id])
+            .map((option) => option.label)
+        : Array.isArray(answers[question.id])
+          ? question.options
+              .filter((option) => (answers[question.id] as string[]).includes(option.id))
+              .map((option) => option.label)
+          : [];
+
+    return selectedOptionLabels.some((label) => /\b(patient|designee|self)\b/i.test(label));
+  });
+}
+
+function fillBioFields(
+  pdf: PDFDocument,
+  bioProfile: BioProfile,
+  options?: { allowPatientRecipientFallback?: boolean },
+) {
   const form = pdf.getForm();
   const fields = form.getFields();
 
+  const fullName = bioProfile.fullName.trim();
+  const phoneNumber = bioProfile.phoneNumber.trim();
+  const email = bioProfile.email.trim();
   const addressLine = [bioProfile.addressLine1, bioProfile.addressLine2]
     .map((value) => value.trim())
     .filter(Boolean)
@@ -198,6 +256,7 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
   const cityStateZip = [cityState, bioProfile.postalCode.trim()].filter(Boolean).join(' ');
   const fullMailingAddress = [addressLine, cityStateZip].filter(Boolean).join(', ');
   const today = buildCurrentDateValue();
+  const allowPatientRecipientFallback = Boolean(options?.allowPatientRecipientFallback);
 
   let filledCount = 0;
 
@@ -214,7 +273,7 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
         /\byour name\b/,
       ])
     ) {
-      filledCount += setTextFieldValue(field, bioProfile.fullName.trim()) ? 1 : 0;
+      filledCount += setTextFieldValue(field, fullName) ? 1 : 0;
       continue;
     }
 
@@ -224,7 +283,66 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
         /\bprinted name\b/,
       ])
     ) {
-      filledCount += setTextFieldValue(field, bioProfile.fullName.trim()) ? 1 : 0;
+      filledCount += setTextFieldValue(field, fullName) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      phoneNumber &&
+      matchesAny(normalized, [
+        /\bpatient telephone number\b/,
+        /\bpatient phone\b/,
+        /\bpatient contact number\b/,
+      ])
+    ) {
+      filledCount += setTextFieldValue(field, phoneNumber) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      email &&
+      matchesAny(normalized, [
+        /\bpatient email\b/,
+        /\bpatient email address\b/,
+      ])
+    ) {
+      filledCount += setTextFieldValue(field, email) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      allowPatientRecipientFallback &&
+      fullName &&
+      matchesAny(normalized, [
+        /\bindividual ?organization name\b/,
+        /\bindividual or organization name\b/,
+      ])
+    ) {
+      filledCount += setTextFieldValue(field, fullName) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      allowPatientRecipientFallback &&
+      phoneNumber &&
+      !/\bfax\b|\bprovider\b|\bhospital\b|\bfacility\b|\bphysician\b|\bdoctor\b|\binsurance\b|\battorney\b|\bhealth care\b|\bhealthcare\b/i.test(
+        normalized,
+      ) &&
+      matchesAny(normalized, [/\btelephone number\b/, /\bphone number\b/, /\bcontact number\b/])
+    ) {
+      filledCount += setTextFieldValue(field, phoneNumber) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      allowPatientRecipientFallback &&
+      email &&
+      !/\bfax\b|\bprovider\b|\bhospital\b|\bfacility\b|\bphysician\b|\bdoctor\b|\binsurance\b|\battorney\b|\bhealth care\b|\bhealthcare\b/i.test(
+        normalized,
+      ) &&
+      matchesAny(normalized, [/\bemail\b/, /\bemail address\b/])
+    ) {
+      filledCount += setTextFieldValue(field, email) ? 1 : 0;
       continue;
     }
 
@@ -309,6 +427,116 @@ function fillBioFields(pdf: PDFDocument, bioProfile: BioProfile) {
   };
 }
 
+function isSignatureField(field: PDFField) {
+  return field instanceof PDFSignature || /\bsignature\b|\bfirma\b/i.test(normalizeFieldName(field.getName()));
+}
+
+function findWidgetPageIndex(pdf: PDFDocument, widget: ReturnType<PDFField['acroField']['getWidgets']>[number]) {
+  const widgetPageRef = widget.P();
+
+  if (widgetPageRef) {
+    const matchingPageIndex = pdf.getPages().findIndex((page) => page.ref === widgetPageRef);
+    if (matchingPageIndex >= 0) {
+      return matchingPageIndex;
+    }
+  }
+
+  return pdf.getPages().findIndex((page) => {
+    const annotations = page.node.Annots();
+    if (!annotations) return false;
+
+    for (let annotationIndex = 0; annotationIndex < annotations.size(); annotationIndex += 1) {
+      if (annotations.lookup(annotationIndex) === widget.dict) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+}
+
+function extractSignatureFields(pdf: PDFDocument): RecordsRequestPdfSignatureField[] {
+  const form = pdf.getForm();
+  const signatureFields: RecordsRequestPdfSignatureField[] = [];
+
+  for (const field of form.getFields()) {
+    if (!isSignatureField(field)) continue;
+
+    for (const widget of field.acroField.getWidgets()) {
+      const pageIndex = findWidgetPageIndex(pdf, widget);
+      const rect = widget.getRectangle();
+
+      if (pageIndex < 0 || rect.width <= 0 || rect.height <= 0) {
+        continue;
+      }
+
+      signatureFields.push({
+        fieldName: field.getName(),
+        pageIndex,
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      });
+    }
+  }
+
+  return signatureFields;
+}
+
+function applySignatureOverlays(
+  pdf: PDFDocument,
+  signatureFields: RecordsRequestPdfSignatureField[],
+  signature: RecordsRequestUserSignature | null | undefined,
+) {
+  if (!hasSignatureStrokeInput(signature) || signatureFields.length === 0) {
+    return 0;
+  }
+
+  const signatureBounds = getSignatureBounds(signature);
+  const signaturePath = buildSignatureSvgPath(signature, { normalize: true });
+
+  if (!signatureBounds || !signaturePath) {
+    return 0;
+  }
+
+  let appliedCount = 0;
+
+  for (const signatureField of signatureFields) {
+    const page = pdf.getPage(signatureField.pageIndex);
+    const padding = Math.min(signatureField.height * 0.18, signatureField.width * 0.08, 6);
+    const availableWidth = Math.max(signatureField.width - padding * 2, 1);
+    const availableHeight = Math.max(signatureField.height - padding * 2, 1);
+    const scale = Math.min(
+      availableWidth / signatureBounds.width,
+      availableHeight / signatureBounds.height,
+    );
+
+    if (!Number.isFinite(scale) || scale <= 0) {
+      continue;
+    }
+
+    const renderedWidth = signatureBounds.width * scale;
+    const renderedHeight = signatureBounds.height * scale;
+    const offsetX = signatureField.x + (signatureField.width - renderedWidth) / 2;
+    const topPadding = (signatureField.height - renderedHeight) / 2;
+    const offsetY = signatureField.y + signatureField.height - topPadding;
+
+    page.drawSvgPath(signaturePath, {
+      x: offsetX,
+      y: offsetY,
+      scale,
+      borderColor: hexToPdfColor(pdfTheme.colors.text),
+      borderWidth: 1.35,
+      borderLineCap: LineCapStyle.Round,
+    });
+
+    appliedCount += 1;
+  }
+
+  return appliedCount;
+}
+
 async function appendIdPage(pdf: PDFDocument, idAttachment: RecordsRequestIdAttachment) {
   const imageBytes = decodeBase64(idAttachment.base64Data);
   const image = /png/i.test(idAttachment.mimeType)
@@ -364,12 +592,14 @@ async function prepareFormTemplate(
   const pdfBytes = new Uint8Array(await response.arrayBuffer());
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const flatTemplate = findFlatPdfTemplate({ packet, form, pdf });
+  const signatureFields = extractSignatureFields(pdf);
 
   return {
     form,
     pdfBytes,
     fieldCount: pdf.getForm().getFields().length,
     flatTemplateId: flatTemplate?.id || null,
+    signatureFields,
   };
 }
 
@@ -395,6 +625,7 @@ async function loadPreparedFormTemplate(
     pdfBytes: prepared.pdfBytes.slice(),
     fieldCount: prepared.fieldCount,
     flatTemplateId: prepared.flatTemplateId,
+    signatureFields: prepared.signatureFields.map((signatureField) => ({ ...signatureField })),
   };
 }
 
@@ -630,6 +861,7 @@ export async function prefetchRecordsRequestPdfTemplate(
     formKey: buildTemplateCacheKey(prepared.form),
     usedCachedTemplate: Boolean(prepared.form.cachedContentUrl),
     autofillQuestionCount: prepared.form.autofill.questions.length,
+    signatureFieldCount: prepared.signatureFields.length,
   };
 }
 
@@ -639,12 +871,20 @@ export async function generateRecordsRequestPdf(input: GenerateRecordsRequestPdf
   });
   const selectedForm = preparedTemplate.form;
   const pdf = await PDFDocument.load(preparedTemplate.pdfBytes, { ignoreEncryption: true });
+  const autofillAnswers = input.autofillAnswers || {};
+  const signatureFields = preparedTemplate.signatureFields;
+  const allowPatientRecipientFallback = shouldFillPatientRecipientFields(
+    selectedForm,
+    autofillAnswers,
+  );
 
   let filledCount = 0;
   let usedAcroForm = false;
 
   if (preparedTemplate.fieldCount > 0) {
-    const bioResult = fillBioFields(pdf, input.bioProfile);
+    const bioResult = fillBioFields(pdf, input.bioProfile, {
+      allowPatientRecipientFallback,
+    });
     filledCount += bioResult.filledCount;
     usedAcroForm ||= bioResult.filledCount > 0;
   } else if (preparedTemplate.flatTemplateId) {
@@ -666,22 +906,32 @@ export async function generateRecordsRequestPdf(input: GenerateRecordsRequestPdf
   const dynamicAnswerResult = await applyDynamicAutofillAnswers({
     pdf,
     form: selectedForm,
-    answers: input.autofillAnswers || {},
+    answers: autofillAnswers,
   });
   filledCount += dynamicAnswerResult.appliedCount;
   usedAcroForm ||= dynamicAnswerResult.usedAcroForm;
 
-  if (filledCount === 0) {
-    throw new Error(
-      'The selected hospital PDF did not expose any matching bio fields or dynamic answer bindings to populate automatically.',
-    );
+  if (
+    preparedTemplate.fieldCount > 0 &&
+    (usedAcroForm || (signatureFields.length > 0 && hasSignatureStrokeInput(input.signature)))
+  ) {
+    const form = pdf.getForm();
+
+    if (usedAcroForm) {
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      form.updateFieldAppearances(font);
+    }
+
+    form.flatten();
   }
 
-  if (usedAcroForm) {
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
-    const form = pdf.getForm();
-    form.updateFieldAppearances(font);
-    form.flatten();
+  const signatureAppliedCount = applySignatureOverlays(pdf, signatureFields, input.signature);
+  filledCount += signatureAppliedCount;
+
+  if (filledCount === 0) {
+    throw new Error(
+      'The selected hospital PDF did not expose any matching bio fields, dynamic answer bindings, or signature placements to populate automatically.',
+    );
   }
 
   if (input.idAttachment) {
@@ -707,10 +957,13 @@ export async function generateRecordsRequestPdf(input: GenerateRecordsRequestPdf
 }
 
 export const __testing__ = {
+  applySignatureOverlays,
   buildCurrentDateValue,
+  extractSignatureFields,
   fillBioFields,
   getLanguagePreferenceScore,
   getPrimaryPdfForm,
   getSemanticFormScore,
+  shouldFillPatientRecipientFields,
   sortPdfForms,
 };

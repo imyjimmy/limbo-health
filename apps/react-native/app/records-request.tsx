@@ -2,6 +2,7 @@ import React, {
   startTransition,
   useDeferredValue,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -9,6 +10,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Linking,
   Platform,
   Pressable,
@@ -21,15 +23,23 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HospitalSystemLogo } from '../components/records/HospitalSystemLogo';
-import { RequestStepper } from '../components/records/RequestStepper';
+import {
+  HospitalSystemLogo,
+  hasHospitalSystemLogo,
+} from '../components/records/HospitalSystemLogo';
+import { SignaturePad } from '../components/records/SignaturePad';
 import { fetchHospitalSystems, fetchRecordsRequestPacket } from '../core/recordsWorkflow/api';
 import {
-  buildRecordsRequestSteps,
+  buildRecordsRequestWorkflowSteps,
+  formatDateAutofillAnswerInput,
+  getRecordsRequestQuestionStepId,
+  getVisibleAutofillQuestions,
+  isDateAutofillQuestion,
   validateAutofillAnswers,
-  type RecordsRequestStepKey,
   type RecordsWorkflowAutofillAnswers,
+  type RecordsRequestWorkflowStep,
 } from '../core/recordsWorkflow/autofill';
+import { hasSignatureStrokeInput } from '../core/recordsWorkflow/signature';
 import {
   generateRecordsRequestPdf,
   getPrimaryPdfForm,
@@ -42,11 +52,12 @@ import {
 import { useCamera } from '../hooks/useCamera';
 import { useBioProfile } from '../providers/BioProfileProvider';
 import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
-import { formatMailingAddress } from '../types/bio';
+import { formatMaskedMailingAddress } from '../types/bio';
 import type {
   HospitalSystemOption,
   RecordsRequestIdAttachment,
   RecordsRequestPacket,
+  RecordsRequestUserSignature,
   RecordsWorkflowAutofillQuestion,
   RecordsWorkflowForm,
 } from '../types/recordsRequest';
@@ -86,6 +97,42 @@ function getAutofillAnswerLabel(
     .join(', ');
 }
 
+function getWorkflowStepTitle(step: RecordsRequestWorkflowStep): string {
+  switch (step.kind) {
+    case 'bio':
+      return 'Build a ready-to-send request packet.';
+    case 'hospital':
+      return 'Choose the hospital system';
+    case 'question':
+      return step.question.label;
+    case 'id':
+      return 'Add identification';
+    case 'signature':
+      return 'Add your signature';
+    case 'submit':
+      return 'Fill out the selected form';
+  }
+}
+
+function getWorkflowStepDescription(
+  step: RecordsRequestWorkflowStep,
+): string {
+  switch (step.kind) {
+    case 'bio':
+      return "We'll use your saved info, guide you through any extra form questions, add ID if needed, and prepare a PDF you can review or share.";
+    case 'hospital':
+      return 'Search the hospital system you want to request records from.';
+    case 'question':
+      return step.question.helpText || '';
+    case 'id':
+      return 'Attach a photo ID when the workflow requires it, or add one optionally if you want it bundled into the packet.';
+    case 'signature':
+      return 'Draw the signature you want printed onto the selected form.';
+    case 'submit':
+      return 'Review the packet, create the completed PDF, and share it when you are ready.';
+  }
+}
+
 export default function RecordsRequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -93,7 +140,7 @@ export default function RecordsRequestScreen() {
   const styles = useThemedStyles(createStyles);
   const { capture } = useCamera();
   const { status: bioStatus, profile, hasProfile } = useBioProfile();
-  const [currentStep, setCurrentStep] = useState<RecordsRequestStepKey>('bio');
+  const [currentStepId, setCurrentStepId] = useState('bio');
   const [searchQuery, setSearchQuery] = useState('');
   const normalizedSearchQuery = normalizeHospitalSystemSearchQuery(searchQuery);
   const deferredSearchQuery = useDeferredValue(normalizedSearchQuery);
@@ -114,7 +161,12 @@ export default function RecordsRequestScreen() {
   const [selectedFormKey, setSelectedFormKey] = useState<string | null>(null);
   const [prefetchedFormName, setPrefetchedFormName] = useState<string | null>(null);
   const [templatePrefetchError, setTemplatePrefetchError] = useState<string | null>(null);
+  const [signatureFieldCount, setSignatureFieldCount] = useState(0);
   const [autofillAnswers, setAutofillAnswers] = useState<RecordsWorkflowAutofillAnswers>({});
+  const [signature, setSignature] = useState<RecordsRequestUserSignature | null>(null);
+  const [signaturePadActive, setSignaturePadActive] = useState(false);
+  const packetLoadRequestIdRef = useRef(0);
+  const scrollViewRef = useRef<ScrollView | null>(null);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -139,7 +191,18 @@ export default function RecordsRequestScreen() {
           signal: abortController.signal,
         });
         if (!cancelled) {
-          setSystems(results);
+          setSystems(
+            [...results].sort((left, right) => {
+              const leftHasLogo = hasHospitalSystemLogo(left.name);
+              const rightHasLogo = hasHospitalSystemLogo(right.name);
+
+              if (leftHasLogo !== rightHasLogo) {
+                return leftHasLogo ? -1 : 1;
+              }
+
+              return left.name.localeCompare(right.name);
+            }),
+          );
         }
       } catch (error) {
         if (abortController.signal.aborted) {
@@ -172,6 +235,7 @@ export default function RecordsRequestScreen() {
       setSelectedFormKey(null);
       setPrefetchedFormName(null);
       setTemplatePrefetchError(null);
+      setSignatureFieldCount(0);
       return;
     }
 
@@ -180,6 +244,7 @@ export default function RecordsRequestScreen() {
     setSelectedFormKey(null);
     setPrefetchedFormName(null);
     setTemplatePrefetchError(null);
+    setSignatureFieldCount(0);
 
     prefetchRecordsRequestPdfTemplate(packet)
       .then((result) => {
@@ -187,6 +252,7 @@ export default function RecordsRequestScreen() {
         setTemplatePrefetchState('ready');
         setSelectedFormKey(result.formKey);
         setPrefetchedFormName(result.formName);
+        setSignatureFieldCount(result.signatureFieldCount);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -194,6 +260,7 @@ export default function RecordsRequestScreen() {
         setTemplatePrefetchError(
           error instanceof Error ? error.message : 'Unable to cache the hospital PDF yet.',
         );
+        setSignatureFieldCount(0);
       });
 
     return () => {
@@ -204,6 +271,16 @@ export default function RecordsRequestScreen() {
   useEffect(() => {
     setAutofillAnswers({});
   }, [selectedFormKey]);
+
+  useEffect(() => {
+    setSignature(null);
+  }, [selectedFormKey]);
+
+  useEffect(() => {
+    if (currentStepId !== 'signature') {
+      setSignaturePadActive(false);
+    }
+  }, [currentStepId]);
 
   const hasPdfForm = Boolean(packet?.forms.some((form) => form.format === 'pdf'));
   const selectedPdfForm =
@@ -216,15 +293,25 @@ export default function RecordsRequestScreen() {
         preferredFormKey: selectedFormKey,
       })
     : null;
-  const dynamicQuestions =
+  const allDynamicQuestions =
     selectedPdfForm?.autofill.supported && selectedPdfForm.autofill.questions.length > 0
       ? selectedPdfForm.autofill.questions
       : [];
-  const workflowSteps = buildRecordsRequestSteps(dynamicQuestions.length > 0);
-  const currentStepIndex = Math.max(
-    workflowSteps.findIndex((step) => step.key === currentStep),
-    0,
-  );
+  const dynamicQuestions = getVisibleAutofillQuestions(allDynamicQuestions, autofillAnswers);
+  const hasSignatureStep = signatureFieldCount > 0;
+  const workflowSteps = buildRecordsRequestWorkflowSteps(dynamicQuestions, {
+    includeSignatureStep: hasSignatureStep,
+  });
+  const rawCurrentStepIndex = workflowSteps.findIndex((step) => step.id === currentStepId);
+  const currentStepIndex = rawCurrentStepIndex >= 0 ? rawCurrentStepIndex : 0;
+  const currentWorkflowStep = workflowSteps[currentStepIndex];
+  const firstWorkflowStepId = workflowSteps[0]?.id || 'bio';
+  const firstQuestionStepId = dynamicQuestions[0]
+    ? getRecordsRequestQuestionStepId(dynamicQuestions[0].id)
+    : null;
+  const currentQuestionStep = currentWorkflowStep.kind === 'question' ? currentWorkflowStep : null;
+  const currentQuestion = currentQuestionStep?.question || null;
+  const currentQuestionAnswer = currentQuestion ? autofillAnswers[currentQuestion.id] : undefined;
   const packetReadyForContinue = Boolean(
     selectedSystem &&
       packet &&
@@ -233,14 +320,55 @@ export default function RecordsRequestScreen() {
       (!hasPdfForm || templatePrefetchState !== 'loading'),
   );
   const idStepCanContinue = Boolean(packet && (!packet.requiresPhotoId || idAttachment));
+  const signatureStepCanContinue = hasSignatureStrokeInput(signature);
   const canGeneratePdf = hasPdfForm && templatePrefetchState !== 'loading';
-  const formFillButtonLabel = dynamicQuestions.length > 0 ? 'Fill Out Form' : 'Apply Bio To PDF';
+  const formFillButtonLabel =
+    dynamicQuestions.length > 0 || hasSignatureStep ? 'Fill Out Form' : 'Apply Bio To PDF';
+  const currentStepTitle = getWorkflowStepTitle(currentWorkflowStep);
+  const currentStepDescription = getWorkflowStepDescription(currentWorkflowStep);
+  const currentQuestionIsDate = currentQuestion ? isDateAutofillQuestion(currentQuestion) : false;
+  const nextWorkflowStep = workflowSteps[currentStepIndex + 1] || null;
 
   useEffect(() => {
-    if (currentStep === 'form' && dynamicQuestions.length === 0) {
-      setCurrentStep('id');
+    if (rawCurrentStepIndex !== -1) return;
+
+    const fallbackStepId = currentStepId.startsWith('question:')
+      ? firstQuestionStepId || 'id'
+      : firstWorkflowStepId;
+
+    startTransition(() => {
+      setCurrentStepId(fallbackStepId);
+    });
+  }, [currentStepId, firstQuestionStepId, firstWorkflowStepId, rawCurrentStepIndex]);
+
+  useEffect(() => {
+    if (currentStepId.startsWith('question:') && dynamicQuestions.length === 0) {
+      startTransition(() => {
+        setCurrentStepId('id');
+      });
     }
-  }, [currentStep, dynamicQuestions.length]);
+  }, [currentStepId, dynamicQuestions.length]);
+
+  useEffect(() => {
+    if (allDynamicQuestions.length === 0) return;
+
+    const visibleQuestionIds = new Set(dynamicQuestions.map((question) => question.id));
+    const allQuestionIds = new Set(allDynamicQuestions.map((question) => question.id));
+
+    setAutofillAnswers((currentAnswers) => {
+      let changed = false;
+      const nextAnswers: RecordsWorkflowAutofillAnswers = { ...currentAnswers };
+
+      for (const questionId of allQuestionIds) {
+        if (visibleQuestionIds.has(questionId)) continue;
+        if (!(questionId in nextAnswers)) continue;
+        delete nextAnswers[questionId];
+        changed = true;
+      }
+
+      return changed ? nextAnswers : currentAnswers;
+    });
+  }, [allDynamicQuestions, dynamicQuestions]);
 
   if (bioStatus === 'loading') {
     return (
@@ -260,6 +388,9 @@ export default function RecordsRequestScreen() {
   }
 
   const handleSelectSystem = async (system: HospitalSystemOption) => {
+    const requestId = packetLoadRequestIdRef.current + 1;
+    packetLoadRequestIdRef.current = requestId;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedSystem(system);
     setPacket(null);
     setPacketError(null);
@@ -267,19 +398,44 @@ export default function RecordsRequestScreen() {
     setTemplatePrefetchState('idle');
     setPrefetchedFormName(null);
     setTemplatePrefetchError(null);
+    setSignatureFieldCount(0);
+    setSignature(null);
     setPacketLoading(true);
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
 
     try {
       const nextPacket = await fetchRecordsRequestPacket(system.id);
+      if (packetLoadRequestIdRef.current !== requestId) return;
       setPacket(nextPacket);
     } catch (error) {
+      if (packetLoadRequestIdRef.current !== requestId) return;
       const message =
         error instanceof Error ? error.message : 'Unable to load that hospital workflow.';
       setPacketError(message);
       Alert.alert('Workflow Unavailable', message);
     } finally {
+      if (packetLoadRequestIdRef.current !== requestId) return;
       setPacketLoading(false);
     }
+  };
+
+  const handleChangeSelectedSystem = () => {
+    packetLoadRequestIdRef.current += 1;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedSystem(null);
+    setPacket(null);
+    setPacketError(null);
+    setGeneratedPdfUri(null);
+    setPacketLoading(false);
+    setSelectedFormKey(null);
+    setTemplatePrefetchState('idle');
+    setPrefetchedFormName(null);
+    setTemplatePrefetchError(null);
+    setSignatureFieldCount(0);
+    setAutofillAnswers({});
+    setSignature(null);
   };
 
   const searchIsPending = deferredSearchQuery !== debouncedSearchQuery;
@@ -341,12 +497,14 @@ export default function RecordsRequestScreen() {
         idAttachment,
         selectedFormKey,
         autofillAnswers,
+        signature,
       });
 
       setGeneratedPdfUri(result.uri);
+      const hasSignature = hasSignatureStrokeInput(signature);
       const appliedSummary =
-        dynamicQuestions.length > 0
-          ? 'Applied your bio and form answers'
+        dynamicQuestions.length > 0 || hasSignature
+          ? `Applied your bio${dynamicQuestions.length > 0 ? ', form answers' : ''}${hasSignature ? dynamicQuestions.length > 0 ? ', and signature' : ' and signature' : ''}`
           : 'Applied your bio';
       Alert.alert(
         'Form Ready',
@@ -374,23 +532,47 @@ export default function RecordsRequestScreen() {
     }
   };
 
-  const goToStep = (nextStep: RecordsRequestStepKey) => {
-    startTransition(() => setCurrentStep(nextStep));
+  const goToStep = (nextStepId: string) => {
+    startTransition(() => setCurrentStepId(nextStepId));
+  };
+
+  const goToStepByIndex = (targetIndex: number) => {
+    if (targetIndex < 0 || targetIndex >= workflowSteps.length) return;
+    goToStep(workflowSteps[targetIndex].id);
+  };
+
+  const goToPreviousStep = () => {
+    goToStepByIndex(currentStepIndex - 1);
+  };
+
+  const goToNextStep = () => {
+    goToStepByIndex(currentStepIndex + 1);
   };
 
   const handleContinueFromHospital = () => {
     if (!packetReadyForContinue) return;
-    goToStep(dynamicQuestions.length > 0 ? 'form' : 'id');
+    goToStep(firstQuestionStepId || 'id');
   };
 
-  const handleContinueFromForm = () => {
-    const validationMessage = validateAutofillAnswers(dynamicQuestions, autofillAnswers);
+  const handleContinueFromQuestion = () => {
+    if (!currentQuestion) return;
+
+    const validationMessage = validateAutofillAnswers([currentQuestion], autofillAnswers);
     if (validationMessage) {
       Alert.alert('Answer Required', validationMessage);
       return;
     }
 
-    goToStep('id');
+    goToNextStep();
+  };
+
+  const handleContinueFromSignature = () => {
+    if (!hasSignatureStrokeInput(signature)) {
+      Alert.alert('Signature Required', 'Please add your signature before continuing.');
+      return;
+    }
+
+    goToNextStep();
   };
 
   const updateShortTextAnswer = (questionId: string, value: string) => {
@@ -427,6 +609,8 @@ export default function RecordsRequestScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
+        ref={scrollViewRef}
+        scrollEnabled={!signaturePadActive}
         contentContainerStyle={[
           styles.content,
           {
@@ -444,38 +628,43 @@ export default function RecordsRequestScreen() {
           <View style={styles.backButtonSpacer} />
         </View>
 
-        <View style={styles.stepperCard}>
-          <Text style={styles.eyebrow}>Guided Workflow</Text>
-          <Text style={styles.heroTitle}>Build a ready-to-send request packet.</Text>
-          <Text style={styles.heroSubtitle}>
-            We&apos;ll confirm your bio details, pull the selected hospital system workflow, check
-            whether ID is needed, ask any form-specific questions we can confidently detect, and
-            generate a PDF you can review or share.
-          </Text>
-          <View style={styles.stepperWrap}>
-            <RequestStepper
-              steps={workflowSteps.map((step) => step.label)}
-              currentStep={currentStepIndex}
-            />
+        {currentWorkflowStep.kind === 'bio' ? (
+          <View style={styles.stepperCard}>
+            <Text style={styles.eyebrow}>Guided Workflow</Text>
+            <Text style={styles.heroTitle}>{currentStepTitle}</Text>
+            <Text style={styles.heroSubtitle}>{currentStepDescription}</Text>
           </View>
-        </View>
+        ) : (
+          <View style={styles.progressCard}>
+            <Text style={styles.progressEyebrow}>
+              Step {currentStepIndex + 1} of {workflowSteps.length}
+            </Text>
+            <Text style={styles.progressTitle}>{currentStepTitle}</Text>
+            {currentStepDescription ? (
+              <Text style={styles.progressSubtitle}>{currentStepDescription}</Text>
+            ) : null}
+            {currentQuestionStep && (
+              <Text style={styles.progressMeta}>
+                Question {currentQuestionStep.questionIndex + 1} of {dynamicQuestions.length}
+              </Text>
+            )}
+          </View>
+        )}
 
-        {currentStep === 'bio' && (
+        {currentWorkflowStep.kind === 'bio' && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Step 1: Verify your personal info</Text>
+            <Text style={styles.sectionTitle}>Use your saved bio info</Text>
             <Text style={styles.sectionBody}>
-              This information will be used to prefill your medical-records request packet.
+              We&apos;ll use your saved profile to prefill the request packet on this device. If
+              anything changed, you can edit it before continuing.
             </Text>
 
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Full name</Text>
-              <Text style={styles.summaryValue}>{profile.fullName}</Text>
-
-              <Text style={styles.summaryLabel}>Date of birth</Text>
-              <Text style={styles.summaryValue}>{profile.dateOfBirth}</Text>
-
-              <Text style={styles.summaryLabel}>Mailing address</Text>
-              <Text style={styles.summaryValue}>{formatMailingAddress(profile)}</Text>
+              <Text style={styles.summaryPlaceholderTitle}>My Bio Info</Text>
+              <Text style={styles.summaryPlaceholderBody}>
+                Ready to prefill your name, contact details, and mailing address without showing
+                them on this screen.
+              </Text>
             </View>
 
             <View style={styles.actionRow}>
@@ -495,80 +684,99 @@ export default function RecordsRequestScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => goToStep('hospital')}
+                onPress={goToNextStep}
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
               >
-                <Text style={styles.primaryButtonText}>Looks Correct</Text>
+                <Text style={styles.primaryButtonText}>Continue</Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        {currentStep === 'hospital' && (
+        {currentWorkflowStep.kind === 'hospital' && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Step 2: Choose the hospital system</Text>
-            <Text style={styles.sectionBody}>
-              Search the Texas system you want to request records from. We&apos;ll pull its workflow
-              packet from the records API.
-            </Text>
+            {!selectedSystem ? (
+              <>
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Search hospital systems"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
+                  style={styles.searchInput}
+                  autoCapitalize="words"
+                  returnKeyType="search"
+                />
 
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search hospital systems"
-              placeholderTextColor={theme.colors.inputPlaceholder}
-              style={styles.searchInput}
-              autoCapitalize="words"
-              returnKeyType="search"
-            />
+                {systemsLoading || searchIsPending ? (
+                  <View style={styles.inlineLoading}>
+                    <ActivityIndicator size="small" color={theme.colors.secondary} />
+                    <Text style={styles.inlineLoadingText}>
+                      {searchIsPending ? 'Searching systems...' : 'Loading systems...'}
+                    </Text>
+                  </View>
+                ) : systemsError ? (
+                  <View style={styles.errorCard}>
+                    <Text style={styles.errorTitle}>Unable to load systems</Text>
+                    <Text style={styles.errorBody}>{systemsError}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.systemList}>
+                    {systems.map((system) => {
+                      return (
+                        <Pressable
+                          key={system.id}
+                          onPress={() => handleSelectSystem(system)}
+                          style={({ pressed }) => [
+                            styles.systemCard,
+                            pressed && styles.systemCardPressed,
+                          ]}
+                        >
+                          <HospitalSystemLogo systemName={system.name} width={92} height={44} />
+                          <View style={styles.systemTextWrap}>
+                            <Text style={styles.systemName}>{system.name}</Text>
+                            <Text style={styles.systemMeta}>
+                              {[system.domain, system.state].filter(Boolean).join(' • ')}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
 
-            {systemsLoading || searchIsPending ? (
-              <View style={styles.inlineLoading}>
-                <ActivityIndicator size="small" color={theme.colors.secondary} />
-                <Text style={styles.inlineLoadingText}>
-                  {searchIsPending ? 'Searching systems...' : 'Loading systems...'}
-                </Text>
-              </View>
-            ) : systemsError ? (
-              <View style={styles.errorCard}>
-                <Text style={styles.errorTitle}>Unable to load systems</Text>
-                <Text style={styles.errorBody}>{systemsError}</Text>
-              </View>
-            ) : (
-              <View style={styles.systemList}>
-                {systems.map((system) => {
-                  const isSelected = selectedSystem?.id === system.id;
-                  return (
-                    <Pressable
-                      key={system.id}
-                      onPress={() => handleSelectSystem(system)}
-                      style={({ pressed }) => [
-                        styles.systemCard,
-                        isSelected && styles.systemCardSelected,
-                        pressed && styles.systemCardPressed,
-                      ]}
-                    >
-                      <HospitalSystemLogo systemName={system.name} width={92} height={44} />
-                      <View style={styles.systemTextWrap}>
-                        <Text style={styles.systemName}>{system.name}</Text>
-                        <Text style={styles.systemMeta}>
-                          {[system.domain, system.state].filter(Boolean).join(' • ')}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-
-                {systems.length === 0 && (
-                  <Text style={styles.emptyStateText}>No hospital systems matched that search.</Text>
+                    {systems.length === 0 && (
+                      <Text style={styles.emptyStateText}>
+                        No hospital systems matched that search.
+                      </Text>
+                    )}
+                  </View>
                 )}
-              </View>
-            )}
+              </>
+            ) : null}
 
             {selectedSystem && (
               <View style={styles.selectionSummary}>
                 <Text style={styles.selectionSummaryTitle}>Selected system</Text>
-                <Text style={styles.selectionSummaryName}>{selectedSystem.name}</Text>
+                <View style={styles.selectionSystemPreview}>
+                  <HospitalSystemLogo systemName={selectedSystem.name} width={92} height={44} />
+                  <View style={styles.systemTextWrap}>
+                    <Text style={styles.selectionSummaryName}>{selectedSystem.name}</Text>
+                    <Text style={styles.systemMeta}>
+                      {[selectedSystem.domain, selectedSystem.state].filter(Boolean).join(' • ')}
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={handleChangeSelectedSystem}
+                  disabled={packetLoading}
+                  style={({ pressed }) => [
+                    styles.changeSelectionButton,
+                    pressed && styles.changeSelectionButtonPressed,
+                    packetLoading && styles.disabledButton,
+                  ]}
+                >
+                  <Text style={styles.changeSelectionButtonText}>
+                    Choose a different hospital system
+                  </Text>
+                </Pressable>
                 {packetLoading && (
                   <View style={styles.inlineLoading}>
                     <ActivityIndicator size="small" color={theme.colors.secondary} />
@@ -587,26 +795,31 @@ export default function RecordsRequestScreen() {
                     </View>
                     <Text style={styles.selectionSummaryMeta}>
                       {primaryDisplayForm
-                        ? `Selected official form: ${primaryDisplayForm.name}`
+                        ? `Ready to fill: ${primaryDisplayForm.name}`
                         : packet.forms.length > 0
                           ? 'Official form links were found, but no preferred PDF was selected yet.'
-                          : 'No official form links attached'}
+                          : 'No official form links were attached.'}
                     </Text>
                     {templatePrefetchState === 'loading' && (
                       <Text style={styles.selectionSummaryMeta}>
-                        Fetching the hospital PDF into memory for faster filling...
+                        Preparing the selected form...
                       </Text>
                     )}
                     {templatePrefetchState === 'ready' && prefetchedFormName && (
                       <>
                         <Text style={styles.selectionSummaryMeta}>
-                          Cached {prefetchedFormName} and kept it ready in memory.
+                          {prefetchedFormName} is ready.
                         </Text>
                         <Text style={styles.selectionSummaryMeta}>
                           {dynamicQuestions.length > 0
-                            ? `Detected ${dynamicQuestions.length} additional form question${dynamicQuestions.length === 1 ? '' : 's'} for the next step.`
-                            : 'No additional form questions were detected for this PDF.'}
+                            ? `This form adds ${dynamicQuestions.length} question${dynamicQuestions.length === 1 ? '' : 's'}.`
+                            : 'No extra form questions are needed for this form.'}
                         </Text>
+                        {signatureFieldCount > 0 && (
+                          <Text style={styles.selectionSummaryMeta}>
+                            We&apos;ll ask for your signature before review.
+                          </Text>
+                        )}
                       </>
                     )}
                     {templatePrefetchState === 'error' && templatePrefetchError && (
@@ -619,7 +832,7 @@ export default function RecordsRequestScreen() {
 
             <View style={styles.actionRow}>
               <Pressable
-                onPress={() => goToStep('bio')}
+                onPress={goToPreviousStep}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   pressed && styles.secondaryButtonPressed,
@@ -638,97 +851,72 @@ export default function RecordsRequestScreen() {
                 ]}
               >
                 <Text style={styles.primaryButtonText}>
-                  {dynamicQuestions.length > 0 ? 'Continue to Form Questions' : 'Continue to ID'}
+                  {dynamicQuestions.length > 0 ? 'Continue to Questions' : 'Continue to ID'}
                 </Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        {currentStep === 'form' && packet && selectedPdfForm && dynamicQuestions.length > 0 && (
+        {currentQuestionStep && currentQuestion && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>
-              Step 3: Answer questions from {selectedPdfForm.name}
-            </Text>
-            <Text style={styles.sectionBody}>
-              We detected high-confidence questions in the selected hospital form. Your answers
-              here will be written back into that same PDF when you fill it.
-            </Text>
+            {currentQuestion.kind === 'short_text' ? (
+              <TextInput
+                value={typeof currentQuestionAnswer === 'string' ? currentQuestionAnswer : ''}
+                onChangeText={(value) =>
+                  updateShortTextAnswer(
+                    currentQuestion.id,
+                    currentQuestionIsDate ? formatDateAutofillAnswerInput(value) : value,
+                  )
+                }
+                placeholder={currentQuestionIsDate ? 'MM/DD/YYYY' : 'Type your answer'}
+                placeholderTextColor={theme.colors.inputPlaceholder}
+                style={styles.answerInput}
+                autoCapitalize={currentQuestionIsDate ? 'none' : 'sentences'}
+                keyboardType={currentQuestionIsDate ? 'number-pad' : 'default'}
+                autoCorrect={false}
+                maxLength={currentQuestionIsDate ? 10 : undefined}
+              />
+            ) : (
+              <View style={styles.optionList}>
+                {currentQuestion.options.map((option) => {
+                  const isSelected =
+                    currentQuestion.kind === 'single_select'
+                      ? currentQuestionAnswer === option.id
+                      : Array.isArray(currentQuestionAnswer) &&
+                        currentQuestionAnswer.includes(option.id);
 
-            <View style={styles.requirementCard}>
-              <Text style={styles.requirementTitle}>Selected form</Text>
-              <Text style={styles.requirementBody}>{selectedPdfForm.name}</Text>
-              <Text style={styles.requirementFootnote}>
-                Autofill mode: {selectedPdfForm.autofill.mode || 'unknown'}
-              </Text>
-            </View>
-
-            <View style={styles.questionList}>
-              {dynamicQuestions.map((question) => {
-                const currentAnswer = autofillAnswers[question.id];
-
-                return (
-                  <View key={question.id} style={styles.questionCard}>
-                    <Text style={styles.questionLabel}>
-                      {question.label}
-                      {question.required ? ' *' : ''}
-                    </Text>
-                    {question.helpText ? (
-                      <Text style={styles.questionHelp}>{question.helpText}</Text>
-                    ) : null}
-
-                    {question.kind === 'short_text' ? (
-                      <TextInput
-                        value={typeof currentAnswer === 'string' ? currentAnswer : ''}
-                        onChangeText={(value) => updateShortTextAnswer(question.id, value)}
-                        placeholder="Type your answer"
-                        placeholderTextColor={theme.colors.inputPlaceholder}
-                        style={styles.answerInput}
-                        autoCapitalize="sentences"
-                      />
-                    ) : (
-                      <View style={styles.optionList}>
-                        {question.options.map((option) => {
-                          const isSelected =
-                            question.kind === 'single_select'
-                              ? currentAnswer === option.id
-                              : Array.isArray(currentAnswer) && currentAnswer.includes(option.id);
-
-                          return (
-                            <Pressable
-                              key={option.id}
-                              onPress={() =>
-                                question.kind === 'single_select'
-                                  ? updateSingleSelectAnswer(question.id, option.id)
-                                  : toggleMultiSelectAnswer(question.id, option.id)
-                              }
-                              style={({ pressed }) => [
-                                styles.optionChip,
-                                isSelected && styles.optionChipSelected,
-                                pressed && styles.optionChipPressed,
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.optionChipText,
-                                  isSelected && styles.optionChipTextSelected,
-                                ]}
-                              >
-                                {option.label}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
+                  return (
+                    <Pressable
+                      key={option.id}
+                      onPress={() =>
+                        currentQuestion.kind === 'single_select'
+                          ? updateSingleSelectAnswer(currentQuestion.id, option.id)
+                          : toggleMultiSelectAnswer(currentQuestion.id, option.id)
+                      }
+                      style={({ pressed }) => [
+                        styles.optionChip,
+                        isSelected && styles.optionChipSelected,
+                        pressed && styles.optionChipPressed,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.optionChipText,
+                          isSelected && styles.optionChipTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
 
             <View style={styles.actionRow}>
               <Pressable
-                onPress={() => goToStep('hospital')}
+                onPress={goToPreviousStep}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   pressed && styles.secondaryButtonPressed,
@@ -738,20 +926,24 @@ export default function RecordsRequestScreen() {
               </Pressable>
 
               <Pressable
-                onPress={handleContinueFromForm}
+                onPress={handleContinueFromQuestion}
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
               >
-                <Text style={styles.primaryButtonText}>Continue to ID</Text>
+                <Text style={styles.primaryButtonText}>
+                  {nextWorkflowStep?.kind === 'id'
+                    ? 'Continue to ID'
+                    : nextWorkflowStep?.kind === 'signature'
+                      ? 'Continue to Signature'
+                      : 'Next Question'}
+                </Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        {currentStep === 'id' && packet && (
+        {currentWorkflowStep.kind === 'id' && packet && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>
-              Step {dynamicQuestions.length > 0 ? 4 : 3}: Add identification
-            </Text>
+            <Text style={styles.sectionTitle}>Add identification</Text>
             <Text style={styles.sectionBody}>
               {packet.requiresPhotoId
                 ? 'This workflow explicitly calls for a legible photo ID, so attach one before continuing.'
@@ -809,7 +1001,7 @@ export default function RecordsRequestScreen() {
 
             <View style={styles.actionRow}>
               <Pressable
-                onPress={() => goToStep(dynamicQuestions.length > 0 ? 'form' : 'hospital')}
+                onPress={goToPreviousStep}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   pressed && styles.secondaryButtonPressed,
@@ -819,7 +1011,7 @@ export default function RecordsRequestScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => goToStep('submit')}
+                onPress={goToNextStep}
                 disabled={!idStepCanContinue}
                 style={({ pressed }) => [
                   styles.primaryButton,
@@ -828,29 +1020,76 @@ export default function RecordsRequestScreen() {
                 ]}
               >
                 <Text style={styles.primaryButtonText}>
-                  {packet.requiresPhotoId ? 'Continue to Submit' : 'Review Packet'}
+                  {nextWorkflowStep?.kind === 'signature'
+                    ? 'Continue to Signature'
+                    : packet.requiresPhotoId
+                      ? 'Continue to Review'
+                      : 'Review Packet'}
                 </Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        {currentStep === 'submit' && packet && (
+        {currentWorkflowStep.kind === 'signature' && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>
-              Step {dynamicQuestions.length > 0 ? 5 : 4}: Fill out the selected form
+            <Text style={styles.signatureHint}>
+              Sign once below and we&apos;ll place it directly onto the final form.
             </Text>
+
+            <SignaturePad
+              value={signature}
+              onChange={setSignature}
+              onInteractionStart={() => setSignaturePadActive(true)}
+              onInteractionEnd={() => setSignaturePadActive(false)}
+            />
+
+            <Pressable onPress={() => setSignature(null)} style={styles.signatureClearButton}>
+              <Text style={styles.signatureClearButtonText}>Clear signature</Text>
+            </Pressable>
+
+            <View style={styles.actionRow}>
+              <Pressable
+                onPress={goToPreviousStep}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  pressed && styles.secondaryButtonPressed,
+                ]}
+              >
+                <Text style={styles.secondaryButtonText}>Back</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleContinueFromSignature}
+                disabled={!signatureStepCanContinue}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  (!signatureStepCanContinue || pressed) && styles.primaryButtonPressed,
+                  !signatureStepCanContinue && styles.disabledButton,
+                ]}
+              >
+                <Text style={styles.primaryButtonText}>Review Packet</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {currentWorkflowStep.kind === 'submit' && packet && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Fill out the selected form</Text>
             <Text style={styles.sectionBody}>
-              The selected hospital PDF is fetched on this device first. When you tap below, we
-              apply your bio to the correct fields, write any answers from the previous step back
-              into the form, and append your ID image as an extra page if you attached one.
+              When you tap below, we fill the selected hospital form with your saved info, any
+              answers you provided, your signature when needed, and append your ID image if you
+              attached one.
             </Text>
 
             <View style={styles.reviewSection}>
               <Text style={styles.reviewHeader}>Bio info</Text>
               <Text style={styles.reviewText}>{profile.fullName}</Text>
               <Text style={styles.reviewText}>{profile.dateOfBirth}</Text>
-              <Text style={styles.reviewText}>{formatMailingAddress(profile)}</Text>
+              {profile.phoneNumber ? <Text style={styles.reviewText}>{profile.phoneNumber}</Text> : null}
+              {profile.email ? <Text style={styles.reviewText}>{profile.email}</Text> : null}
+              <Text style={styles.reviewText}>{formatMaskedMailingAddress(profile)}</Text>
             </View>
 
             <View style={styles.reviewSection}>
@@ -964,6 +1203,15 @@ export default function RecordsRequestScreen() {
               </Text>
             </View>
 
+            {hasSignatureStep && (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewHeader}>Signature</Text>
+                <Text style={styles.reviewMuted}>
+                  {hasSignatureStrokeInput(signature) ? 'Included on the form' : 'No signature captured'}
+                </Text>
+              </View>
+            )}
+
             <View style={styles.actionColumn}>
               <Pressable
                 onPress={handleGeneratePdf}
@@ -992,7 +1240,10 @@ export default function RecordsRequestScreen() {
                 <View style={styles.successCard}>
                   <Text style={styles.successTitle}>Filled form ready</Text>
                   <Text style={styles.successBody}>
-                    Your hospital PDF now has your bio{dynamicQuestions.length > 0 ? ' and form answers' : ''} applied and is ready to share, review, or save elsewhere on your device.
+                    Your hospital PDF now has your bio
+                    {dynamicQuestions.length > 0 ? ', form answers' : ''}
+                    {hasSignatureStrokeInput(signature) ? ', and signature' : ''}
+                    {' '}applied and is ready to share, review, or save elsewhere on your device.
                   </Text>
                   <Pressable
                     onPress={handleSharePdf}
@@ -1010,7 +1261,7 @@ export default function RecordsRequestScreen() {
 
             <View style={styles.actionRow}>
               <Pressable
-                onPress={() => goToStep('id')}
+                onPress={goToPreviousStep}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   pressed && styles.secondaryButtonPressed,
@@ -1021,8 +1272,9 @@ export default function RecordsRequestScreen() {
 
               <Pressable
                 onPress={() => {
-                  setCurrentStep('bio');
+                  setCurrentStepId('bio');
                   setGeneratedPdfUri(null);
+                  setSignature(null);
                 }}
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
               >
@@ -1081,6 +1333,14 @@ const createStyles = createThemedStyles((theme) => ({
     borderColor: theme.colors.border,
     gap: 10,
   },
+  progressCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 24,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 8,
+  },
   eyebrow: {
     color: theme.colors.primary,
     fontSize: 12,
@@ -1100,8 +1360,29 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 16,
     lineHeight: 23,
   },
-  stepperWrap: {
-    marginTop: 6,
+  progressEyebrow: {
+    color: theme.colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  progressTitle: {
+    color: theme.colors.text,
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 30,
+    letterSpacing: -0.5,
+  },
+  progressSubtitle: {
+    color: theme.colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  progressMeta: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
   },
   sectionCard: {
     backgroundColor: theme.colors.surface,
@@ -1128,18 +1409,15 @@ const createStyles = createThemedStyles((theme) => ({
     padding: 16,
     gap: 8,
   },
-  summaryLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginTop: 4,
-  },
-  summaryValue: {
+  summaryPlaceholderTitle: {
     color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  summaryPlaceholderBody: {
+    color: theme.colors.textSecondary,
+    fontSize: 15,
     lineHeight: 22,
   },
   actionRow: {
@@ -1286,9 +1564,26 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 18,
     fontWeight: '700',
   },
+  selectionSystemPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
   selectionSummaryMeta: {
     color: theme.colors.textSecondary,
     fontSize: 14,
+  },
+  changeSelectionButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  changeSelectionButtonPressed: {
+    opacity: 0.72,
+  },
+  changeSelectionButtonText: {
+    color: theme.colors.secondary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   badgeRow: {
     flexDirection: 'row',
@@ -1354,28 +1649,6 @@ const createStyles = createThemedStyles((theme) => ({
     color: theme.colors.textMuted,
     fontSize: 13,
   },
-  questionList: {
-    gap: 12,
-  },
-  questionCard: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 20,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  questionLabel: {
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-    lineHeight: 22,
-  },
-  questionHelp: {
-    color: theme.colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
   answerInput: {
     backgroundColor: theme.colors.inputBackground,
     borderRadius: 16,
@@ -1385,6 +1658,20 @@ const createStyles = createThemedStyles((theme) => ({
     paddingVertical: 13,
     color: theme.colors.text,
     fontSize: 16,
+  },
+  signatureHint: {
+    color: theme.colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  signatureClearButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  signatureClearButtonText: {
+    color: theme.colors.secondary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   optionList: {
     flexDirection: 'row',

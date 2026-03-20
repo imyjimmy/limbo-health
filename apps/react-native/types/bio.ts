@@ -1,6 +1,8 @@
 export interface BioProfile {
   fullName: string;
   dateOfBirth: string;
+  phoneNumber: string;
+  email: string;
   addressLine1: string;
   addressLine2: string;
   city: string;
@@ -8,10 +10,14 @@ export interface BioProfile {
   postalCode: string;
 }
 
-export function emptyBioProfile(suggestedFullName = ''): BioProfile {
+const SIMPLE_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function emptyBioProfile(suggestedFullName = '', suggestedEmail = ''): BioProfile {
   return {
     fullName: suggestedFullName,
     dateOfBirth: '',
+    phoneNumber: '',
+    email: suggestedEmail,
     addressLine1: '',
     addressLine2: '',
     city: '',
@@ -51,6 +57,9 @@ export function isValidDateOfBirth(value: string): boolean {
 export function validateBioProfileBasicDetails(profile: BioProfile): string | null {
   if (!profile.fullName.trim()) return 'Please enter your full name.';
   if (!isValidDateOfBirth(profile.dateOfBirth.trim())) return 'Please enter a valid date of birth.';
+  if (profile.email.trim() && !SIMPLE_EMAIL_PATTERN.test(profile.email.trim())) {
+    return 'Please enter a valid email address.';
+  }
   return null;
 }
 
@@ -84,6 +93,51 @@ export function formatMailingAddress(profile: BioProfile): string {
     profile.addressLine1.trim(),
     profile.addressLine2.trim(),
     `${profile.city.trim()}, ${profile.state.trim()} ${profile.postalCode.trim()}`.trim(),
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function maskAddressSegment(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.length <= 2) {
+    return `${trimmed[0]}${'*'.repeat(Math.max(trimmed.length - 1, 0))}`;
+  }
+
+  return `${trimmed[0]}${'*'.repeat(trimmed.length - 2)}${trimmed.slice(-1)}`;
+}
+
+function maskAddressLine(value: string, visibleEndingChars: number): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  if (trimmed.length <= visibleEndingChars + 1) {
+    return `${trimmed[0]}${'*'.repeat(Math.max(trimmed.length - 1, 0))}`;
+  }
+
+  return `${trimmed[0]}${'*'.repeat(trimmed.length - 1 - visibleEndingChars)}${trimmed.slice(
+    -visibleEndingChars,
+  )}`;
+}
+
+export function formatMaskedMailingAddress(profile: BioProfile): string {
+  const city = maskAddressSegment(profile.city.trim());
+  const state = profile.state.trim();
+  const postalCode = maskAddressSegment(profile.postalCode.trim());
+  const cityStateZipLine = [
+    city ? `${city}${state || postalCode ? ',' : ''}` : '',
+    state,
+    postalCode,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return [
+    maskAddressLine(profile.addressLine1.trim(), 2),
+    maskAddressLine(profile.addressLine2.trim(), 1),
+    cityStateZipLine,
   ]
     .filter(Boolean)
     .join('\n');

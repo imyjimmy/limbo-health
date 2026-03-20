@@ -31,11 +31,15 @@ function getSystemMonogram(systemName: string): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function findLogo(systemName: string): TexasHospitalLogo | null {
+export function findHospitalSystemLogo(systemName: string): TexasHospitalLogo | null {
   const normalized = systemName.trim().toLowerCase();
   return TEXAS_HOSPITAL_LOGOS.find(
     (logo) => logo.systemName.trim().toLowerCase() === normalized,
   ) || null;
+}
+
+export function hasHospitalSystemLogo(systemName: string): boolean {
+  return Boolean(findHospitalSystemLogo(systemName));
 }
 
 interface HospitalSystemLogoProps {
@@ -50,7 +54,7 @@ export function HospitalSystemLogo({
   height = 56,
 }: HospitalSystemLogoProps) {
   const [failed, setFailed] = useState(false);
-  const logo = useMemo(() => findLogo(systemName), [systemName]);
+  const logo = useMemo(() => findHospitalSystemLogo(systemName), [systemName]);
   const styles = useThemedStyles(createStyles);
 
   if (!logo || failed) {

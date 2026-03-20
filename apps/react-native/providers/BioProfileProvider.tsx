@@ -63,12 +63,22 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
     state.googleProfile?.name,
   ]);
 
+  const suggestedEmail = useMemo(
+    () => state.googleProfile?.email?.trim() || '',
+    [state.googleProfile?.email],
+  );
+
+  const defaultProfile = useMemo(
+    () => emptyBioProfile(suggestedFullName || '', suggestedEmail),
+    [suggestedEmail, suggestedFullName],
+  );
+
   const suggestedProfile = useMemo(
     () => ({
-      ...emptyBioProfile(suggestedFullName || ''),
+      ...defaultProfile,
       ...(profile ?? {}),
     }),
-    [profile, suggestedFullName],
+    [defaultProfile, profile],
   );
 
   const ownerKey = useMemo(
@@ -111,8 +121,12 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        const parsed = JSON.parse(raw) as BioProfile;
-        setProfile(isBioProfileComplete(parsed) ? parsed : parsed);
+        const parsed = JSON.parse(raw) as Partial<BioProfile>;
+        const normalizedProfile = {
+          ...defaultProfile,
+          ...parsed,
+        };
+        setProfile(isBioProfileComplete(normalizedProfile) ? normalizedProfile : normalizedProfile);
       } catch (error) {
         console.warn('[BioProfileProvider] Failed to load bio profile', error);
         if (!cancelled) {
@@ -130,7 +144,7 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
     return () => {
       cancelled = true;
     };
-  }, [ownerKey]);
+  }, [defaultProfile, ownerKey]);
 
   const saveProfile = useCallback(
     async (nextProfile: BioProfile) => {
@@ -144,6 +158,8 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
           ...nextProfile,
           fullName: nextProfile.fullName.trim(),
           dateOfBirth: nextProfile.dateOfBirth.trim(),
+          phoneNumber: nextProfile.phoneNumber.trim(),
+          email: nextProfile.email.trim(),
           addressLine1: nextProfile.addressLine1.trim(),
           addressLine2: nextProfile.addressLine2.trim(),
           city: nextProfile.city.trim(),
@@ -156,6 +172,8 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
         ...nextProfile,
         fullName: nextProfile.fullName.trim(),
         dateOfBirth: nextProfile.dateOfBirth.trim(),
+        phoneNumber: nextProfile.phoneNumber.trim(),
+        email: nextProfile.email.trim(),
         addressLine1: nextProfile.addressLine1.trim(),
         addressLine2: nextProfile.addressLine2.trim(),
         city: nextProfile.city.trim(),
