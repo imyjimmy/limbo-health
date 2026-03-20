@@ -32,6 +32,7 @@ import {
 } from '../core/recordsWorkflow/autofill';
 import {
   generateRecordsRequestPdf,
+  getPrimaryPdfForm,
   prefetchRecordsRequestPdfTemplate,
 } from '../core/recordsWorkflow/pdf';
 import {
@@ -209,6 +210,12 @@ export default function RecordsRequestScreen() {
     packet?.forms.find(
       (form) => form.format === 'pdf' && selectedFormKey && buildFormKey(form) === selectedFormKey,
     ) || null;
+  const primaryDisplayForm = packet
+    ? selectedPdfForm ||
+      getPrimaryPdfForm(packet.forms, {
+        preferredFormKey: selectedFormKey,
+      })
+    : null;
   const dynamicQuestions =
     selectedPdfForm?.autofill.supported && selectedPdfForm.autofill.questions.length > 0
       ? selectedPdfForm.autofill.questions
@@ -360,7 +367,6 @@ export default function RecordsRequestScreen() {
       await Share.share({
         title: `${packet.hospitalSystem.name} records request`,
         url: generatedPdfUri,
-        message: generatedPdfUri,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to share the PDF.';
@@ -580,9 +586,11 @@ export default function RecordsRequestScreen() {
                       ))}
                     </View>
                     <Text style={styles.selectionSummaryMeta}>
-                      {packet.forms.length > 0
-                        ? `${packet.forms.length} official form link${packet.forms.length === 1 ? '' : 's'} found`
-                        : 'No official form links attached'}
+                      {primaryDisplayForm
+                        ? `Selected official form: ${primaryDisplayForm.name}`
+                        : packet.forms.length > 0
+                          ? 'Official form links were found, but no preferred PDF was selected yet.'
+                          : 'No official form links attached'}
                     </Text>
                     {templatePrefetchState === 'loading' && (
                       <Text style={styles.selectionSummaryMeta}>
@@ -856,9 +864,22 @@ export default function RecordsRequestScreen() {
             </View>
 
             <View style={styles.reviewSection}>
-              <Text style={styles.reviewHeader}>Official forms</Text>
-              {packet.forms.length > 0 ? (
-                packet.forms.map((form) => (
+              <Text style={styles.reviewHeader}>Official form</Text>
+              {primaryDisplayForm ? (
+                <Pressable
+                  key={`${primaryDisplayForm.name}:${primaryDisplayForm.url}`}
+                  onPress={() => Linking.openURL(primaryDisplayForm.cachedContentUrl || primaryDisplayForm.url)}
+                  style={({ pressed }) => [styles.linkRow, pressed && styles.systemCardPressed]}
+                >
+                  <Text style={styles.linkText}>{primaryDisplayForm.name}</Text>
+                  <Text style={styles.linkMeta}>
+                    {primaryDisplayForm.cachedContentUrl
+                      ? 'CACHED PDF'
+                      : primaryDisplayForm.format?.toUpperCase() || 'LINK'}
+                  </Text>
+                </Pressable>
+              ) : packet.forms.length > 0 ? (
+                packet.forms.slice(0, 1).map((form) => (
                   <Pressable
                     key={`${form.name}:${form.url}`}
                     onPress={() => Linking.openURL(form.cachedContentUrl || form.url)}
@@ -877,7 +898,7 @@ export default function RecordsRequestScreen() {
               )}
             </View>
 
-            {selectedPdfForm && (
+            {selectedPdfForm && primaryDisplayForm && selectedPdfForm.name !== primaryDisplayForm.name && (
               <View style={styles.reviewSection}>
                 <Text style={styles.reviewHeader}>Selected autofill form</Text>
                 <Text style={styles.reviewText}>{selectedPdfForm.name}</Text>

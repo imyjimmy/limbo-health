@@ -59,6 +59,22 @@ describe('records workflow pdf helpers', () => {
     ]);
   });
 
+  it('prefers the target language when equivalent form variants exist', () => {
+    const primaryForm = __testing__.getPrimaryPdfForm(
+      [
+        createForm('authorization for release of medical information from bswh'),
+        createForm('authorization for release of medical information from bswh spanish'),
+      ],
+      {
+        preferredLanguage: 'es',
+      },
+    );
+
+    expect(primaryForm?.name).toBe(
+      'authorization for release of medical information from bswh spanish',
+    );
+  });
+
   it('fills separate street city state zip layouts instead of only the zip field', async () => {
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([612, 792]);

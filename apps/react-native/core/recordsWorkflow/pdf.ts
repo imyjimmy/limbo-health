@@ -53,6 +53,25 @@ function isSpanishFormName(name: string): boolean {
   return /espanol|español|spanish/i.test(name);
 }
 
+function getPreferredLanguageCode(preferredLanguage?: string): string {
+  const normalizedOverride = preferredLanguage?.trim().toLowerCase();
+  if (normalizedOverride) {
+    return normalizedOverride.split(/[-_]/)[0] || 'en';
+  }
+
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+    const normalizedLocale = locale?.trim().toLowerCase();
+    if (normalizedLocale) {
+      return normalizedLocale.split(/[-_]/)[0] || 'en';
+    }
+  } catch {
+    // Fall back to English when locale introspection is unavailable.
+  }
+
+  return 'en';
+}
+
 function normalizeFormDescriptor(form: RecordsWorkflowForm): string {
   return normalizeFieldName(`${form.name} ${form.url} ${form.cachedContentUrl || ''}`);
 }
@@ -86,18 +105,50 @@ function getSemanticFormScore(form: RecordsWorkflowForm): number {
   return score;
 }
 
-function sortPdfForms(forms: RecordsWorkflowForm[]): RecordsWorkflowForm[] {
+function getLanguagePreferenceScore(
+  form: RecordsWorkflowForm,
+  preferredLanguage?: string,
+): number {
+  const normalizedLanguage = getPreferredLanguageCode(preferredLanguage);
+  const wantsSpanish = normalizedLanguage === 'es';
+  const isSpanish = isSpanishFormName(form.name);
+
+  if (wantsSpanish) {
+    return isSpanish ? 40 : -40;
+  }
+
+  return isSpanish ? -30 : 30;
+}
+
+function sortPdfForms(
+  forms: RecordsWorkflowForm[],
+  options?: {
+    preferredLanguage?: string;
+    preferredFormKey?: string | null;
+  },
+): RecordsWorkflowForm[] {
   return [...forms]
     .filter((form) => form.format === 'pdf')
     .sort((a, b) => {
       const score = (form: RecordsWorkflowForm) =>
         getSemanticFormScore(form) +
+        getLanguagePreferenceScore(form, options?.preferredLanguage) +
         (form.cachedContentUrl ? 100 : 0) +
-        (!isSpanishFormName(form.name) ? 10 : 0) +
+        (options?.preferredFormKey && buildTemplateCacheKey(form) === options.preferredFormKey ? 500 : 0) +
         form.autofill.questions.length;
 
       return score(b) - score(a);
     });
+}
+
+export function getPrimaryPdfForm(
+  forms: RecordsWorkflowForm[],
+  options?: {
+    preferredLanguage?: string;
+    preferredFormKey?: string | null;
+  },
+) {
+  return sortPdfForms(forms, options)[0] || null;
 }
 
 function matchesAny(fieldName: string, patterns: RegExp[]): boolean {
@@ -348,14 +399,7 @@ async function loadPreparedFormTemplate(
 }
 
 function orderPdfCandidates(forms: RecordsWorkflowForm[], preferredFormKey?: string | null) {
-  const sorted = sortPdfForms(forms);
-  if (!preferredFormKey) return sorted;
-
-  return [...sorted].sort((a, b) => {
-    const aMatches = buildTemplateCacheKey(a) === preferredFormKey ? -1 : 0;
-    const bMatches = buildTemplateCacheKey(b) === preferredFormKey ? -1 : 0;
-    return aMatches - bMatches;
-  });
+  return sortPdfForms(forms, { preferredFormKey });
 }
 
 async function chooseFillablePdfForm(
@@ -665,6 +709,8 @@ export async function generateRecordsRequestPdf(input: GenerateRecordsRequestPdf
 export const __testing__ = {
   buildCurrentDateValue,
   fillBioFields,
+  getLanguagePreferenceScore,
+  getPrimaryPdfForm,
   getSemanticFormScore,
   sortPdfForms,
 };
