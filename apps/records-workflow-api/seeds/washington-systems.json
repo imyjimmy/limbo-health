@@ -55,7 +55,26 @@
     "state": "WA",
     "domain": "uwmedicine.org",
     "seed_urls": [
-      "https://www.uwmedicine.org/patient-resources/access-medical-records-images"
+      "https://www.uwmedicine.org/patient-resources/access-medical-records-images",
+      "https://stevie.cms.uwmedicine.org/u4657-request-medical-records-in-a-machine-readable-format",
+      "https://depts.washington.edu/comply/docs/103f7_AuthRq.pdf",
+      "https://stevie.cms.uwmedicine.org/sites/stevie/files/2026-01/U4657.pdf",
+      "https://www.valleymed.org/patients--visitors/resources-to-manage-your-health/medical-records",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/96-23371.6-auth-to-release-phi---fillable.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/87-9076.2-request-for-correction-or-amendment-of-the-medical-record.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/87-9076.2-request-for-correction-or-amendment-of-the-medical-record---fillable.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/96-23372.3-request-to-consider-additional-privacy-protection-for-protected-health-information.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/96-23372.3-request-to-consider-additional-privacy-protection-for-protected-health-information---fillable.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/87-9221.2-epic-care-everywhere-patient-opt-out.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/87-9221.2-epic-care-everywhere-patient-opt-out---fillable.pdf"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Valley Medical Center",
+        "city": "Renton",
+        "state": "WA",
+        "facility_page_url": "https://www.valleymed.org/patients--visitors/resources-to-manage-your-health/medical-records"
+      }
     ]
   },
   {
@@ -63,7 +82,8 @@
     "state": "WA",
     "domain": "vmfh.org",
     "seed_urls": [
-      "https://www.vmfh.org/patient-and-visitor-information/patient-information/requesting-medical-records"
+      "https://www.vmfh.org/patient-and-visitor-information/patient-information/requesting-medical-records",
+      "https://www.vmfh.org/content/dam/vmfhorg/pdf/patients-visitors/Authorization-Access-PHI.pdf"
     ]
   },
   {
@@ -89,7 +109,11 @@
     "state": "WA",
     "domain": "evergreenhealth.com",
     "seed_urls": [
-      "https://www.evergreenhealth.com/",
+      "https://www.evergreenhealth.com/patients-visitors/after-your-visit/medical-records/",
+      "https://www.evergreenhealth.com/app/files/public/bb1073da-24b0-4397-99cb-e5ce71e34e06/evergreenhealth-patient-request-for-health-information.pdf",
+      "https://www.evergreenhealth.com/app/files/public/eb45df8e-0fa7-471b-8fec-5ba31b3004c0/adm-536-authorization-to-disclose-healthcare-information.pdf",
+      "https://www.evergreenhealth.com/app/files/public/4ed49239-e820-4146-9bdb-dc0fe56aa01c/evergreenhealth-authorization-disclose-phi-adm-536-es.pdf",
+      "https://www.evergreenhealth.com/app/files/public/78990c9e-a148-4b1a-8398-b101243b8169/evergreenhealth-patient-request-amendment-of-records-adm-553.pdf",
       "https://mychart.evergreenhealth.com/MyChart/Authentication/Login"
     ]
   },
@@ -168,7 +192,10 @@
     "state": "WA",
     "domain": "columbiabasinhospital.org",
     "seed_urls": [
-      "https://www.columbiabasinhospital.org/"
+      "https://www.columbiabasinhospital.org/",
+      "https://www.columbiabasinhospital.org/requestmedicalrecords",
+      "https://ba20ddef-1e13-4d44-94f0-13310290b9db.filesusr.com/ugd/75a2e9_2bf3e6c74caa4f97a6e60375ed3e1ca0.pdf",
+      "https://ba20ddef-1e13-4d44-94f0-13310290b9db.filesusr.com/ugd/75a2e9_ecdcb63ff54747098c81f4b3c1fa7b5e.pdf"
     ]
   },
   {
@@ -208,7 +235,8 @@
     "state": "WA",
     "domain": "fcphd.org",
     "seed_urls": [
-      "http://fcphd.org/"
+      "http://fcphd.org/",
+      "http://fcphd.org/PDF_Files/ReleaseofInformation.pdf"
     ]
   },
   {
@@ -264,7 +292,7 @@
     "state": "WA",
     "domain": "kvhealthcare.org",
     "seed_urls": [
-      "https://www.kvhealthcare.org/"
+      "https://www.kvhealthcare.org/patients-and-visitors/medical-records/"
     ]
   },
   {
@@ -296,6 +324,7 @@
     "state": "WA",
     "domain": "yourlourdes.com",
     "seed_urls": [
+      "https://www.yourlourdes.com/medical-records",
       "https://www.yourlourdes.com/locations/lourdes-medical-center"
     ]
   },
@@ -320,7 +349,9 @@
     "state": "WA",
     "domain": "marybridge.org",
     "seed_urls": [
-      "https://www.marybridge.org/"
+      "https://www.marybridge.org/patients-visitors/medical-records/",
+      "https://www.multicare.org/wp-content/uploads/2025/07/Release-PHI-87-8455-5e-A-Rev-0725.pdf",
+      "https://www.multicare.org/wp-content/uploads/2021/04/MyChart-Proxy-Access-Release-of-Information-Request-Form.pdf"
     ]
   },
   {
@@ -448,7 +479,9 @@
     "state": "WA",
     "domain": "shrinerschildrens.org",
     "seed_urls": [
-      "https://www.shrinerschildrens.org/locations/spokane"
+      "https://www.shrinerschildrens.org/en/patient-information/patient-services-and-resources/requesting-medical-records",
+      "https://shrinershq.canto.com/direct/document/1jcauhmf0p7i18dl0285qjbe04/YGaRTZxaqUF_gUAArGtmBgl4vH4/original?content-type=application%2Fpdf&name=SHC-HQ-pdf-Patient-Request-for-Information-English-09-2025.pdf",
+      "https://shrinershq.canto.com/direct/document/n3k2m26r5p09l5kt9of30qaa4r/nB2TmQ37Gh0Ix_gexKAT77U-cPw/original?content-type=application%2Fpdf&name=UDA001a_Auth_for_Disclosure_of_Health_Info-01-2025.pdf"
     ]
   },
   {
@@ -504,6 +537,7 @@
     "state": "WA",
     "domain": "trioshealth.org",
     "seed_urls": [
+      "https://www.trioshealth.org/medical-records",
       "https://www.trioshealth.org/locations/trios-southridge-hospital"
     ]
   },
@@ -520,7 +554,8 @@
     "state": "WA",
     "domain": "virginiamason.org",
     "seed_urls": [
-      "https://www.virginiamason.org/seattle"
+      "https://www.vmfh.org/patient-and-visitor-information/patient-information/requesting-medical-records",
+      "https://www.vmfh.org/content/dam/vmfhorg/pdf/patients-visitors/Authorization-Access-PHI.pdf"
     ]
   },
   {
@@ -536,7 +571,8 @@
     "state": "WA",
     "domain": "whidbeyhealth.org",
     "seed_urls": [
-      "https://whidbeyhealth.org/"
+      "https://whidbeyhealth.org/patients-visitors/patient-services/",
+      "http://gns.tqp.mybluehost.me/wp-content/uploads/2023/12/ROI-Form.pdf"
     ]
   },
   {
