@@ -10,6 +10,8 @@ The point is not to replace the current crawler. The point is to give the existi
 - pasting official records URLs reached manually
 - uploading or attaching saved HTML pages
 - uploading or attaching downloaded PDFs
+- reviewing and correcting extracted PDF questions and answer bindings
+- approving published autofill templates for app consumption
 - running the downstream normalization steps
 - kicking off targeted recrawls
 - reviewing failures and weak states
@@ -21,6 +23,7 @@ The current automated pipeline works well once it has a good seed file and acces
 1. Public hospital pages are bot-protected.
 2. The crawler finds partial workflow data, but a human can quickly navigate to the real records page or direct PDF.
 3. The crawler reaches a real records PDF, but the PDF is scan-heavy or image-only, so the parser extracts little or no machine-readable text even though a human can clearly read the form.
+4. The PDF question-extraction path gets close, but still needs human review to fix labels, required flags, split/merge mistakes, and answer bindings before the app should trust it.
 
 In those cases, the human should be able to supply the missing source material and let the system handle the structured ingestion and storage.
 
@@ -44,6 +47,17 @@ data/[state].[html|txt|xlsx]
 
 The operator console should sit on top of this pipeline, not replace it.
 
+For PDFs that feed mobile autofill, the console also needs to support a human-reviewed publish path:
+
+```text
+cached PDF source_document
+=> pdf form-understanding extraction run
+=> editable draft question template
+=> human review and correction
+=> approved published template version
+=> mobile app consumes only approved template versions
+```
+
 ## Product Scope
 
 ### In Scope
@@ -53,6 +67,10 @@ The operator console should sit on top of this pipeline, not replace it.
 - manual entry of official records URLs
 - manual upload/import of saved HTML pages
 - manual upload/import of downloaded PDFs
+- PDF question extraction review
+- manual editing of extracted question labels, kinds, required flags, options, and bindings
+- publish/approval flow for app-consumable autofill templates
+- template staleness and PDF-version tracking
 - targeted reseed and targeted recrawl actions
 - review queue for failures, skipped docs, hash-named files, and zero-PDF systems
 - source document inspection
@@ -63,6 +81,8 @@ The operator console should sit on top of this pipeline, not replace it.
 - automatic login flows
 - full workflow editing in the browser
 - complex version-control UI for seed files
+- patient case management or request-follow-up operations
+- outsourced concierge operations for patient requests
 - replacing Postgres or the existing extraction pipeline
 
 ## Operator Workflows
@@ -164,10 +184,37 @@ Operator should be able to quickly review:
 - crawl failures
 - skipped non-medical-records PDFs
 - PDF parse failures
+- low-confidence PDF question extractions
+- stale autofill templates caused by new or changed PDFs
 - long-name collisions
 - hash-named leftovers
 - systems with HTML but no PDFs
 - systems with manual imports but no recrawl yet
+
+### 7. Question Review And Publish
+
+Operator chooses a PDF-backed `source_document` and sees:
+
+- the PDF preview, page by page
+- the latest extracted questions list
+- question type, label, required flag, options, and confidence
+- bindings back to PDF fields or overlay coordinates
+- the current draft status and whether an approved template already exists
+
+Operator can:
+
+- rename, reorder, merge, split, or delete questions
+- edit question kind, required flag, help text, and options
+- inspect and edit bindings
+- mark a PDF or a specific question set as unsupported for autofill
+- re-run extraction to compare a new draft against the current one
+- approve and publish a reviewed template version
+
+Output:
+
+- immutable raw extraction output preserved in `extraction_runs`
+- editable draft template
+- published template version that the app can consume
 
 ## Proposed UI
 
@@ -219,6 +266,7 @@ For one system:
 - source documents
 - PDFs on disk
 - workflows extracted
+- question-template status for each PDF-backed form
 - failures
 - manual evidence entries
 
@@ -227,6 +275,7 @@ Actions:
 - add manual URL
 - import saved HTML
 - import local PDF
+- open question review
 - run targeted crawl
 
 ### Page 4: Manual Import
@@ -255,9 +304,33 @@ Buckets:
 - parse failures
 - access denied / bot-protected
 - zero-PDF systems
+- low-confidence question drafts
+- stale autofill templates
 - suspicious filenames
 - duplicate forms
 - partial workflows
+
+### Page 6: Question Review
+
+For one PDF-backed source document:
+
+- PDF preview with page navigation
+- extracted questions list
+- question type, label, required flag, options, and confidence
+- visible bindings to PDF field names or overlay coordinates
+- current draft status, published status, and staleness status
+
+Actions:
+
+- rename question
+- merge questions
+- split question
+- delete question
+- reorder questions
+- mark unsupported
+- edit bindings manually
+- save draft
+- approve/publish
 
 ## Backend Additions
 
@@ -272,6 +345,10 @@ Buckets:
 - `POST /internal/manual-import/pdf`
 - `POST /internal/crawl/system`
 - `POST /internal/crawl/zero-pdf-systems`
+- `GET /internal/source-documents/:id/question-review`
+- `POST /internal/source-documents/:id/question-review/reextract`
+- `POST /internal/source-documents/:id/question-review/draft`
+- `POST /internal/source-documents/:id/question-review/publish`
 
 ### Service Modules
 
@@ -289,9 +366,18 @@ Buckets:
   - read/write `seeds/[state]-systems.json`
   - validate the seed schema before save
 
+- `questionReviewService.js`
+  - load the latest PDF-understanding extraction for a source document
+  - materialize an editable draft question template
+  - validate manual edits to labels, options, and bindings
+  - publish approved template versions for app consumption
+  - mark templates stale when a new PDF version supersedes the source
+
 ## Data Model Additions
 
-These should be minimal.
+For seed provenance and manual imports, additions can stay minimal.
+
+For question review and publish, dedicated template versioning is worth it because raw extraction output, editable drafts, and approved app-facing templates should not be the same record.
 
 ### Candidate Additions
 
@@ -307,7 +393,22 @@ These should be minimal.
 - `seed_urls.evidence_note`
   - freeform note about why the seed is trusted
 
-These are optional. The MVP can launch without schema changes if provenance is stored in `extraction_runs.structured_output.metadata`.
+- `pdf_question_templates`
+  - editable per-PDF draft record
+  - status like `draft`, `approved`, `stale`, `unsupported`
+  - points at the current `source_document_id`
+  - stores the normalized question/binding payload under review
+  - stores confidence summary and review metadata
+
+- `pdf_question_template_versions`
+  - immutable published versions
+  - captures the exact approved payload and the `source_document` hash it was approved against
+  - supports app-safe consumption without exposing raw experimental drafts
+
+- `workflow_forms.published_question_template_version_id`
+  - optional pointer to the currently approved template version used by the app
+
+The provenance fields above are optional for MVP import flows. The question-template tables are recommended once human-reviewed autofill publishing is part of the console.
 
 ## Rules For Manual PDF Imports
 
@@ -332,6 +433,20 @@ The simplest approval flow is:
 
 No multi-user workflow is needed yet.
 
+For PDF question templates, the approval flow should be:
+
+1. Raw extraction run creates or updates a draft
+2. Operator reviews the PDF and bindings
+3. Operator edits the draft as needed
+4. Operator publishes an approved template version
+5. App consumes only the approved version
+
+Important rules:
+
+- new PDF or changed PDF hash -> existing approved template becomes `stale`
+- low-confidence extraction -> lands in the review queue automatically
+- no approved template -> app can still show workflow and official links, but it must not promise one-tap autofill
+
 ## Suggested Phases
 
 ### Phase 1: Operator MVP
@@ -347,6 +462,9 @@ This is the minimum version that helps with UW, MultiCare, Virginia Mason, and s
 ### Phase 2: Review and Repair
 
 - review queue
+- question review UI
+- editable draft question templates
+- publish flow for approved templates
 - suspicious filename repair UI
 - hash-named file repair UI
 - PDF parse failure review
@@ -373,6 +491,8 @@ Keep it simple.
 - manual imports can create duplicates if source URL and content hash matching are weak
 - operators may accidentally attach a document to the wrong system or facility
 - scanned PDFs can appear "empty" to the parser even when the document is obviously correct to a human
+- raw extraction output may overwrite or conflict with human-reviewed question edits if draft and published states are not separated
+- approved question templates may drift from the source PDF if PDF version changes are not tracked
 
 ## Mitigations
 
@@ -383,6 +503,8 @@ Keep it simple.
 - make recrawls targeted and state-scoped
 - allow human-confirmed source-page context to override parser weakness for ingestion decisions
 - reserve OCR as a later enhancement, not a prerequisite for import
+- keep raw extraction, draft template, and published template version as separate states
+- tie approved templates to the `source_document` hash and mark them stale when the PDF changes
 
 ## Acceptance Criteria
 
@@ -391,6 +513,11 @@ Keep it simple.
 - an operator can reseed a state without editing JSON in a text editor
 - an operator can trigger a targeted recrawl for a single system
 - an operator can see which systems still have `0` PDFs and why
+- an operator can open a PDF, review extracted questions, and see the bindings back to the PDF
+- an operator can manually rename, merge, split, delete, reorder, or mark extracted questions unsupported
+- an operator can approve/publish a reviewed template version without mutating the raw extraction run
+- a changed PDF version marks the prior approved template stale
+- the app only consumes approved template versions and falls back to workflow details plus official links when none exists
 - the resulting files still land in `storage/raw/[state]/...pdf` using the canonical naming scheme
 
 ## Recommended First Target

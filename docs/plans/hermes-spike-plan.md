@@ -1,5 +1,9 @@
 # Spike: Hermes Compatibility Validation
 
+> ✅ Completed
+>
+> This plan reflects a completed workstream. The codebase has since drifted from some implementation details here, so treat this document as historical context rather than the current source of truth.
+
 **Goal:** Confirm that the three critical JS libraries — isomorphic-git, @noble/curves, and NIP-44 encryption — work on Hermes in an Expo React Native app talking to the production mgit-api at `limbo.health`.
 
 **Time box:** 2 days

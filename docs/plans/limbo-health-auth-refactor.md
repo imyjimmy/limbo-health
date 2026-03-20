@@ -1,5 +1,9 @@
 # Limbo Health — Auth Refactor Implementation Guide
 
+> ✅ Completed
+>
+> This plan reflects a completed workstream. The codebase has since drifted from some implementation details here, so treat this document as historical context rather than the current source of truth.
+
 **Purpose:** Move all authorization logic from mgit-api (SQLite + authPersistence) into auth-api (MySQL). Simplify mgit-api to a pure git transport layer that delegates every access decision to auth-api. Add scan token support for the /scan doctor sharing feature.
 
 **Prerequisite:** Phase 1 integration tests are passing against the current codebase. These tests are the safety net for this refactor.

@@ -1,5 +1,9 @@
 # Limbo Health — API Integration Test Plan
 
+> ✅ Completed
+>
+> This plan reflects a completed workstream. The codebase has since drifted from some implementation details here, so treat this document as historical context rather than the current source of truth.
+
 **Purpose:** Define the test file structure and specific test cases for all existing endpoints and the new `/scan` feature. This document should be given to an engineer (or Claude instance) to implement the tests.
 
 **Test runner:** Vitest with direct `fetch` calls against running services. Tests hit real HTTP endpoints — these are integration tests, not unit tests.

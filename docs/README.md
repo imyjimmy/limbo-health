@@ -13,8 +13,10 @@ This directory keeps planning docs, specs, diagrams, and working notes out of th
 
 ### Plans
 
+- [Auth-API-gated patient fax worker](plans/auth-api-gated-patient-fax-worker.md)
 - [Hermes compatibility validation](plans/hermes-spike-plan.md)
 - [Auth refactor implementation guide](plans/limbo-health-auth-refactor.md)
+- [Human-assisted crawler console plan](plans/human-assisted-crawler-console-plan.md)
 - [Mobile app implementation guide](plans/limbo-health-mobile-implementation.md)
 - [API integration test plan](plans/limbo-health-test-plan.md)
 

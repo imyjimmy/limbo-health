@@ -1,5 +1,9 @@
 # Limbo Health Mobile App — Implementation Guide
 
+> ✅ Completed
+>
+> This plan reflects a completed workstream. The codebase has since drifted from some implementation details here, so treat this document as historical context rather than the current source of truth.
+
 **Target:** React Native (Expo, iOS-first)
 **Demo:** Dermatology appointment in ~3 weeks. Patient photographs back acne daily, shares photo timeline with doctor via QR code at appointment.
 **Date:** February 2026
