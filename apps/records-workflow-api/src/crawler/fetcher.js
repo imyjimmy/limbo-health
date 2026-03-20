@@ -6,11 +6,24 @@ import { ensureRawStorageStateDir } from '../utils/rawStorage.js';
 import { parseHtmlDocument } from '../parsers/htmlParser.js';
 import { parsePdfDocument } from '../parsers/pdfParser.js';
 
-function detectSourceType(url, contentType) {
+export function detectSourceType(url, contentType) {
   const normalized = (contentType || '').toLowerCase();
-  if (normalized.includes('pdf') || /\.pdf($|\?)/i.test(url)) {
+  if (
+    normalized.includes('html') ||
+    normalized.includes('xml') ||
+    normalized.startsWith('text/')
+  ) {
+    return 'html';
+  }
+
+  if (normalized.includes('pdf')) {
     return 'pdf';
   }
+
+  if (/\.pdf($|\?)/i.test(url)) {
+    return 'pdf';
+  }
+
   return 'html';
 }
 
@@ -47,7 +60,7 @@ export async function fetchAndParseDocument({
 
     let parsed;
     if (sourceType === 'pdf') {
-      parsed = await parsePdfDocument({ buffer: bodyBuffer });
+      parsed = await parsePdfDocument({ buffer: bodyBuffer, filePath: storagePath });
     } else {
       const html = bodyBuffer.toString('utf8');
       parsed = parseHtmlDocument({ html, url: finalUrl });

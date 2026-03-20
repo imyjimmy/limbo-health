@@ -163,6 +163,31 @@ function hasMedicalRecordsRequestSignal(text) {
   );
 }
 
+function hasTrustedSourcePageContext({
+  sourceUrl = '',
+  sourceTitle = '',
+  sourceText = '',
+  sourceLinkText = '',
+  sourceLinkContext = ''
+}) {
+  const sourcePageHaystack = `${sourceUrl} ${sourceTitle} ${sourceText}`;
+  const sourceLinkHaystack = `${sourceLinkText} ${sourceLinkContext}`;
+  const combined = `${sourcePageHaystack} ${sourceLinkHaystack}`;
+
+  if (!matchesAny(sourcePageHaystack, SOURCE_MEDICAL_RECORD_PATTERNS)) {
+    return false;
+  }
+
+  if (matchesAny(sourceLinkHaystack || combined, MEDICAL_RECORDS_DOCUMENT_NEGATIVE_PATTERNS)) {
+    return false;
+  }
+
+  return (
+    hasMedicalRecordsRequestSignal(sourceLinkHaystack) ||
+    hasMedicalRecordsRequestSignal(combined)
+  );
+}
+
 export function isLikelyMedicalRecordsPdfLink({
   href,
   text = '',
@@ -190,7 +215,12 @@ export function isMedicalRecordsRequestDocument({
   url = '',
   title = '',
   text = '',
-  links = []
+  links = [],
+  sourceUrl = '',
+  sourceTitle = '',
+  sourceText = '',
+  sourceLinkText = '',
+  sourceLinkContext = ''
 }) {
   const linkHaystack = links.map((link) => `${link.text || ''} ${link.href || ''}`).join(' ');
   const titleUrlHaystack = `${url} ${title}`;
@@ -200,7 +230,34 @@ export function isMedicalRecordsRequestDocument({
     return false;
   }
 
-  return hasMedicalRecordsRequestSignal(haystack);
+  if (hasMedicalRecordsRequestSignal(haystack)) {
+    return true;
+  }
+
+  return hasTrustedSourcePageContext({
+    sourceUrl,
+    sourceTitle,
+    sourceText,
+    sourceLinkText,
+    sourceLinkContext
+  });
+}
+
+export function classifyMedicalRecordsRequestDocument(args = {}) {
+  return {
+    accepted: isMedicalRecordsRequestDocument(args),
+    basis: hasMedicalRecordsRequestSignal(
+      `${args.url || ''} ${args.title || ''} ${args.text || ''} ${(
+        args.links || []
+      )
+        .map((link) => `${link.text || ''} ${link.href || ''}`)
+        .join(' ')}`
+    )
+      ? 'document_text'
+      : hasTrustedSourcePageContext(args)
+        ? 'context_verified'
+        : 'unverified'
+  };
 }
 
 export function normalizeUrl(rawUrl, baseUrl) {

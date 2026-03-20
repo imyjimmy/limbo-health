@@ -131,6 +131,7 @@ export function parseHtmlDocument({ html, url }) {
 
   return {
     sourceType: 'html',
+    url,
     title,
     text: bodyText,
     headings,

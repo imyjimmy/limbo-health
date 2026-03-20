@@ -13,10 +13,12 @@ import {
 import { collapseWhitespace } from '../src/utils/text.js';
 import { parseHtmlDocument } from '../src/parsers/htmlParser.js';
 import {
+  classifyMedicalRecordsRequestDocument,
   isLikelyMedicalRecordsPdfLink,
   isLikelyWorkflowLink,
   isMedicalRecordsRequestDocument
 } from '../src/utils/urls.js';
+import { detectSourceType } from '../src/crawler/fetcher.js';
 
 const methodistMedicalRecordsContext = {
   sourceTitle: 'How To Access Your Medical Records | Methodist Health System',
@@ -152,6 +154,30 @@ test('accepts healthcare-information authorization PDFs based on parsed document
   });
 
   assert.equal(accepted, true);
+});
+
+test('accepts context-verified records PDFs even when extracted pdf text is blank', () => {
+  const classification = classifyMedicalRecordsRequestDocument({
+    url: 'http://fcphd.org/PDF_Files/ReleaseofInformation.pdf',
+    title: '',
+    text: '',
+    links: [],
+    sourceUrl: 'http://fcphd.org/',
+    sourceTitle: 'Ferry County Health',
+    sourceText:
+      'Information & Links Release of Information Authorization Ferry County Health official information and links.',
+    sourceLinkText: 'Release of Information Authorization',
+    sourceLinkContext: 'Information & Links'
+  });
+
+  assert.equal(classification.accepted, true);
+  assert.equal(classification.basis, 'context_verified');
+});
+
+test('prefers content-type over .pdf suffix when classifying fetched source types', () => {
+  assert.equal(detectSourceType('https://example.org/roi.pdf', 'text/html; charset=utf-8'), 'html');
+  assert.equal(detectSourceType('https://example.org/roi.pdf', 'application/pdf'), 'pdf');
+  assert.equal(detectSourceType('https://example.org/roi.pdf', ''), 'pdf');
 });
 
 test('rejects accounting-of-disclosure PDFs', () => {

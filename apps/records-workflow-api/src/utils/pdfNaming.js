@@ -37,6 +37,8 @@ const DESCRIPTIVE_TITLE_PATTERNS = [
   /\bmychart\b/i,
   /\bportal\b/i,
   /\bconsent\b/i,
+  /\bopt[- ]out\b/i,
+  /\bcare everywhere\b/i,
   /\bautorizaci[oó]n\b/i,
   /\bautoriza[cç][aã]o\b/i
 ];

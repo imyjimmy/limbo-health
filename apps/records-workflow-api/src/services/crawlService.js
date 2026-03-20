@@ -5,7 +5,7 @@ import { extractWorkflowBundle } from '../extractors/workflowExtractor.js';
 import { config } from '../config.js';
 import { listActiveSeeds, saveExtractionResult } from '../repositories/workflowRepository.js';
 import { assignPdfStoragePath } from '../utils/pdfStorage.js';
-import { isMedicalRecordsRequestDocument } from '../utils/urls.js';
+import { classifyMedicalRecordsRequestDocument } from '../utils/urls.js';
 
 function normalizeForVisited(url) {
   try {
@@ -25,6 +25,39 @@ async function removeIfPresent(filePath) {
       throw error;
     }
   }
+}
+
+function derivePdfTitleFallback(sourceContext = null) {
+  if (!sourceContext) return '';
+
+  const candidates = [sourceContext.text, sourceContext.contextText, sourceContext.sourceTitle];
+  for (const candidate of candidates) {
+    const normalized = (candidate || '').trim();
+    if (!normalized) continue;
+    if (/^(request|download|form|click here)$/i.test(normalized)) continue;
+    return normalized;
+  }
+
+  return '';
+}
+
+function derivePdfTextFallback(sourceContext = null) {
+  if (!sourceContext) return '';
+
+  return [sourceContext.text, sourceContext.contextText, sourceContext.sourceTitle]
+    .map((value) => (value || '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function scoreSourceContext(sourceContext = null) {
+  if (!sourceContext) return 0;
+
+  return (
+    (sourceContext.text || '').length +
+    (sourceContext.contextText || '').length +
+    (sourceContext.sourceTitle || '').length
+  );
 }
 
 export async function runCrawl({
@@ -69,7 +102,8 @@ export async function runCrawl({
       url: seed.url,
       depth: 0,
       facilityId: seed.facility_id || null,
-      facilityName: seed.facility_name || null
+      facilityName: seed.facility_name || null,
+      sourceContext: null
     }));
 
     while (queue.length > 0) {
@@ -81,28 +115,40 @@ export async function runCrawl({
       try {
         const fetched = await fetchAndParseDocument({ url: item.url, state: system.state });
         crawled += 1;
+        const documentClassification =
+          fetched.sourceType === 'pdf'
+            ? classifyMedicalRecordsRequestDocument({
+                url: fetched.finalUrl,
+                title: fetched.title,
+                text: fetched.extractedText,
+                links: fetched.parsed?.links || [],
+                sourceUrl: item.sourceContext?.sourceUrl || '',
+                sourceTitle: item.sourceContext?.sourceTitle || '',
+                sourceText: item.sourceContext?.sourceText || '',
+                sourceLinkText: item.sourceContext?.text || '',
+                sourceLinkContext: item.sourceContext?.contextText || ''
+              })
+            : { accepted: true, basis: 'html' };
 
         if (
           fetched.sourceType === 'pdf' &&
-          !isMedicalRecordsRequestDocument({
-            url: fetched.finalUrl,
-            title: fetched.title,
-            text: fetched.extractedText,
-            links: fetched.parsed?.links || []
-          })
+          !documentClassification.accepted
         ) {
           await removeIfPresent(fetched.storagePath);
           details.push({
             system: system.systemName,
             state: system.state,
             url: fetched.finalUrl,
-            skipped: 'non_medical_records_pdf'
+            skipped: 'non_medical_records_pdf',
+            pdfParseStatus: fetched.parsed?.parseStatus || null
           });
           continue;
         }
 
         let storagePath = fetched.storagePath;
         if (fetched.sourceType === 'pdf') {
+          const fallbackTitle = derivePdfTitleFallback(item.sourceContext);
+          const fallbackText = derivePdfTextFallback(item.sourceContext);
           storagePath = await assignPdfStoragePath({
             currentStoragePath: fetched.storagePath,
             contentHash: fetched.contentHash,
@@ -110,9 +156,9 @@ export async function runCrawl({
             systemName: system.systemName,
             facilityName: item.facilityName,
             url: fetched.finalUrl,
-            title: fetched.title,
-            text: fetched.extractedText,
-            headerText: fetched.parsed?.headerText || '',
+            title: fetched.title || fallbackTitle,
+            text: fetched.extractedText || fallbackText,
+            headerText: fetched.parsed?.headerText || fallbackTitle || '',
             headerLines: fetched.parsed?.headerLines || []
           });
         }
@@ -129,7 +175,7 @@ export async function runCrawl({
             facilityId: item.facilityId,
             sourceUrl: fetched.finalUrl,
             sourceType: fetched.sourceType,
-            title: fetched.title,
+            title: fetched.title || derivePdfTitleFallback(item.sourceContext) || null,
             fetchedAt: fetched.fetchedAt,
             httpStatus: fetched.status,
             contentHash: fetched.contentHash,
@@ -147,7 +193,13 @@ export async function runCrawl({
             metadata: {
               sourceUrl: fetched.finalUrl,
               sourceType: fetched.sourceType,
-              httpStatus: fetched.status
+              httpStatus: fetched.status,
+              documentClassificationBasis: documentClassification.basis,
+              pdfParseStatus: fetched.parsed?.parseStatus || null,
+              pdfParseError: fetched.parsed?.parseError || null,
+              pdfRepairAttempted: Boolean(fetched.parsed?.repairAttempted),
+              pdfRepaired: Boolean(fetched.parsed?.repaired),
+              sourceContext: item.sourceContext || null
             }
           }
         });
@@ -161,13 +213,25 @@ export async function runCrawl({
           });
 
           for (const link of nextLinks) {
-            const nextNormalized = normalizeForVisited(link);
+            const nextNormalized = normalizeForVisited(link.url);
+            const existingQueuedItem = queue.find(
+              (queuedItem) => normalizeForVisited(queuedItem.url) === nextNormalized
+            );
+
+            if (existingQueuedItem) {
+              if (scoreSourceContext(link) > scoreSourceContext(existingQueuedItem.sourceContext)) {
+                existingQueuedItem.sourceContext = link;
+              }
+              continue;
+            }
+
             if (visited.has(nextNormalized)) continue;
             queue.push({
-              url: link,
+              url: link.url,
               depth: item.depth + 1,
               facilityId: item.facilityId,
-              facilityName: item.facilityName
+              facilityName: item.facilityName,
+              sourceContext: link
             });
           }
         }

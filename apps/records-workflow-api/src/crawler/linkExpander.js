@@ -26,8 +26,15 @@ export function expandCandidateLinks({ document, allowedDomain }) {
         sourceText: document.text || ''
       })
     )
-    .map((link) => link.href)
-    .filter(Boolean);
+    .map((link) => ({
+      url: link.href,
+      text: link.text || '',
+      contextText: link.contextText || '',
+      sourceUrl: document.url || '',
+      sourceTitle: document.title || '',
+      sourceText: document.text || ''
+    }))
+    .filter((link) => Boolean(link.url));
 }
 
 export function isOfficialDomain(url, canonicalDomain) {

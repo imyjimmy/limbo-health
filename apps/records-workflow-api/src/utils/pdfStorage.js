@@ -2,7 +2,21 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { sha256 } from './hash.js';
 import { buildMedicalRecordsPdfFilenameStem } from './pdfNaming.js';
+import { deriveAutomaticPdfTitleOverride } from './pdfTitleOverrides.js';
 import { ensureRawStorageStateDir } from './rawStorage.js';
+
+const SAFE_FILENAME_BYTES = 240;
+
+function ensureSafeFilename(candidatePath, context) {
+  const candidateName = path.basename(candidatePath);
+  if (Buffer.byteLength(candidateName, 'utf8') <= SAFE_FILENAME_BYTES) {
+    return;
+  }
+
+  throw new Error(
+    `Generated PDF filename is too long (${candidateName.length} chars) for ${context.url}.`
+  );
+}
 
 async function removeIfPresent(filePath) {
   try {
@@ -41,10 +55,18 @@ export async function assignPdfStoragePath({
   headerText = '',
   headerLines = []
 }) {
-  const baseStem = buildMedicalRecordsPdfFilenameStem({
-    systemName,
-    facilityName,
-    url,
+  const buildStemFrom = ({ title: nextTitle, text: nextText, headerText: nextHeaderText, headerLines: nextHeaderLines }) =>
+    buildMedicalRecordsPdfFilenameStem({
+      systemName,
+      facilityName,
+      url,
+      title: nextTitle,
+      text: nextText,
+      headerText: nextHeaderText,
+      headerLines: nextHeaderLines
+    });
+
+  const baseStem = buildStemFrom({
     title,
     text,
     headerText,
@@ -52,10 +74,35 @@ export async function assignPdfStoragePath({
   });
   const stateStorageDir = await ensureRawStorageStateDir(state);
 
+  let safeBaseStem = baseStem;
+  try {
+    ensureSafeFilename(path.join(stateStorageDir, `${baseStem}.pdf`), { url });
+  } catch {
+    const automaticTitleOverride = deriveAutomaticPdfTitleOverride({
+      title,
+      headerText,
+      headerLines,
+      facilityName,
+      systemName
+    });
+
+    if (automaticTitleOverride) {
+      safeBaseStem = buildStemFrom({
+        title: automaticTitleOverride,
+        text: automaticTitleOverride,
+        headerText: automaticTitleOverride,
+        headerLines: []
+      });
+    }
+  }
+
+  ensureSafeFilename(path.join(stateStorageDir, `${safeBaseStem}.pdf`), { url });
+
   let sequence = 1;
   while (true) {
-    const stem = sequence === 1 ? baseStem : `${baseStem}-${sequence}`;
+    const stem = sequence === 1 ? safeBaseStem : `${safeBaseStem}-${sequence}`;
     const candidatePath = path.join(stateStorageDir, `${stem}.pdf`);
+    ensureSafeFilename(candidatePath, { url });
 
     if (candidatePath === currentStoragePath) {
       return candidatePath;
