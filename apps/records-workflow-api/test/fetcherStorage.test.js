@@ -12,8 +12,10 @@ function importFresh(relativePath) {
 test('fetchAndParseDocument does not write html files to raw storage', async () => {
   const rawDir = await fs.mkdtemp(path.join(os.tmpdir(), 'records-workflow-html-'));
   const originalRawStorageDir = process.env.RAW_STORAGE_DIR;
+  const originalFetchBackend = process.env.RECORDS_FETCH_BACKEND;
 
   process.env.RAW_STORAGE_DIR = rawDir;
+  process.env.RECORDS_FETCH_BACKEND = 'node';
 
   const html = '<html><head><title>Medical Records</title></head><body><a href="/forms/auth.pdf">Authorization form</a></body></html>';
 
@@ -45,6 +47,11 @@ test('fetchAndParseDocument does not write html files to raw storage', async () 
     } else {
       process.env.RAW_STORAGE_DIR = originalRawStorageDir;
     }
+    if (originalFetchBackend == null) {
+      delete process.env.RECORDS_FETCH_BACKEND;
+    } else {
+      process.env.RECORDS_FETCH_BACKEND = originalFetchBackend;
+    }
     await fs.rm(rawDir, { recursive: true, force: true });
   }
 });
@@ -52,8 +59,10 @@ test('fetchAndParseDocument does not write html files to raw storage', async () 
 test('fetchAndParseDocument writes pdf files into a state subdirectory', async () => {
   const rawDir = await fs.mkdtemp(path.join(os.tmpdir(), 'records-workflow-pdf-'));
   const originalRawStorageDir = process.env.RAW_STORAGE_DIR;
+  const originalFetchBackend = process.env.RECORDS_FETCH_BACKEND;
 
   process.env.RAW_STORAGE_DIR = rawDir;
+  process.env.RECORDS_FETCH_BACKEND = 'node';
 
   test.mock.method(global, 'fetch', async () => ({
     url: 'https://example.org/forms/request.pdf',
@@ -93,6 +102,11 @@ test('fetchAndParseDocument writes pdf files into a state subdirectory', async (
       delete process.env.RAW_STORAGE_DIR;
     } else {
       process.env.RAW_STORAGE_DIR = originalRawStorageDir;
+    }
+    if (originalFetchBackend == null) {
+      delete process.env.RECORDS_FETCH_BACKEND;
+    } else {
+      process.env.RECORDS_FETCH_BACKEND = originalFetchBackend;
     }
     await fs.rm(rawDir, { recursive: true, force: true });
   }
