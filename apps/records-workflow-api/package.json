@@ -18,6 +18,8 @@
     "import:generated-seeds": "node src/importGeneratedSeeds.js",
     "crawl:rollout": "node src/crawlRollout.js",
     "crawl:rollout:incremental": "node src/crawlRolloutIncremental.js",
+    "backfill:pdf-form-understanding": "node src/backfillPdfFormUnderstanding.js",
+    "audit:pdf-form-understanding": "node src/auditPdfFormUnderstanding.js",
     "repair:pdf-names": "node src/repairPdfNames.js",
     "reset:crawl-state": "node src/resetCrawlState.js",
     "repartition:raw-storage-state": "node src/repartitionRawStorageByState.js",

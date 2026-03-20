@@ -25,6 +25,12 @@ import { HospitalSystemLogo } from '../components/records/HospitalSystemLogo';
 import { RequestStepper } from '../components/records/RequestStepper';
 import { fetchHospitalSystems, fetchRecordsRequestPacket } from '../core/recordsWorkflow/api';
 import {
+  buildRecordsRequestSteps,
+  validateAutofillAnswers,
+  type RecordsRequestStepKey,
+  type RecordsWorkflowAutofillAnswers,
+} from '../core/recordsWorkflow/autofill';
+import {
   generateRecordsRequestPdf,
   prefetchRecordsRequestPdfTemplate,
 } from '../core/recordsWorkflow/pdf';
@@ -40,9 +46,9 @@ import type {
   HospitalSystemOption,
   RecordsRequestIdAttachment,
   RecordsRequestPacket,
+  RecordsWorkflowAutofillQuestion,
+  RecordsWorkflowForm,
 } from '../types/recordsRequest';
-
-const STEPS = ['Bio', 'Hospital', 'ID', 'Submit'];
 
 function formatMethodLabel(method: string): string {
   return method
@@ -52,6 +58,33 @@ function formatMethodLabel(method: string): string {
     .join(' ');
 }
 
+function buildFormKey(form: RecordsWorkflowForm): string {
+  return form.cachedContentUrl || form.url;
+}
+
+function getAutofillAnswerLabel(
+  question: RecordsWorkflowAutofillQuestion,
+  answers: RecordsWorkflowAutofillAnswers,
+): string {
+  const answer = answers[question.id];
+
+  if (question.kind === 'short_text') {
+    return typeof answer === 'string' ? answer.trim() : '';
+  }
+
+  if (question.kind === 'single_select') {
+    if (typeof answer !== 'string') return '';
+    return question.options.find((option) => option.id === answer)?.label || '';
+  }
+
+  if (!Array.isArray(answer)) return '';
+
+  return question.options
+    .filter((option) => answer.includes(option.id))
+    .map((option) => option.label)
+    .join(', ');
+}
+
 export default function RecordsRequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -59,7 +92,7 @@ export default function RecordsRequestScreen() {
   const styles = useThemedStyles(createStyles);
   const { capture } = useCamera();
   const { status: bioStatus, profile, hasProfile } = useBioProfile();
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState<RecordsRequestStepKey>('bio');
   const [searchQuery, setSearchQuery] = useState('');
   const normalizedSearchQuery = normalizeHospitalSystemSearchQuery(searchQuery);
   const deferredSearchQuery = useDeferredValue(normalizedSearchQuery);
@@ -77,8 +110,10 @@ export default function RecordsRequestScreen() {
   const [templatePrefetchState, setTemplatePrefetchState] = useState<
     'idle' | 'loading' | 'ready' | 'error'
   >('idle');
+  const [selectedFormKey, setSelectedFormKey] = useState<string | null>(null);
   const [prefetchedFormName, setPrefetchedFormName] = useState<string | null>(null);
   const [templatePrefetchError, setTemplatePrefetchError] = useState<string | null>(null);
+  const [autofillAnswers, setAutofillAnswers] = useState<RecordsWorkflowAutofillAnswers>({});
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -133,6 +168,7 @@ export default function RecordsRequestScreen() {
   useEffect(() => {
     if (!packet || !packet.forms.some((form) => form.format === 'pdf')) {
       setTemplatePrefetchState('idle');
+      setSelectedFormKey(null);
       setPrefetchedFormName(null);
       setTemplatePrefetchError(null);
       return;
@@ -140,6 +176,7 @@ export default function RecordsRequestScreen() {
 
     let cancelled = false;
     setTemplatePrefetchState('loading');
+    setSelectedFormKey(null);
     setPrefetchedFormName(null);
     setTemplatePrefetchError(null);
 
@@ -147,6 +184,7 @@ export default function RecordsRequestScreen() {
       .then((result) => {
         if (cancelled) return;
         setTemplatePrefetchState('ready');
+        setSelectedFormKey(result.formKey);
         setPrefetchedFormName(result.formName);
       })
       .catch((error) => {
@@ -161,6 +199,41 @@ export default function RecordsRequestScreen() {
       cancelled = true;
     };
   }, [packet]);
+
+  useEffect(() => {
+    setAutofillAnswers({});
+  }, [selectedFormKey]);
+
+  const hasPdfForm = Boolean(packet?.forms.some((form) => form.format === 'pdf'));
+  const selectedPdfForm =
+    packet?.forms.find(
+      (form) => form.format === 'pdf' && selectedFormKey && buildFormKey(form) === selectedFormKey,
+    ) || null;
+  const dynamicQuestions =
+    selectedPdfForm?.autofill.supported && selectedPdfForm.autofill.questions.length > 0
+      ? selectedPdfForm.autofill.questions
+      : [];
+  const workflowSteps = buildRecordsRequestSteps(dynamicQuestions.length > 0);
+  const currentStepIndex = Math.max(
+    workflowSteps.findIndex((step) => step.key === currentStep),
+    0,
+  );
+  const packetReadyForContinue = Boolean(
+    selectedSystem &&
+      packet &&
+      !packetLoading &&
+      !packetError &&
+      (!hasPdfForm || templatePrefetchState !== 'loading'),
+  );
+  const idStepCanContinue = Boolean(packet && (!packet.requiresPhotoId || idAttachment));
+  const canGeneratePdf = hasPdfForm && templatePrefetchState !== 'loading';
+  const formFillButtonLabel = dynamicQuestions.length > 0 ? 'Fill Out Form' : 'Apply Bio To PDF';
+
+  useEffect(() => {
+    if (currentStep === 'form' && dynamicQuestions.length === 0) {
+      setCurrentStep('id');
+    }
+  }, [currentStep, dynamicQuestions.length]);
 
   if (bioStatus === 'loading') {
     return (
@@ -259,12 +332,18 @@ export default function RecordsRequestScreen() {
         bioProfile: profile,
         packet,
         idAttachment,
+        selectedFormKey,
+        autofillAnswers,
       });
 
       setGeneratedPdfUri(result.uri);
+      const appliedSummary =
+        dynamicQuestions.length > 0
+          ? 'Applied your bio and form answers'
+          : 'Applied your bio';
       Alert.alert(
-        'Filled PDF Ready',
-        `Filled ${result.formName} with ${result.filledFieldCount} bio field${result.filledFieldCount === 1 ? '' : 's'}.`,
+        'Form Ready',
+        `${appliedSummary} to ${result.formName} and filled ${result.filledFieldCount} field${result.filledFieldCount === 1 ? '' : 's'}.`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to generate the PDF.';
@@ -289,13 +368,52 @@ export default function RecordsRequestScreen() {
     }
   };
 
-  const goToStep = (nextStep: number) => {
+  const goToStep = (nextStep: RecordsRequestStepKey) => {
     startTransition(() => setCurrentStep(nextStep));
   };
 
-  const packetReadyForContinue = Boolean(selectedSystem && packet && !packetLoading && !packetError);
-  const idStepCanContinue = Boolean(packet && (!packet.requiresPhotoId || idAttachment));
-  const canGeneratePdf = Boolean(packet?.forms.some((form) => form.format === 'pdf'));
+  const handleContinueFromHospital = () => {
+    if (!packetReadyForContinue) return;
+    goToStep(dynamicQuestions.length > 0 ? 'form' : 'id');
+  };
+
+  const handleContinueFromForm = () => {
+    const validationMessage = validateAutofillAnswers(dynamicQuestions, autofillAnswers);
+    if (validationMessage) {
+      Alert.alert('Answer Required', validationMessage);
+      return;
+    }
+
+    goToStep('id');
+  };
+
+  const updateShortTextAnswer = (questionId: string, value: string) => {
+    setAutofillAnswers((currentAnswers) => ({
+      ...currentAnswers,
+      [questionId]: value,
+    }));
+  };
+
+  const updateSingleSelectAnswer = (questionId: string, optionId: string) => {
+    setAutofillAnswers((currentAnswers) => ({
+      ...currentAnswers,
+      [questionId]: optionId,
+    }));
+  };
+
+  const toggleMultiSelectAnswer = (questionId: string, optionId: string) => {
+    setAutofillAnswers((currentAnswers) => {
+      const existing = Array.isArray(currentAnswers[questionId]) ? currentAnswers[questionId] : [];
+      const nextValue = existing.includes(optionId)
+        ? existing.filter((value) => value !== optionId)
+        : [...existing, optionId];
+
+      return {
+        ...currentAnswers,
+        [questionId]: nextValue,
+      };
+    });
+  };
 
   return (
     <KeyboardAvoidingView
@@ -325,14 +443,18 @@ export default function RecordsRequestScreen() {
           <Text style={styles.heroTitle}>Build a ready-to-send request packet.</Text>
           <Text style={styles.heroSubtitle}>
             We&apos;ll confirm your bio details, pull the selected hospital system workflow, check
-            whether ID is needed, and generate a PDF you can review or share.
+            whether ID is needed, ask any form-specific questions we can confidently detect, and
+            generate a PDF you can review or share.
           </Text>
           <View style={styles.stepperWrap}>
-            <RequestStepper steps={STEPS} currentStep={currentStep} />
+            <RequestStepper
+              steps={workflowSteps.map((step) => step.label)}
+              currentStep={currentStepIndex}
+            />
           </View>
         </View>
 
-        {currentStep === 0 && (
+        {currentStep === 'bio' && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Step 1: Verify your personal info</Text>
             <Text style={styles.sectionBody}>
@@ -367,7 +489,7 @@ export default function RecordsRequestScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => goToStep(1)}
+                onPress={() => goToStep('hospital')}
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
               >
                 <Text style={styles.primaryButtonText}>Looks Correct</Text>
@@ -376,7 +498,7 @@ export default function RecordsRequestScreen() {
           </View>
         )}
 
-        {currentStep === 1 && (
+        {currentStep === 'hospital' && (
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>Step 2: Choose the hospital system</Text>
             <Text style={styles.sectionBody}>
@@ -468,9 +590,16 @@ export default function RecordsRequestScreen() {
                       </Text>
                     )}
                     {templatePrefetchState === 'ready' && prefetchedFormName && (
-                      <Text style={styles.selectionSummaryMeta}>
-                        Cached {prefetchedFormName} and kept it ready in memory.
-                      </Text>
+                      <>
+                        <Text style={styles.selectionSummaryMeta}>
+                          Cached {prefetchedFormName} and kept it ready in memory.
+                        </Text>
+                        <Text style={styles.selectionSummaryMeta}>
+                          {dynamicQuestions.length > 0
+                            ? `Detected ${dynamicQuestions.length} additional form question${dynamicQuestions.length === 1 ? '' : 's'} for the next step.`
+                            : 'No additional form questions were detected for this PDF.'}
+                        </Text>
+                      </>
                     )}
                     {templatePrefetchState === 'error' && templatePrefetchError && (
                       <Text style={styles.errorInlineText}>{templatePrefetchError}</Text>
@@ -482,7 +611,7 @@ export default function RecordsRequestScreen() {
 
             <View style={styles.actionRow}>
               <Pressable
-                onPress={() => goToStep(0)}
+                onPress={() => goToStep('bio')}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   pressed && styles.secondaryButtonPressed,
@@ -492,7 +621,7 @@ export default function RecordsRequestScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => goToStep(2)}
+                onPress={handleContinueFromHospital}
                 disabled={!packetReadyForContinue}
                 style={({ pressed }) => [
                   styles.primaryButton,
@@ -500,15 +629,121 @@ export default function RecordsRequestScreen() {
                   !packetReadyForContinue && styles.disabledButton,
                 ]}
               >
+                <Text style={styles.primaryButtonText}>
+                  {dynamicQuestions.length > 0 ? 'Continue to Form Questions' : 'Continue to ID'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {currentStep === 'form' && packet && selectedPdfForm && dynamicQuestions.length > 0 && (
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>
+              Step 3: Answer questions from {selectedPdfForm.name}
+            </Text>
+            <Text style={styles.sectionBody}>
+              We detected high-confidence questions in the selected hospital form. Your answers
+              here will be written back into that same PDF when you fill it.
+            </Text>
+
+            <View style={styles.requirementCard}>
+              <Text style={styles.requirementTitle}>Selected form</Text>
+              <Text style={styles.requirementBody}>{selectedPdfForm.name}</Text>
+              <Text style={styles.requirementFootnote}>
+                Autofill mode: {selectedPdfForm.autofill.mode || 'unknown'}
+              </Text>
+            </View>
+
+            <View style={styles.questionList}>
+              {dynamicQuestions.map((question) => {
+                const currentAnswer = autofillAnswers[question.id];
+
+                return (
+                  <View key={question.id} style={styles.questionCard}>
+                    <Text style={styles.questionLabel}>
+                      {question.label}
+                      {question.required ? ' *' : ''}
+                    </Text>
+                    {question.helpText ? (
+                      <Text style={styles.questionHelp}>{question.helpText}</Text>
+                    ) : null}
+
+                    {question.kind === 'short_text' ? (
+                      <TextInput
+                        value={typeof currentAnswer === 'string' ? currentAnswer : ''}
+                        onChangeText={(value) => updateShortTextAnswer(question.id, value)}
+                        placeholder="Type your answer"
+                        placeholderTextColor={theme.colors.inputPlaceholder}
+                        style={styles.answerInput}
+                        autoCapitalize="sentences"
+                      />
+                    ) : (
+                      <View style={styles.optionList}>
+                        {question.options.map((option) => {
+                          const isSelected =
+                            question.kind === 'single_select'
+                              ? currentAnswer === option.id
+                              : Array.isArray(currentAnswer) && currentAnswer.includes(option.id);
+
+                          return (
+                            <Pressable
+                              key={option.id}
+                              onPress={() =>
+                                question.kind === 'single_select'
+                                  ? updateSingleSelectAnswer(question.id, option.id)
+                                  : toggleMultiSelectAnswer(question.id, option.id)
+                              }
+                              style={({ pressed }) => [
+                                styles.optionChip,
+                                isSelected && styles.optionChipSelected,
+                                pressed && styles.optionChipPressed,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.optionChipText,
+                                  isSelected && styles.optionChipTextSelected,
+                                ]}
+                              >
+                                {option.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+
+            <View style={styles.actionRow}>
+              <Pressable
+                onPress={() => goToStep('hospital')}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  pressed && styles.secondaryButtonPressed,
+                ]}
+              >
+                <Text style={styles.secondaryButtonText}>Back</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleContinueFromForm}
+                style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
+              >
                 <Text style={styles.primaryButtonText}>Continue to ID</Text>
               </Pressable>
             </View>
           </View>
         )}
 
-        {currentStep === 2 && packet && (
+        {currentStep === 'id' && packet && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Step 3: Add identification</Text>
+            <Text style={styles.sectionTitle}>
+              Step {dynamicQuestions.length > 0 ? 4 : 3}: Add identification
+            </Text>
             <Text style={styles.sectionBody}>
               {packet.requiresPhotoId
                 ? 'This workflow explicitly calls for a legible photo ID, so attach one before continuing.'
@@ -566,7 +801,7 @@ export default function RecordsRequestScreen() {
 
             <View style={styles.actionRow}>
               <Pressable
-                onPress={() => goToStep(1)}
+                onPress={() => goToStep(dynamicQuestions.length > 0 ? 'form' : 'hospital')}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   pressed && styles.secondaryButtonPressed,
@@ -576,7 +811,7 @@ export default function RecordsRequestScreen() {
               </Pressable>
 
               <Pressable
-                onPress={() => goToStep(3)}
+                onPress={() => goToStep('submit')}
                 disabled={!idStepCanContinue}
                 style={({ pressed }) => [
                   styles.primaryButton,
@@ -592,13 +827,16 @@ export default function RecordsRequestScreen() {
           </View>
         )}
 
-        {currentStep === 3 && packet && (
+        {currentStep === 'submit' && packet && (
           <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Step 4: Review and generate PDF</Text>
-          <Text style={styles.sectionBody}>
-            We&apos;ll fill the selected hospital PDF locally on this device using your personal info
-            and append your ID image as an extra page if you attached one.
-          </Text>
+            <Text style={styles.sectionTitle}>
+              Step {dynamicQuestions.length > 0 ? 5 : 4}: Fill out the selected form
+            </Text>
+            <Text style={styles.sectionBody}>
+              The selected hospital PDF is fetched on this device first. When you tap below, we
+              apply your bio to the correct fields, write any answers from the previous step back
+              into the form, and append your ID image as an extra page if you attached one.
+            </Text>
 
             <View style={styles.reviewSection}>
               <Text style={styles.reviewHeader}>Bio info</Text>
@@ -639,12 +877,49 @@ export default function RecordsRequestScreen() {
               )}
             </View>
 
-            {!canGeneratePdf && (
+            {selectedPdfForm && (
               <View style={styles.reviewSection}>
-                <Text style={styles.reviewHeader}>PDF generation</Text>
+                <Text style={styles.reviewHeader}>Selected autofill form</Text>
+                <Text style={styles.reviewText}>{selectedPdfForm.name}</Text>
+                <Text style={styles.reviewMuted}>
+                  {selectedPdfForm.autofill.mode
+                    ? `Autofill mode: ${selectedPdfForm.autofill.mode}`
+                    : 'Autofill mode pending'}
+                </Text>
+              </View>
+            )}
+
+            {dynamicQuestions.length > 0 && (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewHeader}>Form answers</Text>
+                {dynamicQuestions.map((question) => {
+                  const answerLabel = getAutofillAnswerLabel(question, autofillAnswers);
+
+                  return (
+                    <View key={question.id} style={styles.answerSummaryRow}>
+                      <Text style={styles.answerSummaryLabel}>{question.label}</Text>
+                      <Text style={styles.reviewMuted}>{answerLabel || 'No answer recorded'}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {!hasPdfForm && (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewHeader}>Form filling</Text>
                 <Text style={styles.reviewMuted}>
                   No fillable hospital PDF is available for this system yet. You can still review the
                   workflow details above and open any official links manually.
+                </Text>
+              </View>
+            )}
+
+            {hasPdfForm && templatePrefetchState === 'loading' && (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewHeader}>Preparing form</Text>
+                <Text style={styles.reviewMuted}>
+                  Fetching the selected hospital PDF now so it&apos;s ready for one-tap filling.
                 </Text>
               </View>
             )}
@@ -683,16 +958,20 @@ export default function RecordsRequestScreen() {
                   {submitting
                     ? 'Filling PDF...'
                     : canGeneratePdf
-                      ? 'Generate Filled Hospital PDF'
-                      : 'No Fillable PDF Available Yet'}
+                      ? templatePrefetchState === 'error'
+                        ? `Retry ${formFillButtonLabel}`
+                        : formFillButtonLabel
+                      : hasPdfForm
+                        ? 'Fetching Form...'
+                        : 'No Fillable PDF Available Yet'}
                 </Text>
               </Pressable>
 
               {generatedPdfUri && (
                 <View style={styles.successCard}>
-                  <Text style={styles.successTitle}>Filled PDF generated</Text>
+                  <Text style={styles.successTitle}>Filled form ready</Text>
                   <Text style={styles.successBody}>
-                    Your filled hospital form is ready to share, review, or save elsewhere on your device.
+                    Your hospital PDF now has your bio{dynamicQuestions.length > 0 ? ' and form answers' : ''} applied and is ready to share, review, or save elsewhere on your device.
                   </Text>
                   <Pressable
                     onPress={handleSharePdf}
@@ -710,7 +989,7 @@ export default function RecordsRequestScreen() {
 
             <View style={styles.actionRow}>
               <Pressable
-                onPress={() => goToStep(2)}
+                onPress={() => goToStep('id')}
                 style={({ pressed }) => [
                   styles.secondaryButton,
                   pressed && styles.secondaryButtonPressed,
@@ -721,7 +1000,7 @@ export default function RecordsRequestScreen() {
 
               <Pressable
                 onPress={() => {
-                  setCurrentStep(0);
+                  setCurrentStep('bio');
                   setGeneratedPdfUri(null);
                 }}
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
@@ -1054,6 +1333,66 @@ const createStyles = createThemedStyles((theme) => ({
     color: theme.colors.textMuted,
     fontSize: 13,
   },
+  questionList: {
+    gap: 12,
+  },
+  questionCard: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 20,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  questionLabel: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 22,
+  },
+  questionHelp: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  answerInput: {
+    backgroundColor: theme.colors.inputBackground,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.inputBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    color: theme.colors.text,
+    fontSize: 16,
+  },
+  optionList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  optionChip: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  optionChipSelected: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.primary,
+  },
+  optionChipPressed: {
+    opacity: 0.86,
+  },
+  optionChipText: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  optionChipTextSelected: {
+    color: theme.colors.primary,
+  },
   reviewSection: {
     gap: 8,
   },
@@ -1111,6 +1450,15 @@ const createStyles = createThemedStyles((theme) => ({
     color: theme.colors.textSecondary,
     fontSize: 14,
     lineHeight: 20,
+  },
+  answerSummaryRow: {
+    gap: 4,
+    paddingVertical: 2,
+  },
+  answerSummaryLabel: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
   },
   successCard: {
     backgroundColor: theme.colors.successSoft,

@@ -1,5 +1,9 @@
 import path from 'node:path';
 import { query, withTransaction } from '../db.js';
+import {
+  buildUnsupportedAutofillPayload,
+  PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,
+} from '../utils/pdfFormUnderstanding.js';
 import { normalizeStateCode } from '../utils/states.js';
 import { collapseWhitespace, uniqueBy } from '../utils/text.js';
 
@@ -1013,6 +1017,46 @@ async function attachCachedDocumentsToForms(
   return [...hydratedForms, ...fallbackForms];
 }
 
+async function listLatestPdfFormUnderstanding(sourceDocumentIds = []) {
+  const normalizedIds = sourceDocumentIds.filter(Boolean);
+  if (normalizedIds.length === 0) {
+    return new Map();
+  }
+
+  const result = await query(
+    `select distinct on (source_document_id)
+       source_document_id,
+       status,
+       structured_output
+     from extraction_runs
+     where source_document_id = any($1::uuid[])
+       and extractor_name = $2
+     order by source_document_id, created_at desc`,
+    [normalizedIds, PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME]
+  );
+
+  return new Map(
+    result.rows.map((row) => [
+      row.source_document_id,
+      row.structured_output?.form_understanding || buildUnsupportedAutofillPayload(),
+    ])
+  );
+}
+
+async function attachAutofillMetadataToForms(forms = []) {
+  const sourceDocumentIds = forms
+    .map((form) => form?.cached_source_document_id)
+    .filter((value) => typeof value === 'string' && value);
+  const bySourceDocumentId = await listLatestPdfFormUnderstanding(sourceDocumentIds);
+
+  return forms.map((form) => ({
+    ...form,
+    autofill: form?.cached_source_document_id
+      ? bySourceDocumentId.get(form.cached_source_document_id) || buildUnsupportedAutofillPayload()
+      : buildUnsupportedAutofillPayload(),
+  }));
+}
+
 function buildFormalMethods(medicalWorkflow) {
   const formalMethods = [];
   if (medicalWorkflow?.online_request_available) formalMethods.push('online_request');
@@ -1181,10 +1225,10 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
   const workflows = workflowsRes.rows;
   const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
   const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
-  const forms = await attachCachedDocumentsToForms(artifacts.forms, {
+  const forms = await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
     hospitalSystemId: facility.hospital_system_id,
     facilityId: facility.id
-  });
+  }));
   const portal = portalRes.rows[0] || null;
 
   return buildRequestPacket({
@@ -1250,9 +1294,9 @@ export async function getSystemRequestPacket(systemId) {
   const workflows = workflowsRes.rows;
   const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
   const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
-  const forms = await attachCachedDocumentsToForms(artifacts.forms, {
+  const forms = await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
     hospitalSystemId: systemId
-  });
+  }));
   const portal = portalRes.rows[0] || null;
 
   return buildRequestPacket({

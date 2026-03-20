@@ -1,5 +1,9 @@
 import { API_BASE_URL } from '../../constants/api';
-import type { HospitalSystemOption, RecordsRequestPacket } from '../../types/recordsRequest';
+import type {
+  HospitalSystemOption,
+  RecordsRequestPacket,
+  RecordsWorkflowAutofillBinding,
+} from '../../types/recordsRequest';
 import { normalizeHospitalSystemSearchQuery } from './search';
 
 const WORKFLOW_API_HOST = (
@@ -53,6 +57,27 @@ interface ApiRecordsRequestPacket {
     format: string | null;
     cached_source_document_id: string | null;
     cached_content_url: string | null;
+    autofill: {
+      supported: boolean;
+      mode: 'acroform' | 'overlay' | null;
+      template_id: string | null;
+      confidence?: number | null;
+      questions: {
+        id: string;
+        label: string;
+        kind: 'single_select' | 'multi_select' | 'short_text';
+        required: boolean;
+        help_text: string | null;
+        confidence: number;
+        bindings: ApiAutofillBinding[];
+        options: {
+          id: string;
+          label: string;
+          confidence: number;
+          bindings: ApiAutofillBinding[];
+        }[];
+      }[];
+    };
   }[];
   instructions: {
     kind: string;
@@ -68,6 +93,38 @@ interface ApiRecordsRequestPacket {
     last_verified_at: string | null;
   }[];
 }
+
+type ApiAutofillBinding =
+  | {
+      type: 'field_text';
+      field_name: string;
+    }
+  | {
+      type: 'field_checkbox';
+      field_name: string;
+      checked: boolean;
+    }
+  | {
+      type: 'field_radio';
+      field_name: string;
+      value: string;
+    }
+  | {
+      type: 'overlay_text';
+      page_index: number;
+      x: number;
+      y: number;
+      max_width: number | null;
+      font_size: number | null;
+    }
+  | {
+      type: 'overlay_mark';
+      page_index: number;
+      x: number;
+      y: number;
+      mark: 'x' | 'check';
+      size: number | null;
+    };
 
 function buildWorkflowUrl(path: string): string {
   return `${WORKFLOW_API_HOST}${WORKFLOW_API_PREFIX}${path}`;
@@ -130,6 +187,46 @@ function mapHospitalSystem(system: ApiHospitalSystem): HospitalSystemOption {
   };
 }
 
+function mapAutofillBinding(binding: ApiAutofillBinding): RecordsWorkflowAutofillBinding {
+  switch (binding.type) {
+    case 'field_text':
+      return {
+        type: 'field_text',
+        fieldName: binding.field_name,
+      };
+    case 'field_checkbox':
+      return {
+        type: 'field_checkbox',
+        fieldName: binding.field_name,
+        checked: binding.checked,
+      };
+    case 'field_radio':
+      return {
+        type: 'field_radio',
+        fieldName: binding.field_name,
+        value: binding.value,
+      };
+    case 'overlay_text':
+      return {
+        type: 'overlay_text',
+        pageIndex: binding.page_index,
+        x: binding.x,
+        y: binding.y,
+        maxWidth: binding.max_width,
+        fontSize: binding.font_size,
+      };
+    case 'overlay_mark':
+      return {
+        type: 'overlay_mark',
+        pageIndex: binding.page_index,
+        x: binding.x,
+        y: binding.y,
+        mark: binding.mark,
+        size: binding.size,
+      };
+  }
+}
+
 export async function fetchHospitalSystems(
   searchQuery = '',
   options?: { signal?: AbortSignal },
@@ -185,6 +282,28 @@ export async function fetchRecordsRequestPacket(systemId: string): Promise<Recor
       cachedContentUrl: form.cached_content_url
         ? `${WORKFLOW_API_HOST}${form.cached_content_url}`
         : null,
+      autofill: {
+        supported: Boolean(form.autofill?.supported),
+        mode: form.autofill?.mode || null,
+        templateId: form.autofill?.template_id || null,
+        confidence:
+          typeof form.autofill?.confidence === 'number' ? form.autofill.confidence : null,
+        questions: (form.autofill?.questions || []).map((question) => ({
+          id: question.id,
+          label: question.label,
+          kind: question.kind,
+          required: question.required,
+          helpText: question.help_text,
+          confidence: question.confidence,
+          bindings: question.bindings.map(mapAutofillBinding),
+          options: question.options.map((option) => ({
+            id: option.id,
+            label: option.label,
+            confidence: option.confidence,
+            bindings: option.bindings.map(mapAutofillBinding),
+          })),
+        })),
+      },
     })),
     instructions: data.instructions.map((instruction) => ({
       kind: instruction.kind,

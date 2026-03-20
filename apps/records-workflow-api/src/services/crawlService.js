@@ -1,9 +1,14 @@
 import fs from 'node:fs/promises';
 import { fetchAndParseDocument } from '../crawler/fetcher.js';
 import { expandCandidateLinks, isOfficialDomain } from '../crawler/linkExpander.js';
+import { extractPdfFormUnderstanding } from '../extractors/pdfFormUnderstandingExtractor.js';
 import { extractWorkflowBundle } from '../extractors/workflowExtractor.js';
 import { config } from '../config.js';
-import { listActiveSeeds, saveExtractionResult } from '../repositories/workflowRepository.js';
+import {
+  insertExtractionRun,
+  listActiveSeeds,
+  saveExtractionResult,
+} from '../repositories/workflowRepository.js';
 import { assignPdfStoragePath } from '../utils/pdfStorage.js';
 import { classifyMedicalRecordsRequestDocument } from '../utils/urls.js';
 
@@ -169,7 +174,7 @@ export async function runCrawl({
 
         const status = bundle.workflows.length > 0 ? 'success' : 'partial';
 
-        await saveExtractionResult({
+        const sourceDocumentId = await saveExtractionResult({
           sourceDocument: {
             hospitalSystemId: system.systemId,
             facilityId: item.facilityId,
@@ -203,6 +208,24 @@ export async function runCrawl({
             }
           }
         });
+
+        if (fetched.sourceType === 'pdf') {
+          const formUnderstandingExtraction = await extractPdfFormUnderstanding({
+            parsedPdf: fetched.parsed,
+            hospitalSystemName: system.systemName,
+            facilityName: item.facilityName,
+            formName: fetched.title || derivePdfTitleFallback(item.sourceContext) || 'Authorization Form',
+            sourceUrl: fetched.finalUrl,
+          });
+
+          await insertExtractionRun({
+            sourceDocumentId,
+            extractorName: formUnderstandingExtraction.extractorName,
+            extractorVersion: formUnderstandingExtraction.extractorVersion,
+            status: formUnderstandingExtraction.status,
+            structuredOutput: formUnderstandingExtraction.structuredOutput,
+          });
+        }
 
         extracted += 1;
 

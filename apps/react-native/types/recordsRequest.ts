@@ -17,6 +17,67 @@ export interface RecordsWorkflowForm {
   format: string | null;
   cachedSourceDocumentId: string | null;
   cachedContentUrl: string | null;
+  autofill: RecordsWorkflowFormAutofill;
+}
+
+export type RecordsWorkflowAutofillMode = 'acroform' | 'overlay';
+
+export type RecordsWorkflowAutofillBinding =
+  | {
+      type: 'field_text';
+      fieldName: string;
+    }
+  | {
+      type: 'field_checkbox';
+      fieldName: string;
+      checked: boolean;
+    }
+  | {
+      type: 'field_radio';
+      fieldName: string;
+      value: string;
+    }
+  | {
+      type: 'overlay_text';
+      pageIndex: number;
+      x: number;
+      y: number;
+      maxWidth: number | null;
+      fontSize: number | null;
+    }
+  | {
+      type: 'overlay_mark';
+      pageIndex: number;
+      x: number;
+      y: number;
+      mark: 'x' | 'check';
+      size: number | null;
+    };
+
+export interface RecordsWorkflowAutofillOption {
+  id: string;
+  label: string;
+  confidence: number;
+  bindings: RecordsWorkflowAutofillBinding[];
+}
+
+export interface RecordsWorkflowAutofillQuestion {
+  id: string;
+  label: string;
+  kind: 'single_select' | 'multi_select' | 'short_text';
+  required: boolean;
+  helpText: string | null;
+  confidence: number;
+  bindings: RecordsWorkflowAutofillBinding[];
+  options: RecordsWorkflowAutofillOption[];
+}
+
+export interface RecordsWorkflowFormAutofill {
+  supported: boolean;
+  mode: RecordsWorkflowAutofillMode | null;
+  templateId: string | null;
+  confidence: number | null;
+  questions: RecordsWorkflowAutofillQuestion[];
 }
 
 export interface RecordsWorkflowInstruction {

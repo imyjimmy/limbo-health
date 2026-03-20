@@ -29,6 +29,16 @@ function buildMedicalWorkflowRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function buildUnsupportedAutofill() {
+  return {
+    supported: false,
+    mode: null,
+    template_id: null,
+    confidence: null,
+    questions: [],
+  };
+}
+
 describe('workflowRepository request packet PDF hydration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,6 +80,50 @@ describe('workflowRepository request packet PDF hydration', () => {
             fetched_at: '2026-03-20T00:00:00.000Z',
           },
         ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            source_document_id: 'doc-1',
+            status: 'success',
+            structured_output: {
+              form_understanding: {
+                supported: true,
+                mode: 'overlay',
+                template_id: 'multicare-release-template',
+                confidence: 0.91,
+                questions: [
+                  {
+                    id: 'record-types',
+                    label: 'What kind of records do you want?',
+                    kind: 'multi_select',
+                    required: true,
+                    help_text: null,
+                    confidence: 0.9,
+                    bindings: [],
+                    options: [
+                      {
+                        id: 'xrays',
+                        label: 'X-rays',
+                        confidence: 0.94,
+                        bindings: [
+                          {
+                            type: 'overlay_mark',
+                            page_index: 0,
+                            x: 118,
+                            y: 420,
+                            mark: 'x',
+                            size: 12,
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        ],
       });
 
     const packet = await getSystemRequestPacket('system-1');
@@ -81,6 +135,40 @@ describe('workflowRepository request packet PDF hydration', () => {
         format: 'pdf',
         cached_source_document_id: 'doc-1',
         cached_content_url: '/api/records-workflow/source-documents/doc-1/content',
+        autofill: {
+          supported: true,
+          mode: 'overlay',
+          template_id: 'multicare-release-template',
+          confidence: 0.91,
+          questions: [
+            {
+              id: 'record-types',
+              label: 'What kind of records do you want?',
+              kind: 'multi_select',
+              required: true,
+              help_text: null,
+              confidence: 0.9,
+              bindings: [],
+              options: [
+                {
+                  id: 'xrays',
+                  label: 'X-rays',
+                  confidence: 0.94,
+                  bindings: [
+                    {
+                      type: 'overlay_mark',
+                      page_index: 0,
+                      x: 118,
+                      y: 420,
+                      mark: 'x',
+                      size: 12,
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       },
     ]);
   });
@@ -121,6 +209,9 @@ describe('workflowRepository request packet PDF hydration', () => {
             fetched_at: '2026-03-19T00:00:00.000Z',
           },
         ],
+      })
+      .mockResolvedValueOnce({
+        rows: [],
       });
 
     const packet = await getSystemRequestPacket('system-1');
@@ -132,6 +223,7 @@ describe('workflowRepository request packet PDF hydration', () => {
         format: 'pdf',
         cached_source_document_id: 'doc-1',
         cached_content_url: '/api/records-workflow/source-documents/doc-1/content',
+        autofill: buildUnsupportedAutofill(),
       },
       {
         name: 'Authorization to Release Health Care Information (Spanish)',
@@ -139,6 +231,7 @@ describe('workflowRepository request packet PDF hydration', () => {
         format: 'pdf',
         cached_source_document_id: 'doc-2',
         cached_content_url: '/api/records-workflow/source-documents/doc-2/content',
+        autofill: buildUnsupportedAutofill(),
       },
     ]);
   });

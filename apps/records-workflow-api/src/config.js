@@ -26,5 +26,11 @@ export const config = {
     maxDepth: Number.parseInt(process.env.CRAWL_MAX_DEPTH || '2', 10),
     timeoutMs: Number.parseInt(process.env.CRAWL_TIMEOUT_MS || '25000', 10),
     parserVersion: 'v1'
+  },
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+    baseUrl: process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1',
+    pdfFormUnderstandingModel: process.env.OPENAI_PDF_FORM_MODEL || '',
+    timeoutMs: Number.parseInt(process.env.OPENAI_TIMEOUT_MS || '30000', 10),
   }
 };

@@ -67,6 +67,40 @@ describe('records workflow API client', () => {
               format: 'pdf',
               cached_source_document_id: 'doc-1',
               cached_content_url: '/api/records-workflow/source-documents/doc-1/content',
+              autofill: {
+                supported: true,
+                mode: 'overlay',
+                template_id: 'authorization-template',
+                confidence: 0.93,
+                questions: [
+                  {
+                    id: 'record-types',
+                    label: 'What kind of records do you want?',
+                    kind: 'multi_select',
+                    required: true,
+                    help_text: 'Select every category you need.',
+                    confidence: 0.91,
+                    bindings: [],
+                    options: [
+                      {
+                        id: 'xrays',
+                        label: 'X-rays',
+                        confidence: 0.95,
+                        bindings: [
+                          {
+                            type: 'overlay_mark',
+                            page_index: 0,
+                            x: 102,
+                            y: 440,
+                            mark: 'x',
+                            size: 12,
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
             },
           ],
           instructions: [],
@@ -90,6 +124,40 @@ describe('records workflow API client', () => {
     expect(packet.forms[0]?.cachedContentUrl).toBe(
       'https://limbo.health/api/records-workflow/source-documents/doc-1/content',
     );
+    expect(packet.forms[0]?.autofill).toEqual({
+      supported: true,
+      mode: 'overlay',
+      templateId: 'authorization-template',
+      confidence: 0.93,
+      questions: [
+        {
+          id: 'record-types',
+          label: 'What kind of records do you want?',
+          kind: 'multi_select',
+          required: true,
+          helpText: 'Select every category you need.',
+          confidence: 0.91,
+          bindings: [],
+          options: [
+            {
+              id: 'xrays',
+              label: 'X-rays',
+              confidence: 0.95,
+              bindings: [
+                {
+                  type: 'overlay_mark',
+                  pageIndex: 0,
+                  x: 102,
+                  y: 440,
+                  mark: 'x',
+                  size: 12,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
   });
 
   it('throws a clear error when the endpoint returns HTML instead of JSON', async () => {
