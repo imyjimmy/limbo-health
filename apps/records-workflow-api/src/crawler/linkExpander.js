@@ -19,6 +19,7 @@ export function expandCandidateLinks({ document, allowedDomain }) {
       isLikelyWorkflowLink({
         href: link.href,
         text: link.text,
+        contextText: link.contextText || '',
         allowedDomain,
         approvedExternal: APPROVED_EXTERNAL_DOMAINS,
         sourceTitle: document.title || '',

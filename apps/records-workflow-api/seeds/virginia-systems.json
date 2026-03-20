@@ -1,38 +1,126 @@
 [
   {
+    "system_name": "Alexander T. Augusta Military Medical Center",
+    "state": "VA",
+    "domain": "belvoirhospital.tricare.mil",
+    "seed_urls": [
+      "https://belvoirhospital.tricare.mil/Getting-Care/Medical-Records"
+    ]
+  },
+  {
+    "system_name": "Augusta Health",
+    "state": "VA",
+    "domain": "augustahealth.com",
+    "seed_urls": [
+      "https://www.augustahealth.com/service/medical-records/",
+      "https://www.augustahealth.com/request-and-auth-to-copy-or-release-health-information/"
+    ]
+  },
+  {
+    "system_name": "Ballad Health",
+    "state": "VA",
+    "domain": "balladhealth.org",
+    "seed_urls": [
+      "https://www.balladhealth.org/my-medical-records",
+      "https://www.balladhealth.org/mychart"
+    ]
+  },
+  {
+    "system_name": "Bon Secours Virginia",
+    "state": "VA",
+    "domain": "bonsecours.com",
+    "seed_urls": [
+      "https://www.bonsecours.com/patient-resources/request-medical-records"
+    ]
+  },
+  {
+    "system_name": "Bath Community Hospital",
+    "state": "VA",
+    "domain": "bathhospital.org",
+    "seed_urls": [
+      "https://bathhospital.org/",
+      "https://bathhospital.org/patient-resources/your-rights/"
+    ]
+  },
+  {
+    "system_name": "Buchanan General Hospital",
+    "state": "VA",
+    "domain": "bgh.org",
+    "seed_urls": [
+      "https://www.bgh.org/getpage.php"
+    ]
+  },
+  {
+    "system_name": "Carilion Clinic",
+    "state": "VA",
+    "domain": "carilionclinic.org",
+    "seed_urls": [
+      "https://www.carilionclinic.org/medical-records"
+    ]
+  },
+  {
+    "system_name": "Centra Health",
+    "state": "VA",
+    "domain": "centrahealth.com",
+    "seed_urls": [
+      "https://www.centrahealth.com/",
+      "https://www.centrahealth.com/sites/default/files/2023-06/Release%20of%20Information%20new.pdf"
+    ]
+  },
+  {
+    "system_name": "Chesapeake Regional Healthcare",
+    "state": "VA",
+    "domain": "chesapeakeregional.com",
+    "seed_urls": [
+      "https://chesapeakeregional.com/patients-visitors/request-medical-records",
+      "https://www.chesapeakeregional.com/patients-visitors/patient-portal"
+    ]
+  },
+  {
+    "system_name": "Children's Hospital of The King's Daughters",
+    "state": "VA",
+    "domain": "chkd.org",
+    "seed_urls": [
+      "https://www.chkd.org/patient-family-resources/manage-my-childs-care/your-childs-medical-records/",
+      "https://apps.chkd.org/medicalrecordsweb/",
+      "https://www.chkd.org/patient-family-resources/manage-my-childs-care/mychkd-patient-portal/"
+    ]
+  },
+  {
+    "system_name": "Cumberland Hospital for Children and Adolescents",
+    "state": "VA",
+    "domain": "cumberlandhospital.com",
+    "seed_urls": [
+      "https://cumberlandhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Encompass Health Rehabilitation Hospitals of Virginia",
+    "state": "VA",
+    "domain": "encompasshealth.com",
+    "seed_urls": [
+      "https://www.encompasshealth.com/locations/fredericksburg-rehab/contact-us",
+      "https://www.encompasshealth.com/locations/northernvirginiarehab/contact-us",
+      "https://www.encompasshealth.com/locations/petersburg-rehab/contact-us",
+      "https://www.encompasshealth.com/locations/richmond-rehab/contact-us"
+    ]
+  },
+  {
+    "system_name": "Fauquier Health",
+    "state": "VA",
+    "domain": "fauquierhealth.org",
+    "seed_urls": [
+      "https://www.fauquierhealth.org/medical-records",
+      "https://www.fauquierhealth.org/patient-portal"
+    ]
+  },
+  {
     "system_name": "HCA Virginia",
     "state": "VA",
     "domain": "hcavirginia.com",
     "seed_urls": [
       "https://www.hcavirginia.com/patient-center/medical-records.dot",
       "https://www.myhealthone.net/mh1/public/mh1"
-    ]
-  },
-  {
-    "system_name": "VCU Health",
-    "state": "VA",
-    "domain": "vcuhealth.org",
-    "seed_urls": [
-      "https://www.vcuhealth.org/patients-and-visitors/medical-records-and-mychart/release-of-medical-information-/",
-      "https://mychart.vcuhealth.org/MyChart/Authentication/Login?"
-    ]
-  },
-  {
-    "system_name": "Sentara Healthcare",
-    "state": "VA",
-    "domain": "sentara.com",
-    "seed_urls": [
-      "https://www.sentara.com/patientguide/medical-records/request-your-medical-records",
-      "https://mychart.sentara.com/mychart/",
-      "https://www.sentara.com/Documents/a/Authorization-to-Disclose-Protected-Health-Information"
-    ]
-  },
-  {
-    "system_name": "UVA Health",
-    "state": "VA",
-    "domain": "uvahealth.com",
-    "seed_urls": [
-      "https://uvahealth.com/patients-and-visitors/health-information"
     ]
   },
   {
@@ -46,19 +134,30 @@
     ]
   },
   {
-    "system_name": "Carilion Clinic",
+    "system_name": "Mary Washington Healthcare",
     "state": "VA",
-    "domain": "carilionclinic.org",
+    "domain": "marywashingtonhealthcare.com",
     "seed_urls": [
-      "https://www.carilionclinic.org/medical-records"
+      "https://www.marywashingtonhealthcare.com/patients-visitors/medical-records/",
+      "https://www.marywashingtonhealthcare.com/patients-visitors/mychart/"
     ]
   },
   {
-    "system_name": "Bon Secours Virginia",
+    "system_name": "Lake Taylor Transitional Care Hospital",
     "state": "VA",
-    "domain": "bonsecours.com",
+    "domain": "laketaylor.org",
     "seed_urls": [
-      "https://www.bonsecours.com/patient-resources/request-medical-records"
+      "https://www.laketaylor.org/",
+      "https://www.laketaylor.org/privacy-policy/"
+    ]
+  },
+  {
+    "system_name": "Naval Medical Center Portsmouth",
+    "state": "VA",
+    "domain": "portsmouth.tricare.mil",
+    "seed_urls": [
+      "https://portsmouth.tricare.mil/Getting-Care/Medical-Records",
+      "https://portsmouth.tricare.mil/Portals/130/How%20to%20Request%20Records%20from%20NMCP.pdf"
     ]
   },
   {
@@ -71,11 +170,98 @@
     ]
   },
   {
+    "system_name": "Sentara Healthcare",
+    "state": "VA",
+    "domain": "sentara.com",
+    "seed_urls": [
+      "https://www.sentara.com/patientguide/medical-records/request-your-medical-records",
+      "https://mychart.sentara.com/mychart/",
+      "https://www.sentara.com/Documents/a/Authorization-to-Disclose-Protected-Health-Information"
+    ]
+  },
+  {
+    "system_name": "Select Specialty Hospitals of Virginia",
+    "state": "VA",
+    "domain": "selectspecialtyhospitals.com",
+    "seed_urls": [
+      "https://www.selectspecialtyhospitals.com/patients-and-caregivers/request-for-medical-records/",
+      "https://www.selectspecialtyhospitals.com/contact-us"
+    ]
+  },
+  {
+    "system_name": "Sovah Health",
+    "state": "VA",
+    "domain": "sovahhealth.com",
+    "seed_urls": [
+      "https://www.sovahhealth.com/medical-records",
+      "https://www.sovahhealth.com/patient-portal"
+    ]
+  },
+  {
+    "system_name": "UVA Health",
+    "state": "VA",
+    "domain": "uvahealth.com",
+    "seed_urls": [
+      "https://uvahealth.com/patients-and-visitors/health-information"
+    ]
+  },
+  {
+    "system_name": "VA Hampton Health Care",
+    "state": "VA",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/hampton-health-care/programs/medical-records-office/"
+    ]
+  },
+  {
     "system_name": "VA Richmond Health Care",
     "state": "VA",
     "domain": "va.gov",
     "seed_urls": [
       "https://www.va.gov/richmond-health-care/medical-records-office/"
+    ]
+  },
+  {
+    "system_name": "VA Salem Health Care",
+    "state": "VA",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/salem-health-care/programs/medical-records-office/"
+    ]
+  },
+  {
+    "system_name": "Valley Health",
+    "state": "VA",
+    "domain": "valleyhealthlink.com",
+    "seed_urls": [
+      "https://www.valleyhealthlink.com/patients-visitors/for-patients/medical-records/"
+    ]
+  },
+  {
+    "system_name": "VCU Health",
+    "state": "VA",
+    "domain": "vcuhealth.org",
+    "seed_urls": [
+      "https://www.vcuhealth.org/patients-and-visitors/medical-records-and-mychart/release-of-medical-information-/",
+      "https://mychart.vcuhealth.org/MyChart/Authentication/Login?"
+    ]
+  },
+  {
+    "system_name": "VHC Health",
+    "state": "VA",
+    "domain": "vhchealth.org",
+    "seed_urls": [
+      "https://www.vhchealth.org/",
+      "https://myvhc.vhchealth.org/"
+    ]
+  },
+  {
+    "system_name": "Wythe County Community Hospital",
+    "state": "VA",
+    "domain": "wcch.org",
+    "seed_urls": [
+      "https://www.wcch.org/medical-records",
+      "https://www.wcch.org/"
     ]
   }
 ]

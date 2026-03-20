@@ -2,6 +2,7 @@ const HTML_WORKFLOW_PATTERNS = [
   /\bmedical[-\s]?records?\b/i,
   /\bhealth[-\s]?records?\b/i,
   /\bmedical[-\s]?information\b/i,
+  /\bhealthcare[-\s]?information\b/i,
   /\brequest(?:ing)?\b/i,
   /\bauthori[sz](?:ation|e)\b/i,
   /\brelease[-\s]*(?:of|for)?[-\s]*information\b/i,
@@ -32,6 +33,7 @@ const HTML_WORKFLOW_PATTERNS = [
 const SOURCE_MEDICAL_RECORD_PATTERNS = [
   /\bmedical[-\s]?records?\b/i,
   /\bhealth[-\s]?records?\b/i,
+  /\bhealthcare[-\s]?information\b/i,
   /\brelease[-\s]*(?:of|for)?[-\s]*information\b/i,
   /\bauthori[sz](?:ation|e)\b/i,
   /\brequest(?:ing)?\b.{0,40}\brecords?\b/i,
@@ -68,6 +70,7 @@ const MEDICAL_RECORDS_REQUEST_SUBJECT_PATTERNS = [
   /\broi\b/i,
   /\bmedical[-\s]?information\b/i,
   /\bhealth[-\s]?information\b/i,
+  /\bhealthcare[-\s]?information\b/i,
   /\bprotected health information\b/i,
   /\bphi\b/i,
   /\brelease[-\s]*(?:of|for)?[-\s]*information\b/i,
@@ -80,6 +83,7 @@ const MEDICAL_RECORDS_REQUEST_SUBJECT_PATTERNS = [
 
 const MEDICAL_RECORDS_PDF_STRONG_POSITIVE_PATTERNS = [
   /\bauthorization\s+(for|to)\s+(release|disclos(?:e|ure))\b[\s\S]{0,80}\b(medical|health)\s+(information|records?)\b/i,
+  /\bauthorization\s+(for|to)\s+(release|disclos(?:e|ure))\b[\s\S]{0,80}\bhealthcare\s+information\b/i,
   /\brequest\s+(for\s+)?(medical|health)\s+(information|records?)\b/i,
   /\brequest copies of (your )?(medical|health) records\b/i,
   /\brelease of information\b[\s\S]{0,80}\b(medical|health)\s+(information|records?)\b/i,
@@ -162,13 +166,14 @@ function hasMedicalRecordsRequestSignal(text) {
 export function isLikelyMedicalRecordsPdfLink({
   href,
   text = '',
+  contextText = '',
   sourceTitle = '',
   sourceText = ''
 }) {
   const normalized = normalizeUrl(href);
   if (!normalized || !looksLikePdf(normalized)) return false;
 
-  const haystack = `${normalized} ${text}`;
+  const haystack = `${normalized} ${text} ${contextText}`;
   if (matchesAny(haystack, MEDICAL_RECORDS_PDF_LINK_NEGATIVE_PATTERNS)) {
     return false;
   }
@@ -217,6 +222,7 @@ export function hostFromUrl(value) {
 export function isLikelyWorkflowLink({
   href,
   text = '',
+  contextText = '',
   allowedDomain,
   approvedExternal = [],
   sourceTitle = '',
@@ -238,6 +244,7 @@ export function isLikelyWorkflowLink({
     return isLikelyMedicalRecordsPdfLink({
       href: normalized,
       text,
+      contextText,
       sourceTitle,
       sourceText
     });

@@ -181,10 +181,41 @@ function extractPhraseFromSource(value) {
 }
 
 export function detectDocumentLanguageCode({ url = '', title = '', headerText = '', text = '' }) {
+  const detectExplicitFilenameLanguageCode = (value) => {
+    if (!value) return null;
+
+    try {
+      const parsedUrl = new URL(value);
+      const basename = decodeURIComponent(parsedUrl.pathname || '')
+        .split('/')
+        .filter(Boolean)
+        .pop();
+      const match = basename?.match(/(?:^|[-_.])(EN|ES|SP|PT|RU|VT)(?=$|[-_.])/i);
+      return match?.[1]?.toUpperCase() || null;
+    } catch {
+      const match = value.match(/(?:^|[-_.])(EN|ES|SP|PT|RU|VT)(?=$|[-_.])/i);
+      return match?.[1]?.toUpperCase() || null;
+    }
+  };
+
   const priorityHaystack = collapseWhitespace(`${url} ${title} ${headerText}`).toLowerCase();
   const bodyHaystack = text.toLowerCase();
+  const explicitFilenameLanguageCode =
+    detectExplicitFilenameLanguageCode(url) || detectExplicitFilenameLanguageCode(title);
 
   const detectExplicitLanguageCode = (haystack) => {
+    if (/[а-яё]/i.test(haystack) || /\bрусск/i.test(haystack)) {
+      return 'RU';
+    }
+
+    if (
+      /\bti[eế]ng vi[eệ]t\b/.test(haystack) ||
+      /\bth[oô]ng tin b[eệ]nh nh[aâ]n\b/.test(haystack) ||
+      /\bng[aà]y sinh\b/.test(haystack)
+    ) {
+      return 'VT';
+    }
+
     if (
       /\bportuguese\b/.test(haystack) ||
       /\bportugu[eê]s\b/.test(haystack) ||
@@ -211,16 +242,44 @@ export function detectDocumentLanguageCode({ url = '', title = '', headerText = 
     return null;
   };
 
+  const resolveHintAlignedCode = (detectedLanguageCode) => {
+    if (detectedLanguageCode === 'ES' && explicitFilenameLanguageCode === 'SP') {
+      return 'SP';
+    }
+
+    return detectedLanguageCode;
+  };
+
   const priorityLanguageCode = detectExplicitLanguageCode(priorityHaystack);
   if (priorityLanguageCode) {
-    return priorityLanguageCode;
+    return resolveHintAlignedCode(priorityLanguageCode);
+  }
+
+  const normalizedHeaderText = collapseWhitespace(headerText).toLowerCase();
+  if (
+    normalizedHeaderText &&
+    !detectExplicitLanguageCode(normalizedHeaderText) &&
+    /\b(patient|medical|request|authorization|release|records?|proxy|mychart|consent|information)\b/i.test(
+      normalizedHeaderText
+    )
+  ) {
+    return 'EN';
+  }
+
+  const bodyLanguageCode = detectExplicitLanguageCode(bodyHaystack);
+  if (bodyLanguageCode) {
+    return resolveHintAlignedCode(bodyLanguageCode);
+  }
+
+  if (explicitFilenameLanguageCode) {
+    return explicitFilenameLanguageCode;
   }
 
   if (/[a-zà-ÿ]/i.test(priorityHaystack)) {
     return 'EN';
   }
 
-  return detectExplicitLanguageCode(bodyHaystack) || 'EN';
+  return 'EN';
 }
 
 function buildHeaderPhraseSource(headerLines = [], headerText = '') {
@@ -311,6 +370,10 @@ export function extractDescriptivePdfPhrase({
   headerLines = []
 }) {
   const cleanedTitle = sanitizePhrase(cleanPhraseSource(title));
+  if (/^medical records release form$/i.test(cleanedTitle)) {
+    return 'Medical Records Release Form';
+  }
+
   if (cleanedTitle && !isGenericTitle(cleanedTitle)) {
     const titlePhrase = extractPhraseFromSource(cleanedTitle);
     if (titlePhrase) {

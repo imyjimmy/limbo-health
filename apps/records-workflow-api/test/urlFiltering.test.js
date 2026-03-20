@@ -11,6 +11,7 @@ import {
   inferFacilityNameFromHeaderLines
 } from '../src/utils/pdfHeader.js';
 import { collapseWhitespace } from '../src/utils/text.js';
+import { parseHtmlDocument } from '../src/parsers/htmlParser.js';
 import {
   isLikelyMedicalRecordsPdfLink,
   isLikelyWorkflowLink,
@@ -69,6 +70,44 @@ test('accepts Spanish medical records authorization PDFs', () => {
   assert.equal(accepted, true);
 });
 
+test('captures neighboring container text for generic wix pdf buttons', () => {
+  const parsed = parseHtmlDocument({
+    url: 'https://www.columbiabasinhospital.org/requestmedicalrecords',
+    html: `
+      <div data-testid="responsive-container-content" class="comp-mad4c4s317-container">
+        <div class="wixui-rich-text">
+          <p>Release of Information FROM Columbia Basin Hospital or Columbia Basin Family Medicine</p>
+        </div>
+        <div class="comp-mad4vmp5">
+          <a href="https://www.columbiabasinhospital.org/_files/ugd/75a2e9_2bf3e6c74caa4f97a6e60375ed3e1ca0.pdf">Request</a>
+        </div>
+      </div>
+    `
+  });
+
+  const requestLink = parsed.links.find((link) => /2bf3e6c74caa4f97a6e60375ed3e1ca0\.pdf/.test(link.href));
+
+  assert.ok(requestLink);
+  assert.match(
+    requestLink.contextText,
+    /Release of Information FROM Columbia Basin Hospital or Columbia Basin Family Medicine/
+  );
+});
+
+test('accepts generic request pdf buttons when neighboring context identifies release-of-information', () => {
+  const accepted = isLikelyWorkflowLink({
+    href: 'https://www.columbiabasinhospital.org/_files/ugd/75a2e9_2bf3e6c74caa4f97a6e60375ed3e1ca0.pdf',
+    text: 'Request',
+    contextText: 'Release of Information FROM Columbia Basin Hospital or Columbia Basin Family Medicine',
+    allowedDomain: 'columbiabasinhospital.org',
+    sourceTitle: 'Request Medical Records | Columbia Basin Hospital | Columbia Basin Hospital Family Medicine',
+    sourceText:
+      'Easily request your medical records from Columbia Basin Hospital in Ephrata, WA. Find forms and instructions to securely access your health information.'
+  });
+
+  assert.equal(accepted, true);
+});
+
 test('rejects no surprises act PDFs', () => {
   const accepted = isLikelyMedicalRecordsPdfLink({
     href: 'https://www.bswhealth.com/-/media/project/bsw/sites/bswhealth/documents/privacy-and-patient-rights/no-surprises-act.pdf',
@@ -97,6 +136,18 @@ test('accepts release authorization PDFs based on parsed document text', () => {
     title: 'Authorization for Use and Disclosure of Health Information',
     text:
       'AUTHORIZATION FOR USE AND DISCLOSURE OF HEALTH INFORMATION. Complete Medical Record. I hereby authorize Houston Methodist to disclose/release the specified information below.',
+    links: []
+  });
+
+  assert.equal(accepted, true);
+});
+
+test('accepts healthcare-information authorization PDFs based on parsed document text', () => {
+  const accepted = isMedicalRecordsRequestDocument({
+    url: 'https://ba20ddef-1e13-4d44-94f0-13310290b9db.filesusr.com/ugd/75a2e9_2bf3e6c74caa4f97a6e60375ed3e1ca0.pdf',
+    title: '',
+    text:
+      'Authorization to Release Healthcare Information from CBH/CBFM Patient Authorization INFORMATION TO BE RELEASED FROM: Columbia Basin Hospital',
     links: []
   });
 
@@ -212,6 +263,46 @@ test('prefers english header language over multilingual footer boilerplate', () 
   });
 
   assert.equal(language, 'EN');
+});
+
+test('treats filename language codes as hints instead of overriding clear english content', () => {
+  const language = detectDocumentLanguageCode({
+    url: 'https://example.org/forms/Release-PHI-87-8455-5e-A-SP-Rev-0725.pdf',
+    headerText: 'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET',
+    text: 'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET'
+  });
+
+  assert.equal(language, 'EN');
+});
+
+test('detects Russian and Vietnamese documents from page content', () => {
+  assert.equal(
+    detectDocumentLanguageCode({
+      url: 'https://example.org/forms/Release-PHI-87-8455-5e-A-RU-Rev-1123.pdf',
+      headerText: 'Сведения о пациенте',
+      text: 'Сведения о пациенте Дата рождения Адрес'
+    }),
+    'RU'
+  );
+
+  assert.equal(
+    detectDocumentLanguageCode({
+      url: 'https://example.org/forms/Release-PHI-87-8455-5e-A-VT-Rev-1123.pdf',
+      headerText: 'Thông tin bệnh nhân',
+      text: 'Thông tin bệnh nhân Ngày sinh Địa chỉ'
+    }),
+    'VT'
+  );
+});
+
+test('preserves SP when the content is clearly spanish-family and the source token uses SP', () => {
+  const language = detectDocumentLanguageCode({
+    url: 'https://example.org/forms/Release-PHI-87-8455-5e-A-SP-Rev-0725.pdf',
+    headerText: 'Información del paciente',
+    text: 'Información especial: autorizo la inclusión de la siguiente información.'
+  });
+
+  assert.equal(language, 'SP');
 });
 
 test('infers a Mass General facility from the source URL when facilityName is missing', () => {

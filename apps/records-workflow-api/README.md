@@ -23,6 +23,44 @@ Postgres-backed crawler + extraction service that ingests public hospital record
   - `POST /internal/crawl/reseed`
   - `GET /internal/extraction-runs/:id`
 
+## Data Acquisition Pipeline
+
+```text
+data/[state].[html|txt|xlsx]
+=> human-guided rostering + src/generateReasonableSeeds.js
+   (we start from a human-sourced hospital list for the state; this step turns that roster into a reasonable set of official hospital/system targets and records-page candidates)
+=> seeds/[state]-systems.json
+   (authoritative crawler input; each JSON entry has:
+    - system_name
+    - state
+    - domain
+    - seed_urls[]
+    - optional facilities[] with:
+      - facility_name
+      - city
+      - state
+      - facility_type
+      - facility_page_url
+      - external_facility_id)
+=> src/services/seedService.js via src/seed.js
+   (reads the seed file and upserts hospital_systems, facilities, and seed_urls into Postgres; this is the reseed step)
+=> src/services/crawlService.js via src/crawl.js
+   (loads active seeds from the database, groups them by hospital system, and runs the crawl queue)
+=> src/crawler/fetcher.js
+   (fetches each URL and decides whether it is HTML or PDF)
+=> src/parsers/htmlParser.js or src/parsers/pdfParser.js
+   (HTML: extracts title, body text, links, and nearby link context; PDF: extracts text, header lines, and metadata)
+=> src/crawler/linkExpander.js + src/utils/urls.js
+   (scores pages and links to decide which ones look like medical-records workflow pages or medical-records PDFs and should be followed)
+=> src/extractors/workflowExtractor.js
+   (turns parsed pages/docs into structured workflow data such as portal info, request methods, forms, contacts, and instructions)
+=> src/utils/pdfStorage.js + src/utils/pdfNaming.js + src/utils/pdfHeader.js + src/utils/rawStorage.js
+   (for PDFs only: builds the final readable filename from the facility/system name, descriptive phrase, and language code, then writes it into the correct state folder)
+=> storage/raw/[state]/[facility-or-system]-[descriptive-phrase]-[language][-N].pdf
+```
+
+Short version: `data -> seeds -> DB reseed -> crawl/fetch/parse -> link expansion -> workflow extraction -> final named PDF in storage/raw/<state>/`.
+
 ## Setup
 
 1. Create a Postgres database.

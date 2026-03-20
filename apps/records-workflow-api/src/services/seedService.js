@@ -36,6 +36,20 @@ function inferSeedType(url) {
   return 'system_records_page';
 }
 
+function normalizeSeedMatchUrl(url) {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    parsed.pathname = pathname;
+    return parsed.toString();
+  } catch {
+    return String(url).replace(/#.*$/, '').replace(/\/+$/, '');
+  }
+}
+
 function normalizeSeedOptions(input) {
   if (typeof input === 'string') {
     return {
@@ -48,6 +62,10 @@ function normalizeSeedOptions(input) {
     seedFilePath: input?.seedFilePath || null,
     state: normalizeStateCode(input?.state)
   };
+}
+
+function isSameSystemName(left, right) {
+  return typeof left === 'string' && typeof right === 'string' && left.trim() === right.trim();
 }
 
 export function resolveSeedFilePath(input = {}) {
@@ -95,8 +113,11 @@ export async function reseedSystems(systems = []) {
         state: normalizeStateCode(facility.state) || normalizedState
       }));
 
-      const matchedByDomain = system.domain
+      const domainMatch = system.domain
         ? await findHospitalSystemByDomain({ domain: system.domain, state: normalizedState }, client)
+        : null;
+      const matchedByDomain = isSameSystemName(domainMatch?.system_name, system.system_name)
+        ? domainMatch
         : null;
       const matchedByFacility =
         matchedByDomain ||
@@ -119,6 +140,7 @@ export async function reseedSystems(systems = []) {
       summary.systems += 1;
 
       const facilityMap = new Map();
+      const facilityPageUrlMap = new Map();
       for (const facility of system.facilities || []) {
         const facilityId = await upsertFacility(
           {
@@ -135,6 +157,11 @@ export async function reseedSystems(systems = []) {
 
         summary.facilities += 1;
         facilityMap.set(facility.facility_name, facilityId);
+
+        const normalizedFacilityPageUrl = normalizeSeedMatchUrl(facility.facility_page_url || null);
+        if (normalizedFacilityPageUrl) {
+          facilityPageUrlMap.set(normalizedFacilityPageUrl, facilityId);
+        }
       }
 
       if (facilityMap.size === 0) {
@@ -155,10 +182,11 @@ export async function reseedSystems(systems = []) {
       }
 
       for (const url of system.seed_urls || []) {
+        const normalizedSeedUrl = normalizeSeedMatchUrl(url);
         const isFacilitySeed = /\/locations\//i.test(url);
-        let facilityId = null;
+        let facilityId = facilityPageUrlMap.get(normalizedSeedUrl) || null;
 
-        if (isFacilitySeed && facilityMap.size > 0) {
+        if (!facilityId && isFacilitySeed && facilityMap.size > 0) {
           const first = Array.from(facilityMap.values())[0];
           facilityId = first;
         }
