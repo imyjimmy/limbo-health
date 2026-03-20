@@ -288,15 +288,6 @@ export function isLikelyWorkflowLink({
   const normalized = normalizeUrl(href);
   if (!normalized) return false;
 
-  const host = hostFromUrl(normalized);
-  const sameDomain = host === allowedDomain || host.endsWith(`.${allowedDomain}`);
-  const externalAllowed = approvedExternal.some(
-    (domain) => host === domain || host.endsWith(`.${domain}`)
-  );
-
-  if (!sameDomain && !externalAllowed) return false;
-
-  const haystack = `${normalized} ${text}`;
   if (looksLikePdf(normalized)) {
     return isLikelyMedicalRecordsPdfLink({
       href: normalized,
@@ -307,5 +298,14 @@ export function isLikelyWorkflowLink({
     });
   }
 
+  const host = hostFromUrl(normalized);
+  const sameDomain = host === allowedDomain || host.endsWith(`.${allowedDomain}`);
+  const externalAllowed = approvedExternal.some(
+    (domain) => host === domain || host.endsWith(`.${domain}`)
+  );
+
+  if (!sameDomain && !externalAllowed) return false;
+
+  const haystack = `${normalized} ${text}`;
   return matchesAny(haystack, HTML_WORKFLOW_PATTERNS);
 }

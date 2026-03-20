@@ -72,6 +72,37 @@ test('accepts Spanish medical records authorization PDFs', () => {
   assert.equal(accepted, true);
 });
 
+test('accepts off-domain cdn PDFs when the official records page context is strong', () => {
+  const accepted = isLikelyWorkflowLink({
+    href: 'https://res.cloudinary.com/dpmykpsih/image/upload/olympic-medical-site-460/media/0d28d9fb6a4e4b1093b5662aa96a4a85/form-medicalrecordsrequest.pdf',
+    text: 'OMC Medical Records Request',
+    contextText:
+      'Phone: 360.417.7136 To request copies of your hospital medical records, please complete the form and return via mail or fax.',
+    allowedDomain: 'olympicmedical.org',
+    sourceTitle:
+      'Medical Records Release | Request Your Hospital and Clinic Records from Olympic Medical Center',
+    sourceText:
+      'Please download and complete the form for hospital records or clinic records. You may also submit via mail or fax.'
+  });
+
+  assert.equal(accepted, true);
+});
+
+test('still rejects off-domain non-records PDFs even from a records page', () => {
+  const accepted = isLikelyWorkflowLink({
+    href: 'https://res.cloudinary.com/example/olympic-medical-site-460/media/absence-request-employee-instructions.pdf',
+    text: 'Employee initial leave request',
+    contextText: 'Site map Provider resources Staff illness reporting tool',
+    allowedDomain: 'olympicmedical.org',
+    sourceTitle:
+      'Medical Records Release | Request Your Hospital and Clinic Records from Olympic Medical Center',
+    sourceText:
+      'Please download and complete the form for hospital records or clinic records. You may also submit via mail or fax.'
+  });
+
+  assert.equal(accepted, false);
+});
+
 test('captures neighboring container text for generic wix pdf buttons', () => {
   const parsed = parseHtmlDocument({
     url: 'https://www.columbiabasinhospital.org/requestmedicalrecords',
