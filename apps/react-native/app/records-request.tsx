@@ -28,6 +28,10 @@ import {
   generateRecordsRequestPdf,
   prefetchRecordsRequestPdfTemplate,
 } from '../core/recordsWorkflow/pdf';
+import {
+  HOSPITAL_SYSTEM_SEARCH_DEBOUNCE_MS,
+  normalizeHospitalSystemSearchQuery,
+} from '../core/recordsWorkflow/search';
 import { useCamera } from '../hooks/useCamera';
 import { useBioProfile } from '../providers/BioProfileProvider';
 import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
@@ -57,7 +61,9 @@ export default function RecordsRequestScreen() {
   const { status: bioStatus, profile, hasProfile } = useBioProfile();
   const [currentStep, setCurrentStep] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const normalizedSearchQuery = normalizeHospitalSystemSearchQuery(searchQuery);
+  const deferredSearchQuery = useDeferredValue(normalizedSearchQuery);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(deferredSearchQuery);
   const [systems, setSystems] = useState<HospitalSystemOption[]>([]);
   const [systemsLoading, setSystemsLoading] = useState(true);
   const [systemsError, setSystemsError] = useState<string | null>(null);
@@ -75,18 +81,35 @@ export default function RecordsRequestScreen() {
   const [templatePrefetchError, setTemplatePrefetchError] = useState<string | null>(null);
 
   useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearchQuery(deferredSearchQuery);
+    }, HOSPITAL_SYSTEM_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [deferredSearchQuery]);
+
+  useEffect(() => {
     let cancelled = false;
+    const abortController = new AbortController();
 
     async function loadSystems() {
       setSystemsLoading(true);
       setSystemsError(null);
 
       try {
-        const results = await fetchHospitalSystems(deferredSearchQuery);
+        const results = await fetchHospitalSystems(debouncedSearchQuery, {
+          signal: abortController.signal,
+        });
         if (!cancelled) {
           setSystems(results);
         }
       } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
         if (!cancelled) {
           setSystemsError(
             error instanceof Error ? error.message : 'Unable to load hospital systems right now.',
@@ -103,8 +126,9 @@ export default function RecordsRequestScreen() {
 
     return () => {
       cancelled = true;
+      abortController.abort();
     };
-  }, [deferredSearchQuery]);
+  }, [debouncedSearchQuery]);
 
   useEffect(() => {
     if (!packet || !packet.forms.some((form) => form.format === 'pdf')) {
@@ -177,6 +201,8 @@ export default function RecordsRequestScreen() {
       setPacketLoading(false);
     }
   };
+
+  const searchIsPending = deferredSearchQuery !== debouncedSearchQuery;
 
   const handleCaptureId = async () => {
     try {
@@ -368,10 +394,12 @@ export default function RecordsRequestScreen() {
               returnKeyType="search"
             />
 
-            {systemsLoading ? (
+            {systemsLoading || searchIsPending ? (
               <View style={styles.inlineLoading}>
                 <ActivityIndicator size="small" color={theme.colors.secondary} />
-                <Text style={styles.inlineLoadingText}>Loading systems...</Text>
+                <Text style={styles.inlineLoadingText}>
+                  {searchIsPending ? 'Searching systems...' : 'Loading systems...'}
+                </Text>
               </View>
             ) : systemsError ? (
               <View style={styles.errorCard}>

@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../../constants/api';
 import type { HospitalSystemOption, RecordsRequestPacket } from '../../types/recordsRequest';
+import { normalizeHospitalSystemSearchQuery } from './search';
 
 const WORKFLOW_API_HOST = (
   process.env.EXPO_PUBLIC_RECORDS_WORKFLOW_API_BASE_URL || API_BASE_URL
@@ -92,8 +93,10 @@ function buildNonJsonError(path: string, response: Response, bodyText: string): 
   );
 }
 
-async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(buildWorkflowUrl(path));
+async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = init
+    ? await fetch(buildWorkflowUrl(path), init)
+    : await fetch(buildWorkflowUrl(path));
   const contentType = response.headers.get('content-type')?.toLowerCase() || '';
 
   if (!response.ok) {
@@ -127,16 +130,21 @@ function mapHospitalSystem(system: ApiHospitalSystem): HospitalSystemOption {
   };
 }
 
-export async function fetchHospitalSystems(searchQuery = ''): Promise<HospitalSystemOption[]> {
-  const trimmedQuery = searchQuery.trim();
+export async function fetchHospitalSystems(
+  searchQuery = '',
+  options?: { signal?: AbortSignal },
+): Promise<HospitalSystemOption[]> {
+  const trimmedQuery = normalizeHospitalSystemSearchQuery(searchQuery);
   const params = new URLSearchParams();
   if (trimmedQuery) {
     params.set('q', trimmedQuery);
   }
 
   const suffix = params.toString();
+  const requestInit = options?.signal ? { signal: options.signal } : undefined;
   const data = await fetchJson<{ results: ApiHospitalSystem[] }>(
     `/hospital-systems${suffix ? `?${suffix}` : ''}`,
+    requestInit,
   );
   return data.results.map(mapHospitalSystem);
 }

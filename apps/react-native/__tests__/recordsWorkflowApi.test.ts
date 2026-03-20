@@ -13,6 +13,7 @@ describe('records workflow API client', () => {
     ['MultiCare', 'https://limbo.health/api/records-workflow/hospital-systems?q=MultiCare'],
     ['multi care', 'https://limbo.health/api/records-workflow/hospital-systems?q=multi+care'],
     ['multicare', 'https://limbo.health/api/records-workflow/hospital-systems?q=multicare'],
+    ['  multi   care  ', 'https://limbo.health/api/records-workflow/hospital-systems?q=multi+care'],
     [
       'Mass General Brigham',
       'https://limbo.health/api/records-workflow/hospital-systems?q=Mass+General+Brigham',
