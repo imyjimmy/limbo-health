@@ -1,0 +1,62 @@
+[
+  {
+    "system_name": "Englewood Health",
+    "state": "NJ",
+    "domain": "englewoodhealth.org",
+    "seed_urls": [
+      "https://www.englewoodhealth.org/patients-and-visitors/medical-records",
+      "https://www.englewoodhealth.org/patients-and-visitors/mychart"
+    ]
+  },
+  {
+    "system_name": "Hudson Regional Health",
+    "state": "NJ",
+    "domain": "hudsonregionalhospital.com",
+    "seed_urls": [
+      "https://www.hudsonregionalhospital.com/medical-records/",
+      "https://pcgway.com/",
+      "https://www.hudsonregionalhospital.com/medical-records/#",
+      "https://secure.newcropaccounts.com/PatientPortal",
+      "https://www.hudsonregionalhospital.com/wp-content/uploads/2025/08/Auth-to-Release-Health-Info.pdf"
+    ]
+  },
+  {
+    "system_name": "RWJBarnabas Health",
+    "state": "NJ",
+    "domain": "rwjbh.org",
+    "seed_urls": [
+      "https://www.rwjbh.org/patients-visitors/medical-records/",
+      "https://www.rwjbh.org/patients-visitors/patient-portal/",
+      "https://www.rwjbh.org/patients-visitors/health-information-exchange-hie-/",
+      "https://www.rwjbh.org/patients-visitors/patient-portal/mychart/",
+      "https://www.rwjbh.org/childrens-specialized-hospital/patients-visitors/authorization-to-release-information/",
+      "https://www.rwjbh.org/clara-maass-medical-center/patients-visitors/medical-records/"
+    ]
+  },
+  {
+    "system_name": "University Hospital",
+    "state": "NJ",
+    "domain": "uhnj.org",
+    "seed_urls": [
+      "https://www.uhnj.org/patients-visitors/medical-records/",
+      "https://www.uhnj.org/patients-visitors/medical-records/#content",
+      "https://www.uhnj.org/mychart/",
+      "https://www.uhnj.org/patients-visitors/medical-records/#",
+      "https://www.uhnj.org/compliance/docs/Request_for_Amendment_of_Health_Information_Form.pdf",
+      "https://www.uhnj.org/patients-visitors/medical-records/#next"
+    ]
+  },
+  {
+    "system_name": "Virtua Health",
+    "state": "NJ",
+    "domain": "virtua.org",
+    "seed_urls": [
+      "https://www.virtua.org/Patients-and-Visitors/Medical-Records",
+      "https://www.virtua.org/Patients-and-Visitors/MyChart",
+      "https://secure.myvirtua.org/MyChart/Authentication/Login?",
+      "https://www.virtua.org/-/media/Project/Virtua-Tenant/Virtua/PDFs/Medical-Records/31538-HIM----Release-of-MR-From-Virtua-Facilities-0226.pdf",
+      "https://www.virtua.org/-/media/Project/Virtua-Tenant/Virtua/PDFs/Medical-Records/31538-Release-of-MR-From-Virtua-Facilities--0226----SPANISH.pdf",
+      "https://www.virtua.org/-/media/Project/Virtua-Tenant/Virtua/PDFs/Medical-Records/Authorization-to-Release-Records-new-logo.pdf"
+    ]
+  }
+]

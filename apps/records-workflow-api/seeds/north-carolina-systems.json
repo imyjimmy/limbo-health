@@ -1,0 +1,45 @@
+[
+  {
+    "system_name": "Duke Health",
+    "state": "NC",
+    "domain": "dukehealth.org",
+    "seed_urls": [
+      "https://www.dukehealth.org/medical-records/get-medical-records-from-duke",
+      "https://www.dukehealth.org/medical-records/get-medical-records-from-duke#mainContent",
+      "https://www.dukehealth.org/medical-records/get-medical-records-from-duke#",
+      "https://www.dukehealth.org/medical-records",
+      "https://www.dukehealth.org/medical-records/send-your-medical-records-duke",
+      "https://www.dukehealth.org/medical-records/authorization-forms-and-instructions-medical-records"
+    ]
+  },
+  {
+    "system_name": "NC Health Info",
+    "state": "NC",
+    "domain": "nchealthinfo.org",
+    "seed_urls": [
+      "https://www.nchealthinfo.org/health-topics/medical-records/",
+      "https://www.nchealthinfo.org/health-topics/medical-records/#maincontent"
+    ]
+  },
+  {
+    "system_name": "Novant Health",
+    "state": "NC",
+    "domain": "novanthealth.org",
+    "seed_urls": [
+      "https://www.novanthealth.org/for-patients/medical-records/medical-records-faqs/",
+      "https://www.novanthealth.org/for-patients/medical-records/",
+      "https://www.novanthealth.org/for-patients/medical-records/medical-records-forms/",
+      "https://www.novanthealth.org/for-patients/medical-records/patients/",
+      "https://www.novanthealth.org/for-patients/medical-records/third-parties-requesting-medical-records/",
+      "https://www.novanthealth.org/for-patients/mychart/"
+    ]
+  },
+  {
+    "system_name": "UNC Health",
+    "state": "NC",
+    "domain": "unchealth.org",
+    "seed_urls": [
+      "https://www.unchealth.org/records-insurance/medical-records"
+    ]
+  }
+]

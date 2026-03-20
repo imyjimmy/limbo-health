@@ -1,0 +1,611 @@
+[
+  {
+    "system_name": "MultiCare",
+    "state": "WA",
+    "domain": "multicare.org",
+    "seed_urls": [
+      "https://www.multicare.org/patient-resources/medical-records/",
+      "https://www.multicare.org/patient-resources/medical-records/deaconess-hospital-patients/",
+      "https://www.multicare.org/patient-resources/medical-records/rockwood-clinic-patients/",
+      "https://www.multicare.org/patient-resources/medical-records/valley-hospital-patients/",
+      "https://www.multicare.org/patient-resources/medical-records/yakima-memorial-hospital-patients/",
+      "https://www.multicare.org/wp-content/uploads/2025/07/Release-PHI-87-8455-5e-A-Rev-0725.pdf",
+      "https://www.multicare.org/wp-content/uploads/2025/07/Release-PHI-87-8455-5e-A-SP-Rev-0725.pdf",
+      "https://www.multicare.org/wp-content/uploads/2023/04/Release-PHI-87-8455-5e-A-RU-Rev-1123.pdf",
+      "https://www.multicare.org/wp-content/uploads/2023/04/Release-PHI-87-8455-5e-A-VT-Rev-1123.pdf",
+      "https://mychart.multicare.org/mymulticare/Authentication/Login"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Deaconess Hospital",
+        "city": "Spokane",
+        "state": "WA",
+        "facility_page_url": "https://www.multicare.org/patient-resources/medical-records/deaconess-hospital-patients/"
+      },
+      {
+        "facility_name": "Rockwood Clinic",
+        "city": "Spokane",
+        "state": "WA",
+        "facility_page_url": "https://www.multicare.org/patient-resources/medical-records/rockwood-clinic-patients/"
+      },
+      {
+        "facility_name": "Valley Hospital",
+        "city": "Spokane Valley",
+        "state": "WA",
+        "facility_page_url": "https://www.multicare.org/patient-resources/medical-records/valley-hospital-patients/"
+      },
+      {
+        "facility_name": "Yakima Memorial Hospital",
+        "city": "Yakima",
+        "state": "WA",
+        "facility_page_url": "https://www.multicare.org/patient-resources/medical-records/yakima-memorial-hospital-patients/"
+      }
+    ]
+  },
+  {
+    "system_name": "Providence Washington",
+    "state": "WA",
+    "domain": "providence.org",
+    "seed_urls": [
+      "https://www.providence.org/about/medical-records-authorization/medical-records-wa"
+    ]
+  },
+  {
+    "system_name": "UW Medicine",
+    "state": "WA",
+    "domain": "uwmedicine.org",
+    "seed_urls": [
+      "https://www.uwmedicine.org/patient-resources/access-medical-records-images",
+      "https://stevie.cms.uwmedicine.org/u4657-request-medical-records-in-a-machine-readable-format",
+      "https://depts.washington.edu/comply/docs/103f7_AuthRq.pdf",
+      "https://stevie.cms.uwmedicine.org/sites/stevie/files/2026-01/U4657.pdf",
+      "https://www.valleymed.org/patients--visitors/resources-to-manage-your-health/medical-records",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/96-23371.6-auth-to-release-phi---fillable.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/87-9076.2-request-for-correction-or-amendment-of-the-medical-record.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/87-9076.2-request-for-correction-or-amendment-of-the-medical-record---fillable.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/96-23372.3-request-to-consider-additional-privacy-protection-for-protected-health-information.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/96-23372.3-request-to-consider-additional-privacy-protection-for-protected-health-information---fillable.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/87-9221.2-epic-care-everywhere-patient-opt-out.pdf",
+      "https://www.valleymed.org/globalassets/valley-medical/media/files/global/87-9221.2-epic-care-everywhere-patient-opt-out---fillable.pdf"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Valley Medical Center",
+        "city": "Renton",
+        "state": "WA",
+        "facility_page_url": "https://www.valleymed.org/patients--visitors/resources-to-manage-your-health/medical-records"
+      }
+    ]
+  },
+  {
+    "system_name": "Virginia Mason Franciscan Health",
+    "state": "WA",
+    "domain": "vmfh.org",
+    "seed_urls": [
+      "https://www.vmfh.org/patient-and-visitor-information/patient-information/requesting-medical-records",
+      "https://www.vmfh.org/content/dam/vmfhorg/pdf/patients-visitors/Authorization-Access-PHI.pdf"
+    ]
+  },
+  {
+    "system_name": "Seattle Children's",
+    "state": "WA",
+    "domain": "seattlechildrens.org",
+    "seed_urls": [
+      "https://www.seattlechildrens.org/clinics/health-info-management/",
+      "https://mychart.seattlechildrens.org/MyChart/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Overlake Medical Center & Clinics",
+    "state": "WA",
+    "domain": "overlakehospital.org",
+    "seed_urls": [
+      "https://www.overlakehospital.org/visit/medical-records",
+      "https://www.overlakehospital.org/sites/default/files/inline-files/Medical%20Records%20Authorization%20for%20Disclosure.pdf"
+    ]
+  },
+  {
+    "system_name": "EvergreenHealth",
+    "state": "WA",
+    "domain": "evergreenhealth.com",
+    "seed_urls": [
+      "https://www.evergreenhealth.com/patients-visitors/after-your-visit/medical-records/",
+      "https://www.evergreenhealth.com/app/files/public/bb1073da-24b0-4397-99cb-e5ce71e34e06/evergreenhealth-patient-request-for-health-information.pdf",
+      "https://www.evergreenhealth.com/app/files/public/eb45df8e-0fa7-471b-8fec-5ba31b3004c0/adm-536-authorization-to-disclose-healthcare-information.pdf",
+      "https://www.evergreenhealth.com/app/files/public/4ed49239-e820-4146-9bdb-dc0fe56aa01c/evergreenhealth-authorization-disclose-phi-adm-536-es.pdf",
+      "https://www.evergreenhealth.com/app/files/public/78990c9e-a148-4b1a-8398-b101243b8169/evergreenhealth-patient-request-amendment-of-records-adm-553.pdf",
+      "https://mychart.evergreenhealth.com/MyChart/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Confluence Health",
+    "state": "WA",
+    "domain": "confluencehealth.org",
+    "seed_urls": [
+      "https://www.confluencehealth.org/patient-information/request-medical-records/",
+      "https://www.confluencehealth.org/mychart/"
+    ]
+  },
+  {
+    "system_name": "Skagit Regional Health",
+    "state": "WA",
+    "domain": "skagitregionalhealth.org",
+    "seed_urls": [
+      "https://www.skagitregionalhealth.org/for-patients/medical-records",
+      "https://www.skagitregionalhealth.org/for-patients/request-an-appointment"
+    ]
+  },
+  {
+    "system_name": "Island Health",
+    "state": "WA",
+    "domain": "islandhealth.org",
+    "seed_urls": [
+      "https://islandhealth.org/medical-records/"
+    ]
+  },
+  {
+    "system_name": "Astria Health",
+    "state": "WA",
+    "domain": "astria.health",
+    "seed_urls": [
+      "https://www.astria.health/patients-visitors/medical-records/",
+      "https://www.astria.health/patients-visitors/patient-portal/"
+    ]
+  },
+  {
+    "system_name": "Kaiser Permanente Washington",
+    "state": "WA",
+    "domain": "wa.kaiserpermanente.org",
+    "seed_urls": [
+      "https://wa.kaiserpermanente.org/static/pdf/public/customer-service/health-information-request.pdf",
+      "https://wa.kaiserpermanente.org/static/pdf/public/customer-service/release-authorization.pdf",
+      "https://wa.kaiserpermanente.org/html/public/customer-service/radiology-images"
+    ]
+  },
+  {
+    "system_name": "Legacy Salmon Creek Medical Center",
+    "state": "WA",
+    "domain": "legacyhealth.org",
+    "seed_urls": [
+      "https://www.legacyhealth.org/patients-and-visitors/about-your-care/medical-records",
+      "https://www.legacyhealth.org/-/media/files/pdf/for-patients-and-visitors/about-your-care/medical-records/request-for-medical-records---english.pdf"
+    ]
+  },
+  {
+    "system_name": "Arbor Health",
+    "state": "WA",
+    "domain": "myarborhealth.org",
+    "seed_urls": [
+      "https://www.myarborhealth.org/"
+    ]
+  },
+  {
+    "system_name": "Cascade Medical",
+    "state": "WA",
+    "domain": "cascademedical.org",
+    "seed_urls": [
+      "https://cascademedical.org/"
+    ]
+  },
+  {
+    "system_name": "Columbia Basin Hospital",
+    "state": "WA",
+    "domain": "columbiabasinhospital.org",
+    "seed_urls": [
+      "https://www.columbiabasinhospital.org/",
+      "https://www.columbiabasinhospital.org/requestmedicalrecords",
+      "https://ba20ddef-1e13-4d44-94f0-13310290b9db.filesusr.com/ugd/75a2e9_2bf3e6c74caa4f97a6e60375ed3e1ca0.pdf",
+      "https://ba20ddef-1e13-4d44-94f0-13310290b9db.filesusr.com/ugd/75a2e9_ecdcb63ff54747098c81f4b3c1fa7b5e.pdf"
+    ]
+  },
+  {
+    "system_name": "Columbia County Health System",
+    "state": "WA",
+    "domain": "cchd-wa.org",
+    "seed_urls": [
+      "https://cchd-wa.org/"
+    ]
+  },
+  {
+    "system_name": "Coulee Medical Center",
+    "state": "WA",
+    "domain": "cmccares.org",
+    "seed_urls": [
+      "http://www.cmccares.org/"
+    ]
+  },
+  {
+    "system_name": "East Adams Rural Healthcare",
+    "state": "WA",
+    "domain": "earh.org",
+    "seed_urls": [
+      "https://www.earh.org/"
+    ]
+  },
+  {
+    "system_name": "Fairfax Behavioral Health",
+    "state": "WA",
+    "domain": "fairfaxhospital.com",
+    "seed_urls": [
+      "https://www.fairfaxhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Ferry County Health",
+    "state": "WA",
+    "domain": "fcphd.org",
+    "seed_urls": [
+      "http://fcphd.org/",
+      "http://fcphd.org/PDF_Files/ReleaseofInformation.pdf"
+    ]
+  },
+  {
+    "system_name": "Forks Community Hospital",
+    "state": "WA",
+    "domain": "forkshospital.org",
+    "seed_urls": [
+      "https://www.forkshospital.org/"
+    ]
+  },
+  {
+    "system_name": "Fred Hutchinson Cancer Center",
+    "state": "WA",
+    "domain": "fredhutch.org",
+    "seed_urls": [
+      "https://www.fredhutch.org/en.html"
+    ]
+  },
+  {
+    "system_name": "Garfield County Hospital District",
+    "state": "WA",
+    "domain": "garfieldcountyhospital.com",
+    "seed_urls": [
+      "https://www.garfieldcountyhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Harbor Regional Health",
+    "state": "WA",
+    "domain": "ghcares.org",
+    "seed_urls": [
+      "https://www.ghcares.org/"
+    ]
+  },
+  {
+    "system_name": "Jefferson Healthcare",
+    "state": "WA",
+    "domain": "jeffersonhealthcare.org",
+    "seed_urls": [
+      "https://jeffersonhealthcare.org/"
+    ]
+  },
+  {
+    "system_name": "Kindred Hospital Seattle - First Hill",
+    "state": "WA",
+    "domain": "kindredhealthcare.com",
+    "seed_urls": [
+      "https://www.kindredhealthcare.com/locations/ltac/kindred-hospital-seattle-first-hill"
+    ]
+  },
+  {
+    "system_name": "Kittitas Valley Healthcare",
+    "state": "WA",
+    "domain": "kvhealthcare.org",
+    "seed_urls": [
+      "https://www.kvhealthcare.org/patients-and-visitors/medical-records/"
+    ]
+  },
+  {
+    "system_name": "Klickitat Valley Health",
+    "state": "WA",
+    "domain": "kvhealth.net",
+    "seed_urls": [
+      "http://www.kvhealth.net/"
+    ]
+  },
+  {
+    "system_name": "Lake Chelan Health",
+    "state": "WA",
+    "domain": "lakechelanhealth.org",
+    "seed_urls": [
+      "https://lakechelanhealth.org/"
+    ]
+  },
+  {
+    "system_name": "Lincoln Hospital",
+    "state": "WA",
+    "domain": "lincolnhospital.org",
+    "seed_urls": [
+      "https://www.lincolnhospital.org/"
+    ]
+  },
+  {
+    "system_name": "Lourdes Health",
+    "state": "WA",
+    "domain": "yourlourdes.com",
+    "seed_urls": [
+      "https://www.yourlourdes.com/medical-records",
+      "https://www.yourlourdes.com/locations/lourdes-medical-center"
+    ]
+  },
+  {
+    "system_name": "Madigan Army Medical Center",
+    "state": "WA",
+    "domain": "madigan.tricare.mil",
+    "seed_urls": [
+      "https://madigan.tricare.mil/"
+    ]
+  },
+  {
+    "system_name": "Mann-Grandstaff VA Medical Center",
+    "state": "WA",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/spokane-health-care/"
+    ]
+  },
+  {
+    "system_name": "Mary Bridge Children's Hospital",
+    "state": "WA",
+    "domain": "marybridge.org",
+    "seed_urls": [
+      "https://www.marybridge.org/patients-visitors/medical-records/",
+      "https://www.multicare.org/wp-content/uploads/2025/07/Release-PHI-87-8455-5e-A-Rev-0725.pdf",
+      "https://www.multicare.org/wp-content/uploads/2021/04/MyChart-Proxy-Access-Release-of-Information-Request-Form.pdf"
+    ]
+  },
+  {
+    "system_name": "Mason Health",
+    "state": "WA",
+    "domain": "masongeneral.com",
+    "seed_urls": [
+      "https://www.masongeneral.com/"
+    ]
+  },
+  {
+    "system_name": "Naval Hospital Bremerton",
+    "state": "WA",
+    "domain": "bremerton.tricare.mil",
+    "seed_urls": [
+      "https://bremerton.tricare.mil/"
+    ]
+  },
+  {
+    "system_name": "Navos",
+    "state": "WA",
+    "domain": "navos.org",
+    "seed_urls": [
+      "https://www.navos.org/"
+    ]
+  },
+  {
+    "system_name": "Newport Hospital & Health Services",
+    "state": "WA",
+    "domain": "newporthospitalandhealth.org",
+    "seed_urls": [
+      "https://newporthospitalandhealth.org/"
+    ]
+  },
+  {
+    "system_name": "North Valley Hospital",
+    "state": "WA",
+    "domain": "nvhospital.org",
+    "seed_urls": [
+      "https://www.nvhospital.org/"
+    ]
+  },
+  {
+    "system_name": "Ocean Beach Health",
+    "state": "WA",
+    "domain": "oceanbeachhospital.com",
+    "seed_urls": [
+      "https://www.oceanbeachhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Odessa Memorial Healthcare Center",
+    "state": "WA",
+    "domain": "omhc.org",
+    "seed_urls": [
+      "https://www.omhc.org/"
+    ]
+  },
+  {
+    "system_name": "Olympic Medical Center",
+    "state": "WA",
+    "domain": "olympicmedical.org",
+    "seed_urls": [
+      "https://www.olympicmedical.org/"
+    ]
+  },
+  {
+    "system_name": "Othello Community Hospital",
+    "state": "WA",
+    "domain": "othellocommunityhospital.org",
+    "seed_urls": [
+      "https://www.othellocommunityhospital.org/"
+    ]
+  },
+  {
+    "system_name": "Prosser Memorial Health",
+    "state": "WA",
+    "domain": "prosserhealth.org",
+    "seed_urls": [
+      "https://www.prosserhealth.org/"
+    ]
+  },
+  {
+    "system_name": "Providence Swedish Rehabilitation Hospital",
+    "state": "WA",
+    "domain": "providenceswedishrehabhospital.com",
+    "seed_urls": [
+      "https://www.providenceswedishrehabhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Pullman Regional Hospital",
+    "state": "WA",
+    "domain": "pullmanregional.org",
+    "seed_urls": [
+      "https://www.pullmanregional.org/"
+    ]
+  },
+  {
+    "system_name": "Quincy Valley Medical Center",
+    "state": "WA",
+    "domain": "quincyhospital.org",
+    "seed_urls": [
+      "https://quincyhospital.org/"
+    ]
+  },
+  {
+    "system_name": "Rainier Springs",
+    "state": "WA",
+    "domain": "rainiersprings.com",
+    "seed_urls": [
+      "https://rainiersprings.com/"
+    ]
+  },
+  {
+    "system_name": "Samaritan Healthcare",
+    "state": "WA",
+    "domain": "samaritanhealthcare.com",
+    "seed_urls": [
+      "https://www.samaritanhealthcare.com/"
+    ]
+  },
+  {
+    "system_name": "Shriners Children's Spokane",
+    "state": "WA",
+    "domain": "shrinerschildrens.org",
+    "seed_urls": [
+      "https://www.shrinerschildrens.org/en/patient-information/patient-services-and-resources/requesting-medical-records",
+      "https://shrinershq.canto.com/direct/document/1jcauhmf0p7i18dl0285qjbe04/YGaRTZxaqUF_gUAArGtmBgl4vH4/original?content-type=application%2Fpdf&name=SHC-HQ-pdf-Patient-Request-for-Information-English-09-2025.pdf",
+      "https://shrinershq.canto.com/direct/document/n3k2m26r5p09l5kt9of30qaa4r/nB2TmQ37Gh0Ix_gexKAT77U-cPw/original?content-type=application%2Fpdf&name=UDA001a_Auth_for_Disclosure_of_Health_Info-01-2025.pdf"
+    ]
+  },
+  {
+    "system_name": "Snoqualmie Valley Health",
+    "state": "WA",
+    "domain": "snoqualmiehospital.org",
+    "seed_urls": [
+      "https://snoqualmiehospital.org/"
+    ]
+  },
+  {
+    "system_name": "South Sound Behavioral Hospital",
+    "state": "WA",
+    "domain": "southsoundbehavioralhospital.com",
+    "seed_urls": [
+      "https://www.southsoundbehavioralhospital.com/"
+    ]
+  },
+  {
+    "system_name": "Summit Pacific Medical Center",
+    "state": "WA",
+    "domain": "summitpacificmedicalcenter.org",
+    "seed_urls": [
+      "https://summitpacificmedicalcenter.org/"
+    ]
+  },
+  {
+    "system_name": "Swedish",
+    "state": "WA",
+    "domain": "swedish.org",
+    "seed_urls": [
+      "https://www.swedish.org/"
+    ]
+  },
+  {
+    "system_name": "Three Rivers Hospital",
+    "state": "WA",
+    "domain": "threerivershospital.net",
+    "seed_urls": [
+      "https://threerivershospital.net/"
+    ]
+  },
+  {
+    "system_name": "Tri-State Health",
+    "state": "WA",
+    "domain": "tristatehospital.org",
+    "seed_urls": [
+      "https://tristatehospital.org/"
+    ]
+  },
+  {
+    "system_name": "Trios Health",
+    "state": "WA",
+    "domain": "trioshealth.org",
+    "seed_urls": [
+      "https://www.trioshealth.org/medical-records",
+      "https://www.trioshealth.org/locations/trios-southridge-hospital"
+    ]
+  },
+  {
+    "system_name": "VA Puget Sound Health Care System",
+    "state": "WA",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/puget-sound-health-care/"
+    ]
+  },
+  {
+    "system_name": "Virginia Mason Medical Center",
+    "state": "WA",
+    "domain": "virginiamason.org",
+    "seed_urls": [
+      "https://www.vmfh.org/patient-and-visitor-information/patient-information/requesting-medical-records",
+      "https://www.vmfh.org/content/dam/vmfhorg/pdf/patients-visitors/Authorization-Access-PHI.pdf"
+    ]
+  },
+  {
+    "system_name": "Wellfound Behavioral Health Hospital",
+    "state": "WA",
+    "domain": "wellfound.org",
+    "seed_urls": [
+      "https://www.wellfound.org/"
+    ]
+  },
+  {
+    "system_name": "WhidbeyHealth",
+    "state": "WA",
+    "domain": "whidbeyhealth.org",
+    "seed_urls": [
+      "https://whidbeyhealth.org/patients-visitors/patient-services/",
+      "http://gns.tqp.mybluehost.me/wp-content/uploads/2023/12/ROI-Form.pdf"
+    ]
+  },
+  {
+    "system_name": "Whitman Hospital & Medical Clinics",
+    "state": "WA",
+    "domain": "whmc.org",
+    "seed_urls": [
+      "https://www.whmc.org/"
+    ]
+  },
+  {
+    "system_name": "Willapa Harbor Hospital",
+    "state": "WA",
+    "domain": "willapaharborhospital.com",
+    "seed_urls": [
+      "https://www.willapaharborhospital.com/"
+    ]
+  },
+  {
+    "system_name": "PeaceHealth Washington",
+    "state": "WA",
+    "domain": "peacehealth.org",
+    "seed_urls": [
+      "https://www.peacehealth.org/about-us/medical-records",
+      "https://www.peacehealth.org/hospitals/st-joseph-medical-center"
+    ]
+  },
+  {
+    "system_name": "Washington State Hospitals",
+    "state": "WA",
+    "domain": "dshs.wa.gov",
+    "seed_urls": [
+      "https://www.dshs.wa.gov/bha/division-state-hospitals/medical-records"
+    ]
+  }
+]

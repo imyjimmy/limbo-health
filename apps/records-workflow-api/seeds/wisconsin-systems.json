@@ -1,0 +1,85 @@
+[
+  {
+    "system_name": "Aurora Health Care",
+    "state": "WI",
+    "domain": "aurorahealthcare.org",
+    "seed_urls": [
+      "https://www.aurorahealthcare.org/patients-visitors/medical-records",
+      "https://www.aurorahealthcare.org/-/media/Project/Health-System-Enterprise/AuroraHealthCareOrg/aurorahealthcare/documents/patients-visitors/medical-records/patient-request-for-health-information-s88411en.PDF?rev=aaf7c2f76385418fa9949526db35341c&hash=A3835754E766595831A38AC29955B202",
+      "https://www.aurorahealthcare.org/-/media/Project/Health-System-Enterprise/AuroraHealthCareOrg/aurorahealthcare/documents/patients-visitors/medical-records/authorization-to-release-protected-health-information-wi-il-s300503.PDF?rev=4791e9278fef45498ab4c05cb501ee80&hash=321E272FFEA3A491B379F17A1C696D64"
+    ]
+  },
+  {
+    "system_name": "Children's Wisconsin",
+    "state": "WI",
+    "domain": "childrenswi.org",
+    "seed_urls": [
+      "https://childrenswi.org/family-resources/patients-visitors/medical-records",
+      "https://mychart.childrenswi.org/MyChart/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Healthcare Ascension",
+    "state": "WI",
+    "domain": "healthcare.ascension.org",
+    "seed_urls": [
+      "https://healthcare.ascension.org/-/media/legacy/roi-form-standardized-aug-2020.pdf"
+    ]
+  },
+  {
+    "system_name": "Hospital Sisters Health System (HSHS)",
+    "state": "WI",
+    "domain": "hshs.org",
+    "seed_urls": [
+      "https://www.hshs.org/patients/medical-records"
+    ]
+  },
+  {
+    "system_name": "UW Health",
+    "state": "WI",
+    "domain": "uwhealth.org",
+    "seed_urls": [
+      "https://www.uwhealth.org/medical-records"
+    ]
+  },
+  {
+    "system_name": "Froedtert & MCW",
+    "state": "WI",
+    "domain": "froedtert.com",
+    "seed_urls": [
+      "https://www.froedtert.com/patients-visitors/medical-records"
+    ]
+  },
+  {
+    "system_name": "ThedaCare",
+    "state": "WI",
+    "domain": "thedacare.org",
+    "seed_urls": [
+      "https://thedacare.org/about-us/contact-us/request-medical-records/"
+    ]
+  },
+  {
+    "system_name": "Aspirus Health",
+    "state": "WI",
+    "domain": "aspirus.org",
+    "seed_urls": [
+      "https://www.aspirus.org/medical-records"
+    ]
+  },
+  {
+    "system_name": "Marshfield Clinic Health System",
+    "state": "WI",
+    "domain": "marshfieldclinic.org",
+    "seed_urls": [
+      "https://www.marshfieldclinic.org/mPatientResources/Documents/Release-of-Information-Authorization-V6.pdf"
+    ]
+  },
+  {
+    "system_name": "Gundersen Health System",
+    "state": "WI",
+    "domain": "gundersenhealth.org",
+    "seed_urls": [
+      "https://www.gundersenhealth.org/patients-visitors/medical-records"
+    ]
+  }
+]

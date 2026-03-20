@@ -1,0 +1,73 @@
+[
+  {
+    "system_name": "Arkansas Children's",
+    "state": "AR",
+    "domain": "archildrens.org",
+    "seed_urls": [
+      "https://www.archildrens.org/patients-and-visitors/patient-center/medical-records",
+      "https://www.archildrens.org/patients-and-visitors/patient-center/medical-records#expandCare",
+      "https://www.archildrens.org/patients-and-visitors/patient-center/medical-records#expandDiscover",
+      "https://www.archildrens.org/patients-and-visitors/patient-center/medical-records#expandGive",
+      "https://www.archildrens.org/patients-and-visitors/patient-center/medical-records#expandTrials",
+      "https://www.archildrens.org/patients-and-visitors/patient-center/medical-records#expandprograms"
+    ]
+  },
+  {
+    "system_name": "Arkansas Heart Hospital",
+    "state": "AR",
+    "domain": "arheart.com",
+    "seed_urls": [
+      "https://www.arheart.com/plan-your-visit/medical-records/",
+      "https://www.arheart.com/plan-your-visit/medical-records/#content",
+      "https://www.arheart.com/portal/",
+      "https://www.arheart.com/wp-content/uploads/2017/08/Authorization-to-Use-or-Disclose-Health-Information.pdf"
+    ]
+  },
+  {
+    "system_name": "Baptist Health",
+    "state": "AR",
+    "domain": "baptist-health.org",
+    "seed_urls": [
+      "https://www.baptist-health.org/resources/patients-and-visitors/medical-records",
+      "https://www.baptist-health.org/resources/patients-and-visitors/medical-records#main-content",
+      "https://mychart.baptist-health.org/MyChart/Authentication/Login?https://mychart.baptist-health.org/MyChart/Authentication/Login",
+      "https://www.baptist-health.org/resources/patients-and-visitors/mychart-patient-portal",
+      "https://www.baptist-health.org/resources/patients-and-visitors/mychart-portal-pacientes",
+      "https://www.baptist-health.org/resources/patients-and-visitors/medical-records#_S_1_"
+    ]
+  },
+  {
+    "system_name": "Howard Memorial Hospital",
+    "state": "AR",
+    "domain": "howardmemorial.com",
+    "seed_urls": [
+      "https://www.howardmemorial.com/patients-visitors/health-information-management",
+      "https://www.howardmemorial.com/patients-visitors/health-information-management#",
+      "https://www.howardmemorial.com/patients-visitors/health-information-management#menu"
+    ]
+  },
+  {
+    "system_name": "UAMS Health",
+    "state": "AR",
+    "domain": "uamshealth.com",
+    "seed_urls": [
+      "https://uamshealth.com/patients-and-guests/patient-support/medical-records/",
+      "https://uamshealth.com/patients-and-guests/patient-support/medical-records/#genesis-content",
+      "https://mychart.uamshealth.com/",
+      "https://uamshealth.com/patients-and-guests/patient-support/medical-records/electronic-health-records/",
+      "https://uamshealth.com/patients-and-guests/patient-support/medical-records/mychart-and-apple-health/",
+      "https://uamshealth.com/patients-and-guests/patient-support/medical-records/medical-records-other-requesters/"
+    ]
+  },
+  {
+    "system_name": "VA Central Arkansas Health Care",
+    "state": "AR",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/central-arkansas-health-care/medical-records-office/",
+      "https://www.va.gov/central-arkansas-health-care/medical-records-office/#content",
+      "https://www.va.gov/resources/about-electronic-health-information-sharing-at-va/",
+      "https://www.va.gov/resources/about-reviewing-medical-records-online"
+    ]
+  }
+]

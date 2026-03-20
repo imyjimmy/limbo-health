@@ -1,0 +1,60 @@
+[
+  {
+    "system_name": "Arizona General Hospital",
+    "state": "AZ",
+    "domain": "dignityhealth.org",
+    "seed_urls": [
+      "https://www.dignityhealth.org/arizona/patients-and-visitors/for-patients/medical-records",
+      "https://www.dignityhealth.org/arizona/patients-and-visitors/for-patients/medical-records#maincontent",
+      "https://www.dignityhealth.org/arizona/patients-and-visitors/for-patients/medical-records#",
+      "https://www.dignityhealth.org/my-portal",
+      "https://www.dignityhealth.org/arizona/patients-and-visitors/for-patients/medical-records#1443853438",
+      "https://www.dignityhealth.org/arizona/patients-and-visitors/for-patients/medical-records#1683947569"
+    ]
+  },
+  {
+    "system_name": "Arizona State Hospital",
+    "state": "AZ",
+    "domain": "azdhs.gov",
+    "seed_urls": [
+      "https://www.azdhs.gov/documents/az-state-hospital/authorization-phi.pdf"
+    ]
+  },
+  {
+    "system_name": "Kingman Regional Medical Center",
+    "state": "AZ",
+    "domain": "azkrmc.com",
+    "seed_urls": [
+      "https://www.azkrmc.com/patients-visitors/patient-resources-and-amenities/medical-records-krmc",
+      "https://www.azkrmc.com/patients-visitors/patient-resources-and-amenities/medical-records-krmc#main-content",
+      "https://www.azkrmc.com/krmc-patient-portal",
+      "https://www.azkrmc.com/patients-visitors/patient-rights-protections/about-privacy-your-health-information"
+    ]
+  },
+  {
+    "system_name": "Northwest Healthcare",
+    "state": "AZ",
+    "domain": "healthiertucson.com",
+    "seed_urls": [
+      "https://www.healthiertucson.com/request-medical-records",
+      "https://www.healthiertucson.com/northwest-healthcare/hospital-patient-portal.aspx",
+      "https://www.healthiertucson.com/northwest-healthcare/request-medical-records.aspx",
+      "https://www.healthiertucson.com/Northwest-Healthcare/hospital-patient-portal.aspx",
+      "https://www.healthiertucson.com/hospital-patient-portal",
+      "https://www.healthiertucson.com/patient-portal-faq"
+    ]
+  },
+  {
+    "system_name": "Your medical records at Northern Arizona Healthcare",
+    "state": "AZ",
+    "domain": "nahealth.com",
+    "seed_urls": [
+      "https://www.nahealth.com/medical-records/",
+      "https://www.nahealth.com/medical-records/#wp--skip-link--target",
+      "https://www.nahealth.com/medical-records/visiting-our-patient-portal-mynahealthcare/",
+      "https://www.nahealth.com/medical-records/how-submit-request-medical-records-northern-arizona-healthcare/",
+      "https://www.nahealth.com/medical-records/how-submit-request-medical-records-northern-arizona-healthcare/how-to-submit-a-request-for-medical-records-for-fmc-and-vvmc/",
+      "https://www.nahealth.com/medical-records/how-submit-request-medical-records-northern-arizona-healthcare/how-to-submit-a-request-for-medical-records-for-medical-clinics/"
+    ]
+  }
+]

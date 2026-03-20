@@ -1,0 +1,66 @@
+[
+  {
+    "system_name": "Cook County Health",
+    "state": "IL",
+    "domain": "cookcountyhealth.org",
+    "seed_urls": [
+      "https://cookcountyhealth.org/patient-and-visitors/request-medical-records/",
+      "https://cookcountyhealth.org/patient-and-visitors/request-medical-records/#content",
+      "https://cookcountyhealth.org/patient-and-visitors/request-medical-records/#",
+      "https://cookcountyhealth.org/wp-content/uploads/English-Authorization-Form-07162021.pdf",
+      "https://cookcountyhealth.org/wp-content/uploads/Spanish-Authorization-Form-Rev-09042025.pdf",
+      "https://cookcountyhealth.org/wp-content/uploads/CC.024.01-Polish-Authorization-Form-04182022.pdf"
+    ]
+  },
+  {
+    "system_name": "Endeavor Health",
+    "state": "IL",
+    "domain": "endeavorhealth.org",
+    "seed_urls": [
+      "https://www.endeavorhealth.org/patients-visitors/medical-records",
+      "https://www.endeavorhealth.org/patients-visitors/medical-records#main-content",
+      "https://www.northshoreconnect.org/MyChart",
+      "https://mychart.eehealth.org/mychart",
+      "https://mychart.nch.org/mychart",
+      "https://www.endeavorhealth.org/patient-portal"
+    ]
+  },
+  {
+    "system_name": "Hospital Uillinois",
+    "state": "IL",
+    "domain": "hospital.uillinois.edu",
+    "seed_urls": [
+      "https://hospital.uillinois.edu/patients-and-visitors/patient-information/medical-records",
+      "https://hospital.uillinois.edu/patients-and-visitors/patient-information/medical-records#main",
+      "https://hospital.uillinois.edu/patients-and-visitors/patient-information/mychart",
+      "https://hospital.uillinois.edu/patients-and-visitors/patient-information/medical-records#",
+      "https://hospital.uillinois.edu/patients-and-visitors/patient-information/medical-records/request-radiology-imaging",
+      "https://hospital.uillinois.edu/patients-and-visitors/patient-information/health-information-exchange"
+    ]
+  },
+  {
+    "system_name": "Saint Joseph Medical Center",
+    "state": "IL",
+    "domain": "saintjosephmedicalcenter.com",
+    "seed_urls": [
+      "https://saintjosephmedicalcenter.com/patients-visitors/medical-records/",
+      "https://patientportal-sjjil.primehealthcare.com/",
+      "https://saintjosephmedicalcenter.com/wp-content/uploads/2025/09/SJJIL-Authorization-for-Release-of-Patient-Health-Information_ENGLISH.pdf",
+      "https://saintjosephmedicalcenter.com/wp-content/uploads/2025/09/SJJIL-Authorization-for-Release-of-Patient-Health-Information_POLISH.pdf",
+      "https://saintjosephmedicalcenter.com/wp-content/uploads/2025/09/SJJIL-Authorization-for-Release-of-Patient-Health-Information_SPANISH.pdf"
+    ]
+  },
+  {
+    "system_name": "Southern Illinois Healthcare",
+    "state": "IL",
+    "domain": "sih.net",
+    "seed_urls": [
+      "https://www.sih.net/patients-and-visitors/medical-records-and-documents",
+      "https://www.sih.net/patients-and-visitors/medical-records-and-documents#main",
+      "https://www.sih.net/mychart",
+      "https://www.sih.net/patients-and-visitors/medical-records-and-documents#",
+      "https://www.sih.net/-/media/files/patients-and-visitors/medical-records/authorization-to-disclose-health-information-3rd-party-2463_003_.pdf",
+      "https://www.sih.net/-/media/files/patients-and-visitors/medical-records/authorization-to-disclose-health-information-sih-mg-3rd-party-2463.pdf"
+    ]
+  }
+]

@@ -1,0 +1,48 @@
+[
+  {
+    "system_name": "Cheyenne Regional Medical Center",
+    "state": "WY",
+    "domain": "cheyenneregional.org",
+    "seed_urls": [
+      "https://www.cheyenneregional.org/patients-visitors/medical-records/",
+      "https://mychart.crmcwy.org/mychart/Authentication/Login"
+    ]
+  },
+  {
+    "system_name": "Sheridan Memorial Hospital in Sheridan, Wyoming",
+    "state": "WY",
+    "domain": "sheridanhospital.org",
+    "seed_urls": [
+      "https://www.sheridanhospital.org/patients/patient-release-of-information/",
+      "https://www.sheridanhospital.org/patients/my-sheridan-health/",
+      "https://www.sheridanhospital.org/wp-content/uploads/2026/01/Authorization-to-release-or-obtain-health-information-form-12.2025.pdf"
+    ]
+  },
+  {
+    "system_name": "Wyoming County Community Health System",
+    "state": "WY",
+    "domain": "wcchs.net",
+    "seed_urls": [
+      "https://www.wcchs.net/patients-guests/medical-records/",
+      "https://www.wcchs.net/about-us/patient-portal/",
+      "https://www.wcchs.net/wp-content/uploads/2024/02/Authorization-for-Release-of-Information-02-16-2024.pdf"
+    ]
+  },
+  {
+    "system_name": "Ivinson Memorial Hospital",
+    "state": "WY",
+    "domain": "ivinsonhospital.org",
+    "seed_urls": [
+      "https://www.ivinsonhospital.org/assets/Medical-Records-Release-Authorization.pdf"
+    ]
+  },
+  {
+    "system_name": "Banner Wyoming Medical Center",
+    "state": "WY",
+    "domain": "bannerhealth.com",
+    "seed_urls": [
+      "https://www.bannerhealth.com/locations/casper/wyoming-medical-center",
+      "https://www.bannerhealth.com/patients/patient-account"
+    ]
+  }
+]

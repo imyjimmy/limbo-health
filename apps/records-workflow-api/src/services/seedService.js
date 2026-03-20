@@ -2,20 +2,29 @@ import fs from 'node:fs/promises';
 import { config, resolveFromServiceRoot } from '../config.js';
 import { withTransaction } from '../db.js';
 import {
+  findHospitalSystemByDomain,
+  findHospitalSystemByFacilityIdentity,
   upsertFacility,
   upsertHospitalSystem,
   upsertSeedUrl
 } from '../repositories/workflowRepository.js';
-import { normalizeStateCode } from '../utils/states.js';
+import { getStateName, normalizeStateCode } from '../utils/states.js';
 
-export const STATE_SEED_FILES = {
-  TX: 'seeds/texas-systems.json',
-  MA: 'seeds/massachusetts-systems.json',
-  NH: 'seeds/new-hampshire-systems.json',
-  RI: 'seeds/rhode-island-systems.json',
-  DE: 'seeds/delaware-systems.json',
-  VT: 'seeds/vermont-systems.json'
-};
+export function buildStateSeedRelativePath(state) {
+  const normalizedState = normalizeStateCode(state);
+  const stateName = getStateName(normalizedState);
+
+  if (!normalizedState || !stateName) {
+    throw new Error(`No seed file configured for state: ${state}`);
+  }
+
+  const slug = stateName
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return `seeds/${slug}-systems.json`;
+}
 
 function inferSeedType(url) {
   if (/mychart|myhealthone|mybilh|mytuftsmed|mybaystate|mychildren|portal|gateway/i.test(url)) {
@@ -25,6 +34,20 @@ function inferSeedType(url) {
   if (/locations|facility|medical-records/i.test(url)) return 'facility_records_page';
   if (/directory/i.test(url)) return 'directory_page';
   return 'system_records_page';
+}
+
+function normalizeSeedMatchUrl(url) {
+  if (!url) return null;
+
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    parsed.pathname = pathname;
+    return parsed.toString();
+  } catch {
+    return String(url).replace(/#.*$/, '').replace(/\/+$/, '');
+  }
 }
 
 function normalizeSeedOptions(input) {
@@ -41,6 +64,10 @@ function normalizeSeedOptions(input) {
   };
 }
 
+function isSameSystemName(left, right) {
+  return typeof left === 'string' && typeof right === 'string' && left.trim() === right.trim();
+}
+
 export function resolveSeedFilePath(input = {}) {
   const { seedFilePath, state } = normalizeSeedOptions(input);
 
@@ -49,10 +76,7 @@ export function resolveSeedFilePath(input = {}) {
   }
 
   if (state) {
-    const mapped = STATE_SEED_FILES[state];
-    if (!mapped) {
-      throw new Error(`No seed file configured for state: ${state}`);
-    }
+    const mapped = buildStateSeedRelativePath(state);
     return resolveFromServiceRoot(mapped, mapped);
   }
 
@@ -69,8 +93,10 @@ async function readSeedFile(input = {}) {
   return parsed;
 }
 
-export async function reseedFromFile(input = {}) {
-  const systems = await readSeedFile(input);
+export async function reseedSystems(systems = []) {
+  if (!Array.isArray(systems)) {
+    throw new Error('systems must be an array');
+  }
 
   const summary = {
     systems: 0,
@@ -80,11 +106,33 @@ export async function reseedFromFile(input = {}) {
 
   for (const system of systems) {
     await withTransaction(async (client) => {
+      const normalizedState = normalizeStateCode(system.state) || 'TX';
+      const candidateFacilities = (system.facilities || []).map((facility) => ({
+        facilityName: facility.facility_name,
+        city: facility.city || null,
+        state: normalizeStateCode(facility.state) || normalizedState
+      }));
+
+      const domainMatch = system.domain
+        ? await findHospitalSystemByDomain({ domain: system.domain, state: normalizedState }, client)
+        : null;
+      const matchedByDomain = isSameSystemName(domainMatch?.system_name, system.system_name)
+        ? domainMatch
+        : null;
+      const matchedByFacility =
+        matchedByDomain ||
+        (candidateFacilities.length > 0
+          ? await findHospitalSystemByFacilityIdentity(
+              { state: normalizedState, facilities: candidateFacilities },
+              client
+            )
+          : null);
+
       const upserted = await upsertHospitalSystem(
         {
-          systemName: system.system_name,
+          systemName: matchedByDomain?.system_name || matchedByFacility?.system_name || system.system_name,
           domain: system.domain,
-          state: normalizeStateCode(system.state) || 'TX'
+          state: normalizedState
         },
         client
       );
@@ -92,13 +140,14 @@ export async function reseedFromFile(input = {}) {
       summary.systems += 1;
 
       const facilityMap = new Map();
+      const facilityPageUrlMap = new Map();
       for (const facility of system.facilities || []) {
         const facilityId = await upsertFacility(
           {
             hospitalSystemId: upserted.id,
             facilityName: facility.facility_name,
             city: facility.city || null,
-            state: normalizeStateCode(facility.state) || 'TX',
+            state: normalizeStateCode(facility.state) || normalizedState,
             facilityType: facility.facility_type || null,
             facilityPageUrl: facility.facility_page_url || null,
             externalFacilityId: facility.external_facility_id || null
@@ -108,6 +157,11 @@ export async function reseedFromFile(input = {}) {
 
         summary.facilities += 1;
         facilityMap.set(facility.facility_name, facilityId);
+
+        const normalizedFacilityPageUrl = normalizeSeedMatchUrl(facility.facility_page_url || null);
+        if (normalizedFacilityPageUrl) {
+          facilityPageUrlMap.set(normalizedFacilityPageUrl, facilityId);
+        }
       }
 
       if (facilityMap.size === 0) {
@@ -116,7 +170,7 @@ export async function reseedFromFile(input = {}) {
             hospitalSystemId: upserted.id,
             facilityName: system.system_name,
             city: null,
-            state: normalizeStateCode(system.state) || 'TX',
+            state: normalizedState,
             facilityType: 'system_default',
             facilityPageUrl: null,
             externalFacilityId: null
@@ -128,10 +182,11 @@ export async function reseedFromFile(input = {}) {
       }
 
       for (const url of system.seed_urls || []) {
+        const normalizedSeedUrl = normalizeSeedMatchUrl(url);
         const isFacilitySeed = /\/locations\//i.test(url);
-        let facilityId = null;
+        let facilityId = facilityPageUrlMap.get(normalizedSeedUrl) || null;
 
-        if (isFacilitySeed && facilityMap.size > 0) {
+        if (!facilityId && isFacilitySeed && facilityMap.size > 0) {
           const first = Array.from(facilityMap.values())[0];
           facilityId = first;
         }
@@ -153,4 +208,9 @@ export async function reseedFromFile(input = {}) {
   }
 
   return summary;
+}
+
+export async function reseedFromFile(input = {}) {
+  const systems = await readSeedFile(input);
+  return reseedSystems(systems);
 }

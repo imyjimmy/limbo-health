@@ -1,5 +1,10 @@
 import { collapseWhitespace } from './text.js';
 import { inferFacilityNameFromDocument } from './facilityAliases.js';
+import {
+  buildPdfHeaderText,
+  isLikelyPdfHeaderAddressLine,
+  isLikelyPdfHeaderFieldLine
+} from './pdfHeader.js';
 
 const GENERIC_TITLE_PATTERNS = [
   /^patient identification$/i,
@@ -28,12 +33,23 @@ const DESCRIPTIVE_TITLE_PATTERNS = [
   /\bhealth\b/i,
   /\bprotected health information\b/i,
   /\bphi\b/i,
+  /\bproxy\b/i,
+  /\bmychart\b/i,
+  /\bportal\b/i,
+  /\bconsent\b/i,
+  /\bopt[- ]out\b/i,
+  /\bcare everywhere\b/i,
   /\bautorizaci[oó]n\b/i,
   /\bautoriza[cç][aã]o\b/i
 ];
 
 const PHRASE_PATTERNS = [
+  /\b((?:for patients [^.:]{0,50}\s+)?my\s*chart proxy access(?:\s+request(?:\s*(?:and|&)\s*authorization form)?)?(?:\s+authorization form)?)/i,
+  /\b((?:proxy access request(?:\s*(?:and|&)\s*authorization form)?)|(?:request(?:\s*(?:and|&)\s*authorization form)? for proxy access))/i,
+  /\b(consent for patient portal access)\b/i,
   /\b(patient request for health information)/i,
+  /\b(patient request for access to designated record set)/i,
+  /\b(patient request to amend a designated record set)/i,
   /\b(patient request to have medical records transferred)/i,
   /\b(patient right to access request for medical records)/i,
   /\b(request for health information)/i,
@@ -78,8 +94,29 @@ function cleanPhraseSource(value) {
       .replace(/\bmedi\s+cal\b/gi, 'medical')
       .replace(/\bdisclo\s*sure\b/gi, 'disclosure')
       .replace(/\binfo\s*rma(?:tion)?\b(?![A-Za-zÀ-ÿ])/gi, 'information')
+      .replace(/\bmy\s+chart\b/gi, 'MyChart')
+      .replace(/\bolder\b/gi, 'older')
+      .replace(/\byears?\s*old\b/gi, 'years old')
       .replace(/[“”"]/g, '')
   );
+}
+
+function isLikelyHeaderTitleStarter(line) {
+  return (
+    /^for patients\b/i.test(line) ||
+    /\b(?:authori[sz](?:ation|e)|request|medical records|my\s*chart|proxy access|portal|consent|autorizaci[oó]n|autoriza[cç][aã]o)\b/i.test(
+      line
+    )
+  );
+}
+
+function isLikelyHeaderTitleContinuation(line) {
+  if (!line) return false;
+  if (/^requirements?$/i.test(line)) return false;
+  if (/^by signing this form\b/i.test(line)) return false;
+  if (/^i understand\b/i.test(line)) return false;
+  if (/^page\b/i.test(line)) return false;
+  return isLikelyHeaderTitleStarter(line);
 }
 
 function sanitizePhrase(value) {
@@ -145,37 +182,200 @@ function extractPhraseFromSource(value) {
   return null;
 }
 
-export function detectDocumentLanguageCode({ url = '', title = '', text = '' }) {
-  const haystack = `${url} ${title} ${text}`.toLowerCase();
+export function detectDocumentLanguageCode({ url = '', title = '', headerText = '', text = '' }) {
+  const detectExplicitFilenameLanguageCode = (value) => {
+    if (!value) return null;
 
-  if (
-    /\bportuguese\b/.test(haystack) ||
-    /\bportugu[eê]s\b/.test(haystack) ||
-    /\bautoriza[cç][aã]o\b/.test(haystack) ||
-    /\bdivulga[cç][aã]o\b/.test(haystack) ||
-    /\binforma[cç][oõ]es(?:\s+m[eé]dicas?)?\b/.test(haystack) ||
-    /\bsa[úu]de\b/.test(haystack)
-  ) {
-    return 'PT';
+    try {
+      const parsedUrl = new URL(value);
+      const basename = decodeURIComponent(parsedUrl.pathname || '')
+        .split('/')
+        .filter(Boolean)
+        .pop();
+      const match = basename?.match(/(?:^|[-_.])(EN|ES|SP|PT|RU|VT)(?=$|[-_.])/i);
+      return match?.[1]?.toUpperCase() || null;
+    } catch {
+      const match = value.match(/(?:^|[-_.])(EN|ES|SP|PT|RU|VT)(?=$|[-_.])/i);
+      return match?.[1]?.toUpperCase() || null;
+    }
+  };
+
+  const priorityHaystack = collapseWhitespace(`${url} ${title} ${headerText}`).toLowerCase();
+  const bodyHaystack = text.toLowerCase();
+  const explicitFilenameLanguageCode =
+    detectExplicitFilenameLanguageCode(url) || detectExplicitFilenameLanguageCode(title);
+
+  const detectExplicitLanguageCode = (haystack) => {
+    if (/[а-яё]/i.test(haystack) || /\bрусск/i.test(haystack)) {
+      return 'RU';
+    }
+
+    if (
+      /\bti[eế]ng vi[eệ]t\b/.test(haystack) ||
+      /\bth[oô]ng tin b[eệ]nh nh[aâ]n\b/.test(haystack) ||
+      /\bng[aà]y sinh\b/.test(haystack)
+    ) {
+      return 'VT';
+    }
+
+    if (
+      /\bportuguese\b/.test(haystack) ||
+      /\bportugu[eê]s\b/.test(haystack) ||
+      /\bautoriza[cç][aã]o\b/.test(haystack) ||
+      /\bdivulga[cç][aã]o\b/.test(haystack) ||
+      /\binforma[cç][oõ]es(?:\s+m[eé]dicas?)?\b/.test(haystack) ||
+      /\bsa[úu]de\b/.test(haystack)
+    ) {
+      return 'PT';
+    }
+
+    if (
+      /\bspanish\b/.test(haystack) ||
+      /\bespanol\b/.test(haystack) ||
+      /\bespa[nñ]ol\b/.test(haystack) ||
+      /\bautorizaci[oó]n\b/.test(haystack) ||
+      /\bdivulgaci[oó]n\b/.test(haystack) ||
+      /\binformaci[oó]n m[eé]dica\b/.test(haystack) ||
+      /\bregistros? m[eé]dicos?\b/.test(haystack)
+    ) {
+      return 'ES';
+    }
+
+    return null;
+  };
+
+  const resolveHintAlignedCode = (detectedLanguageCode) => {
+    if (detectedLanguageCode === 'ES' && explicitFilenameLanguageCode === 'SP') {
+      return 'SP';
+    }
+
+    return detectedLanguageCode;
+  };
+
+  const priorityLanguageCode = detectExplicitLanguageCode(priorityHaystack);
+  if (priorityLanguageCode) {
+    return resolveHintAlignedCode(priorityLanguageCode);
   }
 
+  const normalizedHeaderText = collapseWhitespace(headerText).toLowerCase();
   if (
-    /\bspanish\b/.test(haystack) ||
-    /\bespanol\b/.test(haystack) ||
-    /\bespa[nñ]ol\b/.test(haystack) ||
-    /\bautorizaci[oó]n\b/.test(haystack) ||
-    /\bdivulgaci[oó]n\b/.test(haystack) ||
-    /\binformaci[oó]n m[eé]dica\b/.test(haystack) ||
-    /\bregistros? m[eé]dicos?\b/.test(haystack)
+    normalizedHeaderText &&
+    !detectExplicitLanguageCode(normalizedHeaderText) &&
+    /\b(patient|medical|request|authorization|release|records?|proxy|mychart|consent|information)\b/i.test(
+      normalizedHeaderText
+    )
   ) {
-    return 'ES';
+    return 'EN';
+  }
+
+  const bodyLanguageCode = detectExplicitLanguageCode(bodyHaystack);
+  if (bodyLanguageCode) {
+    return resolveHintAlignedCode(bodyLanguageCode);
+  }
+
+  if (explicitFilenameLanguageCode) {
+    return explicitFilenameLanguageCode;
+  }
+
+  if (/[a-zà-ÿ]/i.test(priorityHaystack)) {
+    return 'EN';
   }
 
   return 'EN';
 }
 
-export function extractDescriptivePdfPhrase({ title = '', text = '' }) {
+function buildHeaderPhraseSource(headerLines = [], headerText = '') {
+  const normalizedLines = headerLines
+    .map((line) => ({
+      text: collapseWhitespace(line?.text || ''),
+      fontSize: Number(line?.fontSize || 0)
+    }))
+    .filter((line) => line.text)
+    .filter((line) => !isLikelyPdfHeaderFieldLine(line.text))
+    .filter((line) => !isLikelyPdfHeaderAddressLine(line.text));
+
+  if (normalizedLines.length > 0) {
+    const headerTitleStart = normalizedLines.findIndex((line) => isLikelyHeaderTitleStarter(line.text));
+    if (headerTitleStart >= 0) {
+      const titleLines = [];
+
+      for (const line of normalizedLines.slice(headerTitleStart, headerTitleStart + 4)) {
+        if (titleLines.length === 0) {
+          titleLines.push(line);
+          continue;
+        }
+
+        const previous = titleLines[titleLines.length - 1];
+        const keepsTitleBlock =
+          isLikelyHeaderTitleContinuation(line.text) &&
+          (!previous.fontSize ||
+            !line.fontSize ||
+            line.fontSize >= previous.fontSize * 0.8 ||
+            /^for patients\b/i.test(previous.text));
+
+        if (!keepsTitleBlock) {
+          break;
+        }
+
+        titleLines.push(line);
+      }
+
+      return cleanPhraseSource(titleLines.map((line) => line.text).join(' '));
+    }
+  }
+
+  if (!Array.isArray(headerLines) || headerLines.length === 0) {
+    return cleanPhraseSource(headerText);
+  }
+
+  return '';
+}
+
+function extractPhraseFromUrl(url = '') {
+  if (!url) return null;
+
+  try {
+    const parsedUrl = new URL(url);
+    const pathname = decodeURIComponent(parsedUrl.pathname || '');
+    const basename = pathname.split('/').filter(Boolean).pop() || '';
+    const candidate = sanitizePhrase(
+      cleanPhraseSource(
+        basename
+          .replace(/\.[a-z0-9]+$/i, '')
+          .replace(/[-_]+/g, ' ')
+          .replace(/\b\d{4,}\b/g, ' ')
+      )
+    );
+
+    if (!candidate) return null;
+
+    const phrase = extractPhraseFromSource(candidate);
+    if (phrase) {
+      return phrase;
+    }
+
+    if (!isMachineTitle(candidate) && isDescriptivePhrase(candidate)) {
+      return candidate;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+export function extractDescriptivePdfPhrase({
+  url = '',
+  title = '',
+  text = '',
+  headerText = '',
+  headerLines = []
+}) {
   const cleanedTitle = sanitizePhrase(cleanPhraseSource(title));
+  if (/^medical records release form$/i.test(cleanedTitle)) {
+    return 'Medical Records Release Form';
+  }
+
   if (cleanedTitle && !isGenericTitle(cleanedTitle)) {
     const titlePhrase = extractPhraseFromSource(cleanedTitle);
     if (titlePhrase) {
@@ -185,6 +385,17 @@ export function extractDescriptivePdfPhrase({ title = '', text = '' }) {
     if (!isMachineTitle(cleanedTitle) && isDescriptivePhrase(cleanedTitle)) {
       return cleanedTitle;
     }
+  }
+
+  const cleanedHeaderText = buildHeaderPhraseSource(headerLines, headerText);
+  const headerPhrase = extractPhraseFromSource(cleanedHeaderText);
+  if (headerPhrase) {
+    return headerPhrase;
+  }
+
+  const headerSentence = sanitizePhrase(cleanedHeaderText.split(/[.:]/, 1)[0] || '');
+  if (isDescriptivePhrase(headerSentence)) {
+    return headerSentence;
   }
 
   const cleanedText = cleanPhraseSource(text);
@@ -198,6 +409,11 @@ export function extractDescriptivePdfPhrase({ title = '', text = '' }) {
     return firstSentence;
   }
 
+  const urlPhrase = extractPhraseFromUrl(url);
+  if (urlPhrase) {
+    return urlPhrase;
+  }
+
   return null;
 }
 
@@ -206,12 +422,31 @@ export function buildMedicalRecordsPdfFilenameStem({
   facilityName,
   url,
   title,
-  text
+  text,
+  headerText = '',
+  headerLines = []
 }) {
-  const label = facilityName || inferFacilityNameFromDocument({ systemName, url, title }) || systemName;
+  const normalizedHeaderText = buildPdfHeaderText(headerLines) || headerText;
+  const label =
+    facilityName ||
+    inferFacilityNameFromDocument({ systemName, url, title, headerLines }) ||
+    systemName;
   const facilitySlug = slugifyLabel(label);
-  const languageCode = detectDocumentLanguageCode({ url, title, text });
-  const phrase = extractDescriptivePdfPhrase({ title, text }) || 'medical-records-request';
+  const languageCode = detectDocumentLanguageCode({
+    url,
+    title,
+    headerText: normalizedHeaderText,
+    text
+  });
+  const phrase =
+    extractDescriptivePdfPhrase({
+      url,
+      title,
+      text,
+      headerText: normalizedHeaderText,
+      headerLines
+    }) ||
+    'medical-records-request';
   const phraseSlug = slugifyLabel(phrase);
   return `${facilitySlug}-${phraseSlug}-${languageCode}`;
 }

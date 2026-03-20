@@ -26,6 +26,44 @@ Postgres-backed crawler + extraction service that ingests public hospital record
   - `POST /internal/crawl/reseed`
   - `GET /internal/extraction-runs/:id`
 
+## Data Acquisition Pipeline
+
+```text
+data/[state].[html|txt|xlsx]
+=> human-guided rostering + src/generateReasonableSeeds.js
+   (we start from a human-sourced hospital list for the state; this step turns that roster into a reasonable set of official hospital/system targets and records-page candidates)
+=> seeds/[state]-systems.json
+   (authoritative crawler input; each JSON entry has:
+    - system_name
+    - state
+    - domain
+    - seed_urls[]
+    - optional facilities[] with:
+      - facility_name
+      - city
+      - state
+      - facility_type
+      - facility_page_url
+      - external_facility_id)
+=> src/services/seedService.js via src/seed.js
+   (reads the seed file and upserts hospital_systems, facilities, and seed_urls into Postgres; this is the reseed step)
+=> src/services/crawlService.js via src/crawl.js
+   (loads active seeds from the database, groups them by hospital system, and runs the crawl queue)
+=> src/crawler/fetcher.js
+   (fetches each URL and decides whether it is HTML or PDF)
+=> src/parsers/htmlParser.js or src/parsers/pdfParser.js
+   (HTML: extracts title, body text, links, and nearby link context; PDF: extracts text, header lines, and metadata)
+=> src/crawler/linkExpander.js + src/utils/urls.js
+   (scores pages and links to decide which ones look like medical-records workflow pages or medical-records PDFs and should be followed)
+=> src/extractors/workflowExtractor.js
+   (turns parsed pages/docs into structured workflow data such as portal info, request methods, forms, contacts, and instructions)
+=> src/utils/pdfStorage.js + src/utils/pdfNaming.js + src/utils/pdfHeader.js + src/utils/rawStorage.js
+   (for PDFs only: builds the final readable filename from the facility/system name, descriptive phrase, and language code, then writes it into the correct state folder)
+=> storage/raw/[state]/[facility-or-system]-[descriptive-phrase]-[language][-N].pdf
+```
+
+Short version: `data -> seeds -> DB reseed -> crawl/fetch/parse -> link expansion -> workflow extraction -> final named PDF in storage/raw/<state>/`.
+
 ## Setup
 
 1. Create a Postgres database.
@@ -52,6 +90,18 @@ Postgres-backed crawler + extraction service that ingests public hospital record
    - Apply: `npm run repartition:raw-storage-state -- --apply`
 10. Run API:
    - `npm run start`
+11. Build the official CMS national hospital roster and compare processed states against it:
+   - Build roster: `npm run build:national-roster`
+   - Audit states currently represented under `storage/raw/*`: `npm run report:national-roster-coverage`
+12. Generate import-compatible seed candidates from the CMS roster:
+   - Single state: `npm run generate:seed-candidates -- --state CT`
+   - Remaining states: `npm run generate:seed-candidates -- --all-remaining`
+13. Import only high-confidence generated seeds:
+   - Single state: `npm run import:generated-seeds -- --state CT`
+   - Remaining states: `npm run import:generated-seeds -- --all-remaining`
+14. Run the continuous nationwide rollout:
+   - Single state: `npm run crawl:rollout -- --state CT`
+   - Remaining states: `npm run crawl:rollout -- --all-remaining`
 
 ## Notes
 
@@ -59,8 +109,15 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 - `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
 - No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
+- If a PDF generates an overly long filename, the naming pipeline now automatically falls back to a shorter semantic title derived from the PDF title/header before failing the rename step.
 - `npm run reset:crawl-state -- --state MA --include-derived` performs a clean, state-scoped reset of crawl-derived Massachusetts data without touching Texas seeds or data.
 - `npm run repartition:raw-storage-state -- --apply` performs a one-time move of existing PDF artifacts into state subdirectories and updates `source_documents.storage_path` without refetching anything.
+- `npm run build:national-roster` writes a CMS-based active-hospital roster to `data/national-roster/cms-pos-q4-2025-active-hospitals.json`.
+- `npm run report:national-roster-coverage` compares the processed raw-state footprint against that official roster and writes a phase-1 audit report to `logs/reports/<date>-national-roster-audit.json`.
+- `npm run generate:seed-candidates` writes generated seed files to `data/generated-seeds/<state>-systems.generated.json` and includes `discovery_confidence` plus evidence metadata without breaking the existing seed schema.
+- `npm run import:generated-seeds` automatically imports only high-confidence generated seed entries unless you later add broader confidence thresholds.
+- `npm run crawl:rollout` generates seeds, imports high-confidence candidates, crawls by state, audits coverage, appends to a cumulative report, and keeps going even when a state lands in `not_ready`.
+- The nationwide `--all-remaining` rollout scope now means the 50 U.S. states only; `DC` is intentionally excluded from automatic generate/import/crawl rollout targets.
 - Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
 - Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.
 - Crawler depth defaults to `2` and only follows workflow-relevant links.

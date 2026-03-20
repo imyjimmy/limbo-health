@@ -1,0 +1,81 @@
+[
+  {
+    "system_name": "Carlsbad Medical Center",
+    "state": "NM",
+    "domain": "carlsbadmedicalcenter.com",
+    "seed_urls": [
+      "https://www.carlsbadmedicalcenter.com/request-medical-records",
+      "https://www.carlsbadmedicalcenter.com/carlsbad/hospital-patient-portal.aspx",
+      "https://www.carlsbadmedicalcenter.com/carlsbad/request-medical-records.aspx",
+      "https://www.carlsbadmedicalcenter.com/hospital-patient-portal",
+      "https://www.carlsbadmedicalcenter.com/patient-portal-faq",
+      "https://www.carlsbadmedicalcenter.com/request-medical-records#"
+    ]
+  },
+  {
+    "system_name": "Eastern New Mexico Medical Center",
+    "state": "NM",
+    "domain": "enmmc.com",
+    "seed_urls": [
+      "https://www.enmmc.com/request-medical-records",
+      "https://www.enmmc.com/enmmc/hospital-patient-portal.aspx",
+      "https://www.enmmc.com/enmmc/request-medical-records.aspx",
+      "https://www.enmmc.com/hospital-patient-portal",
+      "https://www.enmmc.com/patient-portal-faq",
+      "https://www.enmmc.com/request-medical-records#"
+    ]
+  },
+  {
+    "system_name": "Gila Regional Medical Center",
+    "state": "NM",
+    "domain": "grmc.org",
+    "seed_urls": [
+      "https://www.grmc.org/patients-visitors/medical-records/",
+      "https://www.grmc.org/patients-visitors/pay-my-bill/",
+      "https://www.grmc.org/documents/GRMC-Authorization-Form-ROI-form.pdf"
+    ]
+  },
+  {
+    "system_name": "Lovelace Health System",
+    "state": "NM",
+    "domain": "lovelace.com",
+    "seed_urls": [
+      "https://lovelace.com/patients-and-visitors/medical-record-request/",
+      "https://mychart.lovelace.com/Authentication/Login?",
+      "https://lovelace.com/patients-and-visitors/medical-record-request/#",
+      "https://mychart.lovelace.com/"
+    ]
+  },
+  {
+    "system_name": "MountainView Regional Medical Center",
+    "state": "NM",
+    "domain": "mountainviewregional.com",
+    "seed_urls": [
+      "https://www.mountainviewregional.com/request-medical-records",
+      "https://www.mountainviewregional.com/mountainview/hospital-patient-portal.aspx",
+      "https://www.mountainviewregional.com/mountainview/request-medical-records.aspx",
+      "https://www.mountainviewregional.com/MountainView/hospital-patient-portal.aspx",
+      "https://www.mountainviewregional.com/hospital-patient-portal",
+      "https://www.mountainviewregional.com/patient-portal-faq"
+    ]
+  },
+  {
+    "system_name": "Presbyterian Kaseman Hospital",
+    "state": "NM",
+    "domain": "phs.org",
+    "seed_urls": [
+      "https://www.phs.org/kaseman-hospital/services/medical-records-requests",
+      "https://www.phs.org/tools-resources/patient/access-your-health-information"
+    ]
+  },
+  {
+    "system_name": "Student Health and Counseling",
+    "state": "NM",
+    "domain": "shac.unm.edu",
+    "seed_urls": [
+      "https://shac.unm.edu/forms/medical-records-release.html",
+      "https://shac.unm.edu/forms/medical-records-release.html#main",
+      "https://shac.unm.edu/forms/medical-records-release.html#"
+    ]
+  }
+]

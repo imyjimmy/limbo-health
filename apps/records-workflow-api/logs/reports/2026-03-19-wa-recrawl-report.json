@@ -1,0 +1,201 @@
+{
+  "state": "WA",
+  "seed_file": "seeds/washington-systems.json",
+  "generated_at": "2026-03-19T20:23:46.417Z",
+  "crawl_summary": {
+    "status": "ok",
+    "systems": 65,
+    "crawled": 619,
+    "extracted": 607,
+    "failed": 10
+  },
+  "before": {
+    "systems": 65,
+    "facilities": 66,
+    "active_seeds": 77,
+    "source_documents": 602,
+    "pdf_source_documents": 90,
+    "workflows": 611,
+    "raw_files": 94
+  },
+  "after": {
+    "systems": 65,
+    "facilities": 66,
+    "active_seeds": 77,
+    "source_documents": 965,
+    "pdf_source_documents": 105,
+    "workflows": 631,
+    "raw_files": 109,
+    "systems_with_pdfs": 26
+  },
+  "delta": {
+    "source_documents": 363,
+    "pdf_source_documents": 15,
+    "workflows": 20,
+    "raw_files": 15
+  },
+  "notable_fix_validation": {
+    "system": "Columbia Basin Hospital",
+    "pdfs_now_present": [
+      "columbia-basin-hospital-authorization-to-release-healthcare-information-EN.pdf",
+      "columbia-basin-hospital-authorization-to-release-healthcare-information-EN-2.pdf"
+    ]
+  },
+  "failures_and_skips": [
+    {
+      "system": "Cascade Medical",
+      "url": "https://cascademedical.org/sites/default/files/pdfs/forms/Release%20of%20Healthcare%20Information%202020%20ALL%20check%20box-SPANISH.pdf",
+      "outcome": "skipped",
+      "reason": "non_medical_records_pdf"
+    },
+    {
+      "system": "Ferry County Health",
+      "url": "http://fcphd.org/PDF_Files/ReleaseofInformation.pdf",
+      "outcome": "skipped",
+      "reason": "non_medical_records_pdf"
+    },
+    {
+      "system": "Fred Hutchinson Cancer Center",
+      "url": "https://www.fredhutch.org/content/dam/www/patient-care/medical-record-request/page-translations/medical-record-request-spanish.pdf",
+      "outcome": "failed",
+      "reason": "ENAMETOOLONG during rename"
+    },
+    {
+      "system": "Kaiser Permanente Washington",
+      "url": "https://wa.kaiserpermanente.org/html/public/customer-service/records",
+      "outcome": "failed",
+      "reason": "fetch failed"
+    },
+    {
+      "system": "Mason Health",
+      "url": "https://remote.masongeneral.com/",
+      "outcome": "failed",
+      "reason": "fetch failed"
+    },
+    {
+      "system": "Overlake Medical Center & Clinics",
+      "url": "https://www.overlakehospital.org/sites/default/files/inline-files/Medical%20Records%20Authorization%20for%20Disclosure.pdf",
+      "outcome": "failed",
+      "reason": "Invalid PDF structure"
+    },
+    {
+      "system": "PeaceHealth Washington",
+      "url": "https://www.peacehealth.org/sites/default/files/2021-12/request-restriction-of-your-phi-mandarin.pdf",
+      "outcome": "failed",
+      "reason": "ENAMETOOLONG during rename"
+    },
+    {
+      "system": "PeaceHealth Washington",
+      "url": "https://www.peacehealth.org/sites/default/files/2021-12/request-restriction-of-your-phi-chuukese.pdf",
+      "outcome": "failed",
+      "reason": "ENAMETOOLONG during rename"
+    },
+    {
+      "system": "Providence Washington",
+      "url": "https://www.providence.org/billing-support/bill-pay",
+      "outcome": "failed",
+      "reason": "fetch failed"
+    },
+    {
+      "system": "Providence Washington",
+      "url": "https://www.providence.org/billing-support/price-estimate",
+      "outcome": "failed",
+      "reason": "fetch failed"
+    },
+    {
+      "system": "Providence Washington",
+      "url": "https://www.providence.org/billing-support/payment-plans",
+      "outcome": "failed",
+      "reason": "fetch failed"
+    },
+    {
+      "system": "Providence Washington",
+      "url": "https://www.providence.org/billing-support/contact-us",
+      "outcome": "failed",
+      "reason": "fetch failed"
+    }
+  ],
+  "top_systems_by_pdf_count": [
+    {
+      "system": "Swedish",
+      "pdf_docs": 20,
+      "total_docs": 38
+    },
+    {
+      "system": "Providence Washington",
+      "pdf_docs": 15,
+      "total_docs": 109
+    },
+    {
+      "system": "PeaceHealth Washington",
+      "pdf_docs": 13,
+      "total_docs": 31
+    },
+    {
+      "system": "Fred Hutchinson Cancer Center",
+      "pdf_docs": 11,
+      "total_docs": 42
+    },
+    {
+      "system": "Legacy Salmon Creek Medical Center",
+      "pdf_docs": 7,
+      "total_docs": 47
+    },
+    {
+      "system": "Astria Health",
+      "pdf_docs": 6,
+      "total_docs": 10
+    },
+    {
+      "system": "Lake Chelan Health",
+      "pdf_docs": 4,
+      "total_docs": 12
+    },
+    {
+      "system": "Seattle Children's",
+      "pdf_docs": 3,
+      "total_docs": 60
+    },
+    {
+      "system": "Island Health",
+      "pdf_docs": 3,
+      "total_docs": 14
+    },
+    {
+      "system": "Columbia Basin Hospital",
+      "pdf_docs": 2,
+      "total_docs": 8
+    }
+  ],
+  "zero_pdf_systems_count": 39,
+  "largest_zero_pdf_systems": [
+    {
+      "system": "Confluence Health",
+      "total_docs": 105
+    },
+    {
+      "system": "MultiCare",
+      "total_docs": 46
+    },
+    {
+      "system": "Shriners Children's Spokane",
+      "total_docs": 30
+    },
+    {
+      "system": "EvergreenHealth",
+      "total_docs": 29
+    },
+    {
+      "system": "Kittitas Valley Healthcare",
+      "total_docs": 18
+    },
+    {
+      "system": "Trios Health",
+      "total_docs": 18
+    },
+    {
+      "system": "Lourdes Health",
+      "total_docs": 16
+    }
+  ]
+}

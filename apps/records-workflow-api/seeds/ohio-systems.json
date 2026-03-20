@@ -1,0 +1,41 @@
+[
+  {
+    "system_name": "Ohio State Medical Center",
+    "state": "OH",
+    "domain": "wexnermedical.osu.edu",
+    "seed_urls": [
+      "https://wexnermedical.osu.edu/patient-and-visitor-guide/medical-records",
+      "https://wexnermedical.osu.edu/patient-and-visitor-guide/medical-records#page-content",
+      "https://wexnermedical.osu.edu/mychart",
+      "https://wexnermedical.osu.edu/-/media/files/wexnermedical/patient-care/patient-and-visitor-guide/medical-records/roi-form-and-instructions.pdf?rev=8c5e382b884742b2a9ac2a68ace4ab79&hash=7DEA59A3690392B1F1F56518F460E898",
+      "https://wexnermedical.osu.edu/-/media/files/wexnermedical/patient-care/patient-and-visitor-guide/medical-records/deceased-patient-medical-records-request.pdf?rev=c0ecf1e1245240dfb86268b4fe9f7c9c&hash=DEFD6363E53198559BA3809D0BFAB21E",
+      "https://wexnermedical.osu.edu/features/myhealth"
+    ]
+  },
+  {
+    "system_name": "Southern Ohio Medical Center",
+    "state": "OH",
+    "domain": "somc.org",
+    "seed_urls": [
+      "https://www.somc.org/patients-visitors/medical-records/",
+      "https://www.somc.org/patients-visitors/medical-records/#Content",
+      "https://www.somc.org/patient-portal",
+      "https://www.somc.org/patients-visitors/medical-records/#SetLocation",
+      "https://www.somc.org/patients-visitors/medical-records/amendments/",
+      "https://www.somc.org/patients-visitors/portal/"
+    ]
+  },
+  {
+    "system_name": "The Christ Hospital",
+    "state": "OH",
+    "domain": "thechristhospital.com",
+    "seed_urls": [
+      "https://www.thechristhospital.com/patient-resources/medical-records",
+      "https://www.thechristhospital.com/patient-resources/patient-portal-mobile-app-mychart",
+      "https://www.thechristhospital.com/patient-resources/patient-portal-mobile-app-mychart/app-privacy-policy",
+      "https://www.thechristhospital.com/patient-resources/medical-records#",
+      "https://www.thechristhospital.com/Documents/Patient%20and%20Visitor%20Resources/application%20form.pdf",
+      "https://www.thechristhospital.com/Documents/Our%20Services/New%20Primary%20Care/Forms/Authorization%20for%20Written%20Release%20of%20Medical%20Information.pdf"
+    ]
+  }
+]

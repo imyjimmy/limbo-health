@@ -1,0 +1,57 @@
+[
+  {
+    "system_name": "Beaufort Memorial",
+    "state": "SC",
+    "domain": "bmhsc.org",
+    "seed_urls": [
+      "https://www.bmhsc.org/patients-and-visitors/for-patients/request-medical-records",
+      "https://www.bmhsc.org/patients-and-visitors/for-patients/request-medical-records#block-hg-webdv-child-content",
+      "https://www.bmhsc.org/patients-and-visitors/for-patients/request-medical-records#",
+      "https://www.bmhsc.org/patients-and-visitors/for-patients/request-medical-records/patient-portals",
+      "https://www.bmhsc.org/patients-and-visitors/for-patients/request-medical-records/medical-records-faq",
+      "https://www.bmhsc.org/sites/default/files/hg_features/mercury_standard_layout/be179c2c4ac0fbc7606822b4e4fc4f7c.pdf"
+    ]
+  },
+  {
+    "system_name": "HEALTH",
+    "state": "SC",
+    "domain": "scstatehouse.gov",
+    "seed_urls": [
+      "https://www.scstatehouse.gov/code/t44c115.php"
+    ]
+  },
+  {
+    "system_name": "MUSC Health",
+    "state": "SC",
+    "domain": "muschealth.org",
+    "seed_urls": [
+      "https://muschealth.org/patients-visitors/medical-records",
+      "https://muschealth.org/patients-visitors/medical-records#main",
+      "https://mychart.musc.edu/mychart/Authentication/Login",
+      "https://muschealth.org/patients-visitors/medical-records/disclosure",
+      "https://muschealth.org/patients-visitors/medical-records/faq",
+      "https://mychart.musc.edu/mychart/"
+    ]
+  },
+  {
+    "system_name": "Prisma Health",
+    "state": "SC",
+    "domain": "prismahealth.org",
+    "seed_urls": [
+      "https://prismahealth.org/patients-and-guests/for-patients/medical-records"
+    ]
+  },
+  {
+    "system_name": "Spartanburg Regional",
+    "state": "SC",
+    "domain": "spartanburgregional.com",
+    "seed_urls": [
+      "https://www.spartanburgregional.com/patients-visitors/medical-records/",
+      "https://www.spartanburgregional.com/patients-visitors/medical-records/#main-content",
+      "https://mychart.spartanburgregional.com/MyChart/?_ga=2.184410150.1288386628.1557079416-1538168374.1537981729",
+      "https://www.spartanburgregional.com/patients-visitors/patient-portal",
+      "https://mychart.spartanburgregional.com/MyChart/",
+      "https://www.spartanburgregional.com/sites/default/files/2020-08/AUTHORIZATION%20TO%20RELEASE%20AND%20DISCLOSE%20PATIENT%20INFORMATION_0.pdf"
+    ]
+  }
+]

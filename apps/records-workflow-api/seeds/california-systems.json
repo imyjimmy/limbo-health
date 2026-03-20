@@ -1,0 +1,64 @@
+[
+  {
+    "system_name": "California Hospital Medical Center",
+    "state": "CA",
+    "domain": "dignityhealth.org",
+    "seed_urls": [
+      "https://www.dignityhealth.org/socal/locations/californiahospital/patients-and-visitors/for-patients/medical-records",
+      "https://www.dignityhealth.org/socal/locations/californiahospital/patients-and-visitors/for-patients/medical-records#maincontent",
+      "https://www.dignityhealth.org/socal/locations/californiahospital/patients-and-visitors/for-patients/medical-records#",
+      "https://www.dignityhealth.org/my-portal",
+      "https://www.dignityhealth.org/socal/locations/californiahospital/patients-and-visitors/for-patients/medical-records#1443853438",
+      "https://www.dignityhealth.org/socal/locations/californiahospital/patients-and-visitors/for-patients/medical-records#-1579484751"
+    ]
+  },
+  {
+    "system_name": "Request Medical Information",
+    "state": "CA",
+    "domain": "healthy.kaiserpermanente.org",
+    "seed_urls": [
+      "https://healthy.kaiserpermanente.org/support/medical-requests-myc",
+      "https://healthy.kaiserpermanente.org/secure/medical-record/questionnaires",
+      "https://healthy.kaiserpermanente.org/secure/medical-record",
+      "https://healthy.kaiserpermanente.org/secure/medical-record/test-results",
+      "https://healthy.kaiserpermanente.org/secure/medical-record/upcoming-tests-procedures",
+      "https://healthy.kaiserpermanente.org/secure/medical-record/past-visit-information"
+    ]
+  },
+  {
+    "system_name": "St Francis Medical Center, CA",
+    "state": "CA",
+    "domain": "stfrancismedicalcenter.com",
+    "seed_urls": [
+      "https://stfrancismedicalcenter.com/medical-records/",
+      "https://mychart.primehealthcare.com/MyChart/Authentication/Login",
+      "https://mychart.primehealthcare.com/MyChart//Billing/GuestPay/PayasGuest",
+      "https://stfrancismedicalcenter.com/my-chart-patient-portal/",
+      "https://stfrancismedicalcenter.com/wp-content/uploads/2022/05/280-014-SFMC-Authorization-for-Use-or-Disclosure-of-Health-Information-04-20-English.pdf",
+      "https://stfrancismedicalcenter.com/wp-content/uploads/2022/05/280-014-SFMC-Authorization-for-Use-or-Disclosure-of-Health-Information-SP-04-20-Spanish.pdf"
+    ]
+  },
+  {
+    "system_name": "UCLA Health",
+    "state": "CA",
+    "domain": "uclahealth.org",
+    "seed_urls": [
+      "https://www.uclahealth.org/patient-resources/medical-records",
+      "https://www.uclahealth.org/patient-resources/medical-records#main-content",
+      "https://www.uclahealth.org/patient-resources/medical-records#nolink",
+      "https://www.uclahealth.org/patient-resources/billing-insurance/myuclahealth-messaging-costs",
+      "https://www.uclahealth.org/patient-resources/medical-records#medical-records",
+      "https://www.uclahealth.org/patient-resources/medical-records#contact"
+    ]
+  },
+  {
+    "system_name": "UCSF Health",
+    "state": "CA",
+    "domain": "ucsfhealth.org",
+    "seed_urls": [
+      "https://www.ucsfhealth.org/patients-visitors/medical-records",
+      "https://www.ucsfhealth.org/mychart",
+      "https://www.ucsfhealth.org/patients-visitors/medical-records/how-to-send-radiology-images-to-ucsf"
+    ]
+  }
+]

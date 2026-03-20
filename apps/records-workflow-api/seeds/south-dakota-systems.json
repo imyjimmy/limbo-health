@@ -1,0 +1,39 @@
+[
+  {
+    "system_name": "Avera Health",
+    "state": "SD",
+    "domain": "avera.org",
+    "seed_urls": [
+      "https://www.avera.org/patients-visitors/medical-records/"
+    ]
+  },
+  {
+    "system_name": "Monument Health",
+    "state": "SD",
+    "domain": "monument.health",
+    "seed_urls": [
+      "https://monument.health/patient-information/medical-records/"
+    ]
+  },
+  {
+    "system_name": "Prairie Lakes Healthcare System",
+    "state": "SD",
+    "domain": "prairielakes.com",
+    "seed_urls": [
+      "https://www.prairielakes.com/patients-visitors/patient-information/medical-records/"
+    ]
+  },
+  {
+    "system_name": "Sanford Health",
+    "state": "SD",
+    "domain": "sanfordhealth.org",
+    "seed_urls": [
+      "https://www.sanfordhealth.org/patients-and-visitors/patient-information/release-of-information",
+      "https://www.sanfordhealth.org/patients-and-visitors/patient-information/release-of-information#main-content",
+      "https://www.sanfordhealth.org/patients-and-visitors/patient-information/release-of-information#",
+      "https://www.mysanfordchart.org/mychart/",
+      "https://www.mysanfordchart.org/MyChart/Authentication/Login?postloginurl=documents%2freleased%3ffrom%3dlandingpage&litemode=true",
+      "https://www.sanfordhealth.org/-/media/org/files/patients-and-visitors/release-of-information/roi-authorization.pdf"
+    ]
+  }
+]

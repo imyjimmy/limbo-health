@@ -1,0 +1,77 @@
+[
+  {
+    "system_name": "Bryan Health",
+    "state": "NE",
+    "domain": "bryanhealth.com",
+    "seed_urls": [
+      "https://www.bryanhealth.com/patients-visitors/information/request-medical-records/",
+      "https://www.bryanhealth.com/patients-visitors/information/request-medical-records/#Content",
+      "https://www.bryanhealth.com/mychart/",
+      "https://mychart.bryanhealth.org/MyChart/app/providers/results?filters=22%5E1&mode=0&termId=1018&ref=**JTdCJTIycGFnZSUyMiUzQSUyMnNlYXJjaCUyMiUyQyUyMnBhcmFtcyUyMiUzQSU3QiUyMmVhZklkcyUyMiUzQSUyMiUyMiUyQyUyMnJlZiUyMiUzQSU3QiUyMnBhZ2UlMjIlM0ElMjIlMjIlN0QlMkMlMjJmaWx0ZXJzJTIyJTNBJTIyJTIyJTdEJTdE",
+      "https://mychart.bryanhealth.org/MyChart/app/providers/results?filters=22%5E1&mode=1&termId=1034&ref=**JTdCJTIycGFnZSUyMiUzQSUyMnNlYXJjaCUyMiUyQyUyMnBhcmFtcyUyMiUzQSU3QiUyMmVhZklkcyUyMiUzQSUyMiUyMiUyQyUyMnJlZiUyMiUzQSU3QiUyMnBhZ2UlMjIlM0ElMjIlMjIlN0QlMkMlMjJmaWx0ZXJzJTIyJTNBJTIyJTIyJTdEJTdE",
+      "https://mychart.bryanhealth.org/MyChart/app/providers/results?filters=22%5E1&mode=1&termId=1056&ref=**JTdCJTIycGFnZSUyMiUzQSUyMnNlYXJjaCUyMiUyQyUyMnBhcmFtcyUyMiUzQSU3QiUyMmVhZklkcyUyMiUzQSUyMiUyMiUyQyUyMnJlZiUyMiUzQSU3QiUyMnBhZ2UlMjIlM0ElMjIlMjIlN0QlMkMlMjJmaWx0ZXJzJTIyJTNBJTIyJTIyJTdEJTdE"
+    ]
+  },
+  {
+    "system_name": "Care and Services",
+    "state": "NE",
+    "domain": "nebraskamed.com",
+    "seed_urls": [
+      "https://www.nebraskamed.com/patients/medical-records",
+      "https://www.nebraskamed.com/patients/medical-records#main-content",
+      "https://www.onechartpatient.com/mychart/",
+      "https://www.nebraskamed.com/patients/medical-records#",
+      "https://www.onechartpatient.com/mychart/Authentication/Login",
+      "https://www.nebraskamed.com/patients/medical-records/online"
+    ]
+  },
+  {
+    "system_name": "CHI Health",
+    "state": "NE",
+    "domain": "chihealth.com",
+    "seed_urls": [
+      "https://www.chihealth.com/patients-visitors/medical-records",
+      "https://www.chihealth.com/patients-visitors/medical-records#maincontent",
+      "https://mychart.chihealth.com/prd/Authentication/Login",
+      "https://www.chihealth.com/patients-visitors/medical-records#",
+      "https://www.chihealth.com/content/dam/chihealthcom/documents/patients-and-visitors/medical-records/medical-records-release-english.pdf",
+      "https://www.chihealth.com/content/dam/chihealthcom/documents/patients-and-visitors/medical-records/Authorization%20for%20Use%20or%20Disclosure%20of%20_%20Access%20to%20Protected%20Health%20Information%20-%20(Spanish)%20-%20Form.pdf"
+    ]
+  },
+  {
+    "system_name": "Endeavor Health",
+    "state": "NE",
+    "domain": "endeavorhealth.org",
+    "seed_urls": [
+      "https://www.endeavorhealth.org/patients-visitors/medical-records",
+      "https://www.endeavorhealth.org/patients-visitors/medical-records#main-content",
+      "https://www.northshoreconnect.org/MyChart",
+      "https://mychart.eehealth.org/mychart",
+      "https://mychart.nch.org/mychart",
+      "https://www.endeavorhealth.org/patient-portal"
+    ]
+  },
+  {
+    "system_name": "Methodist Health System",
+    "state": "NE",
+    "domain": "bestcare.org",
+    "seed_urls": [
+      "https://bestcare.org/patient-resources/request-medical-records",
+      "https://bestcare.org/patient-resources/request-medical-records#main",
+      "https://bestcare.org/sites/default/files/RELEASEOFINFO%20Release%20of%20Information%209-2024.pdf",
+      "https://bestcare.org/sites/default/files/RELEASEOFINFSP%20Release%20of%20Information%20-%20Spanish%209-2024.pdf",
+      "https://bestcare.org/patient-resources/methodist-my-care"
+    ]
+  },
+  {
+    "system_name": "Nebraska Medicine UNO Health Center",
+    "state": "NE",
+    "domain": "unomaha.edu",
+    "seed_urls": [
+      "https://www.unomaha.edu/nebraska-medicine-uno-health-center/one-chart-patient/index.php",
+      "https://www.onechartpatient.com/mychart/Authentication/Login?",
+      "https://www.onechartpatient.com/mychart/",
+      "https://www.onechartpatient.com/mychart/signup"
+    ]
+  }
+]

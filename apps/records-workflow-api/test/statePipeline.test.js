@@ -11,6 +11,7 @@ test('resolveSeedFilePath prefers explicit file, resolves states, and preserves 
 
   assert.match(resolveSeedFilePath({}), /seeds\/texas-systems\.json$/);
   assert.match(resolveSeedFilePath({ state: 'MA' }), /seeds\/massachusetts-systems\.json$/);
+  assert.match(resolveSeedFilePath({ state: 'AL' }), /seeds\/alabama-systems\.json$/);
   assert.match(
     resolveSeedFilePath({ state: 'MA', seedFilePath: 'seeds/custom-systems.json' }),
     /seeds\/custom-systems\.json$/
@@ -150,6 +151,146 @@ test('runCrawl forwards the state filter and only crawls returned seeds', async 
     assert.equal(summary.extracted, 1);
     assert.equal(seen.saved.length, 1);
     assert.equal(seen.saved[0].sourceDocument.hospitalSystemId, 'system-ma');
+  } finally {
+    test.mock.restoreAll();
+    test.mock.reset();
+  }
+});
+
+test('reseedSystems preserves distinct same-domain systems when names differ', async () => {
+  const upsertCalls = [];
+
+  test.mock.module('../src/db.js', {
+    namedExports: {
+      withTransaction: async (fn) => fn({}),
+      query: async () => {
+        throw new Error('query should not be used directly in this test');
+      }
+    }
+  });
+
+  test.mock.module('../src/repositories/workflowRepository.js', {
+    namedExports: {
+      findHospitalSystemByDomain: async ({ domain, state }) => ({
+        id: 'existing-va-richmond',
+        system_name: 'VA Richmond Health Care',
+        canonical_domain: domain,
+        state
+      }),
+      findHospitalSystemByFacilityIdentity: async () => null,
+      upsertHospitalSystem: async (payload) => {
+        upsertCalls.push(payload);
+        return { id: `system-${upsertCalls.length}`, system_name: payload.systemName };
+      },
+      upsertFacility: async () => `facility-${upsertCalls.length}`,
+      upsertSeedUrl: async () => `seed-${upsertCalls.length}`
+    }
+  });
+
+  try {
+    const { reseedSystems } = await importFresh('../src/services/seedService.js');
+
+    await reseedSystems([
+      {
+        system_name: 'VA Hampton Health Care',
+        domain: 'va.gov',
+        state: 'VA',
+        seed_urls: ['https://www.va.gov/hampton-health-care/medical-records-office/'],
+        facilities: [
+          {
+            facility_name: 'VA Hampton Health Care',
+            city: 'Hampton',
+            state: 'VA'
+          }
+        ]
+      }
+    ]);
+
+    assert.equal(upsertCalls.length, 1);
+    assert.equal(upsertCalls[0].systemName, 'VA Hampton Health Care');
+    assert.equal(upsertCalls[0].domain, 'va.gov');
+    assert.equal(upsertCalls[0].state, 'VA');
+  } finally {
+    test.mock.restoreAll();
+    test.mock.reset();
+  }
+});
+
+test('reseedSystems attaches facility page seed urls to the matching facility', async () => {
+  const seedCalls = [];
+
+  test.mock.module('../src/db.js', {
+    namedExports: {
+      withTransaction: async (fn) => fn({}),
+      query: async () => {
+        throw new Error('query should not be used directly in this test');
+      }
+    }
+  });
+
+  test.mock.module('../src/repositories/workflowRepository.js', {
+    namedExports: {
+      findHospitalSystemByDomain: async () => null,
+      findHospitalSystemByFacilityIdentity: async () => null,
+      upsertHospitalSystem: async () => ({ id: 'system-wa-multicare', system_name: 'MultiCare' }),
+      upsertFacility: async ({ facilityName }) =>
+        facilityName === 'Deaconess Hospital' ? 'facility-deaconess' : 'facility-yakima',
+      upsertSeedUrl: async (payload) => {
+        seedCalls.push(payload);
+        return `seed-${seedCalls.length}`;
+      }
+    }
+  });
+
+  try {
+    const { reseedSystems } = await importFresh('../src/services/seedService.js');
+
+    await reseedSystems([
+      {
+        system_name: 'MultiCare',
+        domain: 'multicare.org',
+        state: 'WA',
+        seed_urls: [
+          'https://www.multicare.org/patient-resources/medical-records/deaconess-hospital-patients/',
+          'https://www.multicare.org/patient-resources/medical-records/yakima-memorial-hospital-patients/',
+          'https://www.multicare.org/patient-resources/medical-records/'
+        ],
+        facilities: [
+          {
+            facility_name: 'Deaconess Hospital',
+            city: 'Spokane',
+            state: 'WA',
+            facility_page_url:
+              'https://www.multicare.org/patient-resources/medical-records/deaconess-hospital-patients/'
+          },
+          {
+            facility_name: 'Yakima Memorial Hospital',
+            city: 'Yakima',
+            state: 'WA',
+            facility_page_url:
+              'https://www.multicare.org/patient-resources/medical-records/yakima-memorial-hospital-patients/'
+          }
+        ]
+      }
+    ]);
+
+    assert.deepEqual(
+      seedCalls.map((call) => ({ url: call.url, facilityId: call.facilityId })),
+      [
+        {
+          url: 'https://www.multicare.org/patient-resources/medical-records/deaconess-hospital-patients/',
+          facilityId: 'facility-deaconess'
+        },
+        {
+          url: 'https://www.multicare.org/patient-resources/medical-records/yakima-memorial-hospital-patients/',
+          facilityId: 'facility-yakima'
+        },
+        {
+          url: 'https://www.multicare.org/patient-resources/medical-records/',
+          facilityId: null
+        }
+      ]
+    );
   } finally {
     test.mock.restoreAll();
     test.mock.reset();

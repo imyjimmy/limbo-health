@@ -1,0 +1,50 @@
+[
+  {
+    "system_name": "Allina Health",
+    "state": "MN",
+    "domain": "allinahealth.org",
+    "seed_urls": [
+      "https://www.allinahealth.org/customer-service/medical-records",
+      "https://account.allinahealth.org/MyChart/inside.asp?mode=questionnaire&from=list&src=sys&srcid=1&quesid=4000085",
+      "https://account.allinahealth.org/MyChart/inside.asp?mode=questionnaire&from=list&src=sys&srcid=1&quesid=64002100",
+      "https://www.allinahealth.org/customer-service/-/media/allina-health/files/contact/health-records-request-for-access-form.pdf",
+      "https://www.allinahealth.org/customer-service/-/media/allina-health/files/files/global/allina-health-authorization-to-release-and-disclose-patient-information.pdf"
+    ]
+  },
+  {
+    "system_name": "Essentia Health",
+    "state": "MN",
+    "domain": "essentiahealth.org",
+    "seed_urls": [
+      "https://www.essentiahealth.org/patients-visitors/medical-records",
+      "https://www.essentiahealth.org/patients-visitors/medical-records#content",
+      "https://www.essentiamychart.org/",
+      "https://www.essentiahealth.org/patients-visitors/medical-records#javascript;",
+      "https://www.essentiahealth.org/patients-visitors/mychart",
+      "https://www.essentiahealth.org/patients-visitors/mychart/"
+    ]
+  },
+  {
+    "system_name": "M Health Fairview",
+    "state": "MN",
+    "domain": "mhealthfairview.org",
+    "seed_urls": [
+      "https://www.mhealthfairview.org/resources/medical-records",
+      "https://www.mhealthfairview.org/resources/medical-records#main-content",
+      "https://www.mhealthfairview.org/resources/mychart-and-app",
+      "https://mychart.fairview.org/MyChart/app/on-demand-video-visits",
+      "https://mychart.fairview.org/mychart/accountmanagement/sharemyrecord?_ga=2.83979551.760611797.1770667743-968637007.1765897030",
+      "https://play.google.com/store/apps/details?id=org.fairview.mychart"
+    ]
+  },
+  {
+    "system_name": "Mayo Clinic",
+    "state": "MN",
+    "domain": "mayoclinic.org",
+    "seed_urls": [
+      "https://www.mayoclinic.org/patient-visitor-guide/medical-records",
+      "https://www.mayoclinic.org/patient-visitor-guide/medical-records#main-content",
+      "https://www.mayoclinic.org/about-this-site/health-information-policy"
+    ]
+  }
+]

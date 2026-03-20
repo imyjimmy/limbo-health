@@ -6,12 +6,19 @@ import {
   detectDocumentLanguageCode,
   extractDescriptivePdfPhrase
 } from '../src/utils/pdfNaming.js';
-import { collapseWhitespace } from '../src/utils/text.js';
 import {
+  buildPdfHeaderLines,
+  inferFacilityNameFromHeaderLines
+} from '../src/utils/pdfHeader.js';
+import { collapseWhitespace } from '../src/utils/text.js';
+import { parseHtmlDocument } from '../src/parsers/htmlParser.js';
+import {
+  classifyMedicalRecordsRequestDocument,
   isLikelyMedicalRecordsPdfLink,
   isLikelyWorkflowLink,
   isMedicalRecordsRequestDocument
 } from '../src/utils/urls.js';
+import { detectSourceType } from '../src/crawler/fetcher.js';
 
 const methodistMedicalRecordsContext = {
   sourceTitle: 'How To Access Your Medical Records | Methodist Health System',
@@ -65,6 +72,75 @@ test('accepts Spanish medical records authorization PDFs', () => {
   assert.equal(accepted, true);
 });
 
+test('accepts off-domain cdn PDFs when the official records page context is strong', () => {
+  const accepted = isLikelyWorkflowLink({
+    href: 'https://res.cloudinary.com/dpmykpsih/image/upload/olympic-medical-site-460/media/0d28d9fb6a4e4b1093b5662aa96a4a85/form-medicalrecordsrequest.pdf',
+    text: 'OMC Medical Records Request',
+    contextText:
+      'Phone: 360.417.7136 To request copies of your hospital medical records, please complete the form and return via mail or fax.',
+    allowedDomain: 'olympicmedical.org',
+    sourceTitle:
+      'Medical Records Release | Request Your Hospital and Clinic Records from Olympic Medical Center',
+    sourceText:
+      'Please download and complete the form for hospital records or clinic records. You may also submit via mail or fax.'
+  });
+
+  assert.equal(accepted, true);
+});
+
+test('still rejects off-domain non-records PDFs even from a records page', () => {
+  const accepted = isLikelyWorkflowLink({
+    href: 'https://res.cloudinary.com/example/olympic-medical-site-460/media/absence-request-employee-instructions.pdf',
+    text: 'Employee initial leave request',
+    contextText: 'Site map Provider resources Staff illness reporting tool',
+    allowedDomain: 'olympicmedical.org',
+    sourceTitle:
+      'Medical Records Release | Request Your Hospital and Clinic Records from Olympic Medical Center',
+    sourceText:
+      'Please download and complete the form for hospital records or clinic records. You may also submit via mail or fax.'
+  });
+
+  assert.equal(accepted, false);
+});
+
+test('captures neighboring container text for generic wix pdf buttons', () => {
+  const parsed = parseHtmlDocument({
+    url: 'https://www.columbiabasinhospital.org/requestmedicalrecords',
+    html: `
+      <div data-testid="responsive-container-content" class="comp-mad4c4s317-container">
+        <div class="wixui-rich-text">
+          <p>Release of Information FROM Columbia Basin Hospital or Columbia Basin Family Medicine</p>
+        </div>
+        <div class="comp-mad4vmp5">
+          <a href="https://www.columbiabasinhospital.org/_files/ugd/75a2e9_2bf3e6c74caa4f97a6e60375ed3e1ca0.pdf">Request</a>
+        </div>
+      </div>
+    `
+  });
+
+  const requestLink = parsed.links.find((link) => /2bf3e6c74caa4f97a6e60375ed3e1ca0\.pdf/.test(link.href));
+
+  assert.ok(requestLink);
+  assert.match(
+    requestLink.contextText,
+    /Release of Information FROM Columbia Basin Hospital or Columbia Basin Family Medicine/
+  );
+});
+
+test('accepts generic request pdf buttons when neighboring context identifies release-of-information', () => {
+  const accepted = isLikelyWorkflowLink({
+    href: 'https://www.columbiabasinhospital.org/_files/ugd/75a2e9_2bf3e6c74caa4f97a6e60375ed3e1ca0.pdf',
+    text: 'Request',
+    contextText: 'Release of Information FROM Columbia Basin Hospital or Columbia Basin Family Medicine',
+    allowedDomain: 'columbiabasinhospital.org',
+    sourceTitle: 'Request Medical Records | Columbia Basin Hospital | Columbia Basin Hospital Family Medicine',
+    sourceText:
+      'Easily request your medical records from Columbia Basin Hospital in Ephrata, WA. Find forms and instructions to securely access your health information.'
+  });
+
+  assert.equal(accepted, true);
+});
+
 test('rejects no surprises act PDFs', () => {
   const accepted = isLikelyMedicalRecordsPdfLink({
     href: 'https://www.bswhealth.com/-/media/project/bsw/sites/bswhealth/documents/privacy-and-patient-rights/no-surprises-act.pdf',
@@ -97,6 +173,42 @@ test('accepts release authorization PDFs based on parsed document text', () => {
   });
 
   assert.equal(accepted, true);
+});
+
+test('accepts healthcare-information authorization PDFs based on parsed document text', () => {
+  const accepted = isMedicalRecordsRequestDocument({
+    url: 'https://ba20ddef-1e13-4d44-94f0-13310290b9db.filesusr.com/ugd/75a2e9_2bf3e6c74caa4f97a6e60375ed3e1ca0.pdf',
+    title: '',
+    text:
+      'Authorization to Release Healthcare Information from CBH/CBFM Patient Authorization INFORMATION TO BE RELEASED FROM: Columbia Basin Hospital',
+    links: []
+  });
+
+  assert.equal(accepted, true);
+});
+
+test('accepts context-verified records PDFs even when extracted pdf text is blank', () => {
+  const classification = classifyMedicalRecordsRequestDocument({
+    url: 'http://fcphd.org/PDF_Files/ReleaseofInformation.pdf',
+    title: '',
+    text: '',
+    links: [],
+    sourceUrl: 'http://fcphd.org/',
+    sourceTitle: 'Ferry County Health',
+    sourceText:
+      'Information & Links Release of Information Authorization Ferry County Health official information and links.',
+    sourceLinkText: 'Release of Information Authorization',
+    sourceLinkContext: 'Information & Links'
+  });
+
+  assert.equal(classification.accepted, true);
+  assert.equal(classification.basis, 'context_verified');
+});
+
+test('prefers content-type over .pdf suffix when classifying fetched source types', () => {
+  assert.equal(detectSourceType('https://example.org/roi.pdf', 'text/html; charset=utf-8'), 'html');
+  assert.equal(detectSourceType('https://example.org/roi.pdf', 'application/pdf'), 'pdf');
+  assert.equal(detectSourceType('https://example.org/roi.pdf', ''), 'pdf');
 });
 
 test('rejects accounting-of-disclosure PDFs', () => {
@@ -199,6 +311,57 @@ test('detects Portuguese documents as PT', () => {
   assert.equal(language, 'PT');
 });
 
+test('prefers english header language over multilingual footer boilerplate', () => {
+  const language = detectDocumentLanguageCode({
+    title: '',
+    headerText: 'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET',
+    text:
+      'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET ATTENTION: If you do not speak English... ATENCIÓN: Si habla español, tiene a su disposición servicios gratuitos de asistencia lingüística.'
+  });
+
+  assert.equal(language, 'EN');
+});
+
+test('treats filename language codes as hints instead of overriding clear english content', () => {
+  const language = detectDocumentLanguageCode({
+    url: 'https://example.org/forms/Release-PHI-87-8455-5e-A-SP-Rev-0725.pdf',
+    headerText: 'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET',
+    text: 'PATIENT REQUEST FOR ACCESS TO DESIGNATED RECORD SET'
+  });
+
+  assert.equal(language, 'EN');
+});
+
+test('detects Russian and Vietnamese documents from page content', () => {
+  assert.equal(
+    detectDocumentLanguageCode({
+      url: 'https://example.org/forms/Release-PHI-87-8455-5e-A-RU-Rev-1123.pdf',
+      headerText: 'Сведения о пациенте',
+      text: 'Сведения о пациенте Дата рождения Адрес'
+    }),
+    'RU'
+  );
+
+  assert.equal(
+    detectDocumentLanguageCode({
+      url: 'https://example.org/forms/Release-PHI-87-8455-5e-A-VT-Rev-1123.pdf',
+      headerText: 'Thông tin bệnh nhân',
+      text: 'Thông tin bệnh nhân Ngày sinh Địa chỉ'
+    }),
+    'VT'
+  );
+});
+
+test('preserves SP when the content is clearly spanish-family and the source token uses SP', () => {
+  const language = detectDocumentLanguageCode({
+    url: 'https://example.org/forms/Release-PHI-87-8455-5e-A-SP-Rev-0725.pdf',
+    headerText: 'Información del paciente',
+    text: 'Información especial: autorizo la inclusión de la siguiente información.'
+  });
+
+  assert.equal(language, 'SP');
+});
+
 test('infers a Mass General facility from the source URL when facilityName is missing', () => {
   const stems = buildMedicalRecordsPdfFilenameStems({
     systemName: 'Mass General Brigham',
@@ -227,6 +390,147 @@ test('builds readable Portuguese stems for Mass General documents with inferred 
     stems[0],
     'salem-hospital-autorizacao-para-divulgacao-de-informacoes-de-saude-protegidas-ou-privilegiadas-PT'
   );
+});
+
+test('extracts Vermont facility names from page-one header lines', () => {
+  const facilityName = inferFacilityNameFromHeaderLines({
+    systemName: 'The University of Vermont Medical Center',
+    headerLines: [
+      { text: 'Porter Medical Center MRN:', y: 774.12, x: 264.12, fontSize: 9.96 },
+      { text: '115 Porter Drive Name:', y: 761.88, x: 275.88, fontSize: 9.96 },
+      { text: 'Middlebury, VT 05753', y: 749.64, x: 264.12, fontSize: 9.96 },
+      {
+        text: 'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION',
+        y: 724.68,
+        x: 54,
+        fontSize: 12.18
+      },
+      {
+        text: 'BY SIGNING THIS FORM, YOU AUTHORIZE THE SPECIFIED UNIVERSITY OF VERMONT HEALTH NETWORK ENTITY, OR ITS AGENTS TO RELEASE INFORMATION.',
+        y: 708,
+        x: 52.2,
+        fontSize: 9.96
+      }
+    ]
+  });
+
+  assert.equal(facilityName, 'Porter Medical Center');
+});
+
+test('builds Vermont stems from page-one header context instead of system fallback', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'The University of Vermont Medical Center',
+    url: 'https://www.uvmhealth.org/sites/default/files/2024-04/pmc-authorization-to-release-protected-health-information-form-037347.pdf',
+    title: '',
+    text:
+      'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION BY SIGNING THIS FORM, YOU AUTHORIZE THE SPECIFIED UNIVERSITY OF VERMONT HEALTH NETWORK ENTITY, OR ITS AGENTS TO RELEASE INFORMATION.',
+    headerLines: [
+      { text: 'Porter Medical Center MRN:', y: 774.12, x: 264.12, fontSize: 9.96 },
+      { text: '115 Porter Drive Name:', y: 761.88, x: 275.88, fontSize: 9.96 },
+      { text: 'Middlebury, VT 05753', y: 749.64, x: 264.12, fontSize: 9.96 },
+      {
+        text: 'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION',
+        y: 724.68,
+        x: 54,
+        fontSize: 12.18
+      }
+    ]
+  });
+
+  assert.equal(stems[0], 'porter-medical-center-authorization-to-release-protected-health-information-EN');
+});
+
+test('builds mychart proxy stems from header title lines', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'The University of Vermont Medical Center',
+    url: 'https://www.uvmhealth.org/sites/default/files/2024-04/uvmhn-mychart-proxy-access-request-over-18-form-037035.pdf',
+    title: '',
+    text: 'Proxy access request.',
+    headerLines: [
+      { text: 'FOR PATIENTS 18 AND OLDER', y: 753, x: 403.8, fontSize: 12.18 },
+      { text: 'MyChart Proxy Access', y: 702, x: 156.96, fontSize: 26 },
+      { text: 'Request & Authorization Form', y: 664.19, x: 106.66, fontSize: 26 }
+    ]
+  });
+
+  assert.equal(
+    stems[0],
+    'the-university-of-vermont-medical-center-for-patients-18-and-older-mychart-proxy-access-request-and-authorization-form-EN'
+  );
+});
+
+test('normalizes collapsed all-caps providence header titles before phrase matching', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'Providence Washington',
+    url: '',
+    title: '01-243978 Providence 970392 Print',
+    text:
+      'PATIENT REQUEST TO AMEND A DESIGNATED RECORD SET This form must be complete and legible in order to be processed.',
+    headerLines: [
+      { text: 'PATIENTREQUESTTOAMENDADESIGNATEDRECORDSET', y: 724.84, x: 58.08, fontSize: 20.96 },
+      {
+        text: 'This form must be complete and legible in order to be processed.',
+        y: 686.68,
+        x: 100.44,
+        fontSize: 15.37
+      }
+    ]
+  });
+
+  assert.equal(
+    stems[0],
+    'providence-washington-patient-request-to-amend-a-designated-record-set-EN'
+  );
+});
+
+test('keeps age qualifiers in mychart proxy stems when the header uses My Chart spacing', () => {
+  const stems = buildMedicalRecordsPdfFilenameStems({
+    systemName: 'The University of Vermont Medical Center',
+    url: 'https://www.uvmhealth.org/sites/default/files/2024-04/uvmhn-mychart-proxy-access-request-patients-12-17-form-037038.pdf',
+    title: '',
+    text: 'Proxy access request.',
+    headerLines: [
+      { text: 'FOR PATIENTS 12-17 YEARS OLD', y: 747.48, x: 394.56, fontSize: 12.18 },
+      { text: 'My Chart Proxy Access', y: 690, x: 165.24, fontSize: 26 },
+      { text: 'Request & Authorization Form', y: 652.19, x: 114.82, fontSize: 26 }
+    ]
+  });
+
+  assert.equal(
+    stems[0],
+    'the-university-of-vermont-medical-center-for-patients-12-17-years-old-mychart-proxy-access-request-and-authorization-form-EN'
+  );
+});
+
+test('falls back to the pdf url slug when header lines do not expose a title', () => {
+  const phrase = extractDescriptivePdfPhrase({
+    url: 'https://www.northwesternmedicalcenter.org/pdf/patient-portal-terms-and-conditions/',
+    headerLines: [{ text: 'Northwestern Medical Center', fontSize: 11.66 }],
+    text: ''
+  });
+
+  assert.equal(phrase, 'Patient Portal Terms and Conditions');
+});
+
+test('groups top-of-page pdf text items into clean header lines', () => {
+  const lines = buildPdfHeaderLines({
+    pageHeight: 792,
+    items: [
+      { str: 'Porter Medical Center', transform: [9.96, 0, 0, 9.96, 264.12, 774.12] },
+      { str: 'MRN:', transform: [9.96, 0, 0, 9.96, 417.96, 775.32] },
+      { str: '115 ', transform: [9.96, 0, 0, 9.96, 275.88, 761.88] },
+      { str: 'Porter Drive', transform: [9.96, 0, 0, 9.96, 293.28, 761.88] },
+      { str: 'Name:', transform: [9.96, 0, 0, 9.96, 417.96, 760.44] },
+      {
+        str: 'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION',
+        transform: [11.04, 0, 0, 11.04, 54, 724.68]
+      }
+    ]
+  });
+
+  assert.equal(lines[0].text, 'Porter Medical Center');
+  assert.equal(lines[1].text, '115 Porter Drive');
+  assert.equal(lines[2].text, 'AUTHORIZATION TO RELEASE PROTECTED HEALTH INFORMATION');
 });
 
 test('collapseWhitespace strips embedded null bytes before normalizing spaces', () => {

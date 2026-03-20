@@ -1,0 +1,79 @@
+[
+  {
+    "system_name": "Marshall Health",
+    "state": "WV",
+    "domain": "marshallhealth.org",
+    "seed_urls": [
+      "https://www.marshallhealth.org/patients-visitors/medical-records/",
+      "https://www.marshallhealth.org/patients-visitors/patient-portal/",
+      "https://www.marshallhealth.org/media/2185/mh_authorization-to-use-disclose-health-information.pdf"
+    ]
+  },
+  {
+    "system_name": "Mon Health Medical Center",
+    "state": "WV",
+    "domain": "monhealth.com",
+    "seed_urls": [
+      "https://www.monhealth.com/main/medical-records",
+      "https://www.monhealth.com/main/authorization-for-release-of-protected-health-inf1",
+      "https://www.monhealth.com/main/mymonhealth-patient-portal"
+    ]
+  },
+  {
+    "system_name": "Raleigh General Hospital",
+    "state": "WV",
+    "domain": "raleighgeneral.com",
+    "seed_urls": [
+      "https://www.raleighgeneral.com/medical-records",
+      "https://www.raleighgeneral.com/patient-portal",
+      "https://www.raleighgeneral.com/docs/ahraleighgeneralhospitallibraries/default-document-library/roi-form-(002)dbf6a734-02bd-47dc-8dc9-7497b5185ed1.pdf"
+    ]
+  },
+  {
+    "system_name": "Southern West Virginia Health System",
+    "state": "WV",
+    "domain": "swvhs.org",
+    "seed_urls": [
+      "https://swvhs.org/patient-info/medical-record-request/",
+      "https://swvhs.org/patient-info/patient-portal/"
+    ]
+  },
+  {
+    "system_name": "St. Mary's Medical Center",
+    "state": "WV",
+    "domain": "st-marys.org",
+    "seed_urls": [
+      "https://www.st-marys.org/patients-and-visitors/medical-records",
+      "https://www.st-marys.org/assets/SMMC/Medical-Records/16-01-authorization-for-release-of-information.pdf",
+      "https://www.st-marys.org/patients-and-visitors/myhealth"
+    ]
+  },
+  {
+    "system_name": "Valley Health",
+    "state": "WV",
+    "domain": "valleyhealth.org",
+    "seed_urls": [
+      "https://valleyhealth.org/patient-info/medical-record-release-forms/",
+      "https://mychart.valleyhealth.org/PRD/"
+    ]
+  },
+  {
+    "system_name": "WVU Medicine",
+    "state": "WV",
+    "domain": "wvumedicine.org",
+    "seed_urls": [
+      "https://wvumedicine.org/patient-resources/records-and-planning/request-medical-records/",
+      "https://wvumedicine.org/wp-content/uploads/2021/04/Behavioral-Medicine-Release-Authorization-032021.pdf"
+    ]
+  },
+  {
+    "system_name": "CAMC Health System",
+    "state": "WV",
+    "domain": "camc.org",
+    "seed_urls": [
+      "https://www.camc.org/patients-and-visitors/patient-information/medical-records",
+      "https://www.camc.org/patients-and-visitors/patient-information/patientlink",
+      "https://www.camc.org/sites/default/files/MedicalRecords/17-8445%20FINAL%20ROI%20Form%203%20page%20Minor%20Law%20changes-7.11.2025.pdf"
+    ]
+  }
+]

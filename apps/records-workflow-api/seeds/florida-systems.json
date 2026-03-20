@@ -1,0 +1,85 @@
+[
+  {
+    "system_name": "Baptist Health Care",
+    "state": "FL",
+    "domain": "ebaptisthealthcare.org",
+    "seed_urls": [
+      "https://www.ebaptisthealthcare.org/medical-records",
+      "https://www.ebaptisthealthcare.org/medical-records#",
+      "https://www.ebaptisthealthcare.org/patientportal",
+      "https://www.ebaptisthealthcare.org/PatientPortal/language-services",
+      "https://www.ebaptisthealthcare.org/PatientPortal/",
+      "https://www.ebaptisthealthcare.org/PatientPortal/patient-information-and-guides"
+    ]
+  },
+  {
+    "system_name": "Cleveland Clinic Florida",
+    "state": "FL",
+    "domain": "my.clevelandclinic.org",
+    "seed_urls": [
+      "https://my.clevelandclinic.org/florida/patients/medical-records",
+      "https://my.clevelandclinic.org/florida/patients/medical-records#notification-banner__lightbox-popup",
+      "https://my.clevelandclinic.org/online-services/mychart",
+      "https://my.clevelandclinic.org/florida/patients/medical-records#",
+      "https://my.clevelandclinic.org/florida/patients/medical-records#overview-tab",
+      "https://my.clevelandclinic.org/florida/patients/medical-records#cleveland-clinic-martin-health-tab"
+    ]
+  },
+  {
+    "system_name": "Florida Medical Center",
+    "state": "FL",
+    "domain": "floridamedctr.org",
+    "seed_urls": [
+      "https://floridamedctr.org/medical-records/",
+      "https://floridamedctr.org/medical-records/#content"
+    ]
+  },
+  {
+    "system_name": "HCA Florida University Hospital",
+    "state": "FL",
+    "domain": "hcafloridahealthcare.com",
+    "seed_urls": [
+      "https://www.hcafloridahealthcare.com/locations/university-hospital/for-patients/medical-records",
+      "https://www.hcafloridahealthcare.com/locations/university-hospital/for-patients/medical-records#maincontent",
+      "https://www.myhealthone.net/mh1/public/mh1"
+    ]
+  },
+  {
+    "system_name": "Orlando Health",
+    "state": "FL",
+    "domain": "orlandohealth.com",
+    "seed_urls": [
+      "https://www.orlandohealth.com/patients-and-visitors/patient-resources/medical-records",
+      "https://www.orlandohealth.com/mychart",
+      "https://www.orlandohealth.com/patients-and-visitors/patient-resources/medical-records/walk-in-locations",
+      "https://www.orlandohealth.com/patients-and-visitors/patient-resources/medical-records/questions",
+      "https://www.orlandohealth.com/patients-and-visitors/patient-resources/medical-records/correction",
+      "https://www.orlandohealth.com/patients-and-visitors/patient-resources/medical-records/copies"
+    ]
+  },
+  {
+    "system_name": "UF Health",
+    "state": "FL",
+    "domain": "ufhealth.org",
+    "seed_urls": [
+      "https://ufhealth.org/medical-records",
+      "https://ufhealth.org/medical-records#maincontent",
+      "https://mychart.shands.org/mychartprd/Authentication/Login",
+      "https://ufhealth.org/medical-records/questions-about-medical-records",
+      "https://ufhealth.org/medical-records#uf-health-shands-hospital-and-uf-health-physicians",
+      "https://ufhealth.org/medical-records#uf-health-central-florida"
+    ]
+  },
+  {
+    "system_name": "UF Health Jacksonville",
+    "state": "FL",
+    "domain": "ufhealthjax.org",
+    "seed_urls": [
+      "https://ufhealthjax.org/patients-and-visitors/support-services-and-groups/medical-records",
+      "https://ufhealthjax.org/patients-and-visitors/support-services-and-groups/medical-records#maincontent",
+      "https://mychart.shands.org/mychartprd/Authentication/Login",
+      "https://ufhealthjax.org/assets/media/Authorization-for-Release-of-Information.pdf",
+      "https://ufhealthjax.org/assets/media/Request-for-Amendment-of-Medical-Record.pdf"
+    ]
+  }
+]

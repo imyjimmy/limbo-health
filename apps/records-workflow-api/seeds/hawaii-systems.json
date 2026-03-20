@@ -1,0 +1,81 @@
+[
+  {
+    "system_name": "Health Hawaii",
+    "state": "HI",
+    "domain": "health.hawaii.gov",
+    "seed_urls": [
+      "https://health.hawaii.gov/ems/files/2018/09/DOH-Authorization-Form-1.pdf"
+    ]
+  },
+  {
+    "system_name": "Hilo Benioff Medical Center",
+    "state": "HI",
+    "domain": "hbmc.org",
+    "seed_urls": [
+      "https://www.hbmc.org/electronic-medical-records-emr/",
+      "https://www.hbmc.org/electronic-medical-records-emr/#main",
+      "https://www.hbmc.org/electronic-medical-records-emr/#main-nav-container",
+      "https://www.hbmc.org/patient-portal-v2/",
+      "https://www.hbmc.org/electronic-medical-records-emr/#"
+    ]
+  },
+  {
+    "system_name": "Ka'u Hospital",
+    "state": "HI",
+    "domain": "kauhospital.org",
+    "seed_urls": [
+      "https://www.kauhospital.org/patients-and-visitors/electronic-medical-records-emr/",
+      "https://www.kauhospital.org/patients-and-visitors/electronic-medical-records-emr/#main",
+      "https://www.kauhospital.org/patients-and-visitors/electronic-medical-records-emr/#",
+      "https://www.kauhospital.org/patients-and-visitors/electronic-medical-records-emr/#main-nav-container",
+      "https://www.kauhospital.org/patients-and-visitors/patient-portal/",
+      "https://mychart.ehr.hhsc.org/MyChart/Billing/GuestPay/PayasGuest"
+    ]
+  },
+  {
+    "system_name": "Kona Community Hospital",
+    "state": "HI",
+    "domain": "kch.hhsc.org",
+    "seed_urls": [
+      "https://kch.hhsc.org/Patients-Visitors/Patient-Guide/Concerns-Confidentiality-Medical-Records-and-Family-Spokesperson/",
+      "https://kch.hhsc.org/Patients-Visitors/Patient-Guide/Concerns-Confidentiality-Medical-Records-and-Family-Spokesperson/#content",
+      "https://kch.hhsc.org/mychart/",
+      "https://www.hhsc.org/myhealth-patient-portal/",
+      "https://kch.hhsc.org/patients-visitors/what-are-electronic-medical-records-and-why-they-matter/",
+      "https://kch.hhsc.org/patients-visitors/patient-guide/concerns-confidentiality-medical-records-and-family-spokesperson/"
+    ]
+  },
+  {
+    "system_name": "Request for Medical Records at The Queen’s Medical Center",
+    "state": "HI",
+    "domain": "queens.org",
+    "seed_urls": [
+      "https://www.queens.org/locations/hospitals/qmc/patients-visitors/request-for-records/",
+      "https://www.queens.org/mychart-information/",
+      "https://mychart.queens.org/mychart/guestestimates",
+      "https://www.queens.org/wp-content/uploads/2021/11/QMC_AuthorizatonForm_2.pdf",
+      "https://mychart.queens.org/MyChart/Authentication/Login?"
+    ]
+  },
+  {
+    "system_name": "University Health Services Manoa",
+    "state": "HI",
+    "domain": "hawaii.edu",
+    "seed_urls": [
+      "https://www.hawaii.edu/shs/for_patients/medical_records.php",
+      "https://healthservices.hawaii.edu/",
+      "https://www.hawaii.edu/shs/downloads/Consent_Release_Form.pdf"
+    ]
+  },
+  {
+    "system_name": "Welcome to Hawaii Pacific Health",
+    "state": "HI",
+    "domain": "hawaiipacifichealth.org",
+    "seed_urls": [
+      "https://www.hawaiipacifichealth.org/patients-visitors/welcome/",
+      "https://www.hawaiipacifichealth.org/mychart/",
+      "https://www.hawaiipacifichealth.org/patients-visitors/mychart/",
+      "https://mychart.hawaiipacifichealth.org/accesscheck.asp"
+    ]
+  }
+]

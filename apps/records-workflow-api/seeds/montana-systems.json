@@ -1,0 +1,111 @@
+[
+  {
+    "system_name": "Advanced Care Hospital of Montana",
+    "state": "MT",
+    "domain": "achm.ernesthealth.com",
+    "seed_urls": [
+      "https://achm.ernesthealth.com/request-medical-records/",
+      "https://achm.ernesthealth.com/request-medical-records/#",
+      "https://achm.ernesthealth.com/request-medical-records/#top"
+    ]
+  },
+  {
+    "system_name": "Benefis Health System",
+    "state": "MT",
+    "domain": "benefis.org",
+    "seed_urls": [
+      "https://www.benefis.org/patients-visitors/medical-records/",
+      "https://www.benefis.org/patients-visitors/medical-records/#Content",
+      "https://www.benefis.org/patients-visitors/patient-information/patient-portal/",
+      "https://www.benefis.org/app/files/public/1bfac992-da76-425e-9f5c-55d560fd9d31/PDFs/UNI-0005%20Authorization%20to%20Release%20Medical%20Information%20FINAL%203%2024.pdf"
+    ]
+  },
+  {
+    "system_name": "Billings Clinic",
+    "state": "MT",
+    "domain": "billingsclinic.com",
+    "seed_urls": [
+      "https://www.billingsclinic.com/care-at-billings-clinic/your-visit/medical-records/",
+      "https://www.billingsclinic.com/care-at-billings-clinic/your-visit/medical-records/#Content",
+      "https://www.billingsclinic.com/care-at-billings-clinic/your-visit/medical-records/#SetLocation",
+      "https://www.billingsclinic.com/care-at-billings-clinic/your-visit/patient-portal/",
+      "https://www.billingsclinic.com/health-wellness-resources/health-information/",
+      "https://www.billingsclinic.com/for-healthcare-professionals/electronic-medical-record-access-for-providers/"
+    ]
+  },
+  {
+    "system_name": "Cabinet Peaks Medical Center",
+    "state": "MT",
+    "domain": "cabinetpeaks.org",
+    "seed_urls": [
+      "https://www.cabinetpeaks.org/getpage.php?name=CPMC_medrecords_request",
+      "https://www.cabinetpeaks.org/getpage.php?name=CPMC_medrecords_request&sub=Patients%20%26%20Visitors",
+      "https://www.cabinetpeaks.org/getpage.php?name=patient_portal&sub=Patients%20%26%20Visitors",
+      "https://www.cabinetpeaks.org/docs/HIM-015_FB_Authorization_to_Disclose_Protected_Health_Information_%28PHI%29_1111.pdf",
+      "https://www.cabinetpeaks.org/docs/HIM-002-FA_Request_for_Amendment_of_Medical_Record_121720.pdf"
+    ]
+  },
+  {
+    "system_name": "Intermountain Healthcare",
+    "state": "MT",
+    "domain": "intermountainhealthcare.org",
+    "seed_urls": [
+      "https://intermountainhealthcare.org/for-patients/medical-records",
+      "https://intermountainhealthcare.org/for-patients/medical-records/colorado-montana-wyoming-nevada",
+      "https://intermountainhealthcare.org/for-patients/medical-records/utah-idaho",
+      "https://intermountainhealthcare.org/for-patients/undefined",
+      "https://mychart.intermountainhealth.org/",
+      "https://mychart.intermountainhealth.org/Mychart/Authentication/Login?postloginurl=StandardFile%3foption%3dfaq#PROXY_ACCESS"
+    ]
+  },
+  {
+    "system_name": "Logan Health",
+    "state": "MT",
+    "domain": "logan.org",
+    "seed_urls": [
+      "https://www.logan.org/about/medical-records/",
+      "https://www.logan.org/patient-portal/",
+      "https://www.logan.org/wp-content/uploads/2024/12/Authorization-to-Disclose-12.4.24.pdf",
+      "https://www.logan.org/wp-content/uploads/2023/11/pXz0MVQg_177officialLHFILLABLE.pdf",
+      "https://www.logan.org/about/medical-records",
+      "https://www.logan.org/about/medical-records/?bbFormId=b185aee8-a000-4633-8158-832de5b42c77"
+    ]
+  },
+  {
+    "system_name": "Northern Montana Health Care",
+    "state": "MT",
+    "domain": "nmhcare.org",
+    "seed_urls": [
+      "https://nmhcare.org/patients-visitors/medical-records-request/",
+      "https://nmhcare.org/patients-visitors/medical-records-request/#",
+      "https://portal.nmhcare.org/",
+      "https://nmhcare.org/departments/health-information-management/",
+      "https://nmhcare.org/departments/health-information-management/#",
+      "https://nmhcare.org/wp-content/uploads/2021/04/ADM0702-Authorization-for-disclosure-of-PHI-Updated.pdf"
+    ]
+  },
+  {
+    "system_name": "St. Peter's Health",
+    "state": "MT",
+    "domain": "sphealth.org",
+    "seed_urls": [
+      "https://www.sphealth.org/medical-records",
+      "https://www.sphealth.org/medical-records#main-content",
+      "https://www.sphealth.org/patients-visitors/patient-portal",
+      "https://www.sphealth.org/patients-visitors/mychart",
+      "https://www.sphealth.org/sites/default/files/768-515-s-1-(4-20_disclosure-of-health-information-via-verbal-communication.pdf",
+      "https://www.sphealth.org/medical-records#"
+    ]
+  },
+  {
+    "system_name": "VA Montana Health Care",
+    "state": "MT",
+    "domain": "va.gov",
+    "seed_urls": [
+      "https://www.va.gov/montana-health-care/medical-records-office/",
+      "https://www.va.gov/montana-health-care/medical-records-office/#content",
+      "https://www.va.gov/resources/about-electronic-health-information-sharing-at-va/",
+      "https://www.va.gov/resources/about-reviewing-medical-records-online"
+    ]
+  }
+]

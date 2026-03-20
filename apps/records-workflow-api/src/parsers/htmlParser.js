@@ -45,6 +45,56 @@ function extractContactCandidates(text, links) {
   return uniqueBy(contacts, (contact) => `${contact.type}:${contact.value}`);
 }
 
+function collectLinkContext($, node) {
+  const linkText = collapseWhitespace($(node).text());
+  const contextParts = [];
+  let current = $(node);
+
+  for (let depth = 0; depth < 4; depth += 1) {
+    const parent = current.parent();
+    if (!parent.length || parent.is('body') || parent.is('html')) {
+      break;
+    }
+
+    const nearbyParts = [];
+
+    const siblingText = (elements) =>
+      elements
+        .toArray()
+        .map((element) => collapseWhitespace($(element).text()))
+        .filter(Boolean);
+
+    nearbyParts.push(...siblingText(parent.prevAll().slice(0, 2)));
+    nearbyParts.push(...siblingText(parent.nextAll().slice(0, 1)));
+
+    const parentClone = parent.clone();
+    parentClone.find('a').remove();
+    const parentText = collapseWhitespace(parentClone.text());
+    if (parentText) {
+      nearbyParts.push(parentText);
+    }
+
+    const sanitized = uniqueBy(
+      nearbyParts
+        .map((text) => text.replace(/\s+/g, ' ').trim())
+        .filter((text) => text && text !== linkText && text.length > 2 && text.length <= 280),
+      (text) => text.toLowerCase()
+    );
+
+    if (sanitized.length > 0) {
+      contextParts.push(...sanitized);
+
+      if (contextParts.join(' ').length >= 40) {
+        break;
+      }
+    }
+
+    current = parent;
+  }
+
+  return uniqueBy(contextParts, (text) => text.toLowerCase()).join(' ').slice(0, 400);
+}
+
 export function parseHtmlDocument({ html, url }) {
   const $ = load(html);
 
@@ -68,7 +118,8 @@ export function parseHtmlDocument({ html, url }) {
       const href = $(node).attr('href');
       return {
         text: collapseWhitespace($(node).text()),
-        href: normalizeUrl(href, url)
+        href: normalizeUrl(href, url),
+        contextText: collectLinkContext($, node)
       };
     })
     .filter((link) => Boolean(link.href));
@@ -80,6 +131,7 @@ export function parseHtmlDocument({ html, url }) {
 
   return {
     sourceType: 'html',
+    url,
     title,
     text: bodyText,
     headings,

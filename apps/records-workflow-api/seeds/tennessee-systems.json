@@ -1,0 +1,78 @@
+[
+  {
+    "system_name": "Covenant Health",
+    "state": "TN",
+    "domain": "covenanthealth.com",
+    "seed_urls": [
+      "https://www.covenanthealth.com/request-my-medical-records/",
+      "https://www.covenanthealth.com/request-my-medical-records/#mainContent",
+      "https://www.covenanthealth.com/wp-content/uploads/2025/06/Patient-Packet_2025.pdf",
+      "https://www.covenanthealth.com/wp-content/uploads/2025/06/Deceased-Patient.pdf"
+    ]
+  },
+  {
+    "system_name": "Nashville General Hospital",
+    "state": "TN",
+    "domain": "nashvillegeneral.org",
+    "seed_urls": [
+      "https://nashvillegeneral.org/patients-visitors/medical-records-requests",
+      "https://nashvillegeneral.org/patients-visitors/medical-records-requests#main-menu",
+      "https://nashvillegeneral.org/patients-visitors/healthelife-patient-portal",
+      "https://nashvillegeneral.org/patients-visitors/medical-records-requests#paragraph-id-543",
+      "https://nashvillegeneral.org/patients-visitors/medical-records-requests#paragraph-id-544",
+      "https://nashvillegeneral.org/patients-visitors/medical-records-requests#paragraph-id-545"
+    ]
+  },
+  {
+    "system_name": "Tennova Healthcare",
+    "state": "TN",
+    "domain": "tennova.com",
+    "seed_urls": [
+      "https://www.tennova.com/request-medical-records",
+      "https://www.tennova.com/tennova-healthcare/hospital-patient-portal.aspx",
+      "https://www.tennova.com/tennova-healthcare/request-medical-records.aspx",
+      "https://www.tennova.com/hospital-patient-portal",
+      "https://www.tennova.com/hospital-patient-portal.aspx",
+      "https://www.tennova.com/request-medical-records#"
+    ]
+  },
+  {
+    "system_name": "Turkey Creek Medical Center",
+    "state": "TN",
+    "domain": "tennovaturkeycreek.com",
+    "seed_urls": [
+      "https://www.tennovaturkeycreek.com/request-medical-records",
+      "https://www.tennovaturkeycreek.com/turkey-creek-medical-center/hospital-patient-portal.aspx",
+      "https://www.tennovaturkeycreek.com/turkey-creek-medical-center/request-medical-records.aspx",
+      "https://www.tennovaturkeycreek.com/hospital-patient-portal",
+      "https://www.tennovaturkeycreek.com/patient-portal-faq",
+      "https://www.tennovaturkeycreek.com/request-medical-records#"
+    ]
+  },
+  {
+    "system_name": "Vanderbilt Health Nashville, TN",
+    "state": "TN",
+    "domain": "vanderbilthealth.com",
+    "seed_urls": [
+      "https://www.vanderbilthealth.com/information/medical-record-information",
+      "https://www.vanderbilthealth.com/information/medical-record-information#main-content",
+      "https://www.vanderbilthealth.com/information/medical-record-information#footer",
+      "https://www.vanderbilthealth.com/information/medical-record-information#make_an_appointment",
+      "https://www.vanderbilthealth.com/childrens-hospital/information/medical-record-information",
+      "https://www.vanderbilthealth.com/information/medical-record-information#request-records-online-024a"
+    ]
+  },
+  {
+    "system_name": "West Tennessee Healthcare",
+    "state": "TN",
+    "domain": "wth.org",
+    "seed_urls": [
+      "https://www.wth.org/request-medical-records/",
+      "https://www.wth.org/request-medical-records/#main-content",
+      "https://www.wth.org/patient-portal/",
+      "https://www.wth.org/request-medical-records/#",
+      "https://www.wth.org/wp-content/uploads/2020/05/ACCESS-REQUEST-2020.pdf",
+      "https://www.wth.org/wp-content/uploads/2020/05/ACCESS-REQUEST-0517-Spanish.pdf"
+    ]
+  }
+]

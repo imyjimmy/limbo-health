@@ -1,0 +1,1521 @@
+{
+  "generated_at": "2026-03-19T04:09:57.317Z",
+  "scope": "National roster coverage audit against currently processed state crawl data",
+  "national_strategy_summary": {
+    "goal": "Measure whether the existing crawled state data is complete and trustworthy enough relative to the CMS national hospital roster baseline.",
+    "pass_criteria": {
+      "state_ready_threshold": {
+        "exact_match_rate_at_least": 0.75,
+        "weighted_match_rate_at_least": 0.85,
+        "low_confidence_rate_at_most": 0.15
+      },
+      "state_review_threshold": {
+        "exact_match_rate_at_least": 0.55,
+        "weighted_match_rate_at_least": 0.7,
+        "low_confidence_rate_at_most": 0.2
+      }
+    },
+    "verdict": "Current fetched data is not yet strong enough, as a whole, to satisfy the national completeness strategy.",
+    "strongest_states": [
+      {
+        "state": "NH",
+        "recommendation": "review",
+        "exact_match_rate": 0.8,
+        "weighted_match_rate": 0.817,
+        "low_confidence_rate": 0.108
+      },
+      {
+        "state": "RI",
+        "recommendation": "review",
+        "exact_match_rate": 0.625,
+        "weighted_match_rate": 0.703,
+        "low_confidence_rate": 0.073
+      },
+      {
+        "state": "VT",
+        "recommendation": "not_ready",
+        "exact_match_rate": 0.529,
+        "weighted_match_rate": 0.662,
+        "low_confidence_rate": 0.07
+      },
+      {
+        "state": "DE",
+        "recommendation": "not_ready",
+        "exact_match_rate": 0.438,
+        "weighted_match_rate": 0.656,
+        "low_confidence_rate": 0.051
+      },
+      {
+        "state": "MA",
+        "recommendation": "not_ready",
+        "exact_match_rate": 0.019,
+        "weighted_match_rate": 0.05,
+        "low_confidence_rate": 0.02
+      }
+    ],
+    "weakest_states": [
+      {
+        "state": "TX",
+        "recommendation": "not_ready",
+        "exact_match_rate": 0.002,
+        "weighted_match_rate": 0.043,
+        "missing_hospitals": 524
+      },
+      {
+        "state": "MA",
+        "recommendation": "not_ready",
+        "exact_match_rate": 0.019,
+        "weighted_match_rate": 0.05,
+        "missing_hospitals": 94
+      },
+      {
+        "state": "DE",
+        "recommendation": "not_ready",
+        "exact_match_rate": 0.438,
+        "weighted_match_rate": 0.656,
+        "missing_hospitals": 3
+      },
+      {
+        "state": "VT",
+        "recommendation": "not_ready",
+        "exact_match_rate": 0.529,
+        "weighted_match_rate": 0.662,
+        "missing_hospitals": 3
+      },
+      {
+        "state": "RI",
+        "recommendation": "review",
+        "exact_match_rate": 0.625,
+        "weighted_match_rate": 0.703,
+        "missing_hospitals": 3
+      }
+    ],
+    "remediation_backlog_order": [
+      {
+        "state": "TX",
+        "recommendation": "not_ready",
+        "missing_hospitals": 524,
+        "low_confidence_rate": 0.095
+      },
+      {
+        "state": "MA",
+        "recommendation": "not_ready",
+        "missing_hospitals": 94,
+        "low_confidence_rate": 0.02
+      },
+      {
+        "state": "NH",
+        "recommendation": "review",
+        "missing_hospitals": 4,
+        "low_confidence_rate": 0.108
+      },
+      {
+        "state": "RI",
+        "recommendation": "review",
+        "missing_hospitals": 3,
+        "low_confidence_rate": 0.073
+      },
+      {
+        "state": "VT",
+        "recommendation": "not_ready",
+        "missing_hospitals": 3,
+        "low_confidence_rate": 0.07
+      },
+      {
+        "state": "DE",
+        "recommendation": "not_ready",
+        "missing_hospitals": 3,
+        "low_confidence_rate": 0.051
+      }
+    ]
+  },
+  "roster_file_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/data/national-roster/cms-pos-q4-2025-active-hospitals.json",
+  "roster_built_during_run": false,
+  "source_filters": {
+    "provider_category_code": "01",
+    "provider_category_label": "Hospital",
+    "skeleton_record_excluded": true,
+    "termination_code_required": "00",
+    "termination_code_label": "Active provider",
+    "included_state_scope": "50 states plus District of Columbia"
+  },
+  "processed_raw_states": [
+    {
+      "state": "MA",
+      "raw_pdf_file_count": 58,
+      "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/ma"
+    },
+    {
+      "state": "NH",
+      "raw_pdf_file_count": 14,
+      "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/nh"
+    },
+    {
+      "state": "RI",
+      "raw_pdf_file_count": 12,
+      "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/ri"
+    },
+    {
+      "state": "TX",
+      "raw_pdf_file_count": 23,
+      "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/tx"
+    },
+    {
+      "state": "VT",
+      "raw_pdf_file_count": 15,
+      "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/vt"
+    }
+  ],
+  "state_audits": [
+    {
+      "state": "DE",
+      "state_name": "Delaware",
+      "phase_1_scope_reason": "state has crawl data in the database but no raw PDF directory yet",
+      "raw_storage": {
+        "state": "DE",
+        "raw_pdf_file_count": 0,
+        "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/de"
+      },
+      "raw_pdf_snapshot": {
+        "inferred_facility_candidate_count": 0,
+        "parse_error_count": 0,
+        "parse_error_sample": []
+      },
+      "seed_snapshot": {
+        "seed_file_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/seeds/delaware-systems.json",
+        "system_count": 13,
+        "facility_count": 4,
+        "seed_url_count": 17,
+        "seed_error": null
+      },
+      "db": {
+        "system_count": 13,
+        "facility_count": 15,
+        "seed_url_count": 17,
+        "source_document_count": 170,
+        "pdf_source_document_count": 0,
+        "workflow_count": 177,
+        "low_confidence_count": 9,
+        "medium_confidence_count": 9,
+        "high_confidence_count": 159,
+        "low_confidence_rate": 0.051
+      },
+      "coverage": {
+        "official_provider_rows": 18,
+        "official_unique_hospital_identities": 16,
+        "exact_facility_matches": 6,
+        "exact_system_matches": 1,
+        "likely_matches": 5,
+        "possible_matches": 1,
+        "missing_hospitals": 3,
+        "exact_match_rate": 0.438,
+        "weighted_match_rate": 0.656
+      },
+      "recommendation": "not_ready",
+      "quality_against_national_strategy": {
+        "rollout_readiness": "not_ready",
+        "coverage_quality": "partial",
+        "workflow_quality": "strong",
+        "exact_coverage_percent": 43.8,
+        "weighted_coverage_percent": 65.6,
+        "low_confidence_workflow_percent": 5.1,
+        "summary": "State data quality is not yet good enough for the nationwide completeness strategy. DE has major coverage gaps.",
+        "strengths": [
+          "Low-confidence workflow rate is low at 5.1%."
+        ],
+        "concerns": [
+          "Exact CMS hospital coverage is only 43.8% for DE.",
+          "Weighted coverage is only 65.6%, which means the roster mapping is still thin.",
+          "No raw PDF evidence is present in storage for this state."
+        ],
+        "next_actions": [
+          "Backfill the 3 unmatched CMS hospital identities.",
+          "Review likely/possible roster matches and convert them into exact facility mappings.",
+          "Backfill or rehydrate raw PDF storage for this state if PDF evidence is expected."
+        ]
+      },
+      "missing_official_hospitals_sample": [
+        {
+          "official_hospital": "DELAWARE PSYCHIATRIC CENTER",
+          "official_city": "NEW CASTLE",
+          "provider_numbers": [
+            "084001"
+          ]
+        },
+        {
+          "official_hospital": "ENCOMPASS HEALTH REHAB HOSPITAL OF MIDDLETOWN",
+          "official_city": "MIDDLETOWN",
+          "provider_numbers": [
+            "083026"
+          ]
+        },
+        {
+          "official_hospital": "PAM HEALTH REHABILITATION HOSPITAL OF GEORGETOWN L",
+          "official_city": "GEORGETOWN",
+          "provider_numbers": [
+            "083028"
+          ]
+        }
+      ],
+      "possible_matches_sample": [
+        {
+          "official_hospital": "TIDALHEALTH NANTICOKE, INC.",
+          "official_city": "SEAFORD",
+          "matched_name": "TidalHealth Nanticoke",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.833
+        }
+      ],
+      "likely_matches_sample": [
+        {
+          "official_hospital": "BAYHEALTH MEDICAL CENTER, KENT CAMPUS",
+          "official_city": "DOVER",
+          "matched_name": "Bayhealth Hospital, Kent Campus",
+          "matched_type": "facility",
+          "matched_city": "Dover",
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "BEEBE MEDICAL CENTER",
+          "official_city": "LEWES",
+          "matched_name": "Beebe Healthcare",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "MEADOWWOOD BEHAVIORAL HEALTH SYSTEM",
+          "official_city": "NEW CASTLE",
+          "matched_name": "MeadowWood Behavioral Health Hospital",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "PAM REHABILITATION HOSPITAL OF DOVER",
+          "official_city": "DOVER",
+          "matched_name": "PAM Health Rehabilitation Hospital of Dover",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "SUN BEHAVIORAL DELAWARE LLC",
+          "official_city": "GEORGETOWN",
+          "matched_name": "SUN Behavioral Delaware",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        }
+      ],
+      "notes": [
+        "Official CMS hospitals remain unmatched against current facilities/systems.",
+        "Low-confidence workflows are present and should be reviewed alongside coverage gaps.",
+        "This state has no PDF source_documents in the DB."
+      ]
+    },
+    {
+      "state": "MA",
+      "state_name": "Massachusetts",
+      "phase_1_scope_reason": "state directory exists under storage/raw and contains PDFs",
+      "raw_storage": {
+        "state": "MA",
+        "raw_pdf_file_count": 58,
+        "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/ma"
+      },
+      "raw_pdf_snapshot": {
+        "inferred_facility_candidate_count": 6,
+        "parse_error_count": 0,
+        "parse_error_sample": []
+      },
+      "seed_snapshot": {
+        "seed_file_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/seeds/massachusetts-systems.json",
+        "system_count": 10,
+        "facility_count": 0,
+        "seed_url_count": 18,
+        "seed_error": null
+      },
+      "db": {
+        "system_count": 10,
+        "facility_count": 10,
+        "seed_url_count": 18,
+        "source_document_count": 285,
+        "pdf_source_document_count": 58,
+        "workflow_count": 357,
+        "low_confidence_count": 7,
+        "medium_confidence_count": 19,
+        "high_confidence_count": 331,
+        "low_confidence_rate": 0.02
+      },
+      "coverage": {
+        "official_provider_rows": 105,
+        "official_unique_hospital_identities": 105,
+        "exact_facility_matches": 2,
+        "exact_system_matches": 0,
+        "likely_matches": 2,
+        "possible_matches": 7,
+        "missing_hospitals": 94,
+        "exact_match_rate": 0.019,
+        "weighted_match_rate": 0.05
+      },
+      "recommendation": "not_ready",
+      "quality_against_national_strategy": {
+        "rollout_readiness": "not_ready",
+        "coverage_quality": "weak",
+        "workflow_quality": "strong",
+        "exact_coverage_percent": 1.9,
+        "weighted_coverage_percent": 5,
+        "low_confidence_workflow_percent": 2,
+        "summary": "State data quality is not yet good enough for the nationwide completeness strategy. MA has major coverage gaps.",
+        "strengths": [
+          "Low-confidence workflow rate is low at 2%.",
+          "Raw PDF evidence exists for this state (58 files)."
+        ],
+        "concerns": [
+          "Exact CMS hospital coverage is only 1.9% for MA.",
+          "Weighted coverage is only 5%, which means the roster mapping is still thin."
+        ],
+        "next_actions": [
+          "Backfill the 94 unmatched CMS hospital identities.",
+          "Review likely/possible roster matches and convert them into exact facility mappings."
+        ]
+      },
+      "missing_official_hospitals_sample": [
+        {
+          "official_hospital": "ADCARE HOSPITAL OF WORCESTER INC",
+          "official_city": "WORCESTER",
+          "provider_numbers": [
+            "220062"
+          ]
+        },
+        {
+          "official_hospital": "ANNA JAQUES HOSPITAL",
+          "official_city": "NEWBURYPORT",
+          "provider_numbers": [
+            "220029"
+          ]
+        },
+        {
+          "official_hospital": "ARBOUR HOSPITAL, THE",
+          "official_city": "BOSTON",
+          "provider_numbers": [
+            "224013"
+          ]
+        },
+        {
+          "official_hospital": "ARBOUR HUMAN RESOURCE INSTITUTE",
+          "official_city": "BROOKLINE",
+          "provider_numbers": [
+            "224018"
+          ]
+        },
+        {
+          "official_hospital": "ARBOUR-FULLER HOSPITAL",
+          "official_city": "SOUTH ATTLEBORO",
+          "provider_numbers": [
+            "224021"
+          ]
+        },
+        {
+          "official_hospital": "ATHOL MEMORIAL HOSPITAL",
+          "official_city": "ATHOL",
+          "provider_numbers": [
+            "221303"
+          ]
+        },
+        {
+          "official_hospital": "BAYSTATE FRANKLIN MEDICAL CENTER",
+          "official_city": "GREENFIELD",
+          "provider_numbers": [
+            "220016"
+          ]
+        },
+        {
+          "official_hospital": "BAYSTATE MEDICAL CENTER - TRANSPLANT CENTER",
+          "official_city": "SPRINGFIELD",
+          "provider_numbers": [
+            "229809"
+          ]
+        },
+        {
+          "official_hospital": "BAYSTATE NOBLE HOSPITAL",
+          "official_city": "WESTFIELD",
+          "provider_numbers": [
+            "220065"
+          ]
+        },
+        {
+          "official_hospital": "BAYSTATE WING HOSPITAL AND MEDICAL CENTERS",
+          "official_city": "PALMER",
+          "provider_numbers": [
+            "220030"
+          ]
+        },
+        {
+          "official_hospital": "BERKSHIRE MEDICAL CENTER INC - 1",
+          "official_city": "PITTSFIELD",
+          "provider_numbers": [
+            "220046"
+          ]
+        },
+        {
+          "official_hospital": "BETH ISRAEL DEACONESS HOSPITAL - NEEDHAM",
+          "official_city": "NEEDHAM",
+          "provider_numbers": [
+            "220083"
+          ]
+        },
+        {
+          "official_hospital": "BETH ISRAEL DEACONESS HOSPITAL - PLYMOUTH",
+          "official_city": "PLYMOUTH",
+          "provider_numbers": [
+            "220060"
+          ]
+        },
+        {
+          "official_hospital": "BETH ISRAEL DEACONESS HOSPITAL-MILTON INC",
+          "official_city": "MILTON",
+          "provider_numbers": [
+            "220108"
+          ]
+        },
+        {
+          "official_hospital": "BETH ISRAEL DEACONESS MED CTR - TRANSPLANT CENTER",
+          "official_city": "BOSTON",
+          "provider_numbers": [
+            "229803"
+          ]
+        },
+        {
+          "official_hospital": "BETH ISRAEL DEACONESS MEDICAL CENTER",
+          "official_city": "BOSTON",
+          "provider_numbers": [
+            "220086"
+          ]
+        },
+        {
+          "official_hospital": "BEVERLY HOSPITAL CORPORATION",
+          "official_city": "BEVERLY",
+          "provider_numbers": [
+            "220033"
+          ]
+        },
+        {
+          "official_hospital": "BOURNEWOOD HOSPITAL",
+          "official_city": "BOSTON COLLEGE",
+          "provider_numbers": [
+            "224022"
+          ]
+        },
+        {
+          "official_hospital": "BRIGHAM AND WOMEN'S FAULKNER HOSPITAL",
+          "official_city": "BOSTON",
+          "provider_numbers": [
+            "220119"
+          ]
+        },
+        {
+          "official_hospital": "BRIGHAM AND WOMEN'S HOSPITAL",
+          "official_city": "BOSTON",
+          "provider_numbers": [
+            "220110"
+          ]
+        }
+      ],
+      "possible_matches_sample": [
+        {
+          "official_hospital": "BOSTON CHILDREN'S HOSPITAL - TRANSPLANT CENTER",
+          "official_city": "BOSTON",
+          "matched_name": "Boston Children's Hospital",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "BOSTON MEDICAL CENTER - TRANSPLANT CENTER",
+          "official_city": "BOSTON",
+          "matched_name": "Boston Medical Center",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.725
+        },
+        {
+          "official_hospital": "BOSTON MEDICAL CENTER CORPORATION-",
+          "official_city": "BOSTON",
+          "matched_name": "Boston Medical Center",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.725
+        },
+        {
+          "official_hospital": "BOSTON MEDICAL CENTER-BRIGHTON",
+          "official_city": "BRIGHTON",
+          "matched_name": "Boston Medical Center Boston Medical Center – Brighton Boston Medical Center – South",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "raw_pdf",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "BOSTON MEDICAL CENTER-SOUTH",
+          "official_city": "BROCKTON",
+          "matched_name": "Boston Medical Center Boston Medical Center – Brighton Boston Medical Center – South",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "raw_pdf",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "UMASS MEMORIAL HEALTH-MILFORD REGIONAL MEDICAL CTR",
+          "official_city": "MILFORD",
+          "matched_name": "UMass Memorial Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "UMASS MEMORIAL MEDICAL CENTER INC",
+          "official_city": "WORCESTER",
+          "matched_name": "UMass Memorial Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.783
+        }
+      ],
+      "likely_matches_sample": [
+        {
+          "official_hospital": "BAYSTATE MEDICAL CENTER",
+          "official_city": "SPRINGFIELD",
+          "matched_name": "Baystate Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "EMERSON HOSPITAL -",
+          "official_city": "W CONCORD",
+          "matched_name": "Emerson Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        }
+      ],
+      "notes": [
+        "Official CMS hospitals remain unmatched against current facilities/systems.",
+        "Low-confidence workflows are present and should be reviewed alongside coverage gaps.",
+        "Raw PDF header inference was included as additional evidence for facility coverage."
+      ]
+    },
+    {
+      "state": "NH",
+      "state_name": "New Hampshire",
+      "phase_1_scope_reason": "state directory exists under storage/raw and contains PDFs",
+      "raw_storage": {
+        "state": "NH",
+        "raw_pdf_file_count": 14,
+        "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/nh"
+      },
+      "raw_pdf_snapshot": {
+        "inferred_facility_candidate_count": 3,
+        "parse_error_count": 0,
+        "parse_error_sample": []
+      },
+      "seed_snapshot": {
+        "seed_file_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/seeds/new-hampshire-systems.json",
+        "system_count": 24,
+        "facility_count": 9,
+        "seed_url_count": 28,
+        "seed_error": null
+      },
+      "db": {
+        "system_count": 24,
+        "facility_count": 31,
+        "seed_url_count": 28,
+        "source_document_count": 178,
+        "pdf_source_document_count": 14,
+        "workflow_count": 204,
+        "low_confidence_count": 22,
+        "medium_confidence_count": 6,
+        "high_confidence_count": 176,
+        "low_confidence_rate": 0.108
+      },
+      "coverage": {
+        "official_provider_rows": 30,
+        "official_unique_hospital_identities": 30,
+        "exact_facility_matches": 24,
+        "exact_system_matches": 0,
+        "likely_matches": 0,
+        "possible_matches": 2,
+        "missing_hospitals": 4,
+        "exact_match_rate": 0.8,
+        "weighted_match_rate": 0.817
+      },
+      "recommendation": "review",
+      "quality_against_national_strategy": {
+        "rollout_readiness": "review",
+        "coverage_quality": "adequate",
+        "workflow_quality": "mixed",
+        "exact_coverage_percent": 80,
+        "weighted_coverage_percent": 81.7,
+        "low_confidence_workflow_percent": 10.8,
+        "summary": "State data quality is promising but not complete. NH needs targeted review before it should be treated as exhaustive.",
+        "strengths": [
+          "Exact CMS hospital coverage is 80% for NH.",
+          "Weighted match coverage is usable at 81.7%.",
+          "Raw PDF evidence exists for this state (14 files)."
+        ],
+        "concerns": [
+          "Low-confidence workflow rate is moderate at 10.8%."
+        ],
+        "next_actions": [
+          "Backfill the 4 unmatched CMS hospital identities.",
+          "Review likely/possible roster matches and convert them into exact facility mappings.",
+          "Review low-confidence workflows and weak portal/form extractions."
+        ]
+      },
+      "missing_official_hospitals_sample": [
+        {
+          "official_hospital": "ENCOMPASS HEALTH REHABILITATION HOSPITAL OF CONCOR",
+          "official_city": "CONCORD",
+          "provider_numbers": [
+            "303027"
+          ]
+        },
+        {
+          "official_hospital": "MARY HITCHCOCK MEMORIAL HOSPITAL",
+          "official_city": "LEBANON",
+          "provider_numbers": [
+            "300003"
+          ]
+        },
+        {
+          "official_hospital": "MARY HITCHCOCK MEMORIAL HOSPITAL - TRANSPLANT",
+          "official_city": "LEBANON",
+          "provider_numbers": [
+            "309801"
+          ]
+        },
+        {
+          "official_hospital": "SOUTHERN NH MEDICAL CENTER",
+          "official_city": "NASHUA",
+          "provider_numbers": [
+            "300020"
+          ]
+        }
+      ],
+      "possible_matches_sample": [
+        {
+          "official_hospital": "EXETER HOSPITAL INC",
+          "official_city": "EXETER",
+          "matched_name": "Exeter Hospital",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.725
+        },
+        {
+          "official_hospital": "NEW HAMPSHIRE HOSP-PSYCH UNIT",
+          "official_city": "CONCORD",
+          "matched_name": "New Hampshire Hospital",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.725
+        }
+      ],
+      "likely_matches_sample": [],
+      "notes": [
+        "Official CMS hospitals remain unmatched against current facilities/systems.",
+        "Low-confidence workflows are present and should be reviewed alongside coverage gaps.",
+        "Raw PDF header inference was included as additional evidence for facility coverage."
+      ]
+    },
+    {
+      "state": "RI",
+      "state_name": "Rhode Island",
+      "phase_1_scope_reason": "state directory exists under storage/raw and contains PDFs",
+      "raw_storage": {
+        "state": "RI",
+        "raw_pdf_file_count": 12,
+        "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/ri"
+      },
+      "raw_pdf_snapshot": {
+        "inferred_facility_candidate_count": 8,
+        "parse_error_count": 0,
+        "parse_error_sample": []
+      },
+      "seed_snapshot": {
+        "seed_file_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/seeds/rhode-island-systems.json",
+        "system_count": 10,
+        "facility_count": 9,
+        "seed_url_count": 13,
+        "seed_error": null
+      },
+      "db": {
+        "system_count": 10,
+        "facility_count": 16,
+        "seed_url_count": 13,
+        "source_document_count": 87,
+        "pdf_source_document_count": 12,
+        "workflow_count": 96,
+        "low_confidence_count": 7,
+        "medium_confidence_count": 0,
+        "high_confidence_count": 89,
+        "low_confidence_rate": 0.073
+      },
+      "coverage": {
+        "official_provider_rows": 16,
+        "official_unique_hospital_identities": 16,
+        "exact_facility_matches": 10,
+        "exact_system_matches": 0,
+        "likely_matches": 1,
+        "possible_matches": 2,
+        "missing_hospitals": 3,
+        "exact_match_rate": 0.625,
+        "weighted_match_rate": 0.703
+      },
+      "recommendation": "review",
+      "quality_against_national_strategy": {
+        "rollout_readiness": "review",
+        "coverage_quality": "adequate",
+        "workflow_quality": "strong",
+        "exact_coverage_percent": 62.5,
+        "weighted_coverage_percent": 70.3,
+        "low_confidence_workflow_percent": 7.3,
+        "summary": "State data quality is promising but not complete. RI needs targeted review before it should be treated as exhaustive.",
+        "strengths": [
+          "Exact CMS hospital coverage is moderate at 62.5% for RI.",
+          "Weighted match coverage is usable at 70.3%.",
+          "Low-confidence workflow rate is low at 7.3%.",
+          "Raw PDF evidence exists for this state (12 files)."
+        ],
+        "concerns": [],
+        "next_actions": [
+          "Backfill the 3 unmatched CMS hospital identities.",
+          "Review likely/possible roster matches and convert them into exact facility mappings."
+        ]
+      },
+      "missing_official_hospitals_sample": [
+        {
+          "official_hospital": "EMMA PENDLETON BRADLEY HOSPITAL",
+          "official_city": "EAST PROVIDENCE",
+          "provider_numbers": [
+            "414003"
+          ]
+        },
+        {
+          "official_hospital": "ENCOMPASS HEALTH REHAB HOSPITAL OF JOHNSTON",
+          "official_city": "JOHNSTON",
+          "provider_numbers": [
+            "413026"
+          ]
+        },
+        {
+          "official_hospital": "KENT COUNTY MEMORIAL HOSPITAL",
+          "official_city": "WARWICK",
+          "provider_numbers": [
+            "410009"
+          ]
+        }
+      ],
+      "possible_matches_sample": [
+        {
+          "official_hospital": "SOUTH COUNTY HOSPITAL INC",
+          "official_city": "WAKEFIELD",
+          "matched_name": "South County Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.783
+        },
+        {
+          "official_hospital": "WOMEN & INFANTS HOSPITAL OF RHODE ISLAND",
+          "official_city": "PROVIDENCE",
+          "matched_name": "Women & Infants Hospital",
+          "matched_type": "facility",
+          "matched_city": "Providence",
+          "matched_source": "db",
+          "similarity_score": 0.775
+        }
+      ],
+      "likely_matches_sample": [
+        {
+          "official_hospital": "RHODE ISLAND HOSPITAL - TRANSPLANT CENTER",
+          "official_city": "PROVIDENCE",
+          "matched_name": "Rhode Island Hospital",
+          "matched_type": "facility",
+          "matched_city": "Providence",
+          "matched_source": "db",
+          "similarity_score": 0.883
+        }
+      ],
+      "notes": [
+        "Official CMS hospitals remain unmatched against current facilities/systems.",
+        "Low-confidence workflows are present and should be reviewed alongside coverage gaps.",
+        "Raw PDF header inference was included as additional evidence for facility coverage."
+      ]
+    },
+    {
+      "state": "TX",
+      "state_name": "Texas",
+      "phase_1_scope_reason": "state directory exists under storage/raw and contains PDFs",
+      "raw_storage": {
+        "state": "TX",
+        "raw_pdf_file_count": 23,
+        "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/tx"
+      },
+      "raw_pdf_snapshot": {
+        "inferred_facility_candidate_count": 1,
+        "parse_error_count": 0,
+        "parse_error_sample": []
+      },
+      "seed_snapshot": {
+        "seed_file_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/seeds/texas-systems.json",
+        "system_count": 25,
+        "facility_count": 1,
+        "seed_url_count": 29,
+        "seed_error": null
+      },
+      "db": {
+        "system_count": 25,
+        "facility_count": 25,
+        "seed_url_count": 29,
+        "source_document_count": 427,
+        "pdf_source_document_count": 23,
+        "workflow_count": 494,
+        "low_confidence_count": 47,
+        "medium_confidence_count": 28,
+        "high_confidence_count": 419,
+        "low_confidence_rate": 0.095
+      },
+      "coverage": {
+        "official_provider_rows": 598,
+        "official_unique_hospital_identities": 594,
+        "exact_facility_matches": 1,
+        "exact_system_matches": 0,
+        "likely_matches": 15,
+        "possible_matches": 54,
+        "missing_hospitals": 524,
+        "exact_match_rate": 0.002,
+        "weighted_match_rate": 0.043
+      },
+      "recommendation": "not_ready",
+      "quality_against_national_strategy": {
+        "rollout_readiness": "not_ready",
+        "coverage_quality": "weak",
+        "workflow_quality": "mixed",
+        "exact_coverage_percent": 0.2,
+        "weighted_coverage_percent": 4.3,
+        "low_confidence_workflow_percent": 9.5,
+        "summary": "State data quality is not yet good enough for the nationwide completeness strategy. TX has major coverage gaps.",
+        "strengths": [
+          "Raw PDF evidence exists for this state (23 files)."
+        ],
+        "concerns": [
+          "Exact CMS hospital coverage is only 0.2% for TX.",
+          "Weighted coverage is only 4.3%, which means the roster mapping is still thin.",
+          "Low-confidence workflow rate is moderate at 9.5%."
+        ],
+        "next_actions": [
+          "Backfill the 524 unmatched CMS hospital identities.",
+          "Review likely/possible roster matches and convert them into exact facility mappings.",
+          "Review low-confidence workflows and weak portal/form extractions."
+        ]
+      },
+      "missing_official_hospitals_sample": [
+        {
+          "official_hospital": "ACUTE REHABILITATION HOSPITAL OF PLANO",
+          "official_city": "PLANO",
+          "provider_numbers": [
+            "673055"
+          ]
+        },
+        {
+          "official_hospital": "AD HOSPITAL EAST, LLC",
+          "official_city": "HOUSTON",
+          "provider_numbers": [
+            "670102"
+          ]
+        },
+        {
+          "official_hospital": "ADVANCED DALLAS HOSPITALS AND CLINICS",
+          "official_city": "DALLAS",
+          "provider_numbers": [
+            "670321"
+          ]
+        },
+        {
+          "official_hospital": "ADVENTHEALTH CENTRAL TEXAS",
+          "official_city": "KILLEEN",
+          "provider_numbers": [
+            "450152"
+          ]
+        },
+        {
+          "official_hospital": "ADVENTHEALTH ROLLINS BROOK",
+          "official_city": "LAMPASAS",
+          "provider_numbers": [
+            "451323"
+          ]
+        },
+        {
+          "official_hospital": "AHS SHERMAN MEDICAL CENTER",
+          "official_city": "SHERMAN",
+          "provider_numbers": [
+            "450469"
+          ]
+        },
+        {
+          "official_hospital": "ALLEGIANCE BEHAVIORAL HEALTH CENTER OF PLAINVIEW",
+          "official_city": "PLAINVIEW",
+          "provider_numbers": [
+            "454101"
+          ]
+        },
+        {
+          "official_hospital": "ALTUS HOUSTON HOSPITAL, LP",
+          "official_city": "HOUSTON",
+          "provider_numbers": [
+            "670135"
+          ]
+        },
+        {
+          "official_hospital": "ALTUS LUMBERTON HOSPITAL",
+          "official_city": "LUMBERTON",
+          "provider_numbers": [
+            "670134"
+          ]
+        },
+        {
+          "official_hospital": "ANSON GENERAL HOSPITAL",
+          "official_city": "ANSON",
+          "provider_numbers": [
+            "670781"
+          ]
+        },
+        {
+          "official_hospital": "ASCENSION PROVIDENCE",
+          "official_city": "WACO",
+          "provider_numbers": [
+            "450042"
+          ]
+        },
+        {
+          "official_hospital": "ASCENSION SETON EDGAR B DAVIS",
+          "official_city": "LULING",
+          "provider_numbers": [
+            "451371"
+          ]
+        },
+        {
+          "official_hospital": "ASPIRE HOSPITAL",
+          "official_city": "CONROE",
+          "provider_numbers": [
+            "670093"
+          ]
+        },
+        {
+          "official_hospital": "ATRIUM MEDICAL CENTER",
+          "official_city": "STAFFORD",
+          "provider_numbers": [
+            "452114"
+          ]
+        },
+        {
+          "official_hospital": "AUSTIN OAKS HOSPITAL",
+          "official_city": "AUSTIN",
+          "provider_numbers": [
+            "454121"
+          ]
+        },
+        {
+          "official_hospital": "AUSTIN STATE HOSPITAL",
+          "official_city": "AUSTIN",
+          "provider_numbers": [
+            "454084"
+          ]
+        },
+        {
+          "official_hospital": "BALLINGER MEMORIAL HOSPITAL",
+          "official_city": "BALLINGER",
+          "provider_numbers": [
+            "451310"
+          ]
+        },
+        {
+          "official_hospital": "BANDERA FAMILY HOSPITAL",
+          "official_city": "SAN ANTONIO",
+          "provider_numbers": [
+            "670336"
+          ]
+        },
+        {
+          "official_hospital": "BAPTIST BEAUMONT HOSPITAL",
+          "official_city": "BEAUMONT",
+          "provider_numbers": [
+            "450346"
+          ]
+        },
+        {
+          "official_hospital": "BAPTIST MEDICAL CENTER",
+          "official_city": "SAN ANTONIO",
+          "provider_numbers": [
+            "450058"
+          ]
+        }
+      ],
+      "possible_matches_sample": [
+        {
+          "official_hospital": "ASCENSION SETON CEDAR PARK",
+          "official_city": "CEDAR PARK",
+          "matched_name": "Ascension Seton",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.725
+        },
+        {
+          "official_hospital": "ASCENSION SETON HAYS",
+          "official_city": "KYLE",
+          "matched_name": "Ascension Seton",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "ASCENSION SETON HIGHLAND LAKES",
+          "official_city": "BURNET",
+          "matched_name": "Ascension Seton",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.725
+        },
+        {
+          "official_hospital": "ASCENSION SETON MEDICAL CENTER AUSTIN",
+          "official_city": "AUSTIN",
+          "matched_name": "Ascension Seton",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "ASCENSION SETON NORTHWEST",
+          "official_city": "AUSTIN",
+          "matched_name": "Ascension Seton",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "ASCENSION SETON SOUTHWEST",
+          "official_city": "AUSTIN",
+          "matched_name": "Ascension Seton",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "ASCENSION SETON WILLIAMSON",
+          "official_city": "ROUND ROCK",
+          "matched_name": "Ascension Seton",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.833
+        },
+        {
+          "official_hospital": "BAYLOR SCOTT & WHITE CONTINUING CARE HOSPITAL",
+          "official_city": "TEMPLE",
+          "matched_name": "Baylor Scott & White Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.74
+        },
+        {
+          "official_hospital": "BAYLOR SCOTT & WHITE EMERGENCY HOSPITAL",
+          "official_city": "AUBREY",
+          "matched_name": "Baylor Scott & White Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.838
+        },
+        {
+          "official_hospital": "BAYLOR SCOTT & WHITE HEART AND VASCULAR HOSPITAL",
+          "official_city": "DALLAS",
+          "matched_name": "Baylor Scott & White Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.74
+        },
+        {
+          "official_hospital": "BAYLOR SCOTT & WHITE HOSPITAL BRENHAM",
+          "official_city": "BRENHAM",
+          "matched_name": "Baylor Scott & White Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.838
+        },
+        {
+          "official_hospital": "BAYLOR SCOTT & WHITE INSTITUTE FOR REHABILITATION",
+          "official_city": "DALLAS",
+          "matched_name": "Baylor Scott & White Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.74
+        },
+        {
+          "official_hospital": "BAYLOR SCOTT & WHITE INSTITUTE FOR REHABILITATION",
+          "official_city": "LAKEWAY",
+          "matched_name": "Baylor Scott & White Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.74
+        },
+        {
+          "official_hospital": "BAYLOR SCOTT & WHITE MEDICAL CENTER - BUDA",
+          "official_city": "BUDA",
+          "matched_name": "Baylor Scott & White Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.838
+        },
+        {
+          "official_hospital": "BAYLOR SCOTT & WHITE MEDICAL CENTER - CENTENNIAL",
+          "official_city": "FRISCO",
+          "matched_name": "Baylor Scott & White Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.838
+        }
+      ],
+      "likely_matches_sample": [
+        {
+          "official_hospital": "CHI ST LUKE'S HEALTH BRAZOSPORT",
+          "official_city": "LAKE JACKSON",
+          "matched_name": "CHI St. Luke's Health",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "HOUSTON METHODIST HOSPITAL",
+          "official_city": "HOUSTON",
+          "matched_name": "Houston Methodist",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "MEMORIAL HERMANN HOSPITAL",
+          "official_city": "HOUSTON",
+          "matched_name": "Memorial Hermann Health System",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "MEMORIAL HERMANN HOSPITAL SYSTEM",
+          "official_city": "HOUSTON",
+          "matched_name": "Memorial Hermann Health System",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "METHODIST HOSPITAL",
+          "official_city": "SAN ANTONIO",
+          "matched_name": "Methodist Health System",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "UT HEALTH EAST TEXAS ATHENS HOSPITAL",
+          "official_city": "ATHENS",
+          "matched_name": "UT Health East Texas",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "UT HEALTH EAST TEXAS CARTHAGE HOSPITAL",
+          "official_city": "CARTHAGE",
+          "matched_name": "UT Health East Texas",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "UT HEALTH EAST TEXAS HENDERSON HOSPITAL",
+          "official_city": "HENDERSON",
+          "matched_name": "UT Health East Texas",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "UT HEALTH EAST TEXAS JACKSONVILLE HOSPITAL",
+          "official_city": "JACKSONVILLE",
+          "matched_name": "UT Health East Texas",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "UT HEALTH EAST TEXAS PITTSBURG HOSPITAL",
+          "official_city": "PITTSBURG",
+          "matched_name": "UT Health East Texas",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "UT HEALTH EAST TEXAS QUITMAN HOSPITAL",
+          "official_city": "QUITMAN",
+          "matched_name": "UT Health East Texas",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "UT HEALTH EAST TEXAS REHABILITATION HOSPITAL",
+          "official_city": "TYLER",
+          "matched_name": "UT Health East Texas",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "UT HEALTH EAST TEXAS TYLER REGIONAL HOSPITAL",
+          "official_city": "TYLER",
+          "matched_name": "UT Health East Texas",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.888
+        },
+        {
+          "official_hospital": "UT SOUTHWESTERN MEDICAL CENTER UNIVERSITY HOSPITAL",
+          "official_city": "DALLAS",
+          "matched_name": "UT Southwestern Medical Center",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "UT SOUTHWESTERN UNIVERSITY HOSPITAL",
+          "official_city": "DALLAS",
+          "matched_name": "UT Southwestern Medical Center",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        }
+      ],
+      "notes": [
+        "Official CMS hospitals remain unmatched against current facilities/systems.",
+        "Low-confidence workflows are present and should be reviewed alongside coverage gaps.",
+        "Raw PDF header inference was included as additional evidence for facility coverage."
+      ]
+    },
+    {
+      "state": "VT",
+      "state_name": "Vermont",
+      "phase_1_scope_reason": "state directory exists under storage/raw and contains PDFs",
+      "raw_storage": {
+        "state": "VT",
+        "raw_pdf_file_count": 15,
+        "directory_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/storage/raw/vt"
+      },
+      "raw_pdf_snapshot": {
+        "inferred_facility_candidate_count": 10,
+        "parse_error_count": 0,
+        "parse_error_sample": []
+      },
+      "seed_snapshot": {
+        "seed_file_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/seeds/vermont-systems.json",
+        "system_count": 16,
+        "facility_count": 1,
+        "seed_url_count": 25,
+        "seed_error": null
+      },
+      "db": {
+        "system_count": 16,
+        "facility_count": 16,
+        "seed_url_count": 25,
+        "source_document_count": 159,
+        "pdf_source_document_count": 14,
+        "workflow_count": 171,
+        "low_confidence_count": 12,
+        "medium_confidence_count": 7,
+        "high_confidence_count": 152,
+        "low_confidence_rate": 0.07
+      },
+      "coverage": {
+        "official_provider_rows": 17,
+        "official_unique_hospital_identities": 17,
+        "exact_facility_matches": 9,
+        "exact_system_matches": 0,
+        "likely_matches": 2,
+        "possible_matches": 3,
+        "missing_hospitals": 3,
+        "exact_match_rate": 0.529,
+        "weighted_match_rate": 0.662
+      },
+      "recommendation": "not_ready",
+      "quality_against_national_strategy": {
+        "rollout_readiness": "not_ready",
+        "coverage_quality": "partial",
+        "workflow_quality": "strong",
+        "exact_coverage_percent": 52.9,
+        "weighted_coverage_percent": 66.2,
+        "low_confidence_workflow_percent": 7,
+        "summary": "State data quality is not yet good enough for the nationwide completeness strategy. VT has major coverage gaps.",
+        "strengths": [
+          "Low-confidence workflow rate is low at 7%.",
+          "Raw PDF evidence exists for this state (15 files)."
+        ],
+        "concerns": [
+          "Exact CMS hospital coverage is only 52.9% for VT.",
+          "Weighted coverage is only 66.2%, which means the roster mapping is still thin."
+        ],
+        "next_actions": [
+          "Backfill the 3 unmatched CMS hospital identities.",
+          "Review likely/possible roster matches and convert them into exact facility mappings."
+        ]
+      },
+      "missing_official_hospitals_sample": [
+        {
+          "official_hospital": "GIFFORD MEDICAL CENTER",
+          "official_city": "RANDOLPH",
+          "provider_numbers": [
+            "471301"
+          ]
+        },
+        {
+          "official_hospital": "PORTER HOSPITAL INC",
+          "official_city": "MIDDLEBURY",
+          "provider_numbers": [
+            "471307"
+          ]
+        },
+        {
+          "official_hospital": "VERMONT PSYCHIATRIC CARE HOSPITAL",
+          "official_city": "BERLIN",
+          "provider_numbers": [
+            "474004"
+          ]
+        }
+      ],
+      "possible_matches_sample": [
+        {
+          "official_hospital": "GRACE COTTAGE HOSPITAL",
+          "official_city": "TOWNSHEND",
+          "matched_name": "Grace Cottage Family Health & Hospital",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.783
+        },
+        {
+          "official_hospital": "NORTHWESTERN MEDICAL CENTER INC",
+          "official_city": "SAINT ALBANS",
+          "matched_name": "Northwestern Medical Center",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.725
+        },
+        {
+          "official_hospital": "UNIVERSITY OF VERMONT MEDICAL CENTER - TRANSPLANT",
+          "official_city": "BURLINGTON",
+          "matched_name": "The University of Vermont Medical Center",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 0.725
+        }
+      ],
+      "likely_matches_sample": [
+        {
+          "official_hospital": "MT ASCUTNEY HOSPITAL",
+          "official_city": "WINDSOR",
+          "matched_name": "Mt. Ascutney Hospital and Health Center",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        },
+        {
+          "official_hospital": "NORTH COUNTRY HOSPITAL AND HEALTH CENTER",
+          "official_city": "NEWPORT",
+          "matched_name": "North Country Hospital",
+          "matched_type": "facility",
+          "matched_city": null,
+          "matched_source": "db",
+          "similarity_score": 1
+        }
+      ],
+      "notes": [
+        "Official CMS hospitals remain unmatched against current facilities/systems.",
+        "Low-confidence workflows are present and should be reviewed alongside coverage gaps.",
+        "Raw PDF header inference was included as additional evidence for facility coverage."
+      ]
+    }
+  ],
+  "supplemental_crawl_states_without_raw_pdf_directory": [
+    {
+      "state": "DE",
+      "source_document_count": 170
+    }
+  ],
+  "overall_decision": {
+    "proceed_to_remaining_states": false,
+    "ready_states": 0,
+    "review_states": 2,
+    "not_ready_states": 4,
+    "average_weighted_match_rate": 0.488,
+    "summary": "At least one audited state falls short of the national completeness strategy.",
+    "rationale": "Coverage is still incomplete in at least some states; use the report as the remediation backlog."
+  }
+}

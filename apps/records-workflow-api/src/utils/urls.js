@@ -2,6 +2,7 @@ const HTML_WORKFLOW_PATTERNS = [
   /\bmedical[-\s]?records?\b/i,
   /\bhealth[-\s]?records?\b/i,
   /\bmedical[-\s]?information\b/i,
+  /\bhealthcare[-\s]?information\b/i,
   /\brequest(?:ing)?\b/i,
   /\bauthori[sz](?:ation|e)\b/i,
   /\brelease[-\s]*(?:of|for)?[-\s]*information\b/i,
@@ -32,6 +33,7 @@ const HTML_WORKFLOW_PATTERNS = [
 const SOURCE_MEDICAL_RECORD_PATTERNS = [
   /\bmedical[-\s]?records?\b/i,
   /\bhealth[-\s]?records?\b/i,
+  /\bhealthcare[-\s]?information\b/i,
   /\brelease[-\s]*(?:of|for)?[-\s]*information\b/i,
   /\bauthori[sz](?:ation|e)\b/i,
   /\brequest(?:ing)?\b.{0,40}\brecords?\b/i,
@@ -68,6 +70,7 @@ const MEDICAL_RECORDS_REQUEST_SUBJECT_PATTERNS = [
   /\broi\b/i,
   /\bmedical[-\s]?information\b/i,
   /\bhealth[-\s]?information\b/i,
+  /\bhealthcare[-\s]?information\b/i,
   /\bprotected health information\b/i,
   /\bphi\b/i,
   /\brelease[-\s]*(?:of|for)?[-\s]*information\b/i,
@@ -80,6 +83,7 @@ const MEDICAL_RECORDS_REQUEST_SUBJECT_PATTERNS = [
 
 const MEDICAL_RECORDS_PDF_STRONG_POSITIVE_PATTERNS = [
   /\bauthorization\s+(for|to)\s+(release|disclos(?:e|ure))\b[\s\S]{0,80}\b(medical|health)\s+(information|records?)\b/i,
+  /\bauthorization\s+(for|to)\s+(release|disclos(?:e|ure))\b[\s\S]{0,80}\bhealthcare\s+information\b/i,
   /\brequest\s+(for\s+)?(medical|health)\s+(information|records?)\b/i,
   /\brequest copies of (your )?(medical|health) records\b/i,
   /\brelease of information\b[\s\S]{0,80}\b(medical|health)\s+(information|records?)\b/i,
@@ -159,16 +163,42 @@ function hasMedicalRecordsRequestSignal(text) {
   );
 }
 
+function hasTrustedSourcePageContext({
+  sourceUrl = '',
+  sourceTitle = '',
+  sourceText = '',
+  sourceLinkText = '',
+  sourceLinkContext = ''
+}) {
+  const sourcePageHaystack = `${sourceUrl} ${sourceTitle} ${sourceText}`;
+  const sourceLinkHaystack = `${sourceLinkText} ${sourceLinkContext}`;
+  const combined = `${sourcePageHaystack} ${sourceLinkHaystack}`;
+
+  if (!matchesAny(sourcePageHaystack, SOURCE_MEDICAL_RECORD_PATTERNS)) {
+    return false;
+  }
+
+  if (matchesAny(sourceLinkHaystack || combined, MEDICAL_RECORDS_DOCUMENT_NEGATIVE_PATTERNS)) {
+    return false;
+  }
+
+  return (
+    hasMedicalRecordsRequestSignal(sourceLinkHaystack) ||
+    hasMedicalRecordsRequestSignal(combined)
+  );
+}
+
 export function isLikelyMedicalRecordsPdfLink({
   href,
   text = '',
+  contextText = '',
   sourceTitle = '',
   sourceText = ''
 }) {
   const normalized = normalizeUrl(href);
   if (!normalized || !looksLikePdf(normalized)) return false;
 
-  const haystack = `${normalized} ${text}`;
+  const haystack = `${normalized} ${text} ${contextText}`;
   if (matchesAny(haystack, MEDICAL_RECORDS_PDF_LINK_NEGATIVE_PATTERNS)) {
     return false;
   }
@@ -185,7 +215,12 @@ export function isMedicalRecordsRequestDocument({
   url = '',
   title = '',
   text = '',
-  links = []
+  links = [],
+  sourceUrl = '',
+  sourceTitle = '',
+  sourceText = '',
+  sourceLinkText = '',
+  sourceLinkContext = ''
 }) {
   const linkHaystack = links.map((link) => `${link.text || ''} ${link.href || ''}`).join(' ');
   const titleUrlHaystack = `${url} ${title}`;
@@ -195,7 +230,34 @@ export function isMedicalRecordsRequestDocument({
     return false;
   }
 
-  return hasMedicalRecordsRequestSignal(haystack);
+  if (hasMedicalRecordsRequestSignal(haystack)) {
+    return true;
+  }
+
+  return hasTrustedSourcePageContext({
+    sourceUrl,
+    sourceTitle,
+    sourceText,
+    sourceLinkText,
+    sourceLinkContext
+  });
+}
+
+export function classifyMedicalRecordsRequestDocument(args = {}) {
+  return {
+    accepted: isMedicalRecordsRequestDocument(args),
+    basis: hasMedicalRecordsRequestSignal(
+      `${args.url || ''} ${args.title || ''} ${args.text || ''} ${(
+        args.links || []
+      )
+        .map((link) => `${link.text || ''} ${link.href || ''}`)
+        .join(' ')}`
+    )
+      ? 'document_text'
+      : hasTrustedSourcePageContext(args)
+        ? 'context_verified'
+        : 'unverified'
+  };
 }
 
 export function normalizeUrl(rawUrl, baseUrl) {
@@ -217,6 +279,7 @@ export function hostFromUrl(value) {
 export function isLikelyWorkflowLink({
   href,
   text = '',
+  contextText = '',
   allowedDomain,
   approvedExternal = [],
   sourceTitle = '',
@@ -224,6 +287,16 @@ export function isLikelyWorkflowLink({
 }) {
   const normalized = normalizeUrl(href);
   if (!normalized) return false;
+
+  if (looksLikePdf(normalized)) {
+    return isLikelyMedicalRecordsPdfLink({
+      href: normalized,
+      text,
+      contextText,
+      sourceTitle,
+      sourceText
+    });
+  }
 
   const host = hostFromUrl(normalized);
   const sameDomain = host === allowedDomain || host.endsWith(`.${allowedDomain}`);
@@ -234,14 +307,5 @@ export function isLikelyWorkflowLink({
   if (!sameDomain && !externalAllowed) return false;
 
   const haystack = `${normalized} ${text}`;
-  if (looksLikePdf(normalized)) {
-    return isLikelyMedicalRecordsPdfLink({
-      href: normalized,
-      text,
-      sourceTitle,
-      sourceText
-    });
-  }
-
   return matchesAny(haystack, HTML_WORKFLOW_PATTERNS);
 }

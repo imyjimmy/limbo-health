@@ -1,3 +1,5 @@
+import { inferFacilityNameFromHeaderLines } from './pdfHeader.js';
+
 const MASS_GENERAL_BRIGHAM_DOCUMENT_FACILITY_CODES = {
   bwfh: "Brigham and Women's Faulkner Hospital",
   bwh: "Brigham and Women's Hospital",
@@ -76,12 +78,24 @@ function inferMassGeneralBrighamFacilityFromTitle(title = '') {
   return null;
 }
 
-export function inferFacilityNameFromDocument({ systemName = '', url = '', title = '' }) {
-  if ((systemName || '').trim().toLowerCase() !== 'mass general brigham') {
-    return null;
+export function inferFacilityNameFromDocument({
+  systemName = '',
+  url = '',
+  title = '',
+  headerLines = []
+}) {
+  const headerFacilityName = inferFacilityNameFromHeaderLines({ systemName, headerLines });
+  if (headerFacilityName) {
+    return headerFacilityName;
   }
 
-  return (
-    inferMassGeneralBrighamFacilityFromUrl(url) || inferMassGeneralBrighamFacilityFromTitle(title) || null
-  );
+  if ((systemName || '').trim().toLowerCase() === 'mass general brigham') {
+    return (
+      inferMassGeneralBrighamFacilityFromUrl(url) ||
+      inferMassGeneralBrighamFacilityFromTitle(title) ||
+      null
+    );
+  }
+
+  return null;
 }

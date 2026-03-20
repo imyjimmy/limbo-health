@@ -18,6 +18,62 @@ export async function upsertHospitalSystem({ systemName, domain, state = 'TX' },
   return result.rows[0];
 }
 
+export async function findHospitalSystemByDomain({ domain, state = 'TX' }, client = null) {
+  const normalizedState = normalizeStateCode(state) || 'TX';
+  if (!domain) return null;
+
+  const q = client || { query };
+  const result = await q.query(
+    `select id, system_name, canonical_domain, state
+     from hospital_systems
+     where state = $1
+       and canonical_domain = $2
+     limit 1`,
+    [normalizedState, domain]
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function findHospitalSystemByFacilityIdentity(
+  { state = 'TX', facilities = [] } = {},
+  client = null
+) {
+  const normalizedState = normalizeStateCode(state) || 'TX';
+  if (!Array.isArray(facilities) || facilities.length === 0) {
+    return null;
+  }
+
+  const q = client || { query };
+
+  for (const facility of facilities) {
+    const result = await q.query(
+      `select hs.id, hs.system_name, hs.canonical_domain, hs.state
+       from facilities f
+       join hospital_systems hs on hs.id = f.hospital_system_id
+       where hs.state = $1
+         and hs.active = true
+         and f.active = true
+         and f.facility_name = $2
+         and coalesce(f.city, '') = coalesce($3, '')
+         and f.state = $4
+       limit 1`,
+      [
+        normalizedState,
+        facility.facilityName,
+        facility.city || null,
+        normalizeStateCode(facility.state) || normalizedState
+      ]
+    );
+
+    if (result.rows[0]) {
+      return result.rows[0];
+    }
+  }
+
+  return null;
+}
+
 export async function findFacilityByIdentity(
   { hospitalSystemId, facilityName, city = null, state = 'TX' },
   client = null
@@ -222,6 +278,44 @@ export async function insertSourceDocument(
   );
 
   return result.rows[0].id;
+}
+
+export async function listPdfSourceDocumentsByState({ state }, client = null) {
+  const q = client || { query };
+  const normalizedState = normalizeStateCode(state);
+  const result = await q.query(
+    `select
+       sd.id,
+       sd.source_url,
+       sd.title,
+       sd.content_hash,
+       sd.storage_path,
+       hs.system_name,
+       hs.state as system_state,
+       f.facility_name
+     from source_documents sd
+     join hospital_systems hs on hs.id = sd.hospital_system_id
+     left join facilities f on f.id = sd.facility_id
+     where sd.source_type = 'pdf'
+       and hs.state = $1
+     order by hs.system_name, sd.source_url`,
+    [normalizedState]
+  );
+
+  return result.rows;
+}
+
+export async function updateSourceDocumentStoragePath(
+  { sourceDocumentId, storagePath },
+  client = null
+) {
+  const q = client || { query };
+  await q.query(
+    `update source_documents
+     set storage_path = $2
+     where id = $1`,
+    [sourceDocumentId, storagePath]
+  );
 }
 
 export async function insertExtractionRun(

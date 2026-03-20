@@ -1,0 +1,52 @@
+[
+  {
+    "system_name": "Lawrence Memorial Hospital",
+    "state": "KS",
+    "domain": "lmh.org",
+    "seed_urls": [
+      "https://www.lmh.org/patients-visitors/medical-records/",
+      "https://www.lmh.org/patients-visitors/medical-records/#Content",
+      "https://www.lmh.org/patients-visitors/my-patient-portal/",
+      "https://www.lmh.org/patients-visitors/medical-records/release-of-information/",
+      "https://www.lmh.org/app/files/public/7aaf36a4-0f23-429d-a969-ff31ec420234/Release%20of%20Information_PHI%208120-0328.pdf",
+      "https://www.lmh.org/app/files/public/6dc348e8-3522-4943-a889-dc08e6024ec1/Release%20of%20Information_PHI_Spanish%208120-0328.pdf"
+    ]
+  },
+  {
+    "system_name": "NKC Health",
+    "state": "KS",
+    "domain": "nkchealth.org",
+    "seed_urls": [
+      "https://www.nkchealth.org/patients-and-guests/for-patients/after-your-visit/your-medical-record",
+      "https://www.nkchealth.org/patients-and-guests/for-patients/after-your-visit/your-medical-record#block-hg-webdv-child-content",
+      "https://www.nkchealth.org/patients-and-guests/for-patients/after-your-visit/your-medical-record#",
+      "https://northkansascityhospital.consumeridp.us-1.healtheintent.com/saml2/sso/login?authenticationRequestId=936f8a9c-68fe-4fd3-b1b6-e54d77a68b83",
+      "https://www.nkchealth.org/patients-and-guests/for-patients/after-your-visit/your-medical-record/patient-portal",
+      "https://www.nkchealth.org/patients-and-guests/for-patients/after-your-visit/your-medical-record/health-information-exchange"
+    ]
+  },
+  {
+    "system_name": "Requesting Medical Records At The University of Kansas Health System",
+    "state": "KS",
+    "domain": "kansashealthsystem.com",
+    "seed_urls": [
+      "https://www.kansashealthsystem.com/patient-visitor/patient-guide/medical-records",
+      "https://www.kansashealthsystem.com/patient-visitor/patient-guide/medical-records#main",
+      "https://www.kansashealthsystem.com/patient-visitor/patient-guide/medical-records#",
+      "https://mychart.kansashealthsystem.com/MyChart/",
+      "https://www.kansashealthsystem.com/patient-visitor/mychart-information",
+      "https://mychart.kansashealthsystem.com/MyChart/billing/guestpay/payasguest?mobile=0"
+    ]
+  },
+  {
+    "system_name": "St. Francis Campus KU Health System",
+    "state": "KS",
+    "domain": "kutopeka.com",
+    "seed_urls": [
+      "https://kutopeka.com/patients-and-visitors/request-medical-records/",
+      "https://mychart.kutopeka.com/Authentication/Login?",
+      "https://kutopeka.com/patients-and-visitors/request-medical-records/#",
+      "https://mychart.kutopeka.com/"
+    ]
+  }
+]
