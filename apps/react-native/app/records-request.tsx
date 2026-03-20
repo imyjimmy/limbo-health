@@ -2,7 +2,6 @@ import React, {
   startTransition,
   useDeferredValue,
   useEffect,
-  useMemo,
   useState,
 } from 'react';
 import {
@@ -25,7 +24,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HospitalSystemLogo } from '../components/records/HospitalSystemLogo';
 import { RequestStepper } from '../components/records/RequestStepper';
 import { fetchHospitalSystems, fetchRecordsRequestPacket } from '../core/recordsWorkflow/api';
-import { generateRecordsRequestPdf } from '../core/recordsWorkflow/pdf';
+import {
+  generateRecordsRequestPdf,
+  prefetchRecordsRequestPdfTemplate,
+} from '../core/recordsWorkflow/pdf';
 import { useCamera } from '../hooks/useCamera';
 import { useBioProfile } from '../providers/BioProfileProvider';
 import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
@@ -66,6 +68,11 @@ export default function RecordsRequestScreen() {
   const [idAttachment, setIdAttachment] = useState<RecordsRequestIdAttachment | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [generatedPdfUri, setGeneratedPdfUri] = useState<string | null>(null);
+  const [templatePrefetchState, setTemplatePrefetchState] = useState<
+    'idle' | 'loading' | 'ready' | 'error'
+  >('idle');
+  const [prefetchedFormName, setPrefetchedFormName] = useState<string | null>(null);
+  const [templatePrefetchError, setTemplatePrefetchError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +82,7 @@ export default function RecordsRequestScreen() {
       setSystemsError(null);
 
       try {
-        const results = await fetchHospitalSystems();
+        const results = await fetchHospitalSystems(deferredSearchQuery);
         if (!cancelled) {
           setSystems(results);
         }
@@ -97,19 +104,39 @@ export default function RecordsRequestScreen() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [deferredSearchQuery]);
 
-  const filteredSystems = useMemo(() => {
-    const query = deferredSearchQuery.trim().toLowerCase();
-    if (!query) return systems;
+  useEffect(() => {
+    if (!packet || !packet.forms.some((form) => form.format === 'pdf')) {
+      setTemplatePrefetchState('idle');
+      setPrefetchedFormName(null);
+      setTemplatePrefetchError(null);
+      return;
+    }
 
-    return systems.filter((system) => {
-      return [system.name, system.domain ?? '', system.state]
-        .join(' ')
-        .toLowerCase()
-        .includes(query);
-    });
-  }, [deferredSearchQuery, systems]);
+    let cancelled = false;
+    setTemplatePrefetchState('loading');
+    setPrefetchedFormName(null);
+    setTemplatePrefetchError(null);
+
+    prefetchRecordsRequestPdfTemplate(packet)
+      .then((result) => {
+        if (cancelled) return;
+        setTemplatePrefetchState('ready');
+        setPrefetchedFormName(result.formName);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setTemplatePrefetchState('error');
+        setTemplatePrefetchError(
+          error instanceof Error ? error.message : 'Unable to cache the hospital PDF yet.',
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [packet]);
 
   if (bioStatus === 'loading') {
     return (
@@ -133,6 +160,9 @@ export default function RecordsRequestScreen() {
     setPacket(null);
     setPacketError(null);
     setGeneratedPdfUri(null);
+    setTemplatePrefetchState('idle');
+    setPrefetchedFormName(null);
+    setTemplatePrefetchError(null);
     setPacketLoading(true);
 
     try {
@@ -350,7 +380,7 @@ export default function RecordsRequestScreen() {
               </View>
             ) : (
               <View style={styles.systemList}>
-                {filteredSystems.map((system) => {
+                {systems.map((system) => {
                   const isSelected = selectedSystem?.id === system.id;
                   return (
                     <Pressable
@@ -373,7 +403,7 @@ export default function RecordsRequestScreen() {
                   );
                 })}
 
-                {filteredSystems.length === 0 && (
+                {systems.length === 0 && (
                   <Text style={styles.emptyStateText}>No hospital systems matched that search.</Text>
                 )}
               </View>
@@ -404,6 +434,19 @@ export default function RecordsRequestScreen() {
                         ? `${packet.forms.length} official form link${packet.forms.length === 1 ? '' : 's'} found`
                         : 'No official form links attached'}
                     </Text>
+                    {templatePrefetchState === 'loading' && (
+                      <Text style={styles.selectionSummaryMeta}>
+                        Fetching the hospital PDF into memory for faster filling...
+                      </Text>
+                    )}
+                    {templatePrefetchState === 'ready' && prefetchedFormName && (
+                      <Text style={styles.selectionSummaryMeta}>
+                        Cached {prefetchedFormName} and kept it ready in memory.
+                      </Text>
+                    )}
+                    {templatePrefetchState === 'error' && templatePrefetchError && (
+                      <Text style={styles.errorInlineText}>{templatePrefetchError}</Text>
+                    )}
                   </>
                 )}
               </View>
@@ -552,11 +595,15 @@ export default function RecordsRequestScreen() {
                 packet.forms.map((form) => (
                   <Pressable
                     key={`${form.name}:${form.url}`}
-                    onPress={() => Linking.openURL(form.url)}
+                    onPress={() => Linking.openURL(form.cachedContentUrl || form.url)}
                     style={({ pressed }) => [styles.linkRow, pressed && styles.systemCardPressed]}
                   >
                     <Text style={styles.linkText}>{form.name}</Text>
-                    <Text style={styles.linkMeta}>{form.format?.toUpperCase() || 'LINK'}</Text>
+                    <Text style={styles.linkMeta}>
+                      {form.cachedContentUrl
+                        ? 'CACHED PDF'
+                        : form.format?.toUpperCase() || 'LINK'}
+                    </Text>
                   </Pressable>
                 ))
               ) : (

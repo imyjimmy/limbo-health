@@ -127,8 +127,17 @@ function mapHospitalSystem(system: ApiHospitalSystem): HospitalSystemOption {
   };
 }
 
-export async function fetchHospitalSystems(): Promise<HospitalSystemOption[]> {
-  const data = await fetchJson<{ results: ApiHospitalSystem[] }>('/hospital-systems');
+export async function fetchHospitalSystems(searchQuery = ''): Promise<HospitalSystemOption[]> {
+  const trimmedQuery = searchQuery.trim();
+  const params = new URLSearchParams();
+  if (trimmedQuery) {
+    params.set('q', trimmedQuery);
+  }
+
+  const suffix = params.toString();
+  const data = await fetchJson<{ results: ApiHospitalSystem[] }>(
+    `/hospital-systems${suffix ? `?${suffix}` : ''}`,
+  );
   return data.results.map(mapHospitalSystem);
 }
 

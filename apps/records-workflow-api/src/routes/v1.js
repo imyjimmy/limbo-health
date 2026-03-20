@@ -8,6 +8,7 @@ import {
   listHospitalSystems,
   searchFacilities
 } from '../repositories/workflowRepository.js';
+import { resolveRawStoragePath } from '../utils/rawStorage.js';
 
 export const publicRouter = Router();
 export const v1Router = publicRouter;
@@ -81,7 +82,8 @@ publicRouter.get('/source-documents/:id/content', async (req, res) => {
       return res.status(404).json({ error: 'Source document not found.' });
     }
 
-    await fs.access(sourceDocument.storage_path);
+    const resolvedStoragePath = resolveRawStoragePath(sourceDocument.storage_path);
+    await fs.access(resolvedStoragePath);
 
     if (sourceDocument.source_type === 'pdf') {
       res.type('application/pdf');
@@ -89,7 +91,7 @@ publicRouter.get('/source-documents/:id/content', async (req, res) => {
       res.type('text/html; charset=utf-8');
     }
 
-    return res.sendFile(sourceDocument.storage_path);
+    return res.sendFile(resolvedStoragePath);
   } catch (error) {
     console.error('Failed to fetch source document content:', error);
     return res.status(500).json({ error: 'Failed to fetch source document content.' });

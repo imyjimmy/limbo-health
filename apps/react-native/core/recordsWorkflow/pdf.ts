@@ -21,7 +21,14 @@ interface GenerateRecordsRequestPdfInput {
   idAttachment: RecordsRequestIdAttachment | null;
 }
 
+interface PreparedRecordsRequestPdfTemplate {
+  form: RecordsWorkflowForm;
+  pdfBytes: Uint8Array;
+  fieldCount: number;
+}
+
 const pdfTheme = resolveTheme(ACTIVE_THEME_NAME, 'light');
+const preparedTemplateCache = new Map<string, Promise<PreparedRecordsRequestPdfTemplate>>();
 
 function normalizeFieldName(value: string): string {
   return value
@@ -179,18 +186,47 @@ async function appendIdPage(pdf: PDFDocument, idAttachment: RecordsRequestIdAtta
   });
 }
 
-async function loadFormCandidate(form: RecordsWorkflowForm) {
-  const downloadUrl = form.cachedContentUrl || form.url;
+function buildTemplateCacheKey(form: RecordsWorkflowForm) {
+  return form.cachedContentUrl || form.url;
+}
+
+async function prepareFormTemplate(form: RecordsWorkflowForm): Promise<PreparedRecordsRequestPdfTemplate> {
+  const downloadUrl = buildTemplateCacheKey(form);
   const response = await fetch(downloadUrl);
 
   if (!response.ok) {
     throw new Error(`Unable to download ${form.name}.`);
   }
 
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const pdfBytes = new Uint8Array(await response.arrayBuffer());
+  const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
 
-  return { form, pdf };
+  return {
+    form,
+    pdfBytes,
+    fieldCount: pdf.getForm().getFields().length,
+  };
+}
+
+async function loadPreparedFormTemplate(form: RecordsWorkflowForm): Promise<PreparedRecordsRequestPdfTemplate> {
+  const cacheKey = buildTemplateCacheKey(form);
+  let cachedPromise = preparedTemplateCache.get(cacheKey);
+
+  if (!cachedPromise) {
+    cachedPromise = prepareFormTemplate(form).catch((error) => {
+      preparedTemplateCache.delete(cacheKey);
+      throw error;
+    });
+    preparedTemplateCache.set(cacheKey, cachedPromise);
+  }
+
+  const prepared = await cachedPromise;
+
+  return {
+    form: prepared.form,
+    pdfBytes: prepared.pdfBytes.slice(),
+    fieldCount: prepared.fieldCount,
+  };
 }
 
 async function chooseFillablePdfForm(forms: RecordsWorkflowForm[]) {
@@ -204,11 +240,10 @@ async function chooseFillablePdfForm(forms: RecordsWorkflowForm[]) {
 
   for (const candidate of candidates) {
     try {
-      const loaded = await loadFormCandidate(candidate);
-      const fieldCount = loaded.pdf.getForm().getFields().length;
+      const prepared = await loadPreparedFormTemplate(candidate);
 
-      if (fieldCount > 0) {
-        return loaded;
+      if (prepared.fieldCount > 0) {
+        return prepared;
       }
 
       flatFormDetected = true;
@@ -226,8 +261,19 @@ async function chooseFillablePdfForm(forms: RecordsWorkflowForm[]) {
   throw lastError || new Error('Unable to load a fillable hospital PDF form.');
 }
 
+export async function prefetchRecordsRequestPdfTemplate(packet: RecordsRequestPacket) {
+  const prepared = await chooseFillablePdfForm(packet.forms);
+
+  return {
+    formName: prepared.form.name,
+    usedCachedTemplate: Boolean(prepared.form.cachedContentUrl),
+  };
+}
+
 export async function generateRecordsRequestPdf(input: GenerateRecordsRequestPdfInput) {
-  const { form: selectedForm, pdf } = await chooseFillablePdfForm(input.packet.forms);
+  const preparedTemplate = await chooseFillablePdfForm(input.packet.forms);
+  const selectedForm = preparedTemplate.form;
+  const pdf = await PDFDocument.load(preparedTemplate.pdfBytes, { ignoreEncryption: true });
   const { form, fieldCount, filledCount } = fillBioFields(pdf, input.bioProfile);
 
   if (fieldCount === 0 || filledCount === 0) {

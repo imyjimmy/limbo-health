@@ -9,7 +9,23 @@ describe('records workflow API client', () => {
     vi.restoreAllMocks();
   });
 
-  it('requests hospital systems from /api/records-workflow', async () => {
+  it.each([
+    ['MultiCare', 'https://limbo.health/api/records-workflow/hospital-systems?q=MultiCare'],
+    ['multi care', 'https://limbo.health/api/records-workflow/hospital-systems?q=multi+care'],
+    ['multicare', 'https://limbo.health/api/records-workflow/hospital-systems?q=multicare'],
+    [
+      'Mass General Brigham',
+      'https://limbo.health/api/records-workflow/hospital-systems?q=Mass+General+Brigham',
+    ],
+    [
+      'Baylor Scott & White',
+      'https://limbo.health/api/records-workflow/hospital-systems?q=Baylor+Scott+%26+White',
+    ],
+    [
+      "St. David's",
+      'https://limbo.health/api/records-workflow/hospital-systems?q=St.+David%27s',
+    ],
+  ])('requests hospital systems from /api/records-workflow for %s', async (searchTerm, expectedUrl) => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ results: [] }), {
         status: 200,
@@ -19,10 +35,8 @@ describe('records workflow API client', () => {
 
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(fetchHospitalSystems()).resolves.toEqual([]);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://limbo.health/api/records-workflow/hospital-systems',
-    );
+    await expect(fetchHospitalSystems(searchTerm)).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith(expectedUrl);
   });
 
   it('maps cached document URLs onto the API host', async () => {

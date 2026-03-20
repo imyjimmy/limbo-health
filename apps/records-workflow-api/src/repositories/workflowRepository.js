@@ -1,5 +1,7 @@
+import path from 'node:path';
 import { query, withTransaction } from '../db.js';
 import { normalizeStateCode } from '../utils/states.js';
+import { collapseWhitespace, uniqueBy } from '../utils/text.js';
 
 export async function upsertHospitalSystem({ systemName, domain, state = 'TX' }, client = null) {
   const q = client || { query };
@@ -849,50 +851,166 @@ async function getWorkflowArtifacts(recordsWorkflowId) {
   };
 }
 
-async function attachCachedDocumentsToForms(forms = []) {
-  const pdfUrls = Array.from(
-    new Set(
-      forms
-        .filter((form) => form?.url && form.format === 'pdf')
-        .map((form) => form.url)
-    )
-  );
+function normalizeComparableUrl(value) {
+  if (!value) return '';
 
-  if (pdfUrls.length === 0) {
-    return forms.map((form) => ({
-      ...form,
-      cached_source_document_id: null,
-      cached_content_url: null
-    }));
+  try {
+    const normalized = new URL(value);
+    normalized.hash = '';
+    normalized.search = '';
+    normalized.pathname = normalized.pathname.replace(/\/+$/, '') || '/';
+    return normalized.toString();
+  } catch {
+    return String(value || '')
+      .trim()
+      .replace(/[?#].*$/, '')
+      .replace(/\/+$/, '')
+      .toLowerCase();
+  }
+}
+
+function normalizeComparableLabel(value) {
+  return collapseWhitespace(String(value || ''))
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function toCachedContentUrl(sourceDocumentId) {
+  return `/api/records-workflow/source-documents/${sourceDocumentId}/content`;
+}
+
+function buildCachedDocumentFormName(document = {}) {
+  const title = collapseWhitespace(document.title || '');
+  if (title) {
+    return title;
+  }
+
+  const sourceUrlName = (() => {
+    try {
+      const normalized = new URL(document.source_url || '');
+      return decodeURIComponent(path.basename(normalized.pathname || ''));
+    } catch {
+      return path.basename(document.source_url || '');
+    }
+  })();
+  const storageName = path.basename(document.storage_path || '');
+  const bestName = sourceUrlName || storageName || 'Authorization Form';
+
+  return collapseWhitespace(bestName.replace(/\.pdf$/i, '').replace(/[-_]+/g, ' '));
+}
+
+async function listCachedPdfSourceDocuments({ hospitalSystemId, facilityId = undefined } = {}) {
+  if (!hospitalSystemId) return [];
+
+  const params = [hospitalSystemId];
+  let facilityClause = 'and facility_id is null';
+  let orderBy = 'order by fetched_at desc, source_url asc';
+
+  if (typeof facilityId === 'string' && facilityId) {
+    params.push(facilityId);
+    facilityClause = 'and (facility_id = $2 or facility_id is null)';
+    orderBy =
+      'order by case when facility_id = $2 then 0 else 1 end, fetched_at desc, source_url asc';
   }
 
   const result = await query(
-    `select distinct on (source_url)
+    `select
        id,
+       facility_id,
        source_url,
-       source_type,
+       title,
        storage_path,
        fetched_at
      from source_documents
-     where source_url = any($1)
+     where hospital_system_id = $1
+       ${facilityClause}
        and source_type = 'pdf'
        and storage_path is not null
-     order by source_url asc, fetched_at desc`,
-    [pdfUrls]
+       and storage_path <> ''
+     ${orderBy}`,
+    params
   );
 
-  const byUrl = new Map(result.rows.map((row) => [row.source_url, row]));
+  return uniqueBy(result.rows, (row) => normalizeComparableUrl(row.source_url) || row.id);
+}
 
-  return forms.map((form) => {
-    const cached = byUrl.get(form.url);
+async function attachCachedDocumentsToForms(
+  forms = [],
+  { hospitalSystemId, facilityId = undefined } = {}
+) {
+  const cachedDocuments = await listCachedPdfSourceDocuments({ hospitalSystemId, facilityId });
+  const normalizedFormUrls = new Set(
+    forms.map((form) => normalizeComparableUrl(form?.url)).filter(Boolean)
+  );
+
+  const cachedDocumentsWithNames = cachedDocuments.map((document) => ({
+    ...document,
+    derived_form_name: buildCachedDocumentFormName(document)
+  }));
+  const byExactUrl = new Map(
+    cachedDocumentsWithNames.map((document) => [document.source_url, document])
+  );
+  const byNormalizedUrl = new Map(
+    cachedDocumentsWithNames.map((document) => [
+      normalizeComparableUrl(document.source_url),
+      document
+    ])
+  );
+  const byNormalizedName = new Map();
+
+  for (const document of cachedDocumentsWithNames) {
+    const normalizedName = normalizeComparableLabel(document.derived_form_name);
+    if (!normalizedName) continue;
+    if (!byNormalizedName.has(normalizedName)) {
+      byNormalizedName.set(normalizedName, []);
+    }
+    byNormalizedName.get(normalizedName).push(document);
+  }
+
+  const matchedDocumentIds = new Set();
+  const hydratedForms = forms.map((form) => {
+    const normalizedFormUrl = normalizeComparableUrl(form?.url);
+    const normalizedFormName = normalizeComparableLabel(form?.name);
+    let cached =
+      byExactUrl.get(form?.url) ||
+      byNormalizedUrl.get(normalizedFormUrl);
+
+    if (!cached && form?.format === 'pdf' && normalizedFormName) {
+      const nameMatches = byNormalizedName.get(normalizedFormName) || [];
+      if (nameMatches.length === 1) {
+        cached = nameMatches[0];
+      }
+    }
+
+    if (cached?.id) {
+      matchedDocumentIds.add(cached.id);
+    }
+
     return {
       ...form,
       cached_source_document_id: cached?.id || null,
-      cached_content_url: cached
-        ? `/api/records-workflow/source-documents/${cached.id}/content`
-        : null
+      cached_content_url: cached ? toCachedContentUrl(cached.id) : null
     };
   });
+
+  const fallbackForms = cachedDocumentsWithNames
+    .filter((document) => !matchedDocumentIds.has(document.id))
+    .filter((document) => {
+      const normalizedSourceUrl = normalizeComparableUrl(document.source_url);
+      return !normalizedSourceUrl || !normalizedFormUrls.has(normalizedSourceUrl);
+    })
+    .map((document) => ({
+      name: document.derived_form_name,
+      url: document.source_url,
+      format: 'pdf',
+      cached_source_document_id: document.id,
+      cached_content_url: toCachedContentUrl(document.id)
+    }));
+
+  return [...hydratedForms, ...fallbackForms];
 }
 
 function buildFormalMethods(medicalWorkflow) {
@@ -1063,7 +1181,10 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
   const workflows = workflowsRes.rows;
   const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
   const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
-  const forms = await attachCachedDocumentsToForms(artifacts.forms);
+  const forms = await attachCachedDocumentsToForms(artifacts.forms, {
+    hospitalSystemId: facility.hospital_system_id,
+    facilityId: facility.id
+  });
   const portal = portalRes.rows[0] || null;
 
   return buildRequestPacket({
@@ -1129,7 +1250,9 @@ export async function getSystemRequestPacket(systemId) {
   const workflows = workflowsRes.rows;
   const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
   const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
-  const forms = await attachCachedDocumentsToForms(artifacts.forms);
+  const forms = await attachCachedDocumentsToForms(artifacts.forms, {
+    hospitalSystemId: systemId
+  });
   const portal = portalRes.rows[0] || null;
 
   return buildRequestPacket({
