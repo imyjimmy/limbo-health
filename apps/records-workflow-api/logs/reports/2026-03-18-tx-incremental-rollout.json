@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-03-19T05:25:43.775Z",
+  "mode": "incremental_real_rollout",
+  "state": "TX",
+  "roster_file_path": "/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/records-workflow-api/data/national-roster/cms-pos-q4-2025-active-hospitals.json",
+  "minimum_confidence": "high",
+  "chunk_size": 25,
+  "concurrency": 2,
+  "official_hospital_identities": 594,
+  "baseline": {
+    "db": {
+      "systems": 25,
+      "seeds": 29,
+      "source_documents": 427,
+      "pdf_source_documents": 23,
+      "workflows": 494
+    },
+    "raw_pdf_files": [
+      "baylor-scott-and-white-health-authorization-for-release-of-EN.pdf",
+      "baylor-scott-and-white-health-authorization-for-release-of-ES.pdf",
+      "baylor-scott-and-white-health-authorization-for-release-of-medical-information-EN.pdf",
+      "baylor-scott-and-white-health-autorizacion-para-la-divulgacion-de-informacion-medica-ES.pdf",
+      "christus-health-information-via-my-csv-folder-patient-portal-to-the-designated-proxy-EN.pdf",
+      "christus-health-patient-request-for-health-information-EN.pdf",
+      "houston-methodist-i-hereby-authorize-houston-methodist-at-EN.pdf",
+      "i-authorize-gerald-champion-regional-medical-center-gcrmc-to-disclose-the-health-information-of-the-above-authorization-for-the-disclosure-of-protected-health-information-EN.pdf",
+      "memorial-hermann-health-system-authorization-for-the-release-of-medical-or-other-information-EN.pdf",
+      "memorial-hermann-health-system-patient-request-to-have-medical-records-transferred-EN.pdf",
+      "memorial-hermann-health-system-patient-request-to-have-medical-records-transferred-ES.pdf",
+      "memorial-hermann-health-system-patient-right-to-access-request-for-medical-records-EN.pdf",
+      "memorial-hermann-health-system-patient-right-to-access-request-for-medical-records-ES.pdf",
+      "st-david-s-medical-center-authorization-for-release-of-phi-protected-health-information-EN.pdf",
+      "st-david-s-medical-center-authorization-for-release-of-phi-protected-health-information-ES.pdf",
+      "texas-health-resources-authorization-for-release-of-patient-information-EN.pdf",
+      "texas-health-resources-authorization-for-release-of-patient-information-ES.pdf",
+      "texas-health-resources-authorization-for-release-of-patient-substance-use-disorder-records-EN.pdf",
+      "texas-health-resources-authorization-for-release-of-patient-substance-use-disorder-records-ES.pdf",
+      "ut-health-east-texas-patient-request-for-ES.pdf",
+      "ut-health-east-texas-patient-request-for-health-information-EN.pdf",
+      "ut-southwestern-medical-center-authorization-to-disclose-EN.pdf",
+      "ut-southwestern-medical-center-autorizacion-para-revelar-ES.pdf"
+    ],
+    "raw_pdf_file_count": 23
+  },
+  "chunks": [],
+  "final_audit": null,
+  "final_snapshot": null,
+  "comparison": null
+}

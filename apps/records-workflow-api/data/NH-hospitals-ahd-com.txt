@@ -1,0 +1,22 @@
+tatistics for non-federal, short-term, acute care hospitals.
+Data are based on each hospital's most recent cost report and other sources / Definitions
+Hospital Name	City	Staffed
+Beds	Total
+Discharges	Patient
+Days	Gross Patient
+Revenue ($000)
+Catholic Medical Center	Manchester	262	9,163	48,392	$1,732,278
+Cheshire Medical Center	Keene	110	4,303	15,954	$1,121,011
+Concord Hospital	Concord	221	11,774	64,490	$2,198,293
+Concord Hospital-Laconia	Laconia	86	3,264	14,523	$470,888
+Dartmouth Hitchcock Medical Center	Lebanon	506	23,096	139,881	$6,122,190
+Elliot Hospital	Manchester	260	15,338	71,082	$2,115,908
+Exeter Hospital	Exeter	98	5,297	25,291	$1,029,243
+Frisbie Memorial Hospital	Rochester	68	1,077	3,955	$375,925
+Manchester VA Medical Center	Manchester	0	0	0	$0
+Parkland Medical Center	Derry	86	3,735	15,348	$1,044,143
+Portsmouth Regional Hospital	Portsmouth	219	13,500	54,232	$2,702,158
+Saint Joseph Hospital	Nashua	208	4,672	24,053	$993,069
+Southern New Hampshire Medical Center	Nashua	158	7,015	33,578	$1,196,056
+Wentworth-Douglass Hospital	Dover	118	9,007	43,891	$2,240,097
+TOTAL	 	2,400	111,241	554,670	$23,341,258
