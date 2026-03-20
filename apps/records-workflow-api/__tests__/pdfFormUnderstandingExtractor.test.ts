@@ -224,6 +224,110 @@ describe('pdfFormUnderstandingExtractor', () => {
     });
   });
 
+  it('splits grouped BSWH text fields and recovers missing widget-backed follow-ups', async () => {
+    vi.mocked(extractPdfFormUnderstandingWithOpenAI).mockResolvedValue({
+      responseId: 'resp_bswh',
+      usage: { total_tokens: 654 },
+      output: {
+        mode: 'acroform',
+        template_id: null,
+        confidence: 0.97,
+        questions: [
+          {
+            id: 'treatment_dates',
+            label: 'Please specify treatment date range (if applicable)',
+            kind: 'short_text',
+            required: false,
+            help_text: 'Enter from and to dates for records to be released.',
+            confidence: 0.95,
+            bindings: [
+              {
+                type: 'field_text',
+                field_name: 'treatment date from',
+              },
+              {
+                type: 'field_text',
+                field_name: 'treatment date to',
+              },
+            ],
+            options: [],
+          },
+          {
+            id: 'special_categories',
+            label: 'If applicable, specify below if releasing Genetics or HIV/AIDS info',
+            kind: 'short_text',
+            required: false,
+            help_text: 'Fill in only if releasing these sensitive categories.',
+            confidence: 0.92,
+            bindings: [
+              {
+                type: 'field_text',
+                field_name: 'Genetics',
+              },
+              {
+                type: 'field_text',
+                field_name: 'HIV',
+              },
+            ],
+            options: [],
+          },
+        ],
+      },
+    });
+
+    const result = await extractPdfFormUnderstanding({
+      parsedPdf: {
+        title: 'Authorization for Release of Medical Information',
+        text: '',
+        headerText: 'Authorization',
+        pages: [
+          {
+            pageIndex: 0,
+            width: 612,
+            height: 792,
+            words: [],
+            widgets: [
+              { fieldName: 'Clinic visits', fieldType: 'CheckBox', x: 298, y: 352, width: 10, height: 10 },
+              { fieldName: 'Hospital visits', fieldType: 'CheckBox', x: 360, y: 352, width: 10, height: 10 },
+              { fieldName: 'specify provider', fieldType: 'CheckBox', x: 433, y: 353, width: 10, height: 10 },
+              { fieldName: 'Specify provider fill', fieldType: 'Text', x: 443, y: 352, width: 151, height: 11 },
+              { fieldName: 'Alcohol/Drug', fieldType: 'Text', x: 224, y: 316, width: 37, height: 16 },
+              { fieldName: 'Genetics', fieldType: 'Text', x: 325, y: 316, width: 37, height: 16 },
+              { fieldName: 'HIV', fieldType: 'Text', x: 409, y: 316, width: 37, height: 16 },
+              { fieldName: 'Mental Health', fieldType: 'Text', x: 496, y: 316, width: 37, height: 16 },
+            ],
+            lineCandidates: [],
+            checkboxCandidates: [],
+          },
+        ],
+      },
+      hospitalSystemName: 'Baylor Scott & White Health',
+      facilityName: null,
+      formName: 'Authorization for Release of Medical Information',
+      sourceUrl: 'https://example.org/bswh.pdf',
+      promptProfile: 'expanded',
+      maxInputTokens: 20000,
+    });
+
+    expect(result.status).toBe('success');
+
+    const questions = result.structuredOutput.form_understanding.questions;
+    const labels = questions.map((question) => question.label);
+
+    expect(labels).toContain('Information to be released from these BSWH facilities');
+    expect(labels).toContain('If selected, specify provider or location');
+    expect(labels).toContain('Treatment date from');
+    expect(labels).toContain('Treatment date to');
+    expect(labels).toContain('If applicable, enter patient initials for Alcohol/Drug information');
+    expect(labels).toContain('If applicable, enter patient initials for Genetics information');
+    expect(labels).toContain('If applicable, enter patient initials for HIV/AIDS information');
+    expect(labels).toContain('If applicable, enter patient initials for Mental Health information');
+    expect(labels).not.toContain('Please specify treatment date range (if applicable)');
+    expect(labels).not.toContain(
+      'If applicable, specify below if releasing Genetics or HIV/AIDS info',
+    );
+  });
+
   it('returns a partial payload instead of calling OpenAI when the prompt stays over budget', async () => {
     const result = await extractPdfFormUnderstanding({
       parsedPdf: {
