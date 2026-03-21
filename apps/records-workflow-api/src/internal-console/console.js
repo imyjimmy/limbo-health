@@ -149,6 +149,7 @@ const state = {
   selectedSystemDetail: null,
   runHistory: null,
   runHistoryFilterSystemId: '',
+  expandedRunHistoryIds: new Set(),
   systemFilter: '',
   systemSortKey: 'system_name',
   systemSortDirection: 'asc',
@@ -406,6 +407,129 @@ function formatSignedDelta(value) {
   if (number > 0) return `+${formatNumber(number)}`;
   if (number < 0) return `-${formatNumber(Math.abs(number))}`;
   return '0';
+}
+
+function isRunHistoryExpanded(runId) {
+  return Boolean(runId) && state.expandedRunHistoryIds.has(runId);
+}
+
+function toggleRunHistoryExpanded(runId) {
+  if (!runId) return;
+
+  if (state.expandedRunHistoryIds.has(runId)) {
+    state.expandedRunHistoryIds.delete(runId);
+  } else {
+    state.expandedRunHistoryIds.add(runId);
+  }
+
+  renderRunHistoryList();
+}
+
+function formatHistoryValue(value) {
+  if (value == null || value === '') return 'n/a';
+  if (typeof value === 'number') return formatNumber(value);
+  return String(value);
+}
+
+function renderRunHistorySnapshotSection(run) {
+  const beforeSnapshot = run.before_snapshot || {};
+  const afterSnapshot = run.after_snapshot || {};
+  const snapshotMetrics = [
+    ['source_documents', 'Source Docs'],
+    ['parsed_artifacts', 'Parsed'],
+    ['workflows', 'Workflows'],
+    ['pdf_source_documents', 'PDFs'],
+    ['parse_failures', 'Parse Failures'],
+    ['draft_templates', 'Drafts'],
+  ];
+
+  return `
+    <section class="history-detail-panel">
+      <div class="history-detail-title">Before vs After</div>
+      <div class="history-detail-grid">
+        ${snapshotMetrics
+          .map(
+            ([key, label]) => `
+              <article class="history-detail-item">
+                <div class="detail-item-title">${escapeHtml(label)}</div>
+                <div class="history-detail-pair">
+                  <span>${escapeHtml(formatHistoryValue(beforeSnapshot[key]))}</span>
+                  <span class="text-gray-400">-></span>
+                  <span>${escapeHtml(formatHistoryValue(afterSnapshot[key]))}</span>
+                </div>
+              </article>
+            `,
+          )
+          .join('')}
+      </div>
+    </section>
+  `;
+}
+
+function renderRunHistoryIssuesSection(run) {
+  const details = Array.isArray(run.crawl_summary?.details) ? run.crawl_summary.details : [];
+  if (!details.length) {
+    return `
+      <section class="history-detail-panel">
+        <div class="history-detail-title">Run Details</div>
+        <p class="history-detail-copy">No per-item issues were recorded for this run.</p>
+      </section>
+    `;
+  }
+
+  return `
+    <section class="history-detail-panel">
+      <div class="history-detail-title">Run Details</div>
+      <div class="history-detail-list">
+        ${details
+          .slice(0, 8)
+          .map(
+            (detail) => `
+              <article class="history-detail-list-item">
+                <div class="history-detail-list-title">${escapeHtml(detail.url || detail.system || 'Pipeline item')}</div>
+                <div class="history-detail-copy">
+                  ${escapeHtml(detail.error || detail.skipped || detail.pdfParseStatus || 'Recorded in run details')}
+                </div>
+              </article>
+            `,
+          )
+          .join('')}
+      </div>
+    </section>
+  `;
+}
+
+function renderRunHistoryExpandedBody(run) {
+  const summaryRows = [
+    ['Stage', run.crawl_summary?.stage_label || 'Pipeline Action'],
+    ['Scope', run.run_scope || 'system'],
+    ['Status', run.crawl_summary?.stage_status || run.status || 'ok'],
+    ['Systems', run.systems || 0],
+  ];
+
+  return `
+    <div class="history-expanded">
+      <div class="history-detail-panels">
+        <section class="history-detail-panel">
+          <div class="history-detail-title">Run Summary</div>
+          <div class="history-detail-grid">
+            ${summaryRows
+              .map(
+                ([label, value]) => `
+                  <article class="history-detail-item">
+                    <div class="detail-item-title">${escapeHtml(label)}</div>
+                    <div class="detail-item-copy">${escapeHtml(formatHistoryValue(value))}</div>
+                  </article>
+                `,
+              )
+              .join('')}
+          </div>
+        </section>
+        ${renderRunHistorySnapshotSection(run)}
+        ${renderRunHistoryIssuesSection(run)}
+      </div>
+    </div>
+  `;
 }
 
 async function fetchJson(path, init) {
@@ -2739,6 +2863,10 @@ async function loadRunHistory() {
   }
 
   state.runHistory = await fetchJson(`/internal/pipeline-runs?${search.toString()}`);
+  const visibleRunIds = new Set((state.runHistory?.runs || []).map((run) => run.id).filter(Boolean));
+  state.expandedRunHistoryIds = new Set(
+    Array.from(state.expandedRunHistoryIds).filter((runId) => visibleRunIds.has(runId)),
+  );
 }
 
 function renderRunHistorySummary() {
@@ -2821,18 +2949,33 @@ function renderRunHistoryList() {
     .map((run) => {
       const changedMetrics = Array.isArray(run.change_summary?.metrics) ? run.change_summary.metrics : [];
       const visibleMetrics = changedMetrics.slice(0, 6);
+      const expanded = isRunHistoryExpanded(run.id);
 
       return `
-        <article class="history-card">
+        <article class="history-card ${expanded ? 'history-card-expanded' : ''}">
           <div class="history-header">
-            <div>
+            <div class="history-header-copy">
               <h3 class="history-title">${escapeHtml(run.system_name || 'System Run')}</h3>
               <p class="history-copy">${escapeHtml(run.crawl_summary?.stage_label || 'Pipeline Action')}</p>
               <p class="history-copy">${escapeHtml(formatDateTime(run.created_at))}</p>
             </div>
-            <span class="${statusPillClass(run.status === 'failed' ? 'red' : run.status === 'no_seeds' ? 'yellow' : 'green')}">
-              ${escapeHtml(run.status || 'ok')}
-            </span>
+            <div class="history-header-actions">
+              <span class="${statusPillClass(run.status === 'failed' ? 'red' : run.status === 'no_seeds' ? 'yellow' : 'green')}">
+                ${escapeHtml(run.status || 'ok')}
+              </span>
+              <button
+                type="button"
+                class="history-expand-button"
+                data-action="toggle-run-history"
+                data-run-id="${escapeHtml(run.id || '')}"
+                aria-expanded="${String(expanded)}"
+                aria-label="${expanded ? 'Collapse' : 'Expand'} details for ${escapeHtml(run.system_name || 'system run')}"
+              >
+                <svg class="history-chevron ${expanded ? 'history-chevron-expanded' : ''}" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                  <path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="history-metrics">
             <article class="detail-item">
@@ -2864,9 +3007,10 @@ function renderRunHistoryList() {
                       `,
                     )
                     .join('')
-                : '<span class="delta-pill delta-pill-neutral">No tracked metric changes</span>'
+              : '<span class="delta-pill delta-pill-neutral">No tracked metric changes</span>'
             }
           </div>
+          ${expanded ? renderRunHistoryExpandedBody(run) : ''}
         </article>
       `;
     })
@@ -3298,6 +3442,11 @@ document.addEventListener('click', async (event) => {
 
     if (button.dataset.action === 'open-history-tab') {
       setStateTab('history');
+      return;
+    }
+
+    if (button.dataset.action === 'toggle-run-history' && button.dataset.runId) {
+      toggleRunHistoryExpanded(button.dataset.runId);
       return;
     }
 
