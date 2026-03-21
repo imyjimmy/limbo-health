@@ -471,14 +471,67 @@ function sourceDocumentDisplayName(document) {
   );
 }
 
-function currentPdfDocuments() {
+function currentSeedUrls() {
+  return Array.isArray(state.selectedSystemDetail?.seed_urls) ? state.selectedSystemDetail.seed_urls : [];
+}
+
+function currentSourceDocuments() {
   return Array.isArray(state.selectedSystemDetail?.source_documents)
-    ? state.selectedSystemDetail.source_documents.filter((document) => document.source_type === 'pdf')
+    ? state.selectedSystemDetail.source_documents
     : [];
+}
+
+function currentPdfDocuments() {
+  return currentSourceDocuments().filter((document) => document.source_type === 'pdf');
 }
 
 function firstPdfDocument() {
   return currentPdfDocuments()[0] || null;
+}
+
+function totalPublishedTemplateVersions() {
+  return currentPdfDocuments().reduce(
+    (total, document) => total + Number(document?.published_versions || 0),
+    0,
+  );
+}
+
+function latestCrawlStageResult() {
+  if (!state.pipelineRunResult) return null;
+  if (state.pipelineRunResult.stage_key === 'crawl_stage') {
+    return state.pipelineRunResult;
+  }
+  return state.pipelineRunResult.crawl_stage || null;
+}
+
+function latestQuestionStageResult() {
+  if (!state.pipelineRunResult) return null;
+  if (state.pipelineRunResult.stage_key === 'question_extraction_stage') {
+    return state.pipelineRunResult;
+  }
+  return state.pipelineRunResult.question_stage || null;
+}
+
+function renderPipelineRunButton({
+  action,
+  actionKey,
+  label,
+  runningLabel,
+  primary = false,
+}) {
+  const running = state.pipelineActionInFlight === actionKey;
+  const disabled = !state.selectedSystemId || Boolean(state.pipelineActionInFlight);
+
+  return `
+    <button
+      type="button"
+      class="${primary ? 'primary-button' : 'ghost-button'}"
+      data-action="${escapeHtml(action)}"
+      ${disabled ? 'disabled' : ''}
+    >
+      ${escapeHtml(running ? runningLabel : label)}
+    </button>
+  `;
 }
 
 function currentPdfEditorQuestion() {
@@ -501,6 +554,10 @@ function setPipelineActionState(actionKey = null) {
     const running = actionKey === action.key;
     action.element.disabled = !hasSystem || Boolean(actionKey);
     action.element.textContent = running ? 'Running...' : action.idleLabel;
+  }
+
+  if (state.currentStateTab === 'pipeline') {
+    renderPipelineVisual();
   }
 }
 
@@ -1428,7 +1485,33 @@ function renderPipelineInsights() {
   }
 
   const reachability = deriveReachability(system);
+  const seedUrls = currentSeedUrls();
+  const sourceDocuments = currentSourceDocuments();
   const pdfDocuments = currentPdfDocuments();
+  const parseFailures = pdfDocuments.filter((document) =>
+    ['failed', 'empty_text'].includes(String(document?.pdf_parse_status || '').toLowerCase()),
+  ).length;
+  const partialWorkflowDocuments = sourceDocuments.filter(
+    (document) => document?.latest_workflow_status === 'partial',
+  ).length;
+  const questionFailures = pdfDocuments.filter(
+    (document) => document?.latest_question_extraction_status === 'failed',
+  ).length;
+  const lowConfidenceDrafts = Number(system.stats?.low_confidence_question_drafts || 0);
+  const currentBlocker =
+    seedUrls.length === 0
+      ? 'No active seeds'
+      : parseFailures > 0
+        ? `${formatNumber(parseFailures)} PDF parse failures`
+        : partialWorkflowDocuments > 0
+          ? `${formatNumber(partialWorkflowDocuments)} partial workflow docs`
+          : questionFailures > 0
+            ? `${formatNumber(questionFailures)} question extraction failures`
+            : lowConfidenceDrafts > 0
+              ? `${formatNumber(lowConfidenceDrafts)} low-confidence drafts`
+              : pdfDocuments.length === 0
+                ? 'No PDF results yet'
+                : 'No obvious blocker';
 
   elements.pipelineInsights.innerHTML = `
     <article class="metric-card">
@@ -1437,26 +1520,27 @@ function renderPipelineInsights() {
       <p class="metric-note">${escapeHtml(system.domain || 'No canonical domain')}</p>
     </article>
     <article class="metric-card">
-      <div class="metric-label">Reachability</div>
-      <div class="metric-value text-lg">${escapeHtml(reachability.label)}</div>
-      <p class="metric-note">Current crawl path health for this hospital system.</p>
+      <div class="metric-label">Immediate Blocker</div>
+      <div class="metric-value text-lg">${escapeHtml(currentBlocker)}</div>
+      <p class="metric-note">This is the first place the operator should look before rerunning stages blindly.</p>
     </article>
     <article class="metric-card">
-      <div class="metric-label">Pipeline Input</div>
+      <div class="metric-label">Crawl Span</div>
       <div class="metric-value text-lg">
-        ${formatNumber(system.stats?.seed_urls || 0)} seed URLs •
-        ${formatNumber(system.stats?.source_documents || 0)} cached docs
+        ${escapeHtml(reachability.label)} •
+        ${formatNumber(seedUrls.length)} seeds •
+        ${formatNumber(sourceDocuments.length)} docs
       </div>
-      <p class="metric-note">Seeds and cached source documents already attached to this system.</p>
+      <p class="metric-note">The fetch, triage, parse, and workflow-extraction checkpoints all live inside the crawl job today.</p>
     </article>
     <article class="metric-card">
-      <div class="metric-label">Pipeline Output</div>
+      <div class="metric-label">Review Span</div>
       <div class="metric-value text-lg">
         ${formatNumber(pdfDocuments.length)} PDF results •
         ${formatNumber(system.stats?.approved_templates || 0)} approved templates •
         ${formatNumber(system.stats?.draft_templates || 0)} drafts
       </div>
-      <p class="metric-note">Use Results to inspect PDFs and open the mapping editor.</p>
+      <p class="metric-note">Question extraction and mapping review start here after the crawl leaves behind cached PDFs.</p>
     </article>
   `;
 }
@@ -2112,7 +2196,7 @@ function renderPipelineRunResult() {
   if (!state.pipelineRunResult) {
     elements.pipelineRunResult.innerHTML = `
       <div class="empty-state">
-        Pick a hospital system above, then run one real stage or the full pipeline here.
+        Pick a hospital system above, then use the stage cards below to run crawl, question extraction, or the full pipeline.
       </div>
     `;
     return;
@@ -2121,6 +2205,45 @@ function renderPipelineRunResult() {
   const result = state.pipelineRunResult;
   const stageLabel = result.stage_label || 'Pipeline Action';
   const stageStatus = result.stage_status || result.status || 'ok';
+  const crawlDetails = Array.isArray(result.crawl_stage?.details)
+    ? result.crawl_stage.details
+    : result.stage_key === 'crawl_stage' && Array.isArray(result.details)
+      ? result.details
+      : [];
+  const questionDetails = Array.isArray(result.question_stage?.details)
+    ? result.question_stage.details
+    : result.stage_key === 'question_extraction_stage' && Array.isArray(result.details)
+      ? result.details
+      : [];
+  const crawlFailed = crawlDetails.filter((detail) => Boolean(detail?.error)).length;
+  const crawlSkipped = crawlDetails.filter((detail) => Boolean(detail?.skipped)).length;
+  const questionFailed = questionDetails.filter((detail) => detail?.status === 'failed').length;
+  const questionUnsupported = questionDetails.filter((detail) => detail?.supported === false).length;
+  const detailPreview = [
+    ...crawlDetails
+      .filter((detail) => Boolean(detail?.error))
+      .map((detail) => ({
+        title: detail.url || detail.system || 'Fetch failure',
+        copy: detail.error || 'Fetch failed.',
+      })),
+    ...crawlDetails
+      .filter((detail) => Boolean(detail?.skipped))
+      .map((detail) => ({
+        title: detail.url || detail.system || 'Skipped document',
+        copy: detail.skipped === 'non_medical_records_pdf'
+          ? 'Skipped because it did not look like a medical-records-request PDF.'
+          : String(detail.skipped),
+      })),
+    ...questionDetails
+      .filter((detail) => detail?.status === 'failed' || detail?.supported === false)
+      .map((detail) => ({
+        title: detail.title || detail.source_url || 'Question extraction issue',
+        copy:
+          detail.status === 'failed'
+            ? detail.error || 'Question extraction failed.'
+            : 'Question extraction completed, but the PDF still needs manual review.',
+      })),
+  ].slice(0, 4);
   elements.pipelineRunResult.innerHTML = `
     <div class="result-shell">
       <div class="result-header">
@@ -2157,6 +2280,28 @@ function renderPipelineRunResult() {
         </article>
       </div>
       ${
+        crawlDetails.length || questionDetails.length
+          ? `<div class="mt-5 grid gap-3 md:grid-cols-4">
+              <article class="detail-item">
+                <div class="detail-item-title">Crawl Failures</div>
+                <div class="detail-item-copy">${formatNumber(crawlFailed)}</div>
+              </article>
+              <article class="detail-item">
+                <div class="detail-item-title">Skipped Docs</div>
+                <div class="detail-item-copy">${formatNumber(crawlSkipped)}</div>
+              </article>
+              <article class="detail-item">
+                <div class="detail-item-title">Question Failures</div>
+                <div class="detail-item-copy">${formatNumber(questionFailed)}</div>
+              </article>
+              <article class="detail-item">
+                <div class="detail-item-title">Manual Review Needed</div>
+                <div class="detail-item-copy">${formatNumber(questionUnsupported)}</div>
+              </article>
+            </div>`
+          : ''
+      }
+      ${
         result.crawl_stage || result.question_stage
           ? `<div class="history-deltas mt-5">
               ${
@@ -2172,6 +2317,22 @@ function renderPipelineRunResult() {
             </div>`
           : ''
       }
+      ${
+        detailPreview.length
+          ? `<div class="mt-5 space-y-3">
+              ${detailPreview
+                .map(
+                  (detail) => `
+                    <article class="detail-item">
+                      <div class="detail-item-title">${escapeHtml(detail.title)}</div>
+                      <div class="detail-item-copy">${escapeHtml(detail.copy)}</div>
+                    </article>
+                  `,
+                )
+                .join('')}
+            </div>`
+          : ''
+      }
     </div>
   `;
 }
@@ -2184,60 +2345,242 @@ function renderPipelineVisual() {
   }
 
   const reachability = deriveReachability(system);
-  const failures = systemFailures(system);
+  const seedUrls = currentSeedUrls();
+  const approvedSeedUrls = seedUrls.filter((seed) => Boolean(seed?.approved_by_human));
+  const sourceDocuments = currentSourceDocuments();
+  const htmlDocuments = sourceDocuments.filter((document) => document.source_type === 'html');
   const pdfDocuments = currentPdfDocuments();
+  const parseFailureDocuments = pdfDocuments.filter((document) =>
+    ['failed', 'empty_text'].includes(String(document?.pdf_parse_status || '').toLowerCase()),
+  );
+  const partialWorkflowDocuments = sourceDocuments.filter(
+    (document) => document?.latest_workflow_status === 'partial',
+  );
+  const workflowFreeDocuments = sourceDocuments.filter(
+    (document) =>
+      document?.latest_workflow_status !== 'success' &&
+      document?.latest_workflow_status !== 'partial',
+  );
+  const questionFailureDocuments = pdfDocuments.filter(
+    (document) => document?.latest_question_extraction_status === 'failed',
+  );
   const firstPdf = firstPdfDocument();
+  const latestCrawl = latestCrawlStageResult();
+  const latestQuestion = latestQuestionStageResult();
+  const latestCrawlDetails = Array.isArray(latestCrawl?.details) ? latestCrawl.details : [];
+  const latestCrawlSkipped = latestCrawlDetails.filter(
+    (detail) => detail?.skipped === 'non_medical_records_pdf',
+  ).length;
+  const latestCrawlFailures = latestCrawlDetails.filter((detail) => Boolean(detail?.error)).length;
+  const latestQuestionDetails = Array.isArray(latestQuestion?.details) ? latestQuestion.details : [];
+  const latestQuestionFailures = latestQuestionDetails.filter(
+    (detail) => detail?.status === 'failed',
+  ).length;
+  const latestQuestionUnsupported = latestQuestionDetails.filter(
+    (detail) => detail?.supported === false,
+  ).length;
+  const lowConfidenceDrafts = Number(system.stats?.low_confidence_question_drafts || 0);
+  const publishedVersions = totalPublishedTemplateVersions();
   const stepCards = [
     {
       index: '1',
-      title: 'Scope and Seeds',
-      copy: 'Choose one hospital system, then confirm the seed scope that will drive the rest of the pipeline.',
-      input: `${formatNumber(system.stats?.seed_urls || 0)} seed URLs and ${formatNumber(system.stats?.seed_facilities || 0)} seeded facilities.`,
-      output: `Pipeline scope is locked to ${system.system_name}.`,
-      tone: 'green',
+      title: 'Target and Seeds',
+      copy: 'Lock the run to one hospital system, then verify the URLs and manual evidence that will feed the crawl.',
+      runtime: 'Operator checkpoint before any backend work runs.',
+      current: `${formatNumber(seedUrls.length)} active seeds • ${formatNumber(approvedSeedUrls.length)} human-approved • ${formatNumber(Number(system.stats?.manual_imports || 0))} manual imports`,
+      breaks:
+        seedUrls.length === 0
+          ? 'No active seeds means runCrawl exits immediately with no_seeds.'
+          : approvedSeedUrls.length === 0
+            ? 'Seeds exist, but none are human-approved yet, so the crawl scope is still weak.'
+            : 'A wrong seed or facility scope sends the entire crawl down the wrong hospital surface.',
+      humanMove:
+        seedUrls.length === 0
+          ? 'Go back to Systems and add or repair seed URLs before running crawl.'
+          : 'Use Systems to sanity-check the selected hospital system, domain, and seed coverage before you run anything.',
+      tone: seedUrls.length === 0 ? 'red' : approvedSeedUrls.length === 0 ? 'yellow' : 'green',
       actionButtons: [
         `<button type="button" class="ghost-button" data-action="open-systems-tab">Review Systems</button>`,
+        renderPipelineRunButton({
+          action: 'run-full-pipeline',
+          actionKey: 'full_pipeline',
+          label: 'Run Full Pipeline',
+          runningLabel: 'Running Full Pipeline...',
+          primary: true,
+        }),
       ],
     },
     {
       index: '2',
-      title: 'Crawl + Workflow Extraction',
-      copy: 'This is one coupled backend job today: it fetches documents, parses them, extracts workflows, and creates initial PDF question drafts when PDFs are found.',
-      input: `${escapeHtml(reachability.label)} reachability • ${formatNumber(system.stats?.seed_urls || 0)} seed URLs.`,
-      output: `${formatNumber(system.stats?.source_documents || 0)} source docs • ${formatNumber(system.stats?.workflows || 0)} workflows • ${formatNumber(system.stats?.pdf_source_documents || 0)} PDFs.`,
+      title: 'Fetch and Reachability',
+      copy: 'The crawl starts at each seed, follows redirects, and fetches HTML or PDF documents with timeout handling.',
+      runtime: 'Runs inside Run Crawl Stage.',
+      current: `${escapeHtml(reachability.label)} • ${formatNumber(sourceDocuments.length)} fetched docs • ${formatNumber(latestCrawlFailures)} fetch failures in the latest visible crawl action`,
+      breaks:
+        seedUrls.length === 0
+          ? 'This stage cannot run without seeds.'
+          : 'Timeouts, blocked hosts, fetcher subprocess failures, and unreachable records pages land here.',
+      humanMove:
+        sourceDocuments.length === 0
+          ? 'Run Crawl Stage, then inspect failures before assuming later stages are broken.'
+          : 'If fetch keeps failing, improve the seed URLs or use manual source material instead of rerunning blindly.',
       tone:
-        system.stats?.source_documents > 0 ? 'green' : reachability.tone === 'red' ? 'red' : 'yellow',
+        seedUrls.length === 0
+          ? 'red'
+          : latestCrawl?.status === 'failed'
+            ? 'red'
+            : sourceDocuments.length === 0
+              ? reachability.tone === 'red'
+                ? 'red'
+                : 'yellow'
+              : latestCrawlFailures > 0
+                ? 'yellow'
+                : reachability.tone === 'green'
+                  ? 'green'
+                  : 'yellow',
       actionButtons: [
-        `<button type="button" class="ghost-button" data-action="run-crawl-stage">Run Crawl Stage</button>`,
+        renderPipelineRunButton({
+          action: 'run-crawl-stage',
+          actionKey: 'crawl_stage',
+          label: 'Run Crawl Stage',
+          runningLabel: 'Crawling...',
+        }),
         `<button type="button" class="ghost-button" data-action="open-history-tab">Open Run History</button>`,
       ],
     },
     {
       index: '3',
-      title: 'Question Extraction',
-      copy: 'This reruns the OpenAI-backed PDF question extraction stage across the PDFs already cached for this system.',
-      input: `${formatNumber(system.stats?.pdf_source_documents || 0)} PDFs • ${formatNumber(system.stats?.draft_templates || 0)} drafts • ${formatNumber(system.stats?.low_confidence_question_drafts || 0)} low-confidence drafts.`,
-      output: `${formatNumber(system.stats?.approved_templates || 0)} approved templates • ${formatNumber(system.stats?.draft_templates || 0)} drafts ready for review.`,
+      title: 'Document Triage',
+      copy: 'Fetched pages and PDFs are triaged so only legitimate medical-records-request material continues downstream.',
+      runtime: 'Runs inside Run Crawl Stage.',
+      current: `${formatNumber(htmlDocuments.length)} HTML docs • ${formatNumber(pdfDocuments.length)} PDFs kept • ${formatNumber(latestCrawlSkipped)} skipped in the latest visible crawl action`,
+      breaks:
+        latestCrawlSkipped > 0
+          ? 'A legitimate ROI PDF can be skipped here if the page context or file heuristics are weak.'
+          : 'False positives and false negatives both happen here: billing/privacy docs can slip in, and real ROI docs can get skipped.',
+      humanMove:
+        latestCrawlSkipped > 0
+          ? 'Use the latest crawl result and run history as evidence, then improve the seed/source page rather than blaming question extraction.'
+          : 'If the right document never appears later, the fix is usually better source material or better crawl entry points.',
       tone:
-        system.stats?.pdf_source_documents === 0
-          ? 'yellow'
-          : system.stats?.low_confidence_question_drafts > 0
-            ? 'yellow'
-            : 'green',
+        seedUrls.length === 0 ? 'red' : latestCrawlSkipped > 0 ? 'yellow' : sourceDocuments.length > 0 ? 'green' : 'yellow',
       actionButtons: [
-        `<button type="button" class="ghost-button" data-action="run-question-stage">Run Question Stage</button>`,
-        `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
+        renderPipelineRunButton({
+          action: 'run-crawl-stage',
+          actionKey: 'crawl_stage',
+          label: 'Run Crawl Stage',
+          runningLabel: 'Crawling...',
+        }),
+        `<button type="button" class="ghost-button" data-action="open-history-tab">Open Run History</button>`,
       ],
     },
     {
       index: '4',
-      title: 'Results and Mapping Review',
-      copy: 'Review the resulting PDFs, inspect rectangle mappings in the PDF editor, and publish question templates from there.',
-      input: `${formatNumber(pdfDocuments.length)} PDF results • ${formatNumber(failures)} open review signals.`,
-      output: firstPdf
-        ? `First reviewable PDF: ${sourceDocumentDisplayName(firstPdf)}.`
-        : 'No PDF results are attached to this system yet.',
-      tone: pdfDocuments.length > 0 ? 'green' : 'yellow',
+      title: 'PDF Parse and Storage',
+      copy: 'Accepted PDFs are named, stored, and parsed for text and geometry so they can feed workflow and question extraction.',
+      runtime: 'Runs inside Run Crawl Stage.',
+      current: `${formatNumber(pdfDocuments.length)} stored PDFs • ${formatNumber(parseFailureDocuments.length)} parse failures • ${firstPdf ? sourceDocumentDisplayName(firstPdf) : 'no PDF sample yet'}`,
+      breaks:
+        parseFailureDocuments.length > 0
+          ? `${formatNumber(parseFailureDocuments.length)} PDFs currently report empty_text or failed parse status.`
+          : 'Empty-text PDFs and parser failures show up here before question extraction can do useful work.',
+      humanMove:
+        pdfDocuments.length === 0
+          ? 'No PDFs means there is nothing for question extraction or PDF review yet.'
+          : 'Open Results and inspect the affected PDFs before rerunning later stages.',
+      tone: pdfDocuments.length === 0 ? 'yellow' : parseFailureDocuments.length > 0 ? 'red' : 'green',
+      actionButtons: [
+        `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
+        firstPdf
+          ? `<button type="button" class="ghost-button" data-action="open-first-pdf-editor">Open First PDF</button>`
+          : '',
+      ].filter(Boolean),
+    },
+    {
+      index: '5',
+      title: 'Workflow Extraction',
+      copy: 'Parsed source documents turn into portal profiles, request methods, instructions, forms, and records_workflows rows.',
+      runtime: 'Runs inside Run Crawl Stage.',
+      current: `${formatNumber(system.stats?.workflows || 0)} workflow rows • ${formatNumber(partialWorkflowDocuments.length)} partial docs • ${formatNumber(workflowFreeDocuments.length)} docs with no workflow result`,
+      breaks:
+        partialWorkflowDocuments.length > 0
+          ? 'Partial workflows mean the document was fetched but the extractor could not recover enough structured instructions.'
+          : 'When this stage fails softly, documents exist but the workflow rows stay thin or missing.',
+      humanMove:
+        sourceDocuments.length === 0
+          ? 'Fix fetch and source coverage first.'
+          : 'If workflow rows are partial, improve the upstream source document quality or add better manual source material, then rerun crawl.',
+      tone:
+        sourceDocuments.length === 0
+          ? 'yellow'
+          : partialWorkflowDocuments.length > 0
+            ? 'yellow'
+            : Number(system.stats?.workflows || 0) > 0
+              ? 'green'
+              : 'red',
+      actionButtons: [
+        renderPipelineRunButton({
+          action: 'run-crawl-stage',
+          actionKey: 'crawl_stage',
+          label: 'Run Crawl Stage',
+          runningLabel: 'Crawling...',
+        }),
+        `<button type="button" class="ghost-button" data-action="open-history-tab">Open Run History</button>`,
+      ],
+    },
+    {
+      index: '6',
+      title: 'Question Extraction',
+      copy: 'Cached PDFs are sent through the OpenAI-backed form-understanding extractor to produce draft autofill templates.',
+      runtime: 'Runs inside Run Question Stage.',
+      current: `${formatNumber(pdfDocuments.length)} PDFs • ${formatNumber(system.stats?.draft_templates || 0)} drafts • ${formatNumber(system.stats?.approved_templates || 0)} approved • ${formatNumber(latestQuestionFailures || questionFailureDocuments.length)} failed in the latest visible question pass`,
+      breaks:
+        pdfDocuments.length === 0
+          ? 'No PDFs means this stage has nothing to work on.'
+          : latestQuestionUnsupported > 0 || lowConfidenceDrafts > 0
+            ? `${formatNumber(latestQuestionUnsupported || lowConfidenceDrafts)} PDFs need manual review because the extractor produced unsupported or low-confidence output.`
+            : 'OpenAI failures, unsupported forms, and low-confidence drafts land here.',
+      humanMove:
+        pdfDocuments.length === 0
+          ? 'Fix the crawl side first so PDFs exist.'
+          : 'Run Question Stage, then open Results and inspect the PDFs that still need manual mapping or publishing.',
+      tone:
+        pdfDocuments.length === 0
+          ? 'yellow'
+          : latestQuestion?.stage_status === 'failed' || questionFailureDocuments.length > 0
+            ? 'red'
+            : lowConfidenceDrafts > 0 || Number(system.stats?.draft_templates || 0) > 0
+            ? 'yellow'
+            : Number(system.stats?.approved_templates || 0) > 0
+              ? 'green'
+              : 'yellow',
+      actionButtons: [
+        renderPipelineRunButton({
+          action: 'run-question-stage',
+          actionKey: 'question_extraction_stage',
+          label: 'Run Question Stage',
+          runningLabel: 'Extracting Questions...',
+        }),
+        `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
+      ],
+    },
+    {
+      index: '7',
+      title: 'Review and Publish',
+      copy: 'This is the human QA step: inspect the PDF, validate rectangle mappings, and publish the template version used downstream.',
+      runtime: 'Operator checkpoint after question extraction.',
+      current: `${formatNumber(pdfDocuments.length)} PDFs • ${formatNumber(system.stats?.draft_templates || 0)} drafts • ${formatNumber(publishedVersions)} published versions • ${formatNumber(systemFailures(system))} total review signals`,
+      breaks:
+        pdfDocuments.length === 0
+          ? 'There is nothing to review until upstream stages leave behind PDFs.'
+          : publishedVersions > 0
+            ? 'The main risk here is drift: stale mappings or drafts that were never republished.'
+            : 'Drafts can exist here without any published template, which means the downstream autofill path is still not ready.',
+      humanMove:
+        firstPdf
+          ? `Open Results or jump straight into ${sourceDocumentDisplayName(firstPdf)} to inspect the mapping output.`
+          : 'Open Results after the crawl/question stages produce PDFs for this system.',
+      tone: pdfDocuments.length === 0 ? 'yellow' : publishedVersions > 0 ? 'green' : 'yellow',
       actionButtons: [
         `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
         firstPdf
@@ -2262,21 +2605,22 @@ function renderPipelineVisual() {
                 <div class="pipeline-stage-kicker">Stage ${escapeHtml(step.index)}</div>
                 <h4 class="step-title">${escapeHtml(step.title)}</h4>
                 <p class="step-copy">${escapeHtml(step.copy)}</p>
+                <p class="system-subtext">${escapeHtml(step.runtime)}</p>
               </div>
               <span class="${statusPillClass(step.tone)}">${escapeHtml(STATUS_LABELS[step.tone] || step.tone)}</span>
             </div>
             <div class="pipeline-stage-grid">
               <div>
-                <span class="step-item-label">Input</span>
-                <div class="step-item-value">${escapeHtml(step.input)}</div>
+                <span class="step-item-label">Current Signal</span>
+                <div class="step-item-value">${escapeHtml(step.current)}</div>
               </div>
               <div>
-                <span class="step-item-label">What Happens</span>
-                <div class="step-item-value">${escapeHtml(step.copy)}</div>
+                <span class="step-item-label">Failure Points</span>
+                <div class="step-item-value">${escapeHtml(step.breaks)}</div>
               </div>
               <div>
-                <span class="step-item-label">Output</span>
-                <div class="step-item-value">${escapeHtml(step.output)}</div>
+                <span class="step-item-label">Operator Move</span>
+                <div class="step-item-value">${escapeHtml(step.humanMove)}</div>
               </div>
             </div>
             <div class="pipeline-stage-actions">${step.actionButtons.join('')}</div>
@@ -2880,6 +3224,11 @@ document.addEventListener('click', async (event) => {
 
     if (button.dataset.action === 'run-question-stage') {
       await runQuestionStageForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'run-full-pipeline') {
+      await runPipelineForSelectedSystem();
       return;
     }
 

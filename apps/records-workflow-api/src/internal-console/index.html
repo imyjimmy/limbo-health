@@ -916,14 +916,11 @@
                   <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                     <div>
                       <p class="section-kicker">Pipeline</p>
-                      <h3 class="section-title">Stage Runner</h3>
-                      <p class="section-copy">Only real runnable stages are exposed here. Crawl and workflow extraction are currently coupled in the backend.</p>
+                      <h3 class="section-title">Workflow</h3>
+                      <p class="section-copy">This view mirrors the real crawl checkpoints. The cards below show where the crawl can fail and where a human can intervene.</p>
                     </div>
                     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                       <select id="pipeline-system-select" class="input-shell sm:w-80"></select>
-                      <button id="run-crawl-stage" type="button" class="ghost-button">Run Crawl Stage</button>
-                      <button id="run-question-stage" type="button" class="ghost-button">Run Question Stage</button>
-                      <button id="run-pipeline" type="button" class="primary-button">Run Full Pipeline</button>
                     </div>
                   </div>
                   <div id="pipeline-run-result" class="mt-6"></div>
