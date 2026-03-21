@@ -6,7 +6,7 @@ import {
 } from './repositories/workflowRepository.js';
 import { parsePdfDocument } from './parsers/pdfParser.js';
 import { assignPdfStoragePath } from './utils/pdfStorage.js';
-import { resolveRawStoragePath } from './utils/rawStorage.js';
+import { resolveSourceDocumentPath } from './utils/sourceDocumentStorage.js';
 import { normalizeStateCode } from './utils/states.js';
 
 function parseArgs(argv) {
@@ -46,7 +46,7 @@ async function main() {
         continue;
       }
 
-      const currentStoragePath = resolveRawStoragePath(document.storage_path);
+      const currentStoragePath = resolveSourceDocumentPath(document.storage_path);
       const buffer = await fs.readFile(currentStoragePath);
       const parsed = await parsePdfDocument({ buffer });
       const nextStoragePath = await assignPdfStoragePath({

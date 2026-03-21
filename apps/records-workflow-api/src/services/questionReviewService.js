@@ -4,7 +4,7 @@ import { parsePdfDocument } from '../parsers/pdfParser.js';
 import { query, withTransaction } from '../db.js';
 import { extractPdfFormUnderstanding } from '../extractors/pdfFormUnderstandingExtractor.js';
 import { insertExtractionRun } from '../repositories/workflowRepository.js';
-import { resolveRawStoragePath } from '../utils/rawStorage.js';
+import { resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
 import {
   buildUnsupportedAutofillPayload,
   normalizePdfFormUnderstanding,
@@ -79,7 +79,7 @@ async function loadPdfGeometry(sourceDocument) {
     return null;
   }
 
-  const resolvedPath = resolveRawStoragePath(sourceDocument.storage_path);
+  const resolvedPath = resolveSourceDocumentPath(sourceDocument.storage_path);
   const parsed = await parsePdfDocument({ filePath: resolvedPath });
   const pages = Array.isArray(parsed?.pages)
     ? parsed.pages.map((page) => ({
@@ -682,7 +682,7 @@ export async function reextractQuestionReview(
     throw new Error('Source document does not have a stored PDF path.');
   }
 
-  const resolvedPath = resolveRawStoragePath(sourceDocument.storage_path);
+  const resolvedPath = resolveSourceDocumentPath(sourceDocument.storage_path);
   const buffer = await fs.readFile(resolvedPath);
   const parsedPdf = await parsePdfDocument({
     buffer,

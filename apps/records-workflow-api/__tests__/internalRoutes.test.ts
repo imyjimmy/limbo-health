@@ -42,18 +42,40 @@ vi.mock('../src/services/manualImportService.js', () => ({
 
 vi.mock('../src/services/questionReviewService.js', () => ({
   getSourceDocumentQuestionReview: vi.fn(),
-  publishQuestionReview: vi.fn(),
   reextractQuestionReview: vi.fn(),
   saveQuestionReviewDraft: vi.fn(),
 }));
 
+vi.mock('../src/services/pipeline/reviewPublishStageService.js', () => ({
+  runReviewPublishStage: vi.fn(),
+}));
+
+vi.mock('../src/services/pipeline/humanRescueService.js', () => ({
+  acceptTriageDecision: vi.fn(),
+  rerunSourceDocumentParse: vi.fn(),
+  rerunSourceDocumentWorkflowExtraction: vi.fn(),
+  saveTriageOverride: vi.fn(),
+}));
+
 vi.mock('../src/services/pipelineRunHistoryService.js', () => ({
   listPipelineRunHistory: vi.fn(),
+  runTrackedAcceptanceStage: vi.fn(),
+  runTrackedFetchStage: vi.fn(),
   runTrackedFullSystemPipeline: vi.fn(),
   runTrackedParseStage: vi.fn(),
   runTrackedQuestionExtractionStage: vi.fn(),
+  runTrackedSeedScopeStage: vi.fn(),
   runTrackedSystemPipeline: vi.fn(),
+  runTrackedTriageStage: vi.fn(),
   runTrackedWorkflowExtractionStage: vi.fn(),
+}));
+
+vi.mock('../src/services/pipeline/pipelineInspectionService.js', () => ({
+  getFetchArtifactDetail: vi.fn(),
+  getParsedArtifactDetail: vi.fn(),
+  getStageRunDetail: vi.fn(),
+  getTriageDecisionDetail: vi.fn(),
+  listStageRuns: vi.fn(),
 }));
 
 vi.mock('../src/services/seedService.js', () => ({
@@ -74,8 +96,8 @@ import { runCrawl } from '../src/services/crawlService.js';
 import { importManualPdf } from '../src/services/manualImportService.js';
 import {
   getSourceDocumentQuestionReview,
-  publishQuestionReview,
 } from '../src/services/questionReviewService.js';
+import { runReviewPublishStage } from '../src/services/pipeline/reviewPublishStageService.js';
 import { reseedFromFile } from '../src/services/seedService.js';
 import { saveStateSeedFile } from '../src/services/seedEditorService.js';
 import {
@@ -84,7 +106,20 @@ import {
   listStateSystems,
 } from '../src/services/stateSummaryService.js';
 import {
+  getFetchArtifactDetail,
+  getStageRunDetail,
+  listStageRuns,
+} from '../src/services/pipeline/pipelineInspectionService.js';
+import {
+  acceptTriageDecision,
+  rerunSourceDocumentParse,
+  rerunSourceDocumentWorkflowExtraction,
+  saveTriageOverride,
+} from '../src/services/pipeline/humanRescueService.js';
+import {
+  runTrackedFetchStage,
   runTrackedParseStage,
+  runTrackedSeedScopeStage,
   runTrackedWorkflowExtractionStage,
 } from '../src/services/pipelineRunHistoryService.js';
 
@@ -256,7 +291,7 @@ describe('records-workflow internal routes', () => {
   });
 
   it('publishes question-review drafts for a source document', async () => {
-    vi.mocked(publishQuestionReview).mockResolvedValue({
+    vi.mocked(runReviewPublishStage).mockResolvedValue({
       source_document: { id: 'doc-1' },
       published_version: { id: 'version-1', version_no: 1 },
     } as never);
@@ -274,7 +309,7 @@ describe('records-workflow internal routes', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(publishQuestionReview).toHaveBeenCalledWith('doc-1', {
+    expect(runReviewPublishStage).toHaveBeenCalledWith('doc-1', {
       payload: { supported: false },
       reviewNotes: 'Reviewed and intentionally unsupported.',
     });
@@ -325,6 +360,74 @@ describe('records-workflow internal routes', () => {
       status: 'ok',
       systems: 1,
       extracted: 2,
+    });
+  });
+
+  it('runs the seed scope stage for one hospital system', async () => {
+    vi.mocked(runTrackedSeedScopeStage).mockResolvedValue({
+      status: 'ok',
+      stage_key: 'seed_scope_stage',
+      seed_urls: 2,
+      systems: 1,
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/pipeline/system/seed-scope`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        state: 'TX',
+        system_id: 'system-1',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(runTrackedSeedScopeStage).toHaveBeenCalledWith({
+      state: 'TX',
+      systemName: null,
+      systemId: 'system-1',
+      facilityId: null,
+      seedUrl: null,
+      hospitalSystemIds: [],
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'ok',
+      stage_key: 'seed_scope_stage',
+      seed_urls: 2,
+    });
+  });
+
+  it('runs the fetch stage for one hospital system', async () => {
+    vi.mocked(runTrackedFetchStage).mockResolvedValue({
+      status: 'ok',
+      stage_key: 'fetch_stage',
+      fetched_documents: 8,
+      failed: 0,
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/pipeline/system/fetch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        state: 'TX',
+        system_id: 'system-1',
+        max_depth: 1,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(runTrackedFetchStage).toHaveBeenCalledWith({
+      state: 'TX',
+      systemName: null,
+      systemId: 'system-1',
+      facilityId: null,
+      seedUrl: null,
+      hospitalSystemIds: [],
+      maxDepth: 1,
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'ok',
+      stage_key: 'fetch_stage',
+      fetched_documents: 8,
     });
   });
 
@@ -390,5 +493,152 @@ describe('records-workflow internal routes', () => {
       workflow_rows: 6,
       partial_documents: 1,
     });
+  });
+
+  it('lists pipeline stage runs for the selected hospital system', async () => {
+    vi.mocked(listStageRuns).mockResolvedValue({
+      hospital_system_id: 'system-1',
+      stage_key: null,
+      runs: [
+        {
+          id: 'run-1',
+          stage_key: 'fetch_stage',
+          status: 'ok',
+        },
+      ],
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/pipeline/stage-runs?system_id=system-1&limit=40`);
+
+    expect(response.status).toBe(200);
+    expect(listStageRuns).toHaveBeenCalledWith({
+      systemId: 'system-1',
+      stageKey: null,
+      limit: '40',
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      hospital_system_id: 'system-1',
+      runs: [{ id: 'run-1', stage_key: 'fetch_stage', status: 'ok' }],
+    });
+  });
+
+  it('returns stage run detail for the pipeline inspector', async () => {
+    vi.mocked(getStageRunDetail).mockResolvedValue({
+      id: 'run-1',
+      stage_key: 'fetch_stage',
+      status: 'ok',
+      fetch_artifacts: [
+        {
+          id: 'artifact-1',
+          final_url: 'https://example.org/records',
+        },
+      ],
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/pipeline/stage-runs/run-1`);
+
+    expect(response.status).toBe(200);
+    expect(getStageRunDetail).toHaveBeenCalledWith('run-1');
+    await expect(response.json()).resolves.toMatchObject({
+      id: 'run-1',
+      stage_key: 'fetch_stage',
+      fetch_artifacts: [
+        {
+          id: 'artifact-1',
+          final_url: 'https://example.org/records',
+        },
+      ],
+    });
+  });
+
+  it('returns fetch artifact detail for pipeline inspection', async () => {
+    vi.mocked(getFetchArtifactDetail).mockResolvedValue({
+      id: 'artifact-1',
+      final_url: 'https://example.org/roi.pdf',
+      latest_triage_decision: { decision: 'accepted' },
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/fetch-artifacts/artifact-1`);
+
+    expect(response.status).toBe(200);
+    expect(getFetchArtifactDetail).toHaveBeenCalledWith('artifact-1');
+    await expect(response.json()).resolves.toMatchObject({
+      id: 'artifact-1',
+      final_url: 'https://example.org/roi.pdf',
+      latest_triage_decision: { decision: 'accepted' },
+    });
+  });
+
+  it('saves triage overrides', async () => {
+    vi.mocked(saveTriageOverride).mockResolvedValue({
+      triage_decision_id: 'triage-1',
+      original_decision: 'skipped',
+      override: { override_decision: 'accepted' },
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/triage-decisions/triage-1/override`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        override_decision: 'accepted',
+        notes: 'human rescue',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(saveTriageOverride).toHaveBeenCalledWith('triage-1', {
+      overrideDecision: 'accepted',
+      notes: 'human rescue',
+      createdBy: 'operator-console',
+    });
+  });
+
+  it('accepts a triage decision into source documents', async () => {
+    vi.mocked(acceptTriageDecision).mockResolvedValue({
+      triage_decision_id: 'triage-1',
+      source_document_id: 'doc-1',
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/triage-decisions/triage-1/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        notes: 'accept it',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(acceptTriageDecision).toHaveBeenCalledWith('triage-1', {
+      notes: 'accept it',
+      createdBy: 'operator-console',
+    });
+  });
+
+  it('reruns parse for one source document', async () => {
+    vi.mocked(rerunSourceDocumentParse).mockResolvedValue({
+      stage_key: 'parse_stage',
+      stage_status: 'ok',
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/source-documents/doc-1/reparse`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(200);
+    expect(rerunSourceDocumentParse).toHaveBeenCalledWith('doc-1');
+  });
+
+  it('reruns workflow extraction for one source document', async () => {
+    vi.mocked(rerunSourceDocumentWorkflowExtraction).mockResolvedValue({
+      stage_key: 'workflow_extraction_stage',
+      stage_status: 'ok',
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/source-documents/doc-1/reextract-workflow`, {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(200);
+    expect(rerunSourceDocumentWorkflowExtraction).toHaveBeenCalledWith('doc-1');
   });
 });

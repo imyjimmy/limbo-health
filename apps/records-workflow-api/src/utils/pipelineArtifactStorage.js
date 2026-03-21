@@ -22,6 +22,17 @@ export async function ensureParsedArtifactStateDir(state) {
   return ensureStageStateDir(config.parsedStorageDir, state);
 }
 
+export async function ensureSeedScopeArtifactStateDir(state) {
+  return ensureStageStateDir(config.seedScopeStorageDir, state);
+}
+
+export async function ensureFetchArtifactDir(state, fetchArtifactId) {
+  const stateDir = await ensureStageStateDir(config.fetchStorageDir, state);
+  const directory = path.join(stateDir, String(fetchArtifactId || '').trim());
+  await fs.mkdir(directory, { recursive: true });
+  return directory;
+}
+
 export async function ensureWorkflowArtifactDir(state, sourceDocumentId) {
   const stateDir = await ensureStageStateDir(config.workflowStorageDir, state);
   const directory = path.join(stateDir, String(sourceDocumentId || '').trim());
@@ -38,4 +49,11 @@ export async function ensureQuestionArtifactDir(state, sourceDocumentId) {
 
 export async function ensureTriageArtifactStateDir(state) {
   return ensureStageStateDir(config.triageStorageDir, state);
+}
+
+export async function ensurePublishedArtifactDir(state, sourceDocumentId) {
+  const stateDir = await ensureStageStateDir(config.publishedStorageDir, state);
+  const directory = path.join(stateDir, String(sourceDocumentId || '').trim());
+  await fs.mkdir(directory, { recursive: true });
+  return directory;
 }

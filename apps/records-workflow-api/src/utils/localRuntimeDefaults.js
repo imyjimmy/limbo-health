@@ -29,11 +29,16 @@ export async function resolvePreferredLocalPythonBin() {
 export async function applyLocalRuntimeDefaults() {
   process.env.DATABASE_URL ||= LOCAL_DATABASE_URL;
   process.env.PORT ||= DEFAULT_LOCAL_PORT;
+  process.env.RECORDS_FETCH_BACKEND ||= 'scrapling';
 
   if (!process.env.RECORDS_PYTHON_BIN) {
     const pythonBin = await resolvePreferredLocalPythonBin();
     if (pythonBin) {
       process.env.RECORDS_PYTHON_BIN = pythonBin;
     }
+  }
+
+  if (!process.env.RECORDS_FETCH_PYTHON_BIN && process.env.RECORDS_PYTHON_BIN) {
+    process.env.RECORDS_FETCH_PYTHON_BIN = process.env.RECORDS_PYTHON_BIN;
   }
 }

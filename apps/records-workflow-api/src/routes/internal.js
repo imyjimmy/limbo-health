@@ -8,16 +8,33 @@ import {
 } from '../services/manualImportService.js';
 import {
   getSourceDocumentQuestionReview,
-  publishQuestionReview,
   reextractQuestionReview,
   saveQuestionReviewDraft,
 } from '../services/questionReviewService.js';
+import { runReviewPublishStage } from '../services/pipeline/reviewPublishStageService.js';
+import {
+  acceptTriageDecision,
+  rerunSourceDocumentParse,
+  rerunSourceDocumentWorkflowExtraction,
+  saveTriageOverride,
+} from '../services/pipeline/humanRescueService.js';
+import {
+  getFetchArtifactDetail,
+  getParsedArtifactDetail,
+  getStageRunDetail,
+  getTriageDecisionDetail,
+  listStageRuns,
+} from '../services/pipeline/pipelineInspectionService.js';
 import {
   listPipelineRunHistory,
+  runTrackedAcceptanceStage,
+  runTrackedFetchStage,
   runTrackedFullSystemPipeline,
   runTrackedParseStage,
   runTrackedQuestionExtractionStage,
+  runTrackedSeedScopeStage,
   runTrackedSystemPipeline,
+  runTrackedTriageStage,
   runTrackedWorkflowExtractionStage,
 } from '../services/pipelineRunHistoryService.js';
 import { getStateReviewQueue } from '../services/reviewQueueService.js';
@@ -116,6 +133,106 @@ internalRouter.get('/pipeline-runs', async (req, res) => {
   } catch (error) {
     console.error('Failed to load pipeline run history:', error);
     const response = toErrorPayload(error, 'Failed to load pipeline run history.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/pipeline/stage-runs', async (req, res) => {
+  try {
+    const runs = await listStageRuns({
+      systemId: req.query?.system_id || req.query?.systemId || null,
+      stageKey: req.query?.stage_key || req.query?.stageKey || null,
+      limit: req.query?.limit || null,
+    });
+    return res.json(runs);
+  } catch (error) {
+    console.error('Failed to load pipeline stage runs:', error);
+    const response = toErrorPayload(error, 'Failed to load pipeline stage runs.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/pipeline/stage-runs/:id', async (req, res) => {
+  try {
+    const stageRun = await getStageRunDetail(req.params.id);
+    if (!stageRun) {
+      return res.status(404).json({ error: 'Pipeline stage run not found.' });
+    }
+    return res.json(stageRun);
+  } catch (error) {
+    console.error('Failed to load pipeline stage run detail:', error);
+    const response = toErrorPayload(error, 'Failed to load pipeline stage run detail.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/fetch-artifacts/:id', async (req, res) => {
+  try {
+    const artifact = await getFetchArtifactDetail(req.params.id);
+    if (!artifact) {
+      return res.status(404).json({ error: 'Fetch artifact not found.' });
+    }
+    return res.json(artifact);
+  } catch (error) {
+    console.error('Failed to load fetch artifact:', error);
+    const response = toErrorPayload(error, 'Failed to load fetch artifact.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/triage-decisions/:id', async (req, res) => {
+  try {
+    const decision = await getTriageDecisionDetail(req.params.id);
+    if (!decision) {
+      return res.status(404).json({ error: 'Triage decision not found.' });
+    }
+    return res.json(decision);
+  } catch (error) {
+    console.error('Failed to load triage decision:', error);
+    const response = toErrorPayload(error, 'Failed to load triage decision.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/triage-decisions/:id/override', async (req, res) => {
+  try {
+    const result = await saveTriageOverride(req.params.id, {
+      overrideDecision: req.body?.override_decision || req.body?.overrideDecision,
+      notes: req.body?.notes || null,
+      createdBy: req.body?.created_by || req.body?.createdBy || 'operator-console',
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to save triage override:', error);
+    const response = toErrorPayload(error, 'Failed to save triage override.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/triage-decisions/:id/accept', async (req, res) => {
+  try {
+    const result = await acceptTriageDecision(req.params.id, {
+      notes: req.body?.notes || null,
+      createdBy: req.body?.created_by || req.body?.createdBy || 'operator-console',
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to accept triage decision:', error);
+    const response = toErrorPayload(error, 'Failed to accept triage decision.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/parsed-artifacts/:id', async (req, res) => {
+  try {
+    const artifact = await getParsedArtifactDetail(req.params.id);
+    if (!artifact) {
+      return res.status(404).json({ error: 'Parsed artifact not found.' });
+    }
+    return res.json(artifact);
+  } catch (error) {
+    console.error('Failed to load parsed artifact:', error);
+    const response = toErrorPayload(error, 'Failed to load parsed artifact.');
     return res.status(response.status).json(response.body);
   }
 });
@@ -267,7 +384,80 @@ internalRouter.post('/pipeline/system/full', async (req, res) => {
   }
 });
 
-internalRouter.post('/pipeline/system/question-extraction', async (req, res) => {
+internalRouter.post('/pipeline/system/seed-scope', async (req, res) => {
+  try {
+    const summary = await runTrackedSeedScopeStage({
+      state: req.body?.state || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      facilityId: req.body?.facility_id || req.body?.facilityId || null,
+      seedUrl: req.body?.seed_url || req.body?.seedUrl || null,
+      hospitalSystemIds: req.body?.hospital_system_ids || req.body?.hospitalSystemIds || [],
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Seed scope stage failed:', error);
+    const response = toErrorPayload(error, 'Seed scope stage failed.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/pipeline/system/fetch', async (req, res) => {
+  try {
+    const summary = await runTrackedFetchStage({
+      state: req.body?.state || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      facilityId: req.body?.facility_id || req.body?.facilityId || null,
+      seedUrl: req.body?.seed_url || req.body?.seedUrl || null,
+      hospitalSystemIds: req.body?.hospital_system_ids || req.body?.hospitalSystemIds || [],
+      maxDepth: Number.isInteger(req.body?.max_depth)
+        ? req.body.max_depth
+        : Number.isInteger(req.body?.maxDepth)
+          ? req.body.maxDepth
+          : undefined,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Fetch stage failed:', error);
+    const response = toErrorPayload(error, 'Fetch stage failed.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/pipeline/system/triage', async (req, res) => {
+  try {
+    const summary = await runTrackedTriageStage({
+      state: req.body?.state || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      fetchStageRunId: req.body?.fetch_stage_run_id || req.body?.fetchStageRunId || null,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Triage stage failed:', error);
+    const response = toErrorPayload(error, 'Triage stage failed.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/pipeline/system/accept', async (req, res) => {
+  try {
+    const summary = await runTrackedAcceptanceStage({
+      state: req.body?.state || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      triageStageRunId: req.body?.triage_stage_run_id || req.body?.triageStageRunId || null,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Acceptance stage failed:', error);
+    const response = toErrorPayload(error, 'Acceptance stage failed.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+async function handleQuestionStage(req, res) {
   try {
     const summary = await runTrackedQuestionExtractionStage({
       state: req.body?.state || null,
@@ -282,7 +472,10 @@ internalRouter.post('/pipeline/system/question-extraction', async (req, res) => 
     const response = toErrorPayload(error, 'Question extraction stage failed.');
     return res.status(response.status).json(response.body);
   }
-});
+}
+
+internalRouter.post('/pipeline/system/question-extraction', handleQuestionStage);
+internalRouter.post('/pipeline/system/questions', handleQuestionStage);
 
 internalRouter.post('/pipeline/system/parse', async (req, res) => {
   try {
@@ -385,6 +578,28 @@ internalRouter.post('/source-documents/:id/question-review/reextract', async (re
   }
 });
 
+internalRouter.post('/source-documents/:id/reparse', async (req, res) => {
+  try {
+    const summary = await rerunSourceDocumentParse(req.params.id);
+    return res.json(summary);
+  } catch (error) {
+    console.error('Failed to reparse source document:', error);
+    const response = toErrorPayload(error, 'Failed to reparse source document.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/source-documents/:id/reextract-workflow', async (req, res) => {
+  try {
+    const summary = await rerunSourceDocumentWorkflowExtraction(req.params.id);
+    return res.json(summary);
+  } catch (error) {
+    console.error('Failed to rerun workflow extraction:', error);
+    const response = toErrorPayload(error, 'Failed to rerun workflow extraction.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
 internalRouter.post('/source-documents/:id/question-review/draft', async (req, res) => {
   try {
     const review = await saveQuestionReviewDraft(req.params.id, {
@@ -403,7 +618,7 @@ internalRouter.post('/source-documents/:id/question-review/draft', async (req, r
 
 internalRouter.post('/source-documents/:id/question-review/publish', async (req, res) => {
   try {
-    const review = await publishQuestionReview(req.params.id, {
+    const review = await runReviewPublishStage(req.params.id, {
       payload: req.body?.payload || null,
       reviewNotes: req.body?.review_notes || req.body?.reviewNotes || null,
     });

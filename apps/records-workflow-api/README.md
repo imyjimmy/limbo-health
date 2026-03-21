@@ -119,7 +119,9 @@ For this machine, use the local convenience scripts instead of retyping env vars
 These local scripts default to:
 - `DATABASE_URL=postgres://postgres:postgres@localhost:5433/records_workflow`
 - `PORT=3020`
+- `RECORDS_FETCH_BACKEND=scrapling`
 - `RECORDS_PYTHON_BIN=/opt/homebrew/Caskroom/miniconda/base/bin/python3` when that interpreter exists
+- `RECORDS_FETCH_PYTHON_BIN` matching `RECORDS_PYTHON_BIN`
 
 If you want a different interpreter or port, pass the env var explicitly, for example:
 - `PORT=3021 npm run start:local`

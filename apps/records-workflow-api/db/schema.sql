@@ -152,6 +152,8 @@ create table if not exists pipeline_stage_runs (
   id uuid primary key default gen_random_uuid(),
   stage_key text not null,
   stage_label text not null,
+  pipeline_run_history_id uuid references pipeline_run_history(id) on delete set null,
+  parent_stage_run_id uuid references pipeline_stage_runs(id) on delete set null,
   state text,
   hospital_system_id uuid references hospital_systems(id) on delete set null,
   system_name text,
@@ -171,8 +173,35 @@ create index if not exists pipeline_stage_runs_system_stage_created_lookup
 create index if not exists pipeline_stage_runs_state_stage_created_lookup
   on pipeline_stage_runs (state, stage_key, created_at desc);
 
+create table if not exists crawl_frontier_items (
+  id uuid primary key default gen_random_uuid(),
+  fetch_stage_run_id uuid not null references pipeline_stage_runs(id) on delete cascade,
+  hospital_system_id uuid not null references hospital_systems(id) on delete cascade,
+  facility_id uuid references facilities(id) on delete set null,
+  seed_url_id uuid references seed_urls(id) on delete set null,
+  discovered_from_item_id uuid references crawl_frontier_items(id) on delete set null,
+  original_url text not null,
+  normalized_url text not null,
+  final_url text,
+  depth int not null default 0,
+  queue_status text not null check (
+    queue_status in ('queued', 'fetched', 'accepted', 'skipped', 'failed')
+  ),
+  source_context jsonb,
+  last_error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists crawl_frontier_items_stage_lookup
+  on crawl_frontier_items (fetch_stage_run_id, queue_status, depth, created_at);
+
+create index if not exists crawl_frontier_items_system_url_lookup
+  on crawl_frontier_items (hospital_system_id, normalized_url);
+
 create table if not exists fetch_artifacts (
   id uuid primary key default gen_random_uuid(),
+  crawl_frontier_item_id uuid references crawl_frontier_items(id) on delete cascade,
   fetch_stage_run_id uuid not null references pipeline_stage_runs(id) on delete cascade,
   hospital_system_id uuid references hospital_systems(id) on delete set null,
   facility_id uuid references facilities(id) on delete set null,
@@ -221,6 +250,7 @@ create index if not exists triage_decisions_fetch_lookup
 create table if not exists parsed_artifacts (
   id uuid primary key default gen_random_uuid(),
   parse_stage_run_id uuid not null references pipeline_stage_runs(id) on delete cascade,
+  fetch_artifact_id uuid references fetch_artifacts(id) on delete set null,
   source_document_id uuid references source_documents(id) on delete set null,
   source_type text not null check (source_type in ('html', 'pdf')),
   parser_name text not null,
@@ -234,6 +264,9 @@ create table if not exists parsed_artifacts (
 
 create index if not exists parsed_artifacts_source_document_lookup
   on parsed_artifacts (source_document_id, created_at desc);
+
+alter table source_documents
+  add column if not exists accepted_stage_run_id uuid references pipeline_stage_runs(id);
 
 alter table source_documents
   add column if not exists fetch_artifact_id uuid references fetch_artifacts(id);
@@ -252,6 +285,18 @@ alter table source_documents
 
 alter table source_documents
   add column if not exists import_notes text;
+
+alter table pipeline_stage_runs
+  add column if not exists pipeline_run_history_id uuid references pipeline_run_history(id) on delete set null;
+
+alter table pipeline_stage_runs
+  add column if not exists parent_stage_run_id uuid references pipeline_stage_runs(id) on delete set null;
+
+alter table fetch_artifacts
+  add column if not exists crawl_frontier_item_id uuid references crawl_frontier_items(id) on delete cascade;
+
+alter table parsed_artifacts
+  add column if not exists fetch_artifact_id uuid references fetch_artifacts(id) on delete set null;
 
 update source_documents
 set source_page_url = source_url
@@ -325,6 +370,17 @@ create table if not exists pdf_question_templates (
   approved_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
+);
+
+create table if not exists triage_overrides (
+  id uuid primary key default gen_random_uuid(),
+  triage_decision_id uuid not null references triage_decisions(id) on delete cascade,
+  override_decision text not null check (
+    override_decision in ('accepted', 'skipped', 'needs_review')
+  ),
+  notes text,
+  created_by text,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists pdf_question_template_versions (

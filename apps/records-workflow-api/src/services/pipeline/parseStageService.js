@@ -12,7 +12,7 @@ import {
   listStageSourceDocuments,
 } from '../../repositories/pipelineStageRepository.js';
 import { ensureParsedArtifactStateDir } from '../../utils/pipelineArtifactStorage.js';
-import { resolveRawStoragePath } from '../../utils/rawStorage.js';
+import { resolveSourceDocumentPath } from '../../utils/sourceDocumentStorage.js';
 
 const PARSE_STAGE_KEY = 'parse_stage';
 const PARSE_STAGE_LABEL = 'Parse Stage';
@@ -60,7 +60,7 @@ async function loadSourceDocumentForParse(sourceDocument) {
       throw new Error('Stored PDF path is missing.');
     }
 
-    const resolvedPath = resolveRawStoragePath(sourceDocument.storage_path);
+    const resolvedPath = resolveSourceDocumentPath(sourceDocument.storage_path);
     const buffer = await fs.readFile(resolvedPath);
     const parsedDocument = await parsePdfDocument({
       buffer,
@@ -77,7 +77,7 @@ async function loadSourceDocumentForParse(sourceDocument) {
     throw new Error('Stored HTML snapshot is missing.');
   }
 
-  const resolvedPath = resolveRawStoragePath(sourceDocument.storage_path);
+  const resolvedPath = resolveSourceDocumentPath(sourceDocument.storage_path);
   const html = await fs.readFile(resolvedPath, 'utf8');
   const parsedDocument = parseHtmlDocument({
     html,
@@ -111,6 +111,7 @@ async function persistParsedArtifactPayload(artifactPayload, client = null) {
     {
       id: artifactPayload.id,
       parseStageRunId: artifactPayload.parse_stage_run_id,
+      fetchArtifactId: artifactPayload.fetch_artifact_id || null,
       sourceDocumentId: artifactPayload.source_document_id,
       sourceType: artifactPayload.source_type,
       parserName: artifactPayload.parser_name,
@@ -152,6 +153,7 @@ function buildParsedArtifactPayload({
     return {
       id: artifactId,
       parse_stage_run_id: parseStageRunId,
+      fetch_artifact_id: sourceDocument.fetch_artifact_id || null,
       source_document_id: sourceDocument.id,
       source_type: sourceDocument.source_type,
       parser_name: parserNameForSourceType(sourceDocument.source_type),

@@ -147,6 +147,11 @@ const state = {
   reviewQueue: null,
   selectedSystemId: null,
   selectedSystemDetail: null,
+  pipelineStageRuns: null,
+  stageInspectorRunId: null,
+  stageInspectorDetail: null,
+  stageInspectorCache: {},
+  stageInspectorLoading: false,
   runHistory: null,
   runHistoryFilterSystemId: '',
   expandedRunHistoryIds: new Set(),
@@ -222,6 +227,7 @@ const elements = {
   pipelineResultsPanel: document.querySelector('#pipeline-results-panel'),
   pipelineRunResult: document.querySelector('#pipeline-run-result'),
   pipelineVisual: document.querySelector('#pipeline-visual'),
+  pipelineStageInspector: document.querySelector('#pipeline-stage-inspector'),
   pipelineInsights: document.querySelector('#pipeline-insights'),
   pipelineResultsSummary: document.querySelector('#pipeline-results-summary'),
   pipelineResultsList: document.querySelector('#pipeline-results-list'),
@@ -569,6 +575,67 @@ function latestRunForSelectedSystem() {
   return runs.find((run) => run.hospital_system_id === state.selectedSystemId) || null;
 }
 
+function currentPipelineStageRuns() {
+  return Array.isArray(state.pipelineStageRuns?.runs) ? state.pipelineStageRuns.runs : [];
+}
+
+function latestPipelineStageRun(stageKey) {
+  return currentPipelineStageRuns().find((run) => run.stage_key === stageKey) || null;
+}
+
+function currentStageInspectorRun() {
+  return currentPipelineStageRuns().find((run) => run.id === state.stageInspectorRunId) || null;
+}
+
+function stageKeyLabel(stageKey) {
+  const labels = {
+    seed_scope_stage: 'Seed Scope Stage',
+    fetch_stage: 'Fetch Stage',
+    triage_stage: 'Document Triage Stage',
+    acceptance_stage: 'Acceptance Stage',
+    parse_stage: 'Parse Stage',
+    workflow_extraction_stage: 'Workflow Extraction Stage',
+    question_extraction_stage: 'Question Extraction Stage',
+    review_publish_stage: 'Review / Publish Stage',
+  };
+  return labels[stageKey] || stageKey || 'Pipeline Stage';
+}
+
+function stageRunInputCount(stageRun, key) {
+  return Number(stageRun?.input_summary?.[key] || 0);
+}
+
+function stageRunOutputCount(stageRun, key) {
+  return Number(stageRun?.output_summary?.[key] || 0);
+}
+
+function stageRunTone(stageRun, fallbackTone = 'yellow') {
+  const status = String(stageRun?.status || '').toLowerCase();
+  if (!status) return fallbackTone;
+  if (status === 'ok' || status === 'success') return 'green';
+  if (status === 'partial' || status === 'no_documents' || status === 'no_seeds') return 'yellow';
+  if (status === 'failed') return 'red';
+  return fallbackTone;
+}
+
+function formatStageRunHeadline(stageRun, fallback = 'Not run yet') {
+  if (!stageRun) return fallback;
+  const at = stageRun.completed_at || stageRun.created_at || null;
+  return `${stageRun.status || 'ok'}${at ? ` • ${formatDateTime(at)}` : ''}`;
+}
+
+function formatInspectorUrl(value) {
+  const url = String(value || '').trim();
+  if (!url) return 'n/a';
+  try {
+    const parsed = new URL(url);
+    const shortPath = parsed.pathname && parsed.pathname !== '/' ? parsed.pathname : '';
+    return `${parsed.host}${shortPath}`;
+  } catch {
+    return url;
+  }
+}
+
 function fileNameFromPath(filePath) {
   const value = String(filePath || '').trim();
   if (!value) return null;
@@ -674,6 +741,20 @@ function renderPipelineRunButton({
   `;
 }
 
+function renderStageInspectButton(stageRun, label = 'Inspect') {
+  if (!stageRun?.id) return '';
+  return `
+    <button
+      type="button"
+      class="ghost-button"
+      data-action="inspect-stage-run"
+      data-run-id="${escapeHtml(stageRun.id)}"
+    >
+      ${escapeHtml(label)}
+    </button>
+  `;
+}
+
 function currentPdfEditorQuestion() {
   return (
     state.pdfEditorQuestions.find((question) => question.id === state.pdfEditorActiveQuestionId) || null
@@ -684,7 +765,10 @@ function setPipelineActionState(actionKey = null) {
   state.pipelineActionInFlight = actionKey;
   const hasSystem = Boolean(state.selectedSystemId);
   const actions = [
-    { key: 'crawl_stage', element: elements.runCrawlStage, idleLabel: 'Run Crawl Stage' },
+    { key: 'seed_scope_stage', element: null, idleLabel: 'Run Seed Stage' },
+    { key: 'fetch_stage', element: elements.runCrawlStage, idleLabel: 'Run Fetch Stage' },
+    { key: 'triage_stage', element: null, idleLabel: 'Run Triage Stage' },
+    { key: 'acceptance_stage', element: null, idleLabel: 'Run Accept Stage' },
     { key: 'parse_stage', element: null, idleLabel: 'Run Parse Stage' },
     { key: 'workflow_extraction_stage', element: null, idleLabel: 'Run Workflow Stage' },
     { key: 'question_extraction_stage', element: elements.runQuestionStage, idleLabel: 'Run Question Stage' },
@@ -822,6 +906,24 @@ function uniqueSystemPdfSourcePages(system) {
     pages.push(url);
   }
 
+  if (pages.length > 0) {
+    return pages;
+  }
+
+  for (const seed of Array.isArray(system?.db_seed_urls) ? system.db_seed_urls : []) {
+    const url = String(seed?.url || '').trim();
+    if (!url || seen.has(url)) {
+      continue;
+    }
+
+    if (!seed?.approved_by_human && !/records_page/i.test(seed?.seed_type || '')) {
+      continue;
+    }
+
+    seen.add(url);
+    pages.push(url);
+  }
+
   return pages;
 }
 
@@ -916,7 +1018,23 @@ function renderSystemPdfPageLinks(system) {
   const pages = uniqueSystemPdfSourcePages(system);
 
   if (!pages.length) {
-    return '<span class="system-subtext">No source page</span>';
+    if (!system?.hospital_system_id) {
+      return '<span class="system-subtext">No source page</span>';
+    }
+
+    return `
+      <div class="flex flex-col items-start gap-2">
+        <span class="system-subtext">No source page</span>
+        <button
+          type="button"
+          class="ghost-button"
+          data-action="add-system-source-page"
+          data-system-id="${escapeHtml(system.hospital_system_id)}"
+        >
+          Add source page
+        </button>
+      </div>
+    `;
   }
 
   const visiblePages = pages.slice(0, 2);
@@ -1673,7 +1791,7 @@ function renderPipelineInsights() {
         ${formatNumber(seedUrls.length)} seeds •
         ${formatNumber(sourceDocuments.length)} docs
       </div>
-      <p class="metric-note">Crawl gets documents into the accepted source-doc set. Parse and workflow reruns now have their own stage controls.</p>
+      <p class="metric-note">Seed, fetch, triage, acceptance, parse, workflow, and question reruns now have their own stage controls.</p>
     </article>
     <article class="metric-card">
       <div class="metric-label">Review Span</div>
@@ -2338,7 +2456,7 @@ function renderPipelineRunResult() {
   if (!state.pipelineRunResult) {
     elements.pipelineRunResult.innerHTML = `
       <div class="empty-state">
-        Pick a hospital system above, then use the stage cards below to run crawl, question extraction, or the full pipeline.
+        Pick a hospital system above, then use the stage cards below to run seed, fetch, triage, accept, parse, workflow, question, or the full pipeline.
       </div>
     `;
     return;
@@ -2357,9 +2475,19 @@ function renderPipelineRunResult() {
     : result.stage_key === 'workflow_extraction_stage' && Array.isArray(result.details)
       ? result.details
       : [];
-  const crawlDetails = Array.isArray(result.crawl_stage?.details)
-    ? result.crawl_stage.details
-    : result.stage_key === 'crawl_stage' && Array.isArray(result.details)
+  const fetchDetails = Array.isArray(result.fetch_stage?.details)
+    ? result.fetch_stage.details
+    : result.stage_key === 'fetch_stage' && Array.isArray(result.details)
+      ? result.details
+      : [];
+  const triageDetails = Array.isArray(result.triage_stage?.details)
+    ? result.triage_stage.details
+    : result.stage_key === 'triage_stage' && Array.isArray(result.details)
+      ? result.details
+      : [];
+  const acceptanceDetails = Array.isArray(result.acceptance_stage?.details)
+    ? result.acceptance_stage.details
+    : result.stage_key === 'acceptance_stage' && Array.isArray(result.details)
       ? result.details
       : [];
   const questionDetails = Array.isArray(result.question_stage?.details)
@@ -2372,24 +2500,35 @@ function renderPipelineRunResult() {
   ).length;
   const workflowFailed = workflowDetails.filter((detail) => detail?.status === 'failed').length;
   const workflowPartial = workflowDetails.filter((detail) => detail?.status === 'partial').length;
-  const crawlFailed = crawlDetails.filter((detail) => Boolean(detail?.error)).length;
-  const crawlSkipped = crawlDetails.filter((detail) => Boolean(detail?.skipped)).length;
+  const fetchFailed = fetchDetails.filter((detail) => Boolean(detail?.error)).length;
+  const triageSkipped = triageDetails.filter((detail) => detail?.status === 'skipped').length;
+  const triageReviewNeeded = triageDetails.filter((detail) => detail?.status === 'needs_review').length;
+  const acceptanceFailed = acceptanceDetails.filter((detail) => detail?.status === 'failed').length;
   const questionFailed = questionDetails.filter((detail) => detail?.status === 'failed').length;
   const questionUnsupported = questionDetails.filter((detail) => detail?.supported === false).length;
   const detailPreview = [
-    ...crawlDetails
+    ...fetchDetails
       .filter((detail) => Boolean(detail?.error))
       .map((detail) => ({
         title: detail.url || detail.system || 'Fetch failure',
         copy: detail.error || 'Fetch failed.',
       })),
-    ...crawlDetails
-      .filter((detail) => Boolean(detail?.skipped))
+    ...triageDetails
+      .filter((detail) => detail?.status === 'skipped' || detail?.status === 'needs_review')
       .map((detail) => ({
         title: detail.url || detail.system || 'Skipped document',
-        copy: detail.skipped === 'non_medical_records_pdf'
-          ? 'Skipped because it did not look like a medical-records-request PDF.'
-          : String(detail.skipped),
+        copy:
+          detail.status === 'needs_review'
+            ? detail.error || 'This fetched artifact needs human review before it can move downstream.'
+            : detail.reason_code === 'non_medical_records_pdf'
+              ? 'Skipped because it did not look like a medical-records-request PDF.'
+              : detail.reason_code || 'Skipped during triage.',
+      })),
+    ...acceptanceDetails
+      .filter((detail) => detail?.status === 'failed')
+      .map((detail) => ({
+        title: detail.title || detail.url || 'Acceptance issue',
+        copy: detail.error || 'Accepted artifact failed to promote into source documents.',
       })),
     ...parseDetails
       .filter((detail) => detail?.status === 'failed' || detail?.status === 'empty_text')
@@ -2454,33 +2593,59 @@ function renderPipelineRunResult() {
         </article>
       </div>
       ${
-        crawlDetails.length || parseDetails.length || workflowDetails.length || questionDetails.length
+        fetchDetails.length ||
+        triageDetails.length ||
+        acceptanceDetails.length ||
+        parseDetails.length ||
+        workflowDetails.length ||
+        questionDetails.length
           ? `<div class="mt-5 grid gap-3 md:grid-cols-4">
               <article class="detail-item">
-                <div class="detail-item-title">Crawl Failures</div>
-                <div class="detail-item-copy">${formatNumber(crawlFailed)}</div>
+                <div class="detail-item-title">Fetch Failures</div>
+                <div class="detail-item-copy">${formatNumber(fetchFailed)}</div>
               </article>
               <article class="detail-item">
-                <div class="detail-item-title">Parse Failures</div>
-                <div class="detail-item-copy">${formatNumber(parseFailed)}</div>
+                <div class="detail-item-title">Triage Skips / Review</div>
+                <div class="detail-item-copy">${formatNumber(triageSkipped + triageReviewNeeded)}</div>
               </article>
               <article class="detail-item">
-                <div class="detail-item-title">Workflow Issues</div>
-                <div class="detail-item-copy">${formatNumber(workflowFailed + workflowPartial)}</div>
+                <div class="detail-item-title">Accept / Parse Issues</div>
+                <div class="detail-item-copy">${formatNumber(acceptanceFailed + parseFailed)}</div>
               </article>
               <article class="detail-item">
-                <div class="detail-item-title">Manual Review Needed</div>
-                <div class="detail-item-copy">${formatNumber(questionUnsupported + crawlSkipped + questionFailed)}</div>
+                <div class="detail-item-title">Workflow / Question Issues</div>
+                <div class="detail-item-copy">${formatNumber(workflowFailed + workflowPartial + questionUnsupported + questionFailed)}</div>
               </article>
             </div>`
           : ''
       }
       ${
-        result.crawl_stage || result.parse_stage || result.workflow_stage || result.question_stage
+        result.seed_stage ||
+        result.fetch_stage ||
+        result.triage_stage ||
+        result.acceptance_stage ||
+        result.parse_stage ||
+        result.workflow_stage ||
+        result.question_stage
           ? `<div class="history-deltas mt-5">
               ${
-                result.crawl_stage
-                  ? `<span class="${statusPillClass(result.crawl_stage.status === 'failed' ? 'red' : result.crawl_stage.status === 'no_seeds' ? 'yellow' : 'green')}">${escapeHtml(result.crawl_stage.stage_label || 'Crawl Stage')} ${escapeHtml(result.crawl_stage.status || 'ok')}</span>`
+                result.seed_stage
+                  ? `<span class="${statusPillClass(result.seed_stage.stage_status === 'failed' ? 'red' : result.seed_stage.stage_status === 'no_seeds' ? 'yellow' : 'green')}">${escapeHtml(result.seed_stage.stage_label || 'Seed Stage')} ${escapeHtml(result.seed_stage.stage_status || result.seed_stage.status || 'ok')}</span>`
+                  : ''
+              }
+              ${
+                result.fetch_stage
+                  ? `<span class="${statusPillClass(result.fetch_stage.stage_status === 'failed' ? 'red' : result.fetch_stage.stage_status === 'partial' || result.fetch_stage.stage_status === 'no_seeds' ? 'yellow' : 'green')}">${escapeHtml(result.fetch_stage.stage_label || 'Fetch Stage')} ${escapeHtml(result.fetch_stage.stage_status || result.fetch_stage.status || 'ok')}</span>`
+                  : ''
+              }
+              ${
+                result.triage_stage
+                  ? `<span class="${statusPillClass(result.triage_stage.stage_status === 'failed' ? 'red' : result.triage_stage.stage_status === 'partial' || result.triage_stage.stage_status === 'no_documents' ? 'yellow' : 'green')}">${escapeHtml(result.triage_stage.stage_label || 'Triage Stage')} ${escapeHtml(result.triage_stage.stage_status || result.triage_stage.status || 'ok')}</span>`
+                  : ''
+              }
+              ${
+                result.acceptance_stage
+                  ? `<span class="${statusPillClass(result.acceptance_stage.stage_status === 'failed' ? 'red' : result.acceptance_stage.stage_status === 'partial' || result.acceptance_stage.stage_status === 'no_documents' ? 'yellow' : 'green')}">${escapeHtml(result.acceptance_stage.stage_label || 'Acceptance Stage')} ${escapeHtml(result.acceptance_stage.stage_status || result.acceptance_stage.status || 'ok')}</span>`
                   : ''
               }
               ${
@@ -2532,61 +2697,66 @@ function renderPipelineVisual() {
   const seedUrls = currentSeedUrls();
   const approvedSeedUrls = seedUrls.filter((seed) => Boolean(seed?.approved_by_human));
   const sourceDocuments = currentSourceDocuments();
-  const htmlDocuments = sourceDocuments.filter((document) => document.source_type === 'html');
   const pdfDocuments = currentPdfDocuments();
-  const parseFailureDocuments = pdfDocuments.filter((document) =>
+  const parseFailureDocuments = sourceDocuments.filter((document) =>
     ['failed', 'empty_text'].includes(String(document?.pdf_parse_status || '').toLowerCase()),
   );
   const partialWorkflowDocuments = sourceDocuments.filter(
     (document) => document?.latest_workflow_status === 'partial',
   );
-  const workflowFreeDocuments = sourceDocuments.filter(
-    (document) =>
-      document?.latest_workflow_status !== 'success' &&
-      document?.latest_workflow_status !== 'partial',
-  );
   const questionFailureDocuments = pdfDocuments.filter(
     (document) => document?.latest_question_extraction_status === 'failed',
   );
   const firstPdf = firstPdfDocument();
-  const latestCrawl = latestCrawlStageResult();
-  const latestParse = latestParseStageResult();
-  const latestWorkflow = latestWorkflowStageResult();
-  const latestQuestion = latestQuestionStageResult();
-  const latestCrawlDetails = Array.isArray(latestCrawl?.details) ? latestCrawl.details : [];
-  const latestCrawlSkipped = latestCrawlDetails.filter(
-    (detail) => detail?.skipped === 'non_medical_records_pdf',
-  ).length;
-  const latestCrawlFailures = latestCrawlDetails.filter((detail) => Boolean(detail?.error)).length;
-  const latestQuestionDetails = Array.isArray(latestQuestion?.details) ? latestQuestion.details : [];
-  const latestQuestionFailures = latestQuestionDetails.filter(
-    (detail) => detail?.status === 'failed',
-  ).length;
-  const latestQuestionUnsupported = latestQuestionDetails.filter(
-    (detail) => detail?.supported === false,
-  ).length;
   const lowConfidenceDrafts = Number(system.stats?.low_confidence_question_drafts || 0);
   const publishedVersions = totalPublishedTemplateVersions();
+
+  const seedRun = latestPipelineStageRun('seed_scope_stage');
+  const fetchRun = latestPipelineStageRun('fetch_stage');
+  const triageRun = latestPipelineStageRun('triage_stage');
+  const acceptanceRun = latestPipelineStageRun('acceptance_stage');
+  const parseRun = latestPipelineStageRun('parse_stage');
+  const workflowRun = latestPipelineStageRun('workflow_extraction_stage');
+  const questionRun = latestPipelineStageRun('question_extraction_stage');
+
   const stepCards = [
     {
       index: '1',
       title: 'Target and Seeds',
-      copy: 'Lock the run to one hospital system, then verify the URLs and manual evidence that will feed the crawl.',
-      runtime: 'Operator checkpoint before any backend work runs.',
-      current: `${formatNumber(seedUrls.length)} active seeds • ${formatNumber(approvedSeedUrls.length)} human-approved • ${formatNumber(Number(system.stats?.manual_imports || 0))} manual imports`,
+      copy: 'Confirm the selected hospital system and freeze the exact seed URLs that define the crawl scope.',
+      runtime: formatStageRunHeadline(seedRun),
+      current: [
+        `${formatNumber(seedUrls.length)} active seeds`,
+        `${formatNumber(approvedSeedUrls.length)} human-approved`,
+        `last output ${formatNumber(stageRunOutputCount(seedRun, 'seed_urls') || seedUrls.length)} scoped URLs`,
+      ].join(' • '),
       breaks:
         seedUrls.length === 0
-          ? 'No active seeds means runCrawl exits immediately with no_seeds.'
+          ? 'No seeds means the pipeline has no legal starting point.'
           : approvedSeedUrls.length === 0
-            ? 'Seeds exist, but none are human-approved yet, so the crawl scope is still weak.'
-            : 'A wrong seed or facility scope sends the entire crawl down the wrong hospital surface.',
+            ? 'The scope exists, but it still lacks strong human confirmation.'
+            : 'Bad seeds widen the crawl or aim it at the wrong hospital surface.',
       humanMove:
         seedUrls.length === 0
-          ? 'Go back to Systems and add or repair seed URLs before running crawl.'
-          : 'Use Systems to sanity-check the selected hospital system, domain, and seed coverage before you run anything.',
-      tone: seedUrls.length === 0 ? 'red' : approvedSeedUrls.length === 0 ? 'yellow' : 'green',
+          ? 'Fix the seed URLs in Systems before running any later stage.'
+          : 'Run Seed Stage after changing seeds so every later stage reads the updated scope.',
+      tone:
+        seedUrls.length === 0
+          ? 'red'
+          : seedRun
+            ? stageRunTone(seedRun, approvedSeedUrls.length > 0 ? 'green' : 'yellow')
+            : approvedSeedUrls.length > 0
+              ? 'green'
+              : 'yellow',
       actionButtons: [
         `<button type="button" class="ghost-button" data-action="open-systems-tab">Review Systems</button>`,
+        renderPipelineRunButton({
+          action: 'run-seed-stage',
+          actionKey: 'seed_scope_stage',
+          label: 'Run Seed Stage',
+          runningLabel: 'Scoping Seeds...',
+        }),
+        renderStageInspectButton(seedRun),
         renderPipelineRunButton({
           action: 'run-full-pipeline',
           actionKey: 'full_pipeline',
@@ -2599,117 +2769,173 @@ function renderPipelineVisual() {
     {
       index: '2',
       title: 'Fetch and Reachability',
-      copy: 'The crawl starts at each seed, follows redirects, and fetches HTML or PDF documents with timeout handling.',
-      runtime: 'Runs inside Run Crawl Stage.',
-      current: `${escapeHtml(reachability.label)} • ${formatNumber(sourceDocuments.length)} fetched docs • ${formatNumber(latestCrawlFailures)} fetch failures in the latest visible crawl action`,
+      copy: 'Fetch the targeted records page and its adjacent pages/PDFs into stage-tracked fetch artifacts.',
+      runtime: formatStageRunHeadline(fetchRun),
+      current: [
+        `${reachability.label}`,
+        `input ${formatNumber(stageRunInputCount(fetchRun, 'seed_urls') || seedUrls.length)} seeds`,
+        `output ${formatNumber(stageRunOutputCount(fetchRun, 'fetched_documents'))} fetched`,
+        `failures ${formatNumber(stageRunOutputCount(fetchRun, 'failed_documents'))}`,
+      ].join(' • '),
       breaks:
         seedUrls.length === 0
-          ? 'This stage cannot run without seeds.'
-          : 'Timeouts, blocked hosts, fetcher subprocess failures, and unreachable records pages land here.',
+          ? 'No seeds means fetch has nothing to start from.'
+          : 'Timeouts, blocked hosts, redirects, and over-expansion all show up here.',
       humanMove:
-        sourceDocuments.length === 0
-          ? 'Run Crawl Stage, then inspect failures before assuming later stages are broken.'
-          : 'If fetch keeps failing, improve the seed URLs or use manual source material instead of rerunning blindly.',
+        stageRunOutputCount(fetchRun, 'failed_documents') > 0
+          ? 'Inspect the latest fetch run before rerunning later stages. Fix targeting or reachability first.'
+          : 'Run Fetch Stage whenever the target page changes or you need a fresh frontier.',
       tone:
         seedUrls.length === 0
           ? 'red'
-          : latestCrawl?.status === 'failed'
-            ? 'red'
-            : sourceDocuments.length === 0
-              ? reachability.tone === 'red'
-                ? 'red'
-                : 'yellow'
-              : latestCrawlFailures > 0
-                ? 'yellow'
-                : reachability.tone === 'green'
-                  ? 'green'
-                  : 'yellow',
+          : fetchRun
+            ? stageRunTone(fetchRun, reachability.tone)
+            : reachability.tone,
       actionButtons: [
         renderPipelineRunButton({
-          action: 'run-crawl-stage',
-          actionKey: 'crawl_stage',
-          label: 'Run Crawl Stage',
-          runningLabel: 'Crawling...',
+          action: 'run-fetch-stage',
+          actionKey: 'fetch_stage',
+          label: 'Run Fetch Stage',
+          runningLabel: 'Fetching...',
         }),
+        renderStageInspectButton(fetchRun),
         `<button type="button" class="ghost-button" data-action="open-history-tab">Open Run History</button>`,
       ],
     },
     {
       index: '3',
       title: 'Document Triage',
-      copy: 'Fetched pages and PDFs are triaged so only legitimate medical-records-request material continues downstream.',
-      runtime: 'Runs inside Run Crawl Stage.',
-      current: `${formatNumber(htmlDocuments.length)} HTML docs • ${formatNumber(pdfDocuments.length)} PDFs kept • ${formatNumber(latestCrawlSkipped)} skipped in the latest visible crawl action`,
+      copy: 'Classify fetched artifacts into accepted, skipped, or review-needed before they become source documents.',
+      runtime: formatStageRunHeadline(triageRun),
+      current: [
+        `input ${formatNumber(stageRunInputCount(triageRun, 'fetch_artifacts'))} fetched artifacts`,
+        `accepted ${formatNumber(stageRunOutputCount(triageRun, 'accepted_documents'))}`,
+        `skipped ${formatNumber(stageRunOutputCount(triageRun, 'skipped_documents'))}`,
+        `review ${formatNumber(stageRunOutputCount(triageRun, 'review_needed_documents'))}`,
+      ].join(' • '),
       breaks:
-        latestCrawlSkipped > 0
-          ? 'A legitimate ROI PDF can be skipped here if the page context or file heuristics are weak.'
-          : 'False positives and false negatives both happen here: billing/privacy docs can slip in, and real ROI docs can get skipped.',
+        stageRunOutputCount(triageRun, 'review_needed_documents') > 0
+          ? 'Some fetched artifacts could not be classified cleanly and now need rescue logic or a human decision.'
+          : 'Legit ROI PDFs can still be skipped here if the surrounding page context is weak.',
       humanMove:
-        latestCrawlSkipped > 0
-          ? 'Use the latest crawl result and run history as evidence, then improve the seed/source page rather than blaming question extraction.'
-          : 'If the right document never appears later, the fix is usually better source material or better crawl entry points.',
+        fetchRun
+          ? 'Run Triage Stage after fetch. If skip/review counts are high, intervene here before parsing.'
+          : 'Run Fetch Stage first so triage has fetched artifacts to classify.',
       tone:
-        seedUrls.length === 0 ? 'red' : latestCrawlSkipped > 0 ? 'yellow' : sourceDocuments.length > 0 ? 'green' : 'yellow',
+        stageRunOutputCount(triageRun, 'review_needed_documents') > 0
+          ? 'red'
+          : triageRun
+            ? stageRunTone(triageRun)
+            : 'yellow',
       actionButtons: [
         renderPipelineRunButton({
-          action: 'run-crawl-stage',
-          actionKey: 'crawl_stage',
-          label: 'Run Crawl Stage',
-          runningLabel: 'Crawling...',
+          action: 'run-triage-stage',
+          actionKey: 'triage_stage',
+          label: 'Run Triage Stage',
+          runningLabel: 'Triaging...',
         }),
+        renderStageInspectButton(triageRun),
         `<button type="button" class="ghost-button" data-action="open-history-tab">Open Run History</button>`,
       ],
     },
     {
       index: '4',
-      title: 'PDF Parse and Storage',
-      copy: 'Accepted PDFs are named, stored, and parsed for text and geometry so they can feed workflow and question extraction.',
-      runtime: 'Runs inside Run Parse Stage.',
-      current: `${formatNumber(sourceDocuments.filter((document) => Boolean(document?.latest_parsed_artifact_id)).length)} parsed docs • ${formatNumber(parseFailureDocuments.length)} parse failures • ${latestParse?.parsed_documents ? `${formatNumber(latestParse.parsed_documents)} parsed in the latest run` : firstPdf ? sourceDocumentDisplayName(firstPdf) : 'no PDF sample yet'}`,
+      title: 'Acceptance and Source Docs',
+      copy: 'Promote accepted triage decisions into durable source documents that later stages can rerun against.',
+      runtime: formatStageRunHeadline(acceptanceRun),
+      current: [
+        `input ${formatNumber(stageRunInputCount(acceptanceRun, 'triage_decisions'))} triage decisions`,
+        `accepted ${formatNumber(stageRunOutputCount(acceptanceRun, 'accepted_documents'))}`,
+        `output ${formatNumber(stageRunOutputCount(acceptanceRun, 'source_documents_upserted'))} source docs`,
+        `failures ${formatNumber(stageRunOutputCount(acceptanceRun, 'failed_documents'))}`,
+      ].join(' • '),
+      breaks:
+        stageRunOutputCount(acceptanceRun, 'failed_documents') > 0
+          ? 'Accepted artifacts failed to promote into source documents, so downstream reruns will miss them.'
+          : 'If this stage has not run, parse is still operating on stale accepted source docs.',
+      humanMove:
+        triageRun
+          ? 'Run Accept Stage after triage whenever new artifacts were accepted.'
+          : 'Run Triage Stage first so there is something to promote.',
+      tone:
+        acceptanceRun
+          ? stageRunTone(acceptanceRun, sourceDocuments.length > 0 ? 'green' : 'yellow')
+          : sourceDocuments.length > 0
+            ? 'green'
+            : 'yellow',
+      actionButtons: [
+        renderPipelineRunButton({
+          action: 'run-acceptance-stage',
+          actionKey: 'acceptance_stage',
+          label: 'Run Accept Stage',
+          runningLabel: 'Accepting...',
+        }),
+        renderStageInspectButton(acceptanceRun),
+        `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
+      ],
+    },
+    {
+      index: '5',
+      title: 'Parse',
+      copy: 'Turn accepted HTML and PDF source docs into persisted parsed artifacts for downstream reruns.',
+      runtime: formatStageRunHeadline(parseRun),
+      current: [
+        `input ${formatNumber(stageRunInputCount(parseRun, 'source_documents') || sourceDocuments.length)} source docs`,
+        `output ${formatNumber(stageRunOutputCount(parseRun, 'parsed_documents'))} parsed`,
+        `failures ${formatNumber(stageRunOutputCount(parseRun, 'parse_failures') || parseFailureDocuments.length)}`,
+      ].join(' • '),
       breaks:
         parseFailureDocuments.length > 0
-          ? `${formatNumber(parseFailureDocuments.length)} PDFs currently report empty_text or failed parse status.`
-          : 'Empty-text PDFs and parser failures show up here before question extraction can do useful work.',
+          ? `${formatNumber(parseFailureDocuments.length)} source documents currently report failed or empty parse output.`
+          : 'Parser failures or empty-text documents stop workflow/question stages from seeing usable content.',
       humanMove:
         sourceDocuments.length === 0
-          ? 'No accepted source docs means there is nothing to parse yet.'
-          : 'Run Parse Stage after crawl or source edits, then inspect the affected PDFs before rerunning later stages.',
-      tone: sourceDocuments.length === 0 ? 'yellow' : parseFailureDocuments.length > 0 ? 'red' : latestParse?.stage_status === 'partial' ? 'yellow' : 'green',
+          ? 'Run Fetch, Triage, and Accept first so parse has accepted source docs.'
+          : 'Run Parse Stage after new source docs land or when parser behavior changes.',
+      tone:
+        parseRun
+          ? stageRunTone(parseRun, parseFailureDocuments.length > 0 ? 'red' : sourceDocuments.length > 0 ? 'green' : 'yellow')
+          : parseFailureDocuments.length > 0
+            ? 'red'
+            : sourceDocuments.length > 0
+              ? 'green'
+              : 'yellow',
       actionButtons: [
         renderPipelineRunButton({
           action: 'run-parse-stage',
           actionKey: 'parse_stage',
           label: 'Run Parse Stage',
-          runningLabel: 'Parsing Documents...',
+          runningLabel: 'Parsing...',
         }),
+        renderStageInspectButton(parseRun),
         `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
-        firstPdf
-          ? `<button type="button" class="ghost-button" data-action="open-first-pdf-editor">Open First PDF</button>`
-          : '',
-      ].filter(Boolean),
+      ],
     },
     {
-      index: '5',
+      index: '6',
       title: 'Workflow Extraction',
-      copy: 'Parsed source documents turn into portal profiles, request methods, instructions, forms, and records_workflows rows.',
-      runtime: 'Runs inside Run Workflow Stage.',
-      current: `${formatNumber(system.stats?.workflows || 0)} workflow rows • ${formatNumber(partialWorkflowDocuments.length)} partial docs • ${latestWorkflow?.workflow_rows ? `${formatNumber(latestWorkflow.workflow_rows)} rows written in the latest run` : formatNumber(workflowFreeDocuments.length) + ' docs with no workflow result'}`,
+      copy: 'Extract request workflows from persisted parsed artifacts instead of refetching or reparsing documents.',
+      runtime: formatStageRunHeadline(workflowRun),
+      current: [
+        `input ${formatNumber(stageRunInputCount(workflowRun, 'parsed_artifacts'))}`,
+        `output ${formatNumber(stageRunOutputCount(workflowRun, 'workflow_rows') || Number(system.stats?.workflows || 0))} workflow rows`,
+        `partial ${formatNumber(stageRunOutputCount(workflowRun, 'partial_documents') || partialWorkflowDocuments.length)}`,
+        `failures ${formatNumber(stageRunOutputCount(workflowRun, 'failed_documents'))}`,
+      ].join(' • '),
       breaks:
         partialWorkflowDocuments.length > 0
-          ? 'Partial workflows mean the document was fetched but the extractor could not recover enough structured instructions.'
-          : 'When this stage fails softly, documents exist but the workflow rows stay thin or missing.',
+          ? 'Partial workflows mean the extractor saw the document but could not recover enough structured instructions.'
+          : 'If parse is bad upstream, this stage inherits those failures and weak outputs.',
       humanMove:
         sourceDocuments.length === 0
-          ? 'Fix fetch and source coverage first.'
-          : 'If workflow rows are partial, rerun Parse Stage if needed, then rerun Workflow Stage against the accepted source docs.',
+          ? 'Upstream source docs are missing.'
+          : 'Run Workflow Stage after Parse Stage whenever parsed artifacts change.',
       tone:
-        sourceDocuments.length === 0
-          ? 'yellow'
-          : partialWorkflowDocuments.length > 0 || latestWorkflow?.stage_status === 'partial'
-            ? 'yellow'
-            : Number(system.stats?.workflows || 0) > 0
-              ? 'green'
-              : 'red',
+        workflowRun
+          ? stageRunTone(workflowRun, Number(system.stats?.workflows || 0) > 0 ? 'green' : 'yellow')
+          : Number(system.stats?.workflows || 0) > 0
+            ? 'green'
+            : 'yellow',
       actionButtons: [
         renderPipelineRunButton({
           action: 'run-workflow-stage',
@@ -2717,35 +2943,37 @@ function renderPipelineVisual() {
           label: 'Run Workflow Stage',
           runningLabel: 'Extracting Workflows...',
         }),
+        renderStageInspectButton(workflowRun),
         `<button type="button" class="ghost-button" data-action="open-history-tab">Open Run History</button>`,
       ],
     },
     {
-      index: '6',
+      index: '7',
       title: 'Question Extraction',
-      copy: 'Cached PDFs are sent through the OpenAI-backed form-understanding extractor to produce draft autofill templates.',
-      runtime: 'Runs inside Run Question Stage.',
-      current: `${formatNumber(pdfDocuments.length)} PDFs • ${formatNumber(system.stats?.draft_templates || 0)} drafts • ${formatNumber(system.stats?.approved_templates || 0)} approved • ${formatNumber(latestQuestionFailures || questionFailureDocuments.length)} failed in the latest visible question pass`,
+      copy: 'Run the OpenAI form-understanding stage against persisted parsed PDF artifacts only.',
+      runtime: formatStageRunHeadline(questionRun),
+      current: [
+        `input ${formatNumber(stageRunInputCount(questionRun, 'parsed_artifacts') || pdfDocuments.length)}`,
+        `output ${formatNumber(stageRunOutputCount(questionRun, 'reextracted'))}`,
+        `partial ${formatNumber(stageRunOutputCount(questionRun, 'partial_documents') || lowConfidenceDrafts)}`,
+        `failures ${formatNumber(stageRunOutputCount(questionRun, 'failed_documents') || questionFailureDocuments.length)}`,
+      ].join(' • '),
       breaks:
         pdfDocuments.length === 0
-          ? 'No PDFs means this stage has nothing to work on.'
-          : latestQuestionUnsupported > 0 || lowConfidenceDrafts > 0
-            ? `${formatNumber(latestQuestionUnsupported || lowConfidenceDrafts)} PDFs need manual review because the extractor produced unsupported or low-confidence output.`
-            : 'OpenAI failures, unsupported forms, and low-confidence drafts land here.',
+          ? 'No accepted PDFs means there is nothing to extract questions from.'
+          : lowConfidenceDrafts > 0
+            ? `${formatNumber(lowConfidenceDrafts)} PDFs still need manual review because the extractor produced weak or unsupported output.`
+            : 'Timeouts, unsupported forms, or weak OCR/geometry land here.',
       humanMove:
         pdfDocuments.length === 0
-          ? 'Fix the crawl side first so PDFs exist.'
-          : 'Run Question Stage, then open Results and inspect the PDFs that still need manual mapping or publishing.',
+          ? 'Fix the fetch/triage/accept side first so real PDFs exist.'
+          : 'Run Question Stage after Parse Stage, then inspect Results for anything still needing manual mapping.',
       tone:
-        pdfDocuments.length === 0
-          ? 'yellow'
-          : latestQuestion?.stage_status === 'failed' || questionFailureDocuments.length > 0
-            ? 'red'
-            : lowConfidenceDrafts > 0 || Number(system.stats?.draft_templates || 0) > 0
+        questionRun
+          ? stageRunTone(questionRun, lowConfidenceDrafts > 0 ? 'yellow' : Number(system.stats?.approved_templates || 0) > 0 ? 'green' : 'yellow')
+          : pdfDocuments.length > 0
             ? 'yellow'
-            : Number(system.stats?.approved_templates || 0) > 0
-              ? 'green'
-              : 'yellow',
+            : 'yellow',
       actionButtons: [
         renderPipelineRunButton({
           action: 'run-question-stage',
@@ -2753,26 +2981,37 @@ function renderPipelineVisual() {
           label: 'Run Question Stage',
           runningLabel: 'Extracting Questions...',
         }),
+        renderStageInspectButton(questionRun),
         `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
       ],
     },
     {
-      index: '7',
+      index: '8',
       title: 'Review and Publish',
-      copy: 'This is the human QA step: inspect the PDF, validate rectangle mappings, and publish the template version used downstream.',
-      runtime: 'Operator checkpoint after question extraction.',
-      current: `${formatNumber(pdfDocuments.length)} PDFs • ${formatNumber(system.stats?.draft_templates || 0)} drafts • ${formatNumber(publishedVersions)} published versions • ${formatNumber(systemFailures(system))} total review signals`,
+      copy: 'Inspect the PDFs, validate mappings, and publish usable templates for downstream autofill.',
+      runtime: firstPdf ? 'Operator review step' : 'Waiting for PDFs',
+      current: [
+        `${formatNumber(pdfDocuments.length)} PDFs`,
+        `${formatNumber(Number(system.stats?.draft_templates || 0))} drafts`,
+        `${formatNumber(Number(system.stats?.approved_templates || 0))} approved templates`,
+        `${formatNumber(publishedVersions)} published versions`,
+      ].join(' • '),
       breaks:
         pdfDocuments.length === 0
-          ? 'There is nothing to review until upstream stages leave behind PDFs.'
+          ? 'There is nothing to review until earlier stages leave behind PDFs.'
           : publishedVersions > 0
-            ? 'The main risk here is drift: stale mappings or drafts that were never republished.'
-            : 'Drafts can exist here without any published template, which means the downstream autofill path is still not ready.',
+            ? 'The main failure here is stale mappings or drafts that were never republished.'
+            : 'Drafts can exist with no published template, which means the downstream autofill path is still not ready.',
       humanMove:
         firstPdf
-          ? `Open Results or jump straight into ${sourceDocumentDisplayName(firstPdf)} to inspect the mapping output.`
-          : 'Open Results after the crawl/question stages produce PDFs for this system.',
-      tone: pdfDocuments.length === 0 ? 'yellow' : publishedVersions > 0 ? 'green' : 'yellow',
+          ? `Open Results or jump straight into ${sourceDocumentDisplayName(firstPdf)} to inspect mappings.`
+          : 'Run upstream stages until PDFs appear in Results.',
+      tone:
+        pdfDocuments.length === 0
+          ? 'yellow'
+          : publishedVersions > 0
+            ? 'green'
+            : 'yellow',
       actionButtons: [
         `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
         firstPdf
@@ -2823,6 +3062,318 @@ function renderPipelineVisual() {
     .join('');
 }
 
+function renderInspectorMetaPill(label, value) {
+  return `<span class="delta-pill delta-pill-neutral">${escapeHtml(label)}: ${escapeHtml(formatHistoryValue(value))}</span>`;
+}
+
+function renderStageInspectorHeader(detail) {
+  return `
+    <div class="inspector-header">
+      <div>
+        <p class="section-kicker">Stage Inspector</p>
+        <h3 class="section-title">${escapeHtml(detail.system_name || currentSystem()?.system_name || 'Selected system')} • ${escapeHtml(stageKeyLabel(detail.stage_key))}</h3>
+        <p class="section-copy">${escapeHtml(formatStageRunHeadline(detail))}</p>
+      </div>
+      <span class="${statusPillClass(stageRunTone(detail))}">${escapeHtml(detail.status || 'ok')}</span>
+    </div>
+  `;
+}
+
+function renderSeedScopeInspector(detail) {
+  const systems = Array.isArray(detail.seed_scope?.systems) ? detail.seed_scope.systems : [];
+  if (!systems.length) {
+    return '<div class="empty-state">No persisted seed scope artifact was found for this stage run.</div>';
+  }
+
+  return `
+    <div class="inspector-list">
+      ${systems
+        .map(
+          (system) => `
+            <article class="inspector-item">
+              <div class="inspector-item-header">
+                <div>
+                  <div class="inspector-item-title">${escapeHtml(system.system_name || 'System')}</div>
+                  <div class="inspector-item-copy">${formatNumber(system.seed_urls?.length || 0)} scoped seeds captured for this run.</div>
+                </div>
+              </div>
+              <div class="inspector-list">
+                ${(Array.isArray(system.seed_urls) ? system.seed_urls : [])
+                  .map(
+                    (seed) => `
+                      <article class="history-detail-list-item">
+                        <div class="history-detail-list-title">${escapeHtml(formatInspectorUrl(seed.url))}</div>
+                        <div class="history-detail-copy">${escapeHtml(seed.seed_type || 'seed')}</div>
+                        <div class="inspector-meta">
+                          ${renderInspectorMetaPill('Approved', seed.approved_by_human ? 'yes' : 'no')}
+                          ${seed.facility_name ? renderInspectorMetaPill('Facility', seed.facility_name) : ''}
+                        </div>
+                      </article>
+                    `,
+                  )
+                  .join('')}
+              </div>
+            </article>
+          `,
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function renderFetchInspector(detail) {
+  const frontierById = new Map(
+    (Array.isArray(detail.frontier_items) ? detail.frontier_items : []).map((item) => [item.id, item]),
+  );
+  const artifacts = Array.isArray(detail.fetch_artifacts) ? detail.fetch_artifacts : [];
+  if (!artifacts.length) {
+    return '<div class="empty-state">No fetch artifacts were stored for this stage run.</div>';
+  }
+
+  return `
+    <div class="inspector-list">
+      ${artifacts
+        .map((artifact) => {
+          const frontier = frontierById.get(artifact.crawl_frontier_item_id) || null;
+          return `
+            <article class="inspector-item">
+              <div class="inspector-item-header">
+                <div>
+                  <div class="inspector-item-title">${escapeHtml(formatInspectorUrl(artifact.final_url || artifact.requested_url))}</div>
+                  <div class="inspector-item-copy">${escapeHtml(artifact.title || artifact.content_type || 'Fetched artifact')}</div>
+                </div>
+                <span class="${statusPillClass(frontier?.queue_status === 'failed' ? 'red' : frontier?.queue_status === 'accepted' || frontier?.queue_status === 'fetched' ? 'green' : 'yellow')}">${escapeHtml(frontier?.queue_status || 'fetched')}</span>
+              </div>
+              <div class="inspector-meta">
+                ${renderInspectorMetaPill('Type', artifact.source_type || 'other')}
+                ${renderInspectorMetaPill('HTTP', artifact.http_status ?? 'n/a')}
+                ${renderInspectorMetaPill('Depth', frontier?.depth ?? 'n/a')}
+                ${renderInspectorMetaPill('Fetched', formatDateTime(artifact.fetched_at))}
+              </div>
+              <div class="inspector-actions">
+                ${renderIconLink(artifact.final_url || artifact.requested_url, `Open fetched URL ${artifact.final_url || artifact.requested_url}`)}
+                ${renderIconLink(artifact.source_page_url, `Open source page for ${artifact.title || artifact.final_url || artifact.requested_url}`)}
+              </div>
+            </article>
+          `;
+        })
+        .join('')}
+    </div>
+  `;
+}
+
+function renderTriageInspector(detail) {
+  const decisions = Array.isArray(detail.triage_decisions) ? detail.triage_decisions : [];
+  if (!decisions.length) {
+    return '<div class="empty-state">No triage decisions were recorded for this stage run.</div>';
+  }
+
+  return `
+    <div class="inspector-list">
+      ${decisions
+        .map((decision) => {
+          const fetchArtifact = decision.fetch_artifact || {};
+          const tone =
+            decision.decision === 'accepted'
+              ? 'green'
+              : decision.decision === 'needs_review'
+                ? 'red'
+                : 'yellow';
+          return `
+            <article class="inspector-item">
+              <div class="inspector-item-header">
+                <div>
+                  <div class="inspector-item-title">${escapeHtml(fetchArtifact.title || formatInspectorUrl(fetchArtifact.final_url || fetchArtifact.requested_url))}</div>
+                  <div class="inspector-item-copy">${escapeHtml(decision.reason_detail || decision.reason_code || decision.basis || 'No triage note recorded.')}</div>
+                </div>
+                <span class="${statusPillClass(tone)}">${escapeHtml(decision.decision)}</span>
+              </div>
+              <div class="inspector-meta">
+                ${renderInspectorMetaPill('Type', fetchArtifact.source_type || 'other')}
+                ${renderInspectorMetaPill('HTTP', fetchArtifact.http_status ?? 'n/a')}
+                ${renderInspectorMetaPill('Basis', decision.basis || 'n/a')}
+              </div>
+              <div class="inspector-actions">
+                ${renderIconLink(fetchArtifact.final_url || fetchArtifact.requested_url, `Open fetched URL for ${fetchArtifact.title || fetchArtifact.final_url || fetchArtifact.requested_url}`)}
+                ${renderIconLink(fetchArtifact.source_page_url, `Open source page for ${fetchArtifact.title || fetchArtifact.final_url || fetchArtifact.requested_url}`)}
+                ${
+                  decision.decision !== 'accepted'
+                    ? `<button type="button" class="ghost-button" data-action="accept-triage-decision" data-triage-id="${escapeHtml(decision.id)}">Accept Into Source Docs</button>`
+                    : ''
+                }
+                ${
+                  decision.decision !== 'needs_review'
+                    ? `<button type="button" class="ghost-button" data-action="override-triage-decision" data-triage-id="${escapeHtml(decision.id)}" data-decision="needs_review">Mark Needs Review</button>`
+                    : ''
+                }
+                ${
+                  decision.decision !== 'skipped'
+                    ? `<button type="button" class="ghost-button" data-action="override-triage-decision" data-triage-id="${escapeHtml(decision.id)}" data-decision="skipped">Mark Skipped</button>`
+                    : ''
+                }
+              </div>
+            </article>
+          `;
+        })
+        .join('')}
+    </div>
+  `;
+}
+
+function renderAcceptanceInspector(detail) {
+  const docs = Array.isArray(detail.accepted_source_documents) ? detail.accepted_source_documents : [];
+  if (!docs.length) {
+    return '<div class="empty-state">No accepted source documents were written by this stage run.</div>';
+  }
+
+  return `
+    <div class="inspector-list">
+      ${docs
+        .map(
+          (document) => `
+            <article class="inspector-item">
+              <div class="inspector-item-header">
+                <div>
+                  <div class="inspector-item-title">${escapeHtml(sourceDocumentDisplayName(document))}</div>
+                  <div class="inspector-item-copy">${escapeHtml(formatInspectorUrl(document.source_url))}</div>
+                </div>
+                <span class="${statusPillClass('green')}">accepted</span>
+              </div>
+              <div class="inspector-meta">
+                ${renderInspectorMetaPill('Type', document.source_type || 'other')}
+                ${renderInspectorMetaPill('Fetched', formatDateTime(document.fetched_at))}
+              </div>
+              <div class="inspector-actions">
+                ${renderIconLink(document.source_page_url, `Open source page for ${sourceDocumentDisplayName(document)}`)}
+                ${
+                  document.source_type === 'pdf'
+                    ? `<button type="button" class="ghost-button" data-action="open-pdf-editor" data-source-document-id="${escapeHtml(document.id)}">Open PDF Editor</button>`
+                    : ''
+                }
+              </div>
+            </article>
+          `,
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+function renderParseInspector(detail) {
+  const artifacts = Array.isArray(detail.parsed_artifacts) ? detail.parsed_artifacts : [];
+  if (!artifacts.length) {
+    return '<div class="empty-state">No parsed artifacts were recorded for this stage run.</div>';
+  }
+
+  const sortedArtifacts = [...artifacts].sort((left, right) => {
+    const leftFailed = left.parse_status === 'failed' || left.parse_status === 'empty_text';
+    const rightFailed = right.parse_status === 'failed' || right.parse_status === 'empty_text';
+    return Number(rightFailed) - Number(leftFailed);
+  });
+
+  return `
+    <div class="inspector-list">
+      ${sortedArtifacts
+        .map((artifact) => {
+          const tone =
+            artifact.parse_status === 'success'
+              ? 'green'
+              : artifact.parse_status === 'empty_text'
+                ? 'yellow'
+                : 'red';
+          const parseError = artifact.summary?.parse_error || null;
+          return `
+            <article class="inspector-item">
+              <div class="inspector-item-header">
+                <div>
+                  <div class="inspector-item-title">${escapeHtml(artifact.title || formatInspectorUrl(artifact.source_url))}</div>
+                  <div class="inspector-item-copy">${escapeHtml(parseError || `Parse status: ${artifact.parse_status}`)}</div>
+                </div>
+                <span class="${statusPillClass(tone)}">${escapeHtml(artifact.parse_status)}</span>
+              </div>
+              <div class="inspector-meta">
+                ${renderInspectorMetaPill('Type', artifact.source_type || artifact.source_document_type || 'other')}
+                ${renderInspectorMetaPill('Pages', artifact.summary?.page_count ?? 'n/a')}
+                ${renderInspectorMetaPill('Links', artifact.summary?.link_count ?? 'n/a')}
+              </div>
+              <div class="inspector-actions">
+                ${renderIconLink(artifact.source_page_url, `Open source page for ${artifact.title || artifact.source_url}`)}
+                ${
+                  artifact.source_document_id
+                    ? `<button type="button" class="ghost-button" data-action="reparse-source-document" data-source-document-id="${escapeHtml(artifact.source_document_id)}">Reparse</button>`
+                    : ''
+                }
+                ${
+                  artifact.source_document_id
+                    ? `<button type="button" class="ghost-button" data-action="reextract-workflow-source-document" data-source-document-id="${escapeHtml(artifact.source_document_id)}">Reextract Workflow</button>`
+                    : ''
+                }
+              </div>
+            </article>
+          `;
+        })
+        .join('')}
+    </div>
+  `;
+}
+
+function renderGenericStageInspector(detail) {
+  return `
+    <div class="inspector-grid">
+      <article class="history-detail-item">
+        <div class="detail-item-title">Input Summary</div>
+        <div class="history-detail-copy">${escapeHtml(JSON.stringify(detail.input_summary || {}, null, 2))}</div>
+      </article>
+      <article class="history-detail-item">
+        <div class="detail-item-title">Output Summary</div>
+        <div class="history-detail-copy">${escapeHtml(JSON.stringify(detail.output_summary || {}, null, 2))}</div>
+      </article>
+      <article class="history-detail-item">
+        <div class="detail-item-title">Error Summary</div>
+        <div class="history-detail-copy">${escapeHtml(JSON.stringify(detail.error_summary || {}, null, 2))}</div>
+      </article>
+    </div>
+  `;
+}
+
+function renderPipelineStageInspector() {
+  if (!elements.pipelineStageInspector) return;
+
+  if (!state.selectedSystemId) {
+    elements.pipelineStageInspector.innerHTML = '<div class="empty-state">Pick a hospital system to inspect stage runs.</div>';
+    return;
+  }
+
+  if (state.stageInspectorLoading) {
+    elements.pipelineStageInspector.innerHTML = '<div class="empty-state">Loading stage detail...</div>';
+    return;
+  }
+
+  if (!state.stageInspectorDetail) {
+    elements.pipelineStageInspector.innerHTML = '<div class="empty-state">Use Inspect on a stage card to reveal the exact seeds, fetched URLs, triage decisions, or parse failures behind that checkpoint.</div>';
+    return;
+  }
+
+  const detail = state.stageInspectorDetail;
+  let body = renderGenericStageInspector(detail);
+  if (detail.stage_key === 'seed_scope_stage') {
+    body = renderSeedScopeInspector(detail);
+  } else if (detail.stage_key === 'fetch_stage') {
+    body = renderFetchInspector(detail);
+  } else if (detail.stage_key === 'triage_stage') {
+    body = renderTriageInspector(detail);
+  } else if (detail.stage_key === 'acceptance_stage') {
+    body = renderAcceptanceInspector(detail);
+  } else if (detail.stage_key === 'parse_stage') {
+    body = renderParseInspector(detail);
+  }
+
+  elements.pipelineStageInspector.innerHTML = `
+    ${renderStageInspectorHeader(detail)}
+    ${body}
+  `;
+}
+
 function populateRunHistorySystemSelect() {
   const selectedValue =
     state.runHistoryFilterSystemId && state.runHistoryFilterSystemId !== '__all__'
@@ -2842,6 +3393,19 @@ function populateRunHistorySystemSelect() {
   ].join('');
 
   elements.runHistorySystemSelect.value = selectedValue;
+}
+
+async function loadPipelineStageRuns() {
+  if (!state.selectedSystemId) {
+    state.pipelineStageRuns = null;
+    return;
+  }
+
+  const search = new URLSearchParams({
+    system_id: state.selectedSystemId,
+    limit: '40',
+  });
+  state.pipelineStageRuns = await fetchJson(`/internal/pipeline/stage-runs?${search.toString()}`);
 }
 
 async function loadRunHistory() {
@@ -3023,6 +3587,7 @@ function renderStateView() {
     elements.systemsTable.innerHTML = '<div class="empty-state">Hospital systems appear here after a state is selected.</div>';
     elements.priorityBuckets.innerHTML = '';
     elements.pipelineVisual.innerHTML = '';
+    elements.pipelineStageInspector.innerHTML = '';
     elements.pipelineRunResult.innerHTML = '';
     elements.pipelineInsights.innerHTML = '';
     elements.pipelineResultsSummary.innerHTML = '';
@@ -3043,6 +3608,7 @@ function renderStateView() {
   renderPipelineSystemSelect();
   renderPipelineRunResult();
   renderPipelineVisual();
+  renderPipelineStageInspector();
   renderPipelineInsights();
   renderPipelineResults();
   populateRunHistorySystemSelect();
@@ -3103,8 +3669,12 @@ async function loadStateView(stateCode, options = {}) {
   ) {
     state.runHistoryFilterSystemId = state.selectedSystemId || '__all__';
   }
-  await loadSelectedSystemDetail();
-  await loadRunHistory();
+  await Promise.all([loadSelectedSystemDetail(), loadPipelineStageRuns(), loadRunHistory()]);
+
+  if (state.stageInspectorRunId && !currentStageInspectorRun()) {
+    state.stageInspectorRunId = null;
+    state.stageInspectorDetail = null;
+  }
 
   syncOverviewForCurrentState();
   renderHomeOverviewCards();
@@ -3144,14 +3714,136 @@ async function runPipelineActionForSelectedSystem({
       ranAt: new Date().toISOString(),
     };
 
+    const inspectorRunId =
+      result.stage_run_id ||
+      result.question_stage?.stage_run_id ||
+      result.workflow_stage?.stage_run_id ||
+      result.parse_stage?.stage_run_id ||
+      result.acceptance_stage?.stage_run_id ||
+      result.triage_stage?.stage_run_id ||
+      result.fetch_stage?.stage_run_id ||
+      result.seed_stage?.stage_run_id ||
+      null;
+
     await loadStateView(state.currentState, {
       preserveSelectedSystem: true,
       keepPipelineResult: true,
       stateTab: 'pipeline',
       pipelineTab: nextPipelineTab,
     });
+
+    if (inspectorRunId) {
+      await openStageInspector(inspectorRunId, { force: true });
+    }
   } finally {
     setPipelineActionState(null);
+  }
+}
+
+async function openStageInspector(runId, { force = false } = {}) {
+  if (!runId) {
+    state.stageInspectorRunId = null;
+    state.stageInspectorDetail = null;
+    state.stageInspectorLoading = false;
+    renderPipelineStageInspector();
+    return;
+  }
+
+  state.stageInspectorRunId = runId;
+  if (!force && state.stageInspectorCache[runId]) {
+    state.stageInspectorDetail = state.stageInspectorCache[runId];
+    state.stageInspectorLoading = false;
+    renderPipelineStageInspector();
+    return;
+  }
+
+  state.stageInspectorLoading = true;
+  renderPipelineStageInspector();
+  const detail = await fetchJson(`/internal/pipeline/stage-runs/${encodeURIComponent(runId)}`);
+  state.stageInspectorCache[runId] = detail;
+  if (state.stageInspectorRunId === runId) {
+    state.stageInspectorDetail = detail;
+    state.stageInspectorLoading = false;
+    renderPipelineStageInspector();
+  }
+}
+
+async function acceptTriageDecisionFromInspector(triageDecisionId) {
+  const result = await fetchJson(`/internal/triage-decisions/${encodeURIComponent(triageDecisionId)}/accept`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      created_by: 'operator-console',
+      notes: 'Accepted from pipeline inspector',
+    }),
+  });
+
+  notify('Accepted the triage decision into source documents.');
+  await loadStateView(state.currentState, {
+    preserveSelectedSystem: true,
+    keepPipelineResult: true,
+    stateTab: 'pipeline',
+    pipelineTab: 'flow',
+  });
+  await openStageInspector(result.stage_run_id || state.stageInspectorRunId, { force: true });
+}
+
+async function overrideTriageDecisionFromInspector(triageDecisionId, overrideDecision) {
+  const result = await fetchJson(`/internal/triage-decisions/${encodeURIComponent(triageDecisionId)}/override`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      override_decision: overrideDecision,
+      created_by: 'operator-console',
+      notes: `Override set to ${overrideDecision} from pipeline inspector`,
+    }),
+  });
+
+  notify(`Marked the triage decision as ${overrideDecision}.`);
+  state.stageInspectorCache = {};
+  await loadStateView(state.currentState, {
+    preserveSelectedSystem: true,
+    keepPipelineResult: true,
+    stateTab: 'pipeline',
+    pipelineTab: 'flow',
+  });
+  const triageRunId = result.override?.triage_stage_run_id || state.stageInspectorRunId;
+  if (triageRunId) {
+    await openStageInspector(triageRunId, { force: true });
+  }
+}
+
+async function rerunParseFromInspector(sourceDocumentId) {
+  const result = await fetchJson(`/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reparse`, {
+    method: 'POST',
+  });
+
+  notify('Reparse started for the selected source document.');
+  await loadStateView(state.currentState, {
+    preserveSelectedSystem: true,
+    keepPipelineResult: true,
+    stateTab: 'pipeline',
+    pipelineTab: 'flow',
+  });
+  if (result.stage_run_id) {
+    await openStageInspector(result.stage_run_id, { force: true });
+  }
+}
+
+async function rerunWorkflowFromInspector(sourceDocumentId) {
+  const result = await fetchJson(`/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reextract-workflow`, {
+    method: 'POST',
+  });
+
+  notify('Workflow extraction reran for the selected source document.');
+  await loadStateView(state.currentState, {
+    preserveSelectedSystem: true,
+    keepPipelineResult: true,
+    stateTab: 'pipeline',
+    pipelineTab: 'flow',
+  });
+  if (result.stage_run_id) {
+    await openStageInspector(result.stage_run_id, { force: true });
   }
 }
 
@@ -3163,10 +3855,70 @@ async function runPipelineForSelectedSystem() {
   });
 }
 
-async function runCrawlStageForSelectedSystem() {
+async function addSourcePageForSystem(systemId) {
+  const system = state.systems.find((entry) => entry.hospital_system_id === systemId) || null;
+  if (!system?.hospital_system_id) {
+    throw new Error('Hospital system not found in the current state view.');
+  }
+
+  const suggestedUrl = deriveSystemUrl(system) || '';
+  const enteredUrl = window.prompt(
+    `Add the medical-records source page for ${system.system_name}`,
+    suggestedUrl,
+  );
+  const nextUrl = String(enteredUrl || '').trim();
+  if (!nextUrl) {
+    return;
+  }
+
+  await fetchJson('/internal/manual-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      hospital_system_id: system.hospital_system_id,
+      official_page_url: nextUrl,
+      notes: 'Added from Systems view PDF Link',
+      update_seed_file: true,
+      crawl_now: false,
+    }),
+  });
+
+  notify(`Saved ${nextUrl} as the focused source page for ${system.system_name}.`);
+  await loadStateView(state.currentState, {
+    preserveSelectedSystem: true,
+    keepPipelineResult: true,
+    stateTab: 'systems',
+  });
+}
+
+async function runSeedStageForSelectedSystem() {
   await runPipelineActionForSelectedSystem({
-    actionKey: 'crawl_stage',
-    endpoint: '/internal/crawl/system',
+    actionKey: 'seed_scope_stage',
+    endpoint: '/internal/pipeline/system/seed-scope',
+    nextPipelineTab: 'flow',
+  });
+}
+
+async function runFetchStageForSelectedSystem() {
+  await runPipelineActionForSelectedSystem({
+    actionKey: 'fetch_stage',
+    endpoint: '/internal/pipeline/system/fetch',
+    nextPipelineTab: 'flow',
+  });
+}
+
+async function runTriageStageForSelectedSystem() {
+  await runPipelineActionForSelectedSystem({
+    actionKey: 'triage_stage',
+    endpoint: '/internal/pipeline/system/triage',
+    nextPipelineTab: 'flow',
+  });
+}
+
+async function runAcceptanceStageForSelectedSystem() {
+  await runPipelineActionForSelectedSystem({
+    actionKey: 'acceptance_stage',
+    endpoint: '/internal/pipeline/system/accept',
     nextPipelineTab: 'flow',
   });
 }
@@ -3190,7 +3942,7 @@ async function runWorkflowStageForSelectedSystem() {
 async function runQuestionStageForSelectedSystem() {
   await runPipelineActionForSelectedSystem({
     actionKey: 'question_extraction_stage',
-    endpoint: '/internal/pipeline/system/question-extraction',
+    endpoint: '/internal/pipeline/system/questions',
     nextPipelineTab: 'flow',
   });
 }
@@ -3211,17 +3963,21 @@ async function selectSystem(systemId) {
   state.selectedSystemId = systemId || null;
   setPipelineActionState(state.pipelineActionInFlight);
   resetPdfEditorState();
+  state.stageInspectorRunId = null;
+  state.stageInspectorDetail = null;
+  state.stageInspectorLoading = false;
+  state.stageInspectorCache = {};
 
   if (!state.runHistoryFilterSystemId || state.runHistoryFilterSystemId === previousSystemId) {
     state.runHistoryFilterSystemId = state.selectedSystemId || '__all__';
   }
 
-  await loadSelectedSystemDetail();
-  await loadRunHistory();
+  await Promise.all([loadSelectedSystemDetail(), loadPipelineStageRuns(), loadRunHistory()]);
   renderSystemsTable();
   renderPriorityBuckets();
   renderPipelineSystemSelect();
   renderPipelineVisual();
+  renderPipelineStageInspector();
   renderPipelineInsights();
   renderPipelineResults();
   populateRunHistorySystemSelect();
@@ -3391,7 +4147,7 @@ document.addEventListener('click', async (event) => {
     }
 
     if (button === elements.runCrawlStage) {
-      await runCrawlStageForSelectedSystem();
+      await runFetchStageForSelectedSystem();
       return;
     }
 
@@ -3429,6 +4185,11 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (button.dataset.action === 'add-system-source-page' && button.dataset.systemId) {
+      await addSourcePageForSystem(button.dataset.systemId);
+      return;
+    }
+
     if (button.dataset.action === 'open-systems-tab') {
       setStateTab('systems');
       return;
@@ -3450,8 +4211,28 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
-    if (button.dataset.action === 'run-crawl-stage') {
-      await runCrawlStageForSelectedSystem();
+    if (button.dataset.action === 'inspect-stage-run' && button.dataset.runId) {
+      await openStageInspector(button.dataset.runId, { force: true });
+      return;
+    }
+
+    if (button.dataset.action === 'run-seed-stage') {
+      await runSeedStageForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'run-fetch-stage') {
+      await runFetchStageForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'run-triage-stage') {
+      await runTriageStageForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'run-acceptance-stage') {
+      await runAcceptanceStageForSelectedSystem();
       return;
     }
 
@@ -3486,6 +4267,36 @@ document.addEventListener('click', async (event) => {
 
     if (button.dataset.action === 'open-pdf-editor' && button.dataset.sourceDocumentId) {
       await openPdfEditor(button.dataset.sourceDocumentId);
+      return;
+    }
+
+    if (button.dataset.action === 'accept-triage-decision' && button.dataset.triageId) {
+      await acceptTriageDecisionFromInspector(button.dataset.triageId);
+      return;
+    }
+
+    if (
+      button.dataset.action === 'override-triage-decision' &&
+      button.dataset.triageId &&
+      button.dataset.decision
+    ) {
+      await overrideTriageDecisionFromInspector(
+        button.dataset.triageId,
+        button.dataset.decision,
+      );
+      return;
+    }
+
+    if (button.dataset.action === 'reparse-source-document' && button.dataset.sourceDocumentId) {
+      await rerunParseFromInspector(button.dataset.sourceDocumentId);
+      return;
+    }
+
+    if (
+      button.dataset.action === 'reextract-workflow-source-document' &&
+      button.dataset.sourceDocumentId
+    ) {
+      await rerunWorkflowFromInspector(button.dataset.sourceDocumentId);
       return;
     }
 

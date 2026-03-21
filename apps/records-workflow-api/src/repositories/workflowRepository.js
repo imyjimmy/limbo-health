@@ -346,6 +346,7 @@ export async function insertSourceDocument(
     sourceUrl,
     sourcePageUrl = null,
     discoveredFromUrl = null,
+    acceptedStageRunId = null,
     fetchArtifactId = null,
     triageDecisionId = null,
     sourceType,
@@ -370,6 +371,7 @@ export async function insertSourceDocument(
        source_url,
        source_page_url,
        discovered_from_url,
+       accepted_stage_run_id,
        fetch_artifact_id,
        triage_decision_id,
        source_type,
@@ -383,7 +385,7 @@ export async function insertSourceDocument(
        import_mode,
        import_notes
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      on conflict (hospital_system_id, source_url, content_hash)
      do update set hospital_system_id = case
                      when excluded.facility_id is not null then excluded.hospital_system_id
@@ -395,6 +397,7 @@ export async function insertSourceDocument(
                    title = excluded.title,
                    source_page_url = coalesce(excluded.source_page_url, source_documents.source_page_url),
                    discovered_from_url = coalesce(excluded.discovered_from_url, source_documents.discovered_from_url),
+                   accepted_stage_run_id = coalesce(excluded.accepted_stage_run_id, source_documents.accepted_stage_run_id),
                    fetch_artifact_id = coalesce(excluded.fetch_artifact_id, source_documents.fetch_artifact_id),
                    triage_decision_id = coalesce(excluded.triage_decision_id, source_documents.triage_decision_id),
                    storage_path = excluded.storage_path,
@@ -409,6 +412,7 @@ export async function insertSourceDocument(
       sourceUrl,
       sourcePageUrl,
       discoveredFromUrl,
+      acceptedStageRunId,
       fetchArtifactId,
       triageDecisionId,
       sourceType,

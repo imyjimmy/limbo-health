@@ -1,7 +1,11 @@
 import { query } from '../db.js';
 import { runCrawl } from './crawlService.js';
+import { runAcceptanceStage } from './pipeline/acceptanceStageService.js';
+import { runFetchStage } from './pipeline/fetchStageService.js';
 import { runParseStage } from './pipeline/parseStageService.js';
 import { runQuestionExtractionStage } from './pipeline/questionExtractionStageService.js';
+import { runSeedScopeStage } from './pipeline/seedScopeStageService.js';
+import { runTriageStage } from './pipeline/triageStageService.js';
 import { runWorkflowExtractionStage } from './pipeline/workflowExtractionStageService.js';
 
 const SNAPSHOT_METRICS = [
@@ -258,6 +262,105 @@ function withStageSummary(summary = {}, { stageKey, stageLabel, stageStatus = nu
   };
 }
 
+function stageSummaryToHistoryStatus(
+  stageSummary,
+  {
+    noSeedStatuses = ['no_seeds'],
+    noDocumentStatuses = ['no_documents', 'no_pdfs'],
+  } = {},
+) {
+  const stageStatus = stageSummary?.stage_status || stageSummary?.status || 'ok';
+  if (stageStatus === 'failed') return 'failed';
+  if (noSeedStatuses.includes(stageStatus) || noDocumentStatuses.includes(stageStatus)) {
+    return 'no_seeds';
+  }
+  return 'ok';
+}
+
+async function runTrackedStageExecution({
+  state = null,
+  systemId = null,
+  systemName = null,
+  stageKey,
+  stageLabel,
+  executeStage,
+  noSeedStatuses = ['no_seeds'],
+  noDocumentStatuses = ['no_documents', 'no_pdfs'],
+} = {}) {
+  const normalizedState = normalizeState(state);
+  const beforeSnapshot = await captureSystemSnapshot({
+    state: normalizedState,
+    systemId,
+    systemName,
+  });
+
+  try {
+    const stageSummary = await executeStage({
+      state: normalizedState,
+      systemId: beforeSnapshot.hospital_system_id || systemId,
+      systemName: beforeSnapshot.system_name || systemName,
+    });
+    const afterSnapshot = await captureSystemSnapshot({
+      state: normalizedState || beforeSnapshot.state,
+      systemId: beforeSnapshot.hospital_system_id || systemId,
+      systemName: beforeSnapshot.system_name || systemName,
+    });
+    const changeSummary = summarizeChanges(beforeSnapshot, afterSnapshot);
+    const historyEntry = await insertRunHistory({
+      state: normalizedState || afterSnapshot.state,
+      systemId: afterSnapshot.hospital_system_id || systemId,
+      systemName: afterSnapshot.system_name || beforeSnapshot.system_name || systemName,
+      status: stageSummaryToHistoryStatus(stageSummary, {
+        noSeedStatuses,
+        noDocumentStatuses,
+      }),
+      crawlSummary: stageSummary,
+      beforeSnapshot,
+      afterSnapshot,
+      changeSummary,
+    });
+
+    return {
+      ...stageSummary,
+      history_entry: mapHistoryRow(historyEntry),
+    };
+  } catch (error) {
+    const afterSnapshot = await captureSystemSnapshot({
+      state: normalizedState || beforeSnapshot.state,
+      systemId: beforeSnapshot.hospital_system_id || systemId,
+      systemName: beforeSnapshot.system_name || systemName,
+    });
+    const changeSummary = summarizeChanges(beforeSnapshot, afterSnapshot);
+
+    await insertRunHistory({
+      state: normalizedState || afterSnapshot.state,
+      systemId: afterSnapshot.hospital_system_id || systemId,
+      systemName: afterSnapshot.system_name || beforeSnapshot.system_name || systemName,
+      status: 'failed',
+      crawlSummary: withStageSummary(
+        {
+          status: 'failed',
+          crawled: 0,
+          extracted: 0,
+          failed: 1,
+          systems: systemId ? 1 : 0,
+          error: error instanceof Error ? error.message : `${stageLabel} failed.`,
+        },
+        {
+          stageKey,
+          stageLabel,
+          stageStatus: 'failed',
+        },
+      ),
+      beforeSnapshot,
+      afterSnapshot,
+      changeSummary,
+    });
+
+    throw error;
+  }
+}
+
 async function runSystemQuestionExtractionBatch({
   systemId,
   replaceDraft = true,
@@ -453,79 +556,117 @@ export async function runTrackedQuestionExtractionStage({
   systemName = null,
   replaceDraft = true,
 } = {}) {
-  const normalizedState = normalizeState(state);
-  const beforeSnapshot = await captureSystemSnapshot({
-    state: normalizedState,
+  return runTrackedStageExecution({
+    state,
     systemId,
     systemName,
+    stageKey: 'question_extraction_stage',
+    stageLabel: 'Question Extraction Stage',
+    executeStage: async ({ systemId: resolvedSystemId }) =>
+      runSystemQuestionExtractionBatch({
+        systemId: resolvedSystemId,
+        replaceDraft,
+      }),
+    noDocumentStatuses: ['no_documents', 'no_pdfs'],
   });
+}
 
-  try {
-    const questionSummary = await runSystemQuestionExtractionBatch({
-      systemId: beforeSnapshot.hospital_system_id || systemId,
-      replaceDraft,
-    });
-    const afterSnapshot = await captureSystemSnapshot({
-      state: normalizedState || beforeSnapshot.state || questionSummary.state,
-      systemId: beforeSnapshot.hospital_system_id || systemId,
-      systemName: beforeSnapshot.system_name || questionSummary.system_name || systemName,
-    });
-    const changeSummary = summarizeChanges(beforeSnapshot, afterSnapshot);
-    const historyEntry = await insertRunHistory({
-      state: normalizedState || afterSnapshot.state || questionSummary.state,
-      systemId: afterSnapshot.hospital_system_id || systemId,
-      systemName: afterSnapshot.system_name || beforeSnapshot.system_name || questionSummary.system_name || systemName,
-      status:
-        questionSummary.stage_status === 'failed'
-          ? 'failed'
-          : questionSummary.stage_status === 'no_pdfs'
-            ? 'no_seeds'
-            : 'ok',
-      crawlSummary: questionSummary,
-      beforeSnapshot,
-      afterSnapshot,
-      changeSummary,
-    });
+export async function runTrackedSeedScopeStage({
+  state = null,
+  systemId = null,
+  systemName = null,
+  facilityId = null,
+  seedUrl = null,
+  hospitalSystemIds = [],
+} = {}) {
+  return runTrackedStageExecution({
+    state,
+    systemId,
+    systemName,
+    stageKey: 'seed_scope_stage',
+    stageLabel: 'Seed Scope Stage',
+    executeStage: async ({ state: normalizedState, systemId: resolvedSystemId, systemName: resolvedSystemName }) =>
+      runSeedScopeStage({
+        state: normalizedState,
+        systemId: resolvedSystemId,
+        systemName: resolvedSystemName,
+        facilityId,
+        seedUrl,
+        hospitalSystemIds,
+      }),
+    noDocumentStatuses: [],
+  });
+}
 
-    return {
-      ...questionSummary,
-      history_entry: mapHistoryRow(historyEntry),
-    };
-  } catch (error) {
-    const afterSnapshot = await captureSystemSnapshot({
-      state: normalizedState || beforeSnapshot.state,
-      systemId: beforeSnapshot.hospital_system_id || systemId,
-      systemName: beforeSnapshot.system_name || systemName,
-    });
-    const changeSummary = summarizeChanges(beforeSnapshot, afterSnapshot);
+export async function runTrackedFetchStage({
+  state = null,
+  systemId = null,
+  systemName = null,
+  facilityId = null,
+  seedUrl = null,
+  hospitalSystemIds = [],
+  maxDepth = undefined,
+} = {}) {
+  return runTrackedStageExecution({
+    state,
+    systemId,
+    systemName,
+    stageKey: 'fetch_stage',
+    stageLabel: 'Fetch Stage',
+    executeStage: async ({ state: normalizedState, systemId: resolvedSystemId, systemName: resolvedSystemName }) =>
+      runFetchStage({
+        state: normalizedState,
+        systemId: resolvedSystemId,
+        systemName: resolvedSystemName,
+        facilityId,
+        seedUrl,
+        hospitalSystemIds,
+        maxDepth,
+      }),
+    noDocumentStatuses: [],
+  });
+}
 
-    await insertRunHistory({
-      state: normalizedState || afterSnapshot.state,
-      systemId: afterSnapshot.hospital_system_id || systemId,
-      systemName: afterSnapshot.system_name || beforeSnapshot.system_name || systemName,
-      status: 'failed',
-      crawlSummary: withStageSummary(
-        {
-          status: 'failed',
-          crawled: 0,
-          extracted: 0,
-          failed: 1,
-          systems: systemId ? 1 : 0,
-          error: error.message,
-        },
-        {
-          stageKey: 'question_extraction_stage',
-          stageLabel: 'Question Extraction Stage',
-          stageStatus: 'failed',
-        },
-      ),
-      beforeSnapshot,
-      afterSnapshot,
-      changeSummary,
-    });
+export async function runTrackedTriageStage({
+  state = null,
+  systemId = null,
+  systemName = null,
+  fetchStageRunId = null,
+} = {}) {
+  return runTrackedStageExecution({
+    state,
+    systemId,
+    systemName,
+    stageKey: 'triage_stage',
+    stageLabel: 'Document Triage Stage',
+    executeStage: async ({ systemId: resolvedSystemId, systemName: resolvedSystemName }) =>
+      runTriageStage({
+        systemId: resolvedSystemId,
+        systemName: resolvedSystemName,
+        fetchStageRunId,
+      }),
+  });
+}
 
-    throw error;
-  }
+export async function runTrackedAcceptanceStage({
+  state = null,
+  systemId = null,
+  systemName = null,
+  triageStageRunId = null,
+} = {}) {
+  return runTrackedStageExecution({
+    state,
+    systemId,
+    systemName,
+    stageKey: 'acceptance_stage',
+    stageLabel: 'Acceptance Stage',
+    executeStage: async ({ systemId: resolvedSystemId, systemName: resolvedSystemName }) =>
+      runAcceptanceStage({
+        systemId: resolvedSystemId,
+        systemName: resolvedSystemName,
+        triageStageRunId,
+      }),
+  });
 }
 
 export async function runTrackedParseStage({
@@ -699,66 +840,98 @@ export async function runTrackedFullSystemPipeline({
   });
 
   try {
-    const crawlStage = withStageSummary(
-      await runCrawl({
-        state: normalizedState,
-        systemId,
-        systemName,
-        facilityId,
-        seedUrl,
-        maxDepth,
-      }),
-      {
-        stageKey: 'crawl_stage',
-        stageLabel: 'Crawl Stage',
-      },
-    );
+    const resolvedSystemId = beforeSnapshot.hospital_system_id || systemId;
+    const resolvedSystemName = beforeSnapshot.system_name || systemName;
+
+    const seedStage = await runSeedScopeStage({
+      state: normalizedState,
+      systemId: resolvedSystemId,
+      systemName: resolvedSystemName,
+      facilityId,
+      seedUrl,
+    });
+
+    const fetchStage = await runFetchStage({
+      state: normalizedState,
+      systemId: resolvedSystemId,
+      systemName: resolvedSystemName,
+      facilityId,
+      seedUrl,
+      maxDepth,
+    });
+
+    const triageStage = await runTriageStage({
+      systemId: resolvedSystemId,
+      systemName: resolvedSystemName,
+      fetchStageRunId: fetchStage.stage_run_id || null,
+    });
+
+    const acceptanceStage = await runAcceptanceStage({
+      systemId: resolvedSystemId,
+      systemName: resolvedSystemName,
+      triageStageRunId: triageStage.stage_run_id || null,
+    });
 
     const parseStage = await runParseStage({
-      systemId: beforeSnapshot.hospital_system_id || systemId,
+      systemId: resolvedSystemId,
     });
 
     const workflowStage = await runWorkflowExtractionStage({
-      systemId: beforeSnapshot.hospital_system_id || systemId,
+      systemId: resolvedSystemId,
     });
 
     const questionStage = await runSystemQuestionExtractionBatch({
-      systemId: beforeSnapshot.hospital_system_id || systemId,
+      systemId: resolvedSystemId,
       replaceDraft,
     });
 
     const afterSnapshot = await captureSystemSnapshot({
       state: normalizedState || beforeSnapshot.state || questionStage.state,
-      systemId: beforeSnapshot.hospital_system_id || systemId,
+      systemId: resolvedSystemId,
       systemName: beforeSnapshot.system_name || questionStage.system_name || systemName,
     });
     const changeSummary = summarizeChanges(beforeSnapshot, afterSnapshot);
     const combinedStatus =
-      crawlStage.status === 'failed' ||
+      fetchStage.status === 'failed' ||
+      triageStage.status === 'failed' ||
+      acceptanceStage.status === 'failed' ||
       parseStage.stage_status === 'failed' ||
       workflowStage.stage_status === 'failed' ||
       questionStage.stage_status === 'failed'
         ? 'failed'
-        : crawlStage.status === 'no_seeds'
+        : seedStage.stage_status === 'no_seeds' || fetchStage.stage_status === 'no_seeds'
           ? 'no_seeds'
+          : questionStage.stage_status === 'no_pdfs' || questionStage.stage_status === 'no_documents'
+            ? 'no_pdfs'
           : 'ok';
 
     const fullSummary = withStageSummary(
       {
         status: combinedStatus,
-        systems: Math.max(toInt(crawlStage.systems), toInt(questionStage.systems), systemId ? 1 : 0),
-        crawled: toInt(crawlStage.crawled),
-        extracted: toInt(workflowStage.extracted),
+        systems: Math.max(toInt(fetchStage.systems), toInt(questionStage.systems), systemId ? 1 : 0),
+        crawled: toInt(fetchStage.crawled),
+        extracted: toInt(questionStage.extracted),
         failed:
-          toInt(crawlStage.failed) +
+          toInt(fetchStage.failed) +
+          toInt(triageStage.failed) +
+          toInt(acceptanceStage.failed) +
           toInt(parseStage.failed) +
           toInt(workflowStage.failed) +
           toInt(questionStage.failed),
+        seed_urls: toInt(seedStage.seed_urls),
+        fetched_documents: toInt(fetchStage.fetched_documents),
+        accepted_documents: toInt(triageStage.accepted_documents),
+        skipped_documents: toInt(triageStage.skipped_documents),
+        review_needed_documents: toInt(triageStage.review_needed_documents),
+        source_documents_upserted: toInt(acceptanceStage.source_documents_upserted),
         parsed_documents: toInt(parseStage.parsed_documents),
         workflow_rows: toInt(workflowStage.workflow_rows),
         reextracted: toInt(questionStage.reextracted),
         pdf_documents: toInt(questionStage.pdf_documents),
-        crawl_stage: crawlStage,
+        seed_stage: seedStage,
+        fetch_stage: fetchStage,
+        triage_stage: triageStage,
+        acceptance_stage: acceptanceStage,
         parse_stage: parseStage,
         workflow_stage: workflowStage,
         question_stage: questionStage,
@@ -766,13 +939,7 @@ export async function runTrackedFullSystemPipeline({
       {
         stageKey: 'full_pipeline',
         stageLabel: 'Full Pipeline',
-        stageStatus:
-          questionStage.stage_status === 'no_pdfs' &&
-          crawlStage.status === 'ok' &&
-          parseStage.stage_status !== 'failed' &&
-          workflowStage.stage_status !== 'failed'
-            ? 'question_stage_empty'
-            : combinedStatus,
+        stageStatus: combinedStatus,
       },
     );
 

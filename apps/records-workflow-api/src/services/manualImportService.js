@@ -13,7 +13,7 @@ import {
   saveExtractionResult,
   upsertSeedUrl,
 } from '../repositories/workflowRepository.js';
-import { resolveRawStoragePath, ensureRawStorageStateDir } from '../utils/rawStorage.js';
+import { ensureSourceDocumentStateDir, resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
 import { sha256 } from '../utils/hash.js';
 import { assignPdfStoragePath } from '../utils/pdfStorage.js';
 import { collapseWhitespace } from '../utils/text.js';
@@ -140,7 +140,7 @@ async function readBinaryImportInput({ localFilePath = null, fileBase64 = null }
 }
 
 async function writeManualHtmlSnapshot({ state, contentHash, title, html }) {
-  const stateDir = await ensureRawStorageStateDir(state);
+  const stateDir = await ensureSourceDocumentStateDir(state);
   const snapshotDir = path.join(stateDir, 'manual-html');
   const fileStem = slugify(title || '') || contentHash.slice(0, 16);
   const filePath = path.join(snapshotDir, `${fileStem}-${contentHash.slice(0, 12)}.html`);
@@ -377,7 +377,7 @@ export async function importManualPdf({
   const context = await resolveSystemContext({ hospitalSystemId, facilityId, state });
   const input = await readBinaryImportInput({ localFilePath, fileBase64 });
   const contentHash = sha256(input.buffer);
-  const stateDir = await ensureRawStorageStateDir(context.state);
+  const stateDir = await ensureSourceDocumentStateDir(context.state);
   const tempStoragePath = path.join(stateDir, `${contentHash}.pdf`);
   await fs.writeFile(tempStoragePath, input.buffer);
 
@@ -393,7 +393,7 @@ export async function importManualPdf({
   });
   const title = buildPdfFallbackTitle(parsed, titleOverride, input.fileName);
   const finalStoragePath = await assignPdfStoragePath({
-    currentStoragePath: resolveRawStoragePath(tempStoragePath),
+    currentStoragePath: resolveSourceDocumentPath(tempStoragePath),
     contentHash,
     state: context.state,
     systemName: context.system.system_name,

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { sha256 } from './hash.js';
 import { buildMedicalRecordsPdfFilenameStem } from './pdfNaming.js';
 import { deriveAutomaticPdfTitleOverride } from './pdfTitleOverrides.js';
-import { ensureRawStorageStateDir } from './rawStorage.js';
+import { ensureSourceDocumentStateDir } from './sourceDocumentStorage.js';
 
 const SAFE_FILENAME_BYTES = 240;
 
@@ -72,7 +72,7 @@ export async function assignPdfStoragePath({
     headerText,
     headerLines
   });
-  const stateStorageDir = await ensureRawStorageStateDir(state);
+  const stateStorageDir = await ensureSourceDocumentStateDir(state);
 
   let safeBaseStem = baseStem;
   try {

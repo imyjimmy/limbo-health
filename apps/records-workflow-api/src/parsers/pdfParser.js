@@ -14,7 +14,6 @@ const PHONE_PATTERN =
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const execFile = promisify(execFileCallback);
 const PDF_EXTRACTOR_PATH = fileURLToPath(new URL('./pdf_extract.py', import.meta.url));
-const PDF_PYTHON_BIN = resolvePythonExecutable({ overrideEnvVar: 'RECORDS_PDF_PYTHON_BIN' });
 
 function normalizeHeaderLines(rawHeaderLines = []) {
   return rawHeaderLines
@@ -67,7 +66,8 @@ export async function parsePdfDocument({ buffer, filePath = null }) {
   const { pdfPath, cleanup } = await withTemporaryPdfPath(buffer, filePath);
 
   try {
-    const { stdout } = await execFile(PDF_PYTHON_BIN, [PDF_EXTRACTOR_PATH, pdfPath], {
+    const pythonBin = resolvePythonExecutable({ overrideEnvVar: 'RECORDS_PDF_PYTHON_BIN' });
+    const { stdout } = await execFile(pythonBin, [PDF_EXTRACTOR_PATH, pdfPath], {
       maxBuffer: 20 * 1024 * 1024
     });
     const parsed = JSON.parse(stdout || '{}');

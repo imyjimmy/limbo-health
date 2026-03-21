@@ -4,6 +4,7 @@ import { resolvePythonExecutable } from './utils/pythonRuntime.js';
 
 const execFile = promisify(execFileCallback);
 const pythonBin = resolvePythonExecutable();
+const fetchPythonBin = resolvePythonExecutable({ overrideEnvVar: 'RECORDS_FETCH_PYTHON_BIN' });
 
 const verificationScript = `
 import importlib.metadata as metadata
@@ -28,5 +29,9 @@ const { stdout } = await execFile(pythonBin, ['-c', verificationScript], {
   maxBuffer: 2 * 1024 * 1024,
 });
 
-process.stdout.write(stdout.trim());
+const runtimeInfo = JSON.parse(stdout || '{}');
+runtimeInfo.fetch_backend = process.env.RECORDS_FETCH_BACKEND || 'scrapling';
+runtimeInfo.fetch_python = fetchPythonBin;
+
+process.stdout.write(JSON.stringify(runtimeInfo));
 process.stdout.write('\n');
