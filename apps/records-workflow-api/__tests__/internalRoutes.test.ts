@@ -47,6 +47,15 @@ vi.mock('../src/services/questionReviewService.js', () => ({
   saveQuestionReviewDraft: vi.fn(),
 }));
 
+vi.mock('../src/services/pipelineRunHistoryService.js', () => ({
+  listPipelineRunHistory: vi.fn(),
+  runTrackedFullSystemPipeline: vi.fn(),
+  runTrackedParseStage: vi.fn(),
+  runTrackedQuestionExtractionStage: vi.fn(),
+  runTrackedSystemPipeline: vi.fn(),
+  runTrackedWorkflowExtractionStage: vi.fn(),
+}));
+
 vi.mock('../src/services/seedService.js', () => ({
   reseedFromFile: vi.fn(),
   resolveSeedFilePath: vi.fn(),
@@ -74,6 +83,10 @@ import {
   getStateSummary,
   listStateSystems,
 } from '../src/services/stateSummaryService.js';
+import {
+  runTrackedParseStage,
+  runTrackedWorkflowExtractionStage,
+} from '../src/services/pipelineRunHistoryService.js';
 
 describe('records-workflow internal routes', () => {
   let server: http.Server;
@@ -312,6 +325,70 @@ describe('records-workflow internal routes', () => {
       status: 'ok',
       systems: 1,
       extracted: 2,
+    });
+  });
+
+  it('runs the parse stage for one hospital system', async () => {
+    vi.mocked(runTrackedParseStage).mockResolvedValue({
+      status: 'ok',
+      stage_key: 'parse_stage',
+      parsed_documents: 3,
+      failed: 1,
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/pipeline/system/parse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        state: 'TX',
+        system_id: 'system-1',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(runTrackedParseStage).toHaveBeenCalledWith({
+      state: 'TX',
+      systemId: 'system-1',
+      systemName: null,
+      sourceType: null,
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'ok',
+      stage_key: 'parse_stage',
+      parsed_documents: 3,
+      failed: 1,
+    });
+  });
+
+  it('runs the workflow extraction stage for one hospital system', async () => {
+    vi.mocked(runTrackedWorkflowExtractionStage).mockResolvedValue({
+      status: 'ok',
+      stage_key: 'workflow_extraction_stage',
+      workflow_rows: 6,
+      partial_documents: 1,
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/pipeline/system/workflows`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        state: 'TX',
+        system_id: 'system-1',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(runTrackedWorkflowExtractionStage).toHaveBeenCalledWith({
+      state: 'TX',
+      systemId: 'system-1',
+      systemName: null,
+      sourceType: null,
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'ok',
+      stage_key: 'workflow_extraction_stage',
+      workflow_rows: 6,
+      partial_documents: 1,
     });
   });
 });

@@ -349,11 +349,21 @@ async function loadStateSystemStats(state) {
          where hs.state = $1
            and er.extractor_name = 'pdf_form_understanding_openai'
          order by er.source_document_id, er.created_at desc
+       ),
+       latest_parsed_artifacts as (
+         select distinct on (pa.source_document_id)
+           pa.source_document_id,
+           pa.parse_status
+         from parsed_artifacts pa
+         join source_documents sd on sd.id = pa.source_document_id
+         join hospital_systems hs on hs.id = sd.hospital_system_id
+         where hs.state = $1
+         order by pa.source_document_id, pa.created_at desc
        )
        select
          hs.system_name,
          count(*) filter (
-           where coalesce(latest_workflow_runs.structured_output->'metadata'->>'pdfParseStatus', '') in ('failed', 'empty_text')
+           where coalesce(latest_parsed_artifacts.parse_status, '') in ('failed', 'empty_text')
          )::int as parse_failures,
          count(*) filter (where latest_workflow_runs.status = 'partial')::int as partial_workflows,
          count(*) filter (
@@ -374,6 +384,8 @@ async function loadStateSystemStats(state) {
        from hospital_systems hs
        left join source_documents sd
          on sd.hospital_system_id = hs.id
+       left join latest_parsed_artifacts
+         on latest_parsed_artifacts.source_document_id = sd.id
        left join latest_workflow_runs
          on latest_workflow_runs.source_document_id = sd.id
        left join latest_form_runs

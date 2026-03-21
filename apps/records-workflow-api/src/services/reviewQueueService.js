@@ -35,18 +35,17 @@ export async function getStateReviewQueue(state) {
     manualImportsPendingRecrawl,
   ] = await Promise.all([
     query(
-      `with latest_workflow_runs as (
-         select distinct on (er.source_document_id)
-           er.source_document_id,
-           er.status,
-           er.structured_output,
-           er.created_at
-         from extraction_runs er
-         join source_documents sd on sd.id = er.source_document_id
+      `with latest_parsed_artifacts as (
+         select distinct on (pa.source_document_id)
+           pa.source_document_id,
+           pa.parse_status,
+           pa.summary,
+           pa.created_at
+         from parsed_artifacts pa
+         join source_documents sd on sd.id = pa.source_document_id
          join hospital_systems hs on hs.id = sd.hospital_system_id
          where hs.state = $1
-           and er.extractor_name = 'workflow_extractor'
-         order by er.source_document_id, er.created_at desc
+         order by pa.source_document_id, pa.created_at desc
        )
        select
          sd.id as source_document_id,
@@ -57,16 +56,15 @@ export async function getStateReviewQueue(state) {
          sd.source_url,
          sd.title,
          sd.fetched_at,
-         latest_workflow_runs.status as extraction_status,
-         latest_workflow_runs.structured_output->'metadata'->>'pdfParseStatus' as pdf_parse_status,
-         latest_workflow_runs.structured_output->'metadata'->>'pdfParseError' as pdf_parse_error
+         latest_parsed_artifacts.parse_status as pdf_parse_status,
+         latest_parsed_artifacts.summary->>'parse_error' as pdf_parse_error
        from source_documents sd
        join hospital_systems hs on hs.id = sd.hospital_system_id
        left join facilities f on f.id = sd.facility_id
-       join latest_workflow_runs on latest_workflow_runs.source_document_id = sd.id
+       join latest_parsed_artifacts on latest_parsed_artifacts.source_document_id = sd.id
        where hs.state = $1
          and sd.source_type = 'pdf'
-         and coalesce(latest_workflow_runs.structured_output->'metadata'->>'pdfParseStatus', '') in ('failed', 'empty_text')
+         and coalesce(latest_parsed_artifacts.parse_status, '') in ('failed', 'empty_text')
        order by sd.fetched_at desc, hs.system_name asc`,
       [normalizedState],
     ),

@@ -76,6 +76,18 @@ export async function getHospitalSystemDetail(systemId) {
              and er.extractor_name = 'pdf_form_understanding_openai'
            order by er.source_document_id, er.created_at desc
          ),
+         latest_parsed_artifacts as (
+           select distinct on (pa.source_document_id)
+             pa.source_document_id,
+             pa.id,
+             pa.parse_status,
+             pa.storage_path,
+             pa.created_at
+           from parsed_artifacts pa
+           join source_documents sd on sd.id = pa.source_document_id
+           where sd.hospital_system_id = $1
+           order by pa.source_document_id, pa.created_at desc
+         ),
          version_counts as (
            select
              source_document_id,
@@ -95,13 +107,20 @@ export async function getHospitalSystemDetail(systemId) {
            sd.storage_path,
            sd.import_mode,
            sd.import_notes,
+           latest_parsed_artifacts.id as latest_parsed_artifact_id,
+           latest_parsed_artifacts.parse_status as latest_parse_status,
+           latest_parsed_artifacts.storage_path as latest_parsed_storage_path,
            latest_workflow_runs.status as latest_workflow_status,
-           latest_workflow_runs.structured_output->'metadata'->>'pdfParseStatus' as pdf_parse_status,
+           coalesce(
+             latest_parsed_artifacts.parse_status,
+             latest_workflow_runs.structured_output->'metadata'->>'pdfParseStatus'
+           ) as pdf_parse_status,
            pqt.status as question_template_status,
            coalesce(version_counts.published_versions, 0) as published_versions,
            latest_form_runs.status as latest_question_extraction_status
          from source_documents sd
          left join facilities f on f.id = sd.facility_id
+         left join latest_parsed_artifacts on latest_parsed_artifacts.source_document_id = sd.id
          left join latest_workflow_runs on latest_workflow_runs.source_document_id = sd.id
          left join latest_form_runs on latest_form_runs.source_document_id = sd.id
          left join pdf_question_templates pqt on pqt.source_document_id = sd.id

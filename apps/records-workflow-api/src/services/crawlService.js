@@ -1,13 +1,10 @@
 import fs from 'node:fs/promises';
 import { fetchAndParseDocument } from '../crawler/fetcher.js';
-import { expandCandidateLinks, isOfficialDomain } from '../crawler/linkExpander.js';
-import { extractPdfFormUnderstanding } from '../extractors/pdfFormUnderstandingExtractor.js';
-import { extractWorkflowBundle } from '../extractors/workflowExtractor.js';
+import { expandCandidateLinks } from '../crawler/linkExpander.js';
 import { config } from '../config.js';
 import {
-  insertExtractionRun,
+  insertSourceDocument,
   listActiveSeeds,
-  saveExtractionResult,
 } from '../repositories/workflowRepository.js';
 import { assignPdfStoragePath } from '../utils/pdfStorage.js';
 import { classifyMedicalRecordsRequestDocument } from '../utils/urls.js';
@@ -179,70 +176,25 @@ export async function runCrawl({
           });
         }
 
-        const bundle = extractWorkflowBundle(fetched.parsed, {
-          isOfficialDomain: isOfficialDomain(fetched.finalUrl, system.canonicalDomain)
-        });
-
-        const status = bundle.workflows.length > 0 ? 'success' : 'partial';
         const sourcePageUrl =
           fetched.sourceType === 'html'
             ? fetched.finalUrl
             : item.sourceContext?.sourceUrl || null;
 
-        const sourceDocumentId = await saveExtractionResult({
-          sourceDocument: {
-            hospitalSystemId: system.systemId,
-            facilityId: item.facilityId,
-            sourceUrl: fetched.finalUrl,
-            sourcePageUrl,
-            sourceType: fetched.sourceType,
-            title: fetched.title || derivePdfTitleFallback(item.sourceContext) || null,
-            fetchedAt: fetched.fetchedAt,
-            httpStatus: fetched.status,
-            contentHash: fetched.contentHash,
-            storagePath,
-            extractedText: fetched.extractedText,
-            parserVersion: fetched.parserVersion
-          },
-          status,
-          portal: bundle.portal,
-          workflows: bundle.workflows,
-          structuredOutput: {
-            portal: bundle.portal,
-            workflows: bundle.workflows,
-            evidenceSnippets: bundle.evidenceSnippets,
-            metadata: {
-              sourceUrl: fetched.finalUrl,
-              sourcePageUrl,
-              sourceType: fetched.sourceType,
-              httpStatus: fetched.status,
-              documentClassificationBasis: documentClassification.basis,
-              pdfParseStatus: fetched.parsed?.parseStatus || null,
-              pdfParseError: fetched.parsed?.parseError || null,
-              pdfRepairAttempted: Boolean(fetched.parsed?.repairAttempted),
-              pdfRepaired: Boolean(fetched.parsed?.repaired),
-              sourceContext: item.sourceContext || null
-            }
-          }
+        await insertSourceDocument({
+          hospitalSystemId: system.systemId,
+          facilityId: item.facilityId,
+          sourceUrl: fetched.finalUrl,
+          sourcePageUrl,
+          sourceType: fetched.sourceType,
+          title: fetched.title || derivePdfTitleFallback(item.sourceContext) || null,
+          fetchedAt: fetched.fetchedAt,
+          httpStatus: fetched.status,
+          contentHash: fetched.contentHash,
+          storagePath,
+          extractedText: fetched.extractedText,
+          parserVersion: fetched.parserVersion,
         });
-
-        if (fetched.sourceType === 'pdf') {
-          const formUnderstandingExtraction = await extractPdfFormUnderstanding({
-            parsedPdf: fetched.parsed,
-            hospitalSystemName: system.systemName,
-            facilityName: item.facilityName,
-            formName: fetched.title || derivePdfTitleFallback(item.sourceContext) || 'Authorization Form',
-            sourceUrl: fetched.finalUrl,
-          });
-
-          await insertExtractionRun({
-            sourceDocumentId,
-            extractorName: formUnderstandingExtraction.extractorName,
-            extractorVersion: formUnderstandingExtraction.extractorVersion,
-            status: formUnderstandingExtraction.status,
-            structuredOutput: formUnderstandingExtraction.structuredOutput,
-          });
-        }
 
         extracted += 1;
 

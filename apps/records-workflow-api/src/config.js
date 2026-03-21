@@ -20,6 +20,8 @@ export const config = {
     process.env.DATABASE_URL ||
     'postgres://postgres:postgres@localhost:5432/records_workflow',
   rawStorageDir: resolveFromServiceRoot(process.env.RAW_STORAGE_DIR, 'storage/raw'),
+  parsedStorageDir: resolveFromServiceRoot(process.env.PARSED_STORAGE_DIR, 'storage/parsed'),
+  workflowStorageDir: resolveFromServiceRoot(process.env.WORKFLOW_STORAGE_DIR, 'storage/workflows'),
   seedFile: resolveFromServiceRoot(process.env.SEED_FILE, 'seeds/texas-systems.json'),
   crawlState: normalizeStateCode(process.env.CRAWL_STATE),
   crawl: {

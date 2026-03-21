@@ -15,8 +15,10 @@ import {
 import {
   listPipelineRunHistory,
   runTrackedFullSystemPipeline,
+  runTrackedParseStage,
   runTrackedQuestionExtractionStage,
   runTrackedSystemPipeline,
+  runTrackedWorkflowExtractionStage,
 } from '../services/pipelineRunHistoryService.js';
 import { getStateReviewQueue } from '../services/reviewQueueService.js';
 import { saveStateSeedFile } from '../services/seedEditorService.js';
@@ -278,6 +280,38 @@ internalRouter.post('/pipeline/system/question-extraction', async (req, res) => 
   } catch (error) {
     console.error('Question extraction stage failed:', error);
     const response = toErrorPayload(error, 'Question extraction stage failed.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/pipeline/system/parse', async (req, res) => {
+  try {
+    const summary = await runTrackedParseStage({
+      state: req.body?.state || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      sourceType: req.body?.source_type || req.body?.sourceType || null,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Parse stage failed:', error);
+    const response = toErrorPayload(error, 'Parse stage failed.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/pipeline/system/workflows', async (req, res) => {
+  try {
+    const summary = await runTrackedWorkflowExtractionStage({
+      state: req.body?.state || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      sourceType: req.body?.source_type || req.body?.sourceType || null,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Workflow extraction stage failed:', error);
+    const response = toErrorPayload(error, 'Workflow extraction stage failed.');
     return res.status(response.status).json(response.body);
   }
 });

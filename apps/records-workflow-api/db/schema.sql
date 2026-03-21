@@ -148,6 +148,49 @@ create table if not exists source_documents (
 alter table source_documents
   add column if not exists source_page_url text;
 
+create table if not exists pipeline_stage_runs (
+  id uuid primary key default gen_random_uuid(),
+  stage_key text not null,
+  stage_label text not null,
+  state text,
+  hospital_system_id uuid references hospital_systems(id) on delete set null,
+  system_name text,
+  status text not null check (
+    status in ('running', 'ok', 'partial', 'failed', 'no_targets', 'no_documents')
+  ),
+  input_summary jsonb not null default '{}'::jsonb,
+  output_summary jsonb not null default '{}'::jsonb,
+  error_summary jsonb,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index if not exists pipeline_stage_runs_system_stage_created_lookup
+  on pipeline_stage_runs (hospital_system_id, stage_key, created_at desc);
+
+create index if not exists pipeline_stage_runs_state_stage_created_lookup
+  on pipeline_stage_runs (state, stage_key, created_at desc);
+
+create table if not exists parsed_artifacts (
+  id uuid primary key default gen_random_uuid(),
+  parse_stage_run_id uuid not null references pipeline_stage_runs(id) on delete cascade,
+  source_document_id uuid references source_documents(id) on delete set null,
+  source_type text not null check (source_type in ('html', 'pdf')),
+  parser_name text not null,
+  parser_version text not null,
+  parse_status text not null check (parse_status in ('success', 'empty_text', 'failed')),
+  storage_path text not null,
+  extracted_text text,
+  summary jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists parsed_artifacts_source_document_lookup
+  on parsed_artifacts (source_document_id, created_at desc);
+
+alter table source_documents
+  add column if not exists parsed_artifact_id uuid references parsed_artifacts(id);
+
 alter table source_documents
   add column if not exists import_mode text not null default 'crawl';
 
