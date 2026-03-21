@@ -359,10 +359,27 @@ export function isLikelyDirectRecordsPageLink({
 
   if (!sameDomain && !externalAllowed) return false;
 
-  const haystack = `${normalized} ${text} ${contextText}`;
-  if (matchesAny(haystack, MEDICAL_RECORDS_DOCUMENT_NEGATIVE_PATTERNS)) {
+  const directHaystack = `${normalized} ${text}`;
+  if (matchesAny(directHaystack, MEDICAL_RECORDS_DOCUMENT_NEGATIVE_PATTERNS)) {
     return false;
   }
 
-  return matchesAny(haystack, DIRECT_RECORDS_PAGE_HTML_PATTERNS);
+  if (matchesAny(directHaystack, DIRECT_RECORDS_PAGE_HTML_PATTERNS)) {
+    return true;
+  }
+
+  const contextualHaystack = `${directHaystack} ${contextText}`;
+  const trustedContextualCandidate =
+    externalAllowed ||
+    /mybswhealth|mychart|myhealthone|healthmark|verisma|patient gateway/i.test(normalized);
+
+  if (!trustedContextualCandidate) {
+    return false;
+  }
+
+  if (matchesAny(contextualHaystack, MEDICAL_RECORDS_DOCUMENT_NEGATIVE_PATTERNS)) {
+    return false;
+  }
+
+  return matchesAny(contextualHaystack, DIRECT_RECORDS_PAGE_HTML_PATTERNS);
 }

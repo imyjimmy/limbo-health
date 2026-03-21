@@ -87,6 +87,10 @@ function isPinnedRecordsSeed(seed = null) {
   );
 }
 
+function hasTargetedRecordsSeed(seed = null) {
+  return Boolean(seed?.approved_by_human) || /records_page/i.test(seed?.seed_type || '');
+}
+
 function buildFetchStageStatus({ fetchedDocuments, failedDocuments }) {
   if (fetchedDocuments === 0 && failedDocuments > 0) return 'failed';
   if (failedDocuments > 0) return 'partial';
@@ -153,7 +157,16 @@ export async function runCrawl({
           hospitalSystemIds,
           state,
         });
-  const seeds = dedupeSeeds([...knownPdfSourcePageSeeds, ...activeSeeds]);
+  const systemsWithTargetedSeeds = new Set(
+    activeSeeds
+      .filter((seed) => hasTargetedRecordsSeed(seed))
+      .map((seed) => seed.hospital_system_id)
+      .filter(Boolean),
+  );
+  const effectiveKnownPdfSourcePageSeeds = knownPdfSourcePageSeeds.filter(
+    (seed) => !systemsWithTargetedSeeds.has(seed.hospital_system_id),
+  );
+  const seeds = dedupeSeeds([...effectiveKnownPdfSourcePageSeeds, ...activeSeeds]);
   if (seeds.length === 0) {
     return {
       status: 'no_seeds',
