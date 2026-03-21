@@ -49,6 +49,31 @@ function groupSeedRows(rows = []) {
   return grouped;
 }
 
+function toContentUrl(sourceDocumentId) {
+  return `/api/records-workflow/source-documents/${sourceDocumentId}/content`;
+}
+
+function groupPdfLinksBySystemId(rows = []) {
+  const grouped = new Map();
+
+  for (const row of rows) {
+    if (!grouped.has(row.hospital_system_id)) {
+      grouped.set(row.hospital_system_id, []);
+    }
+
+    grouped.get(row.hospital_system_id).push({
+      id: row.id,
+      source_url: row.source_url || null,
+      source_page_url: row.source_page_url || null,
+      title: row.title || null,
+      storage_path: row.storage_path || null,
+      content_url: toContentUrl(row.id),
+    });
+  }
+
+  return grouped;
+}
+
 function createEmptySummaryCounts() {
   return {
     seeded_systems: 0,
@@ -234,7 +259,7 @@ async function computeNationalStateOverview() {
 }
 
 async function loadStateSystemStats(state) {
-  const [systemStats, templateStats, dbSeedUrls, qualityStats] = await Promise.all([
+  const [systemStats, templateStats, dbSeedUrls, qualityStats, pdfLinks] = await Promise.all([
     query(
       `select
          hs.id,
@@ -358,6 +383,48 @@ async function loadStateSystemStats(state) {
        group by hs.system_name`,
       [state],
     ),
+    query(
+      `with ranked_pdfs as (
+         select
+           hs.id as hospital_system_id,
+           sd.id,
+           sd.source_url,
+           workflow_source.official_page_url as source_page_url,
+           sd.title,
+           sd.storage_path,
+           row_number() over (
+             partition by hs.id
+             order by sd.fetched_at desc nulls last, sd.created_at desc
+           ) as pdf_rank
+         from hospital_systems hs
+         join source_documents sd
+           on sd.hospital_system_id = hs.id
+          and sd.source_type = 'pdf'
+         left join lateral (
+           select rw.official_page_url
+           from workflow_forms wf
+           join records_workflows rw
+             on rw.id = wf.records_workflow_id
+           where rw.hospital_system_id = hs.id
+             and wf.form_url = sd.source_url
+           order by rw.updated_at desc nulls last, rw.created_at desc
+           limit 1
+         ) workflow_source on true
+         where hs.state = $1
+           and hs.active = true
+       )
+       select
+         hospital_system_id,
+         id,
+         source_url,
+         source_page_url,
+         title,
+         storage_path
+       from ranked_pdfs
+       where pdf_rank <= 3
+       order by hospital_system_id asc, pdf_rank asc`,
+      [state],
+    ),
   ]);
 
   return {
@@ -365,13 +432,14 @@ async function loadStateSystemStats(state) {
     templateStatsByName: indexBySystemName(templateStats.rows),
     seedRowsBySystem: groupSeedRows(dbSeedUrls.rows),
     qualityStatsByName: indexBySystemName(qualityStats.rows),
+    pdfLinksBySystemId: groupPdfLinksBySystemId(pdfLinks.rows),
   };
 }
 
 export async function listStateSystems(state) {
   const normalizedState = assertState(state);
   const seedSnapshot = await readStateSeedFile(normalizedState);
-  const { systemStatsByName, templateStatsByName, seedRowsBySystem, qualityStatsByName } =
+  const { systemStatsByName, templateStatsByName, seedRowsBySystem, qualityStatsByName, pdfLinksBySystemId } =
     await loadStateSystemStats(normalizedState);
 
   const names = new Set([
@@ -387,12 +455,12 @@ export async function listStateSystems(state) {
       const dbSystem = systemStatsByName.get(systemName) || null;
       const templateStats = templateStatsByName.get(systemName) || {};
       const qualityStats = qualityStatsByName.get(systemName) || {};
-
       return {
         hospital_system_id: dbSystem?.id || null,
         system_name: systemName,
         state: normalizedState,
         domain: seedSystem?.domain || dbSystem?.canonical_domain || null,
+        pdf_links: dbSystem?.id ? pdfLinksBySystemId.get(dbSystem.id) || [] : [],
         in_seed_file: Boolean(seedSystem),
         seed_file: {
           facilities: seedSystem?.facilities || [],

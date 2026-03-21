@@ -127,6 +127,12 @@ const MAP_COLORS = {
   red: '#f87171',
 };
 
+const STATUS_LABELS = {
+  green: 'Ready',
+  yellow: 'Needs Attention',
+  red: 'Blocked',
+};
+
 const state = {
   currentView: 'home',
   currentState: null,
@@ -144,7 +150,10 @@ const state = {
   runHistory: null,
   runHistoryFilterSystemId: '',
   systemFilter: '',
+  systemSortKey: 'system_name',
+  systemSortDirection: 'asc',
   pipelineRunResult: null,
+  pipelineActionInFlight: null,
   pdfEditorReview: null,
   pdfEditorDraftPayload: null,
   pdfEditorQuestions: [],
@@ -171,7 +180,6 @@ const elements = {
   sidebarToggleMobileIcon: document.querySelector('#sidebar-toggle-mobile-icon'),
   sidebarToggleCloseIcon: document.querySelector('#sidebar-toggle-close-icon'),
   appScrollRoot: document.querySelector('#app-scroll-root'),
-  pageKicker: document.querySelector('#page-kicker'),
   homeNav: document.querySelector('#home-nav'),
   stateNav: document.querySelector('#state-nav'),
   sidebarSystemsNav: document.querySelector('#sidebar-systems-nav'),
@@ -204,6 +212,8 @@ const elements = {
   systemsTable: document.querySelector('#systems-table'),
   priorityBuckets: document.querySelector('#priority-buckets'),
   pipelineSystemSelect: document.querySelector('#pipeline-system-select'),
+  runCrawlStage: document.querySelector('#run-crawl-stage'),
+  runQuestionStage: document.querySelector('#run-question-stage'),
   runPipeline: document.querySelector('#run-pipeline'),
   pipelineFlowTab: document.querySelector('#pipeline-flow-tab'),
   pipelineResultsTab: document.querySelector('#pipeline-results-tab'),
@@ -461,10 +471,37 @@ function sourceDocumentDisplayName(document) {
   );
 }
 
+function currentPdfDocuments() {
+  return Array.isArray(state.selectedSystemDetail?.source_documents)
+    ? state.selectedSystemDetail.source_documents.filter((document) => document.source_type === 'pdf')
+    : [];
+}
+
+function firstPdfDocument() {
+  return currentPdfDocuments()[0] || null;
+}
+
 function currentPdfEditorQuestion() {
   return (
     state.pdfEditorQuestions.find((question) => question.id === state.pdfEditorActiveQuestionId) || null
   );
+}
+
+function setPipelineActionState(actionKey = null) {
+  state.pipelineActionInFlight = actionKey;
+  const hasSystem = Boolean(state.selectedSystemId);
+  const actions = [
+    { key: 'crawl_stage', element: elements.runCrawlStage, idleLabel: 'Run Crawl Stage' },
+    { key: 'question_extraction_stage', element: elements.runQuestionStage, idleLabel: 'Run Question Stage' },
+    { key: 'full_pipeline', element: elements.runPipeline, idleLabel: 'Run Full Pipeline' },
+  ];
+
+  for (const action of actions) {
+    if (!action.element) continue;
+    const running = actionKey === action.key;
+    action.element.disabled = !hasSystem || Boolean(actionKey);
+    action.element.textContent = running ? 'Running...' : action.idleLabel;
+  }
 }
 
 function currentPdfDraftPayload() {
@@ -571,6 +608,140 @@ function deriveSystemUrl(system) {
     system?.seed_file?.seed_urls?.[0] ||
     (system?.domain ? `https://${system.domain}` : null)
   );
+}
+
+function uniqueSystemPdfSourcePages(system) {
+  const pages = [];
+  const seen = new Set();
+
+  for (const pdfLink of Array.isArray(system?.pdf_links) ? system.pdf_links : []) {
+    const url = String(pdfLink?.source_page_url || '').trim();
+    if (!url || seen.has(url)) {
+      continue;
+    }
+    seen.add(url);
+    pages.push(url);
+  }
+
+  return pages;
+}
+
+function compareText(left, right) {
+  return String(left || '').localeCompare(String(right || ''), undefined, {
+    sensitivity: 'base',
+    numeric: true,
+  });
+}
+
+function compareNumber(left, right) {
+  return Number(left || 0) - Number(right || 0);
+}
+
+function sortDirectionForSystemKey(key) {
+  return key === 'system_name' || key === 'reachability' ? 'asc' : 'desc';
+}
+
+function toggleSystemSort(key) {
+  if (!key) return;
+  if (state.systemSortKey === key) {
+    state.systemSortDirection = state.systemSortDirection === 'asc' ? 'desc' : 'asc';
+  } else {
+    state.systemSortKey = key;
+    state.systemSortDirection = sortDirectionForSystemKey(key);
+  }
+  renderSystemsTable();
+}
+
+function sortSystems(systems) {
+  const direction = state.systemSortDirection === 'desc' ? -1 : 1;
+
+  return [...systems].sort((left, right) => {
+    let comparison = 0;
+
+    switch (state.systemSortKey) {
+      case 'reachability':
+        comparison = compareText(deriveReachability(left).label, deriveReachability(right).label);
+        break;
+      case 'pdf_links':
+        comparison = compareNumber(
+          uniqueSystemPdfSourcePages(left).length,
+          uniqueSystemPdfSourcePages(right).length,
+        );
+        break;
+      case 'pdf_source_documents':
+        comparison = compareNumber(left?.stats?.pdf_source_documents, right?.stats?.pdf_source_documents);
+        break;
+      case 'source_documents':
+        comparison = compareNumber(left?.stats?.source_documents, right?.stats?.source_documents);
+        break;
+      case 'workflows':
+        comparison = compareNumber(left?.stats?.workflows, right?.stats?.workflows);
+        break;
+      case 'failures':
+        comparison = compareNumber(systemFailures(left), systemFailures(right));
+        break;
+      case 'system_name':
+      default:
+        comparison = compareText(left?.system_name, right?.system_name);
+        break;
+    }
+
+    if (comparison === 0) {
+      comparison = compareText(left?.system_name, right?.system_name);
+    }
+
+    return comparison * direction;
+  });
+}
+
+function renderSystemSortHeader(label, key, className = '') {
+  const isActive = state.systemSortKey === key;
+  const indicator = isActive ? (state.systemSortDirection === 'asc' ? '^' : 'v') : '-';
+  const buttonClass = ['data-head-button', className].filter(Boolean).join(' ');
+
+  return `
+    <button
+      type="button"
+      class="${escapeHtml(buttonClass)}"
+      data-action="sort-systems"
+      data-sort-key="${escapeHtml(key)}"
+      aria-label="Sort by ${escapeHtml(label)}"
+    >
+      <span>${escapeHtml(label)}</span>
+      <span class="sort-indicator">${escapeHtml(indicator)}</span>
+    </button>
+  `;
+}
+
+function renderSystemPdfPageLinks(system) {
+  const pages = uniqueSystemPdfSourcePages(system);
+
+  if (!pages.length) {
+    return '<span class="system-subtext">No source page</span>';
+  }
+
+  const visiblePages = pages.slice(0, 2);
+  const remainingCount = pages.length - visiblePages.length;
+
+  return `
+    <div class="pdf-page-links">
+      ${visiblePages
+        .map((url, index) => {
+          const label =
+            pages.length === 1
+              ? `Open source page for ${system?.system_name || 'system PDF'}`
+              : `Open source page ${index + 1} for ${system?.system_name || 'system PDF'}`;
+          return renderIconLink(url, label);
+        })
+        .join('')}
+      ${
+        pages.length > 1
+          ? `<span class="system-subtext">${escapeHtml(`${pages.length} pages`)}</span>`
+          : ''
+      }
+      ${remainingCount > 0 ? `<span class="system-subtext">+${remainingCount} more</span>` : ''}
+    </div>
+  `;
 }
 
 function deriveHomeTotals() {
@@ -757,7 +928,6 @@ function updateSidebarSectionNav() {
 
 function updateDashboardChrome() {
   if (state.currentView === 'home') {
-    elements.pageKicker.textContent = 'Dashboard';
     elements.stateTitle.textContent = 'Records Workflow';
     elements.pageCopy.textContent = '';
     elements.pageCopy.classList.toggle('hidden', !elements.pageCopy.textContent.trim());
@@ -771,13 +941,6 @@ function updateDashboardChrome() {
   }
 
   const stateName = STATE_NAMES[state.currentState] || state.currentState || 'State';
-  elements.pageKicker.textContent = state.pdfEditorReview
-    ? 'PDF Editor'
-    : state.currentStateTab === 'history'
-      ? 'Run History'
-    : state.currentStateTab === 'pipeline'
-      ? 'Pipeline'
-      : 'State View';
   elements.stateTitle.textContent = state.pdfEditorReview
     ? `${stateName} PDF Editor`
     : state.currentStateTab === 'history'
@@ -806,6 +969,7 @@ function setNavState() {
 
 function setStateTab(nextTab) {
   state.currentStateTab = nextTab;
+  elements.stateSummary.classList.toggle('hidden', nextTab !== 'systems');
   elements.systemsPanel.classList.toggle('hidden', nextTab !== 'systems');
   elements.pipelinePanel.classList.toggle('hidden', nextTab !== 'pipeline');
   elements.runHistoryPanel.classList.toggle('hidden', nextTab !== 'history');
@@ -1104,14 +1268,14 @@ function renderSystemsTable() {
   }
 
   const query = state.systemFilter.trim().toLowerCase();
-  const systems = state.systems.filter((system) => {
+  const systems = sortSystems(state.systems.filter((system) => {
     if (!query) return true;
     return (
       system.system_name.toLowerCase().includes(query) ||
       String(system.domain || '').toLowerCase().includes(query) ||
       String(deriveSystemUrl(system) || '').toLowerCase().includes(query)
     );
-  });
+  }));
 
   if (systems.length === 0) {
     elements.systemsTable.innerHTML = '<div class="empty-state">No hospital systems match the current filter.</div>';
@@ -1122,13 +1286,14 @@ function renderSystemsTable() {
     <table class="data-table">
       <thead>
         <tr>
-          <th class="data-head min-w-[16rem]">System</th>
-          <th class="data-head min-w-[10rem]">Bot Reachability</th>
-          <th class="data-head min-w-[5rem] text-center">PDF Link</th>
-          <th class="data-head min-w-[4.5rem]">PDFs</th>
-          <th class="data-head min-w-[6.5rem]">Source Docs</th>
-          <th class="data-head min-w-[6.5rem]">Workflows</th>
-          <th class="data-head min-w-[5.5rem]">Failures</th>
+          <th class="data-head min-w-[16rem]">${renderSystemSortHeader('System', 'system_name')}</th>
+          <th class="data-head min-w-[10rem]">${renderSystemSortHeader('Bot Reachability', 'reachability')}</th>
+          <th class="data-head min-w-[8.5rem]">${renderSystemSortHeader('PDF Link', 'pdf_links')}</th>
+          <th class="data-head min-w-[6.5rem] text-center">Results</th>
+          <th class="data-head min-w-[4.5rem]">${renderSystemSortHeader('PDFs', 'pdf_source_documents')}</th>
+          <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Source Docs', 'source_documents')}</th>
+          <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Workflows', 'workflows')}</th>
+          <th class="data-head min-w-[5.5rem]">${renderSystemSortHeader('Failures', 'failures')}</th>
           <th class="data-head min-w-[8.5rem]">Action</th>
         </tr>
       </thead>
@@ -1161,14 +1326,13 @@ function renderSystemsTable() {
                 <td class="data-cell">
                   <span class="${statusPillClass(reachability.tone)}">${escapeHtml(reachability.label)}</span>
                 </td>
+                <td class="data-cell">
+                  ${renderSystemPdfPageLinks(system)}
+                </td>
                 <td class="data-cell text-center">
                   ${
                     system.hospital_system_id
-                      ? renderIconAction(
-                          'open-system-results',
-                          `Open PDFs for ${system.system_name}`,
-                          `data-system-id="${escapeHtml(system.hospital_system_id)}"`,
-                        )
+                      ? `<button type="button" class="ghost-button" data-action="open-system-results" data-system-id="${escapeHtml(system.hospital_system_id)}">Results</button>`
                       : '<span class="system-subtext">Unavailable</span>'
                   }
                 </td>
@@ -1237,7 +1401,7 @@ function renderPriorityBuckets() {
 function renderPipelineSystemSelect() {
   if (!state.systems.length) {
     elements.pipelineSystemSelect.innerHTML = '<option value="">No systems available</option>';
-    elements.runPipeline.disabled = true;
+    setPipelineActionState(null);
     return;
   }
 
@@ -1252,7 +1416,7 @@ function renderPipelineSystemSelect() {
     .join('');
 
   elements.pipelineSystemSelect.value = state.selectedSystemId || state.systems[0].hospital_system_id || '';
-  elements.runPipeline.disabled = !elements.pipelineSystemSelect.value;
+  setPipelineActionState(state.pipelineActionInFlight);
 }
 
 function renderPipelineInsights() {
@@ -1264,41 +1428,35 @@ function renderPipelineInsights() {
   }
 
   const reachability = deriveReachability(system);
-  const pdfDocuments = Array.isArray(state.selectedSystemDetail?.source_documents)
-    ? state.selectedSystemDetail.source_documents.filter((document) => document.source_type === 'pdf')
-    : [];
+  const pdfDocuments = currentPdfDocuments();
 
   elements.pipelineInsights.innerHTML = `
-    <article class="focus-card">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <div class="focus-label">Selected system</div>
-          <div class="focus-value">${escapeHtml(system.system_name)}</div>
-        </div>
-        <span class="${statusPillClass(reachability.tone)}">${escapeHtml(reachability.label)}</span>
-      </div>
-      <div class="focus-copy">${escapeHtml(system.domain || 'No canonical domain')}</div>
+    <article class="metric-card">
+      <div class="metric-label">Selected System</div>
+      <div class="metric-value text-lg">${escapeHtml(system.system_name)}</div>
+      <p class="metric-note">${escapeHtml(system.domain || 'No canonical domain')}</p>
     </article>
-    <article class="focus-card">
-      <div class="focus-label">Pipeline input</div>
-      <div class="focus-copy">
+    <article class="metric-card">
+      <div class="metric-label">Reachability</div>
+      <div class="metric-value text-lg">${escapeHtml(reachability.label)}</div>
+      <p class="metric-note">Current crawl path health for this hospital system.</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-label">Pipeline Input</div>
+      <div class="metric-value text-lg">
         ${formatNumber(system.stats?.seed_urls || 0)} seed URLs •
         ${formatNumber(system.stats?.source_documents || 0)} cached docs
       </div>
+      <p class="metric-note">Seeds and cached source documents already attached to this system.</p>
     </article>
-    <article class="focus-card">
-      <div class="focus-label">Pipeline output</div>
-      <div class="focus-copy">
+    <article class="metric-card">
+      <div class="metric-label">Pipeline Output</div>
+      <div class="metric-value text-lg">
         ${formatNumber(pdfDocuments.length)} PDF results •
         ${formatNumber(system.stats?.approved_templates || 0)} approved templates •
         ${formatNumber(system.stats?.draft_templates || 0)} drafts
       </div>
-    </article>
-    <article class="focus-card">
-      <div class="focus-label">Next step</div>
-      <div class="focus-copy">
-        Run the pipeline, open Results, then click a PDF tile to inspect question mappings.
-      </div>
+      <p class="metric-note">Use Results to inspect PDFs and open the mapping editor.</p>
     </article>
   `;
 }
@@ -1954,20 +2112,21 @@ function renderPipelineRunResult() {
   if (!state.pipelineRunResult) {
     elements.pipelineRunResult.innerHTML = `
       <div class="empty-state">
-        Pick a hospital system above, then run the pipeline here. The action targets only that
-        selected hospital system inside the current state.
+        Pick a hospital system above, then run one real stage or the full pipeline here.
       </div>
     `;
     return;
   }
 
   const result = state.pipelineRunResult;
+  const stageLabel = result.stage_label || 'Pipeline Action';
+  const stageStatus = result.stage_status || result.status || 'ok';
   elements.pipelineRunResult.innerHTML = `
     <div class="result-shell">
       <div class="result-header">
         <div>
-          <p class="section-kicker">Latest Pipeline Run</p>
-          <h4 class="result-title">${escapeHtml(result.systemName || 'Selected System')}</h4>
+          <p class="section-kicker">Latest Pipeline Action</p>
+          <h4 class="result-title">${escapeHtml(stageLabel)} • ${escapeHtml(result.systemName || 'Selected System')}</h4>
           <p class="result-copy">Ran at ${escapeHtml(formatDateTime(result.ranAt))} and targeted only this hospital system.</p>
           ${
             result.history_entry
@@ -1975,8 +2134,8 @@ function renderPipelineRunResult() {
               : ''
           }
         </div>
-        <span class="${statusPillClass(result.failed > 0 ? 'red' : result.extracted > 0 ? 'green' : 'yellow')}">
-          ${escapeHtml(result.status || 'completed')}
+        <span class="${statusPillClass(stageStatus === 'failed' ? 'red' : stageStatus === 'no_pdfs' || stageStatus === 'no_seeds' || stageStatus === 'question_stage_empty' ? 'yellow' : 'green')}">
+          ${escapeHtml(stageStatus)}
         </span>
       </div>
       <div class="result-grid">
@@ -1997,6 +2156,22 @@ function renderPipelineRunResult() {
           <div class="metric-value">${formatNumber(result.systems || 0)}</div>
         </article>
       </div>
+      ${
+        result.crawl_stage || result.question_stage
+          ? `<div class="history-deltas mt-5">
+              ${
+                result.crawl_stage
+                  ? `<span class="${statusPillClass(result.crawl_stage.status === 'failed' ? 'red' : result.crawl_stage.status === 'no_seeds' ? 'yellow' : 'green')}">${escapeHtml(result.crawl_stage.stage_label || 'Crawl Stage')} ${escapeHtml(result.crawl_stage.status || 'ok')}</span>`
+                  : ''
+              }
+              ${
+                result.question_stage
+                  ? `<span class="${statusPillClass(result.question_stage.stage_status === 'failed' ? 'red' : result.question_stage.stage_status === 'no_pdfs' ? 'yellow' : 'green')}">${escapeHtml(result.question_stage.stage_label || 'Question Stage')} ${escapeHtml(result.question_stage.stage_status || result.question_stage.status || 'ok')}</span>`
+                  : ''
+              }
+            </div>`
+          : ''
+      }
     </div>
   `;
 }
@@ -2010,68 +2185,105 @@ function renderPipelineVisual() {
 
   const reachability = deriveReachability(system);
   const failures = systemFailures(system);
+  const pdfDocuments = currentPdfDocuments();
+  const firstPdf = firstPdfDocument();
   const stepCards = [
     {
-      index: 'Step 1',
-      title: 'Seed Inputs',
-      copy: 'The selected hospital system starts with state seed JSON, domain metadata, and any approved seed URLs.',
+      index: '1',
+      title: 'Scope and Seeds',
+      copy: 'Choose one hospital system, then confirm the seed scope that will drive the rest of the pipeline.',
       input: `${formatNumber(system.stats?.seed_urls || 0)} seed URLs and ${formatNumber(system.stats?.seed_facilities || 0)} seeded facilities.`,
-      output: 'Queued target URLs for this hospital system only.',
+      output: `Pipeline scope is locked to ${system.system_name}.`,
+      tone: 'green',
+      actionButtons: [
+        `<button type="button" class="ghost-button" data-action="open-systems-tab">Review Systems</button>`,
+      ],
     },
     {
-      index: 'Step 2',
-      title: 'Bot Fetch',
-      copy: 'The crawler attempts to reach the selected system’s URLs and fetches HTML or PDFs when access works.',
-      input: `${escapeHtml(reachability.label)} reachability using the current crawl path.`,
-      output: `${formatNumber(system.stats?.source_documents || 0)} source documents cached so far.`,
+      index: '2',
+      title: 'Crawl + Workflow Extraction',
+      copy: 'This is one coupled backend job today: it fetches documents, parses them, extracts workflows, and creates initial PDF question drafts when PDFs are found.',
+      input: `${escapeHtml(reachability.label)} reachability • ${formatNumber(system.stats?.seed_urls || 0)} seed URLs.`,
+      output: `${formatNumber(system.stats?.source_documents || 0)} source docs • ${formatNumber(system.stats?.workflows || 0)} workflows • ${formatNumber(system.stats?.pdf_source_documents || 0)} PDFs.`,
+      tone:
+        system.stats?.source_documents > 0 ? 'green' : reachability.tone === 'red' ? 'red' : 'yellow',
+      actionButtons: [
+        `<button type="button" class="ghost-button" data-action="run-crawl-stage">Run Crawl Stage</button>`,
+        `<button type="button" class="ghost-button" data-action="open-history-tab">Open Run History</button>`,
+      ],
     },
     {
-      index: 'Step 3',
-      title: 'Parse Documents',
-      copy: 'HTML and PDF parsers extract text, metadata, and source artifacts needed for downstream workflow extraction.',
-      input: `${formatNumber(system.stats?.html_source_documents || 0)} HTML docs and ${formatNumber(system.stats?.pdf_source_documents || 0)} PDF docs.`,
-      output: `${formatNumber(system.stats?.parse_failures || 0)} parse failures currently tracked.`,
+      index: '3',
+      title: 'Question Extraction',
+      copy: 'This reruns the OpenAI-backed PDF question extraction stage across the PDFs already cached for this system.',
+      input: `${formatNumber(system.stats?.pdf_source_documents || 0)} PDFs • ${formatNumber(system.stats?.draft_templates || 0)} drafts • ${formatNumber(system.stats?.low_confidence_question_drafts || 0)} low-confidence drafts.`,
+      output: `${formatNumber(system.stats?.approved_templates || 0)} approved templates • ${formatNumber(system.stats?.draft_templates || 0)} drafts ready for review.`,
+      tone:
+        system.stats?.pdf_source_documents === 0
+          ? 'yellow'
+          : system.stats?.low_confidence_question_drafts > 0
+            ? 'yellow'
+            : 'green',
+      actionButtons: [
+        `<button type="button" class="ghost-button" data-action="run-question-stage">Run Question Stage</button>`,
+        `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
+      ],
     },
     {
-      index: 'Step 4',
-      title: 'Normalize Workflow',
-      copy: 'Workflow extraction turns parsed documents into records workflow rows, contacts, instructions, and linked forms.',
-      input: `${formatNumber(system.stats?.source_documents || 0)} parsed source documents ready for extraction.`,
-      output: `${formatNumber(system.stats?.workflows || 0)} workflow rows and ${formatNumber(system.stats?.partial_workflows || 0)} partial workflow results.`,
-    },
-    {
-      index: 'Step 5',
-      title: 'PDF Output',
-      copy: 'PDF-backed forms move into review readiness, including drafts, approved templates, and final PDF output visibility.',
-      input: `${formatNumber(system.stats?.pdf_source_documents || 0)} PDFs entering review and template generation.`,
-      output: `${formatNumber(system.stats?.approved_templates || 0)} approved templates, ${formatNumber(system.stats?.draft_templates || 0)} drafts, ${formatNumber(failures)} open failure signals.`,
+      index: '4',
+      title: 'Results and Mapping Review',
+      copy: 'Review the resulting PDFs, inspect rectangle mappings in the PDF editor, and publish question templates from there.',
+      input: `${formatNumber(pdfDocuments.length)} PDF results • ${formatNumber(failures)} open review signals.`,
+      output: firstPdf
+        ? `First reviewable PDF: ${sourceDocumentDisplayName(firstPdf)}.`
+        : 'No PDF results are attached to this system yet.',
+      tone: pdfDocuments.length > 0 ? 'green' : 'yellow',
+      actionButtons: [
+        `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
+        firstPdf
+          ? `<button type="button" class="ghost-button" data-action="open-first-pdf-editor">Open First PDF</button>`
+          : '',
+      ].filter(Boolean),
     },
   ];
 
   elements.pipelineVisual.innerHTML = stepCards
-    .map(
-      (step) => `
-        <article class="step-card">
-          <div class="step-index">${escapeHtml(step.index)}</div>
-          <h4 class="step-title">${escapeHtml(step.title)}</h4>
-          <p class="step-copy">${escapeHtml(step.copy)}</p>
-          <div class="step-list">
-            <div>
-              <span class="step-item-label">Input</span>
-              <div class="step-item-value">${escapeHtml(step.input)}</div>
+    .map((step, index) => {
+      const isLast = index === stepCards.length - 1;
+      return `
+        <article class="pipeline-stage">
+          <div class="pipeline-stage-rail">
+            <div class="pipeline-stage-node">${escapeHtml(step.index)}</div>
+            ${isLast ? '' : '<div class="pipeline-stage-line"></div>'}
+          </div>
+          <div class="pipeline-stage-body">
+            <div class="pipeline-stage-header">
+              <div>
+                <div class="pipeline-stage-kicker">Stage ${escapeHtml(step.index)}</div>
+                <h4 class="step-title">${escapeHtml(step.title)}</h4>
+                <p class="step-copy">${escapeHtml(step.copy)}</p>
+              </div>
+              <span class="${statusPillClass(step.tone)}">${escapeHtml(STATUS_LABELS[step.tone] || step.tone)}</span>
             </div>
-            <div>
-              <span class="step-item-label">What Happens</span>
-              <div class="step-item-value">${escapeHtml(step.copy)}</div>
+            <div class="pipeline-stage-grid">
+              <div>
+                <span class="step-item-label">Input</span>
+                <div class="step-item-value">${escapeHtml(step.input)}</div>
+              </div>
+              <div>
+                <span class="step-item-label">What Happens</span>
+                <div class="step-item-value">${escapeHtml(step.copy)}</div>
+              </div>
+              <div>
+                <span class="step-item-label">Output</span>
+                <div class="step-item-value">${escapeHtml(step.output)}</div>
+              </div>
             </div>
-            <div>
-              <span class="step-item-label">Output</span>
-              <div class="step-item-value">${escapeHtml(step.output)}</div>
-            </div>
+            <div class="pipeline-stage-actions">${step.actionButtons.join('')}</div>
           </div>
         </article>
-      `,
-    )
+      `;
+    })
     .join('');
 }
 
@@ -2203,6 +2415,7 @@ function renderRunHistoryList() {
           <div class="history-header">
             <div>
               <h3 class="history-title">${escapeHtml(run.system_name || 'System Run')}</h3>
+              <p class="history-copy">${escapeHtml(run.crawl_summary?.stage_label || 'Pipeline Action')}</p>
               <p class="history-copy">${escapeHtml(formatDateTime(run.created_at))}</p>
             </div>
             <span class="${statusPillClass(run.status === 'failed' ? 'red' : run.status === 'no_seeds' ? 'yellow' : 'green')}">
@@ -2282,6 +2495,7 @@ function renderStateView() {
   renderRunHistoryInsights();
   renderPdfEditor();
   const showingPdfEditor = Boolean(state.pdfEditorReview);
+  elements.stateSummary.classList.toggle('hidden', state.currentStateTab !== 'systems' || showingPdfEditor);
   elements.systemsPanel.classList.toggle('hidden', state.currentStateTab !== 'systems' || showingPdfEditor);
   elements.pipelinePanel.classList.toggle('hidden', state.currentStateTab !== 'pipeline' || showingPdfEditor);
   elements.runHistoryPanel.classList.toggle('hidden', state.currentStateTab !== 'history' || showingPdfEditor);
@@ -2347,32 +2561,65 @@ async function loadStateView(stateCode, options = {}) {
   }
 }
 
-async function runPipelineForSelectedSystem() {
+async function runPipelineActionForSelectedSystem({
+  actionKey,
+  endpoint,
+  nextPipelineTab = 'results',
+} = {}) {
   const system = currentSystem();
   if (!system?.hospital_system_id) {
     throw new Error('Pick a hospital system before running the pipeline.');
   }
 
-  const result = await fetchJson('/internal/crawl/system', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      state: state.currentState,
-      system_id: system.hospital_system_id,
-    }),
+  setPipelineActionState(actionKey);
+  try {
+    const result = await fetchJson(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        state: state.currentState,
+        system_id: system.hospital_system_id,
+      }),
+    });
+
+    state.pipelineRunResult = {
+      ...result,
+      systemName: system.system_name,
+      ranAt: new Date().toISOString(),
+    };
+
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'pipeline',
+      pipelineTab: nextPipelineTab,
+    });
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
+async function runPipelineForSelectedSystem() {
+  await runPipelineActionForSelectedSystem({
+    actionKey: 'full_pipeline',
+    endpoint: '/internal/pipeline/system/full',
+    nextPipelineTab: 'results',
   });
+}
 
-  state.pipelineRunResult = {
-    ...result,
-    systemName: system.system_name,
-    ranAt: new Date().toISOString(),
-  };
+async function runCrawlStageForSelectedSystem() {
+  await runPipelineActionForSelectedSystem({
+    actionKey: 'crawl_stage',
+    endpoint: '/internal/crawl/system',
+    nextPipelineTab: 'flow',
+  });
+}
 
-  await loadStateView(state.currentState, {
-    preserveSelectedSystem: true,
-    keepPipelineResult: true,
-    stateTab: 'pipeline',
-    pipelineTab: 'results',
+async function runQuestionStageForSelectedSystem() {
+  await runPipelineActionForSelectedSystem({
+    actionKey: 'question_extraction_stage',
+    endpoint: '/internal/pipeline/system/question-extraction',
+    nextPipelineTab: 'flow',
   });
 }
 
@@ -2390,7 +2637,7 @@ async function loadSelectedSystemDetail() {
 async function selectSystem(systemId) {
   const previousSystemId = state.selectedSystemId;
   state.selectedSystemId = systemId || null;
-  elements.runPipeline.disabled = !state.selectedSystemId;
+  setPipelineActionState(state.pipelineActionInFlight);
   resetPdfEditorState();
 
   if (!state.runHistoryFilterSystemId || state.runHistoryFilterSystemId === previousSystemId) {
@@ -2571,8 +2818,23 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (button === elements.runCrawlStage) {
+      await runCrawlStageForSelectedSystem();
+      return;
+    }
+
+    if (button === elements.runQuestionStage) {
+      await runQuestionStageForSelectedSystem();
+      return;
+    }
+
     if (button === elements.runPipeline) {
       await runPipelineForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'sort-systems' && button.dataset.sortKey) {
+      toggleSystemSort(button.dataset.sortKey);
       return;
     }
 
@@ -2592,6 +2854,41 @@ document.addEventListener('click', async (event) => {
       await selectSystem(button.dataset.systemId);
       setStateTab('pipeline');
       setPipelineTab('results');
+      return;
+    }
+
+    if (button.dataset.action === 'open-systems-tab') {
+      setStateTab('systems');
+      return;
+    }
+
+    if (button.dataset.action === 'open-results-tab') {
+      setStateTab('pipeline');
+      setPipelineTab('results');
+      return;
+    }
+
+    if (button.dataset.action === 'open-history-tab') {
+      setStateTab('history');
+      return;
+    }
+
+    if (button.dataset.action === 'run-crawl-stage') {
+      await runCrawlStageForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'run-question-stage') {
+      await runQuestionStageForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'open-first-pdf-editor') {
+      const firstPdf = firstPdfDocument();
+      if (!firstPdf?.id) {
+        throw new Error('No PDF results are attached to this system yet.');
+      }
+      await openPdfEditor(firstPdf.id);
       return;
     }
 

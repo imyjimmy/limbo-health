@@ -14,6 +14,8 @@ import {
 } from '../services/questionReviewService.js';
 import {
   listPipelineRunHistory,
+  runTrackedFullSystemPipeline,
+  runTrackedQuestionExtractionStage,
   runTrackedSystemPipeline,
 } from '../services/pipelineRunHistoryService.js';
 import { getStateReviewQueue } from '../services/reviewQueueService.js';
@@ -236,6 +238,47 @@ internalRouter.post('/crawl/system', async (req, res) => {
   } catch (error) {
     console.error('Targeted crawl failed:', error);
     return res.status(500).json({ error: 'Targeted crawl failed.' });
+  }
+});
+
+internalRouter.post('/pipeline/system/full', async (req, res) => {
+  try {
+    const summary = await runTrackedFullSystemPipeline({
+      state: req.body?.state || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      facilityId: req.body?.facility_id || req.body?.facilityId || null,
+      seedUrl: req.body?.seed_url || req.body?.seedUrl || null,
+      maxDepth: Number.isInteger(req.body?.max_depth)
+        ? req.body.max_depth
+        : Number.isInteger(req.body?.maxDepth)
+          ? req.body.maxDepth
+          : undefined,
+      replaceDraft:
+        req.body?.replace_draft !== false && req.body?.replaceDraft !== false,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Full pipeline failed:', error);
+    const response = toErrorPayload(error, 'Full pipeline failed.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/pipeline/system/question-extraction', async (req, res) => {
+  try {
+    const summary = await runTrackedQuestionExtractionStage({
+      state: req.body?.state || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      replaceDraft:
+        req.body?.replace_draft !== false && req.body?.replaceDraft !== false,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Question extraction stage failed:', error);
+    const response = toErrorPayload(error, 'Question extraction stage failed.');
+    return res.status(response.status).json(response.body);
   }
 });
 

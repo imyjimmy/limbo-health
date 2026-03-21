@@ -330,6 +330,14 @@
           @apply px-3 py-3 text-left text-xs font-medium uppercase tracking-[0.15em] leading-5 text-gray-500;
         }
 
+        .data-head-button {
+          @apply inline-flex w-full items-center justify-between gap-2 text-left text-xs font-medium uppercase tracking-[0.15em] leading-5 text-gray-500 transition hover:text-gray-700;
+        }
+
+        .sort-indicator {
+          @apply text-[10px] text-gray-400;
+        }
+
         .data-cell {
           @apply px-3 py-3 align-top text-sm text-gray-500;
         }
@@ -372,6 +380,14 @@
 
         .icon-link-row {
           @apply flex items-center gap-2;
+        }
+
+        .pdf-page-links {
+          @apply flex flex-wrap items-center gap-2;
+        }
+
+        .pdf-page-link {
+          @apply inline-flex text-xs font-medium text-gray-600 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-900;
         }
 
         .bucket-card {
@@ -460,6 +476,42 @@
 
         .step-item-value {
           @apply mt-1 text-sm text-gray-700;
+        }
+
+        .pipeline-stage {
+          @apply grid grid-cols-[2.5rem_minmax(0,1fr)] gap-4;
+        }
+
+        .pipeline-stage-rail {
+          @apply flex flex-col items-center;
+        }
+
+        .pipeline-stage-node {
+          @apply flex h-10 w-10 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700;
+        }
+
+        .pipeline-stage-line {
+          @apply mt-3 w-px flex-1 bg-gray-200;
+        }
+
+        .pipeline-stage-body {
+          @apply rounded-xl border border-gray-200 bg-white p-4;
+        }
+
+        .pipeline-stage-header {
+          @apply flex flex-col gap-3 md:flex-row md:items-start md:justify-between;
+        }
+
+        .pipeline-stage-kicker {
+          @apply text-xs uppercase tracking-[0.2em] text-gray-400;
+        }
+
+        .pipeline-stage-grid {
+          @apply mt-4 grid gap-3 md:grid-cols-3;
+        }
+
+        .pipeline-stage-actions {
+          @apply mt-4 flex flex-wrap gap-2;
         }
 
         .results-summary {
@@ -725,7 +777,7 @@
         <header class="sticky top-0 z-30 flex w-full border-b border-gray-200 bg-white">
           <div class="flex grow flex-col justify-between lg:flex-row lg:px-6">
             <div class="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 lg:border-b-0 lg:px-0 lg:py-4">
-              <div class="flex items-center gap-3">
+              <div class="flex min-w-0 items-center gap-3">
                 <button
                   id="sidebar-toggle"
                   type="button"
@@ -784,9 +836,10 @@
                   </svg>
                 </button>
 
-                <div>
-                <div class="text-sm font-semibold text-gray-900">Records Workflow</div>
-                <div class="text-xs text-gray-500">Dashboard</div>
+                <div class="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+                  <h2 id="state-title" class="truncate text-2xl font-semibold leading-none text-gray-900">Records Workflow</h2>
+                  <p id="state-breadcrumb" class="truncate text-sm text-gray-500">Home &gt; National Map</p>
+                  <p id="page-copy" class="hidden text-sm text-gray-500"></p>
                 </div>
               </div>
             </div>
@@ -801,13 +854,6 @@
 
         <main>
           <div class="mx-auto max-w-[1600px] p-3 md:p-4">
-            <div class="mb-6">
-              <p id="page-kicker" class="text-xs uppercase tracking-[0.2em] text-gray-400">Dashboard</p>
-              <p id="state-breadcrumb" class="mt-2 text-sm text-gray-500">Home &gt; Dashboard</p>
-              <h2 id="state-title" class="mt-2 text-2xl font-semibold text-gray-900">Records Workflow</h2>
-              <p id="page-copy" class="mt-1 text-sm text-gray-500"></p>
-            </div>
-
             <section id="home-view" class="space-y-6">
               <div id="home-overview-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"></div>
 
@@ -839,13 +885,13 @@
             </section>
 
             <section id="state-view" class="hidden space-y-6">
-              <div id="state-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"></div>
-
-              <div class="inline-flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1">
+              <div id="state-tab-switcher" class="inline-flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1">
                 <button id="systems-tab" type="button" class="nav-pill nav-pill-active">Systems</button>
                 <button id="pipeline-tab" type="button" class="nav-pill">Pipeline</button>
                 <button id="history-tab" type="button" class="nav-pill">Run History</button>
               </div>
+
+              <div id="state-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"></div>
 
               <section id="systems-panel" class="space-y-6">
                 <section class="app-card">
@@ -866,52 +912,45 @@
               </section>
 
               <section id="pipeline-panel" class="hidden space-y-6">
-                <div class="grid grid-cols-12 gap-3 md:gap-4">
-                  <section class="col-span-12 space-y-6 xl:col-span-8">
-                    <div class="app-card">
-                      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div>
-                          <p class="section-kicker">Pipeline</p>
-                          <h3 class="section-title">Runner</h3>
-                        </div>
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                          <select id="pipeline-system-select" class="input-shell sm:w-80"></select>
-                          <button id="run-pipeline" type="button" class="primary-button">Run Pipeline</button>
-                        </div>
-                      </div>
-                      <div id="pipeline-run-result" class="mt-6"></div>
+                <section class="app-card">
+                  <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div>
+                      <p class="section-kicker">Pipeline</p>
+                      <h3 class="section-title">Stage Runner</h3>
+                      <p class="section-copy">Only real runnable stages are exposed here. Crawl and workflow extraction are currently coupled in the backend.</p>
                     </div>
-
-                    <div class="app-card">
-                      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p class="section-kicker">Workspace</p>
-                          <h3 class="section-title">Flow and Results</h3>
-                        </div>
-                        <div class="subnav-shell">
-                          <button id="pipeline-flow-tab" type="button" class="subnav-pill subnav-pill-active">Flow</button>
-                          <button id="pipeline-results-tab" type="button" class="subnav-pill">Results</button>
-                        </div>
-                      </div>
-
-                      <div id="pipeline-flow-panel" class="mt-6 space-y-6">
-                        <div id="pipeline-visual" class="grid gap-3 xl:grid-cols-5"></div>
-                      </div>
-
-                      <div id="pipeline-results-panel" class="hidden mt-6 space-y-6">
-                        <div id="pipeline-results-summary" class="results-summary"></div>
-                        <div id="pipeline-results-list" class="pdf-results-grid"></div>
-                      </div>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                      <select id="pipeline-system-select" class="input-shell sm:w-80"></select>
+                      <button id="run-crawl-stage" type="button" class="ghost-button">Run Crawl Stage</button>
+                      <button id="run-question-stage" type="button" class="ghost-button">Run Question Stage</button>
+                      <button id="run-pipeline" type="button" class="primary-button">Run Full Pipeline</button>
                     </div>
-                  </section>
+                  </div>
+                  <div id="pipeline-run-result" class="mt-6"></div>
+                </section>
 
-                  <aside class="col-span-12 xl:col-span-4">
-                    <section class="app-card">
-                      <p class="section-kicker">Pipeline Context</p>
-                      <div id="pipeline-insights" class="mt-4 focus-stack"></div>
-                    </section>
-                  </aside>
-                </div>
+                <section class="app-card">
+                  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p class="section-kicker">Workspace</p>
+                      <h3 class="section-title">Flow and Results</h3>
+                    </div>
+                    <div class="subnav-shell">
+                      <button id="pipeline-flow-tab" type="button" class="subnav-pill subnav-pill-active">Flow</button>
+                      <button id="pipeline-results-tab" type="button" class="subnav-pill">Results</button>
+                    </div>
+                  </div>
+
+                  <div id="pipeline-flow-panel" class="mt-6 space-y-6">
+                    <div id="pipeline-insights" class="grid gap-3 lg:grid-cols-4"></div>
+                    <div id="pipeline-visual" class="space-y-4"></div>
+                  </div>
+
+                  <div id="pipeline-results-panel" class="hidden mt-6 space-y-6">
+                    <div id="pipeline-results-summary" class="results-summary"></div>
+                    <div id="pipeline-results-list" class="pdf-results-grid"></div>
+                  </div>
+                </section>
               </section>
 
               <section id="run-history-panel" class="hidden space-y-6">
