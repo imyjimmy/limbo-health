@@ -1626,8 +1626,8 @@ function renderPipelineResults() {
             <span class="status-pill status-yellow">Inspect</span>
           </button>
           <div class="icon-link-row mt-3">
-            ${renderIconLink(document.source_url, `Open source page for ${displayName}`)}
-            ${document.source_url ? '<span class="system-subtext">Open source page</span>' : ''}
+            ${renderIconLink(document.source_page_url, `Open source page for ${displayName}`)}
+            ${document.source_page_url ? '<span class="system-subtext">Open source page</span>' : ''}
           </div>
           <div class="pdf-result-meta">
             <span class="${statusPillClass(document.pdf_parse_status === 'empty_text' || document.latest_question_extraction_status === 'failed' ? 'red' : 'green')}">

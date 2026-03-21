@@ -323,6 +323,7 @@ export async function importManualHtml({
       hospitalSystemId: context.system.id,
       facilityId: context.facility?.id || null,
       sourceUrl: manualSourceUrl,
+      sourcePageUrl: manualSourceUrl,
       sourceType: 'html',
       title,
       fetchedAt: new Date().toISOString(),
@@ -343,6 +344,7 @@ export async function importManualHtml({
       evidenceSnippets: bundle.evidenceSnippets,
       metadata: {
         sourceUrl: manualSourceUrl,
+        sourcePageUrl: manualSourceUrl,
         sourceType: 'html',
         httpStatus: 200,
         documentClassificationBasis: 'human_confirmed',

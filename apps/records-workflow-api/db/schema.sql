@@ -131,6 +131,7 @@ create table if not exists source_documents (
   hospital_system_id uuid references hospital_systems(id),
   facility_id uuid references facilities(id),
   source_url text not null,
+  source_page_url text,
   source_type text not null check (source_type in ('html', 'pdf')),
   title text,
   fetched_at timestamptz not null,
@@ -145,10 +146,53 @@ create table if not exists source_documents (
 );
 
 alter table source_documents
+  add column if not exists source_page_url text;
+
+alter table source_documents
   add column if not exists import_mode text not null default 'crawl';
 
 alter table source_documents
   add column if not exists import_notes text;
+
+update source_documents
+set source_page_url = source_url
+where source_page_url is null
+  and source_type = 'html';
+
+with latest_workflow_runs as (
+  select distinct on (er.source_document_id)
+    er.source_document_id,
+    er.structured_output->'metadata'->'sourceContext'->>'sourceUrl' as source_page_url
+  from extraction_runs er
+  where er.extractor_name = 'workflow_extractor'
+  order by er.source_document_id, er.created_at desc
+)
+update source_documents sd
+set source_page_url = latest_workflow_runs.source_page_url
+from latest_workflow_runs
+where sd.id = latest_workflow_runs.source_document_id
+  and sd.source_page_url is null
+  and coalesce(latest_workflow_runs.source_page_url, '') <> '';
+
+with workflow_source_pages as (
+  select distinct on (sd.id)
+    sd.id as source_document_id,
+    rw.official_page_url as source_page_url
+  from source_documents sd
+  join workflow_forms wf
+    on wf.form_url = sd.source_url
+  join records_workflows rw
+    on rw.id = wf.records_workflow_id
+  where sd.source_page_url is null
+    and sd.source_type = 'pdf'
+  order by sd.id, rw.updated_at desc nulls last, rw.created_at desc
+)
+update source_documents sd
+set source_page_url = workflow_source_pages.source_page_url
+from workflow_source_pages
+where sd.id = workflow_source_pages.source_document_id
+  and sd.source_page_url is null
+  and coalesce(workflow_source_pages.source_page_url, '') <> '';
 
 drop index if exists source_documents_unique_fetch;
 

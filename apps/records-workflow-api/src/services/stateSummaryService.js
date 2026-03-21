@@ -389,7 +389,7 @@ async function loadStateSystemStats(state) {
            hs.id as hospital_system_id,
            sd.id,
            sd.source_url,
-           workflow_source.official_page_url as source_page_url,
+           coalesce(sd.source_page_url, workflow_source.official_page_url) as source_page_url,
            sd.title,
            sd.storage_path,
            row_number() over (

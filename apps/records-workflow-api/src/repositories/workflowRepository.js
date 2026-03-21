@@ -267,6 +267,7 @@ export async function insertSourceDocument(
     hospitalSystemId,
     facilityId = null,
     sourceUrl,
+    sourcePageUrl = null,
     sourceType,
     title,
     fetchedAt,
@@ -287,6 +288,7 @@ export async function insertSourceDocument(
        hospital_system_id,
        facility_id,
        source_url,
+       source_page_url,
        source_type,
        title,
        fetched_at,
@@ -298,7 +300,7 @@ export async function insertSourceDocument(
        import_mode,
        import_notes
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      on conflict (hospital_system_id, source_url, content_hash)
      do update set hospital_system_id = case
                      when excluded.facility_id is not null then excluded.hospital_system_id
@@ -308,6 +310,7 @@ export async function insertSourceDocument(
                    fetched_at = excluded.fetched_at,
                    http_status = excluded.http_status,
                    title = excluded.title,
+                   source_page_url = coalesce(excluded.source_page_url, source_documents.source_page_url),
                    storage_path = excluded.storage_path,
                    extracted_text = excluded.extracted_text,
                    parser_version = excluded.parser_version,
@@ -318,6 +321,7 @@ export async function insertSourceDocument(
       hospitalSystemId,
       facilityId,
       sourceUrl,
+      sourcePageUrl,
       sourceType,
       title,
       fetchedAt,
@@ -1491,11 +1495,12 @@ export async function getSystemRequestPacket(systemId) {
 export async function getSourceDocumentById(sourceDocumentId) {
   const result = await query(
     `select
-       id,
-       source_url,
-       source_type,
-       storage_path,
-       fetched_at
+      id,
+      source_url,
+      source_page_url,
+      source_type,
+      storage_path,
+      fetched_at
      from source_documents
      where id = $1`,
     [sourceDocumentId]

@@ -88,6 +88,7 @@ export async function getHospitalSystemDetail(systemId) {
            sd.facility_id,
            f.facility_name,
            sd.source_url,
+           sd.source_page_url,
            sd.source_type,
            sd.title,
            sd.fetched_at,

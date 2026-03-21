@@ -41,9 +41,15 @@ export async function fetchAndParseDocument({
   const contentHash = sha256(bodyBuffer);
 
   let storagePath = null;
-  if (sourceType === 'pdf') {
+  if (state && sourceType === 'pdf') {
     const stateStorageDir = await ensureRawStorageStateDir(state);
     storagePath = path.join(stateStorageDir, `${contentHash}.pdf`);
+    await fs.writeFile(storagePath, bodyBuffer);
+  } else if (state && sourceType === 'html') {
+    const stateStorageDir = await ensureRawStorageStateDir(state);
+    const htmlStorageDir = path.join(stateStorageDir, 'crawl-html');
+    storagePath = path.join(htmlStorageDir, `${contentHash}.html`);
+    await fs.mkdir(htmlStorageDir, { recursive: true });
     await fs.writeFile(storagePath, bodyBuffer);
   }
 

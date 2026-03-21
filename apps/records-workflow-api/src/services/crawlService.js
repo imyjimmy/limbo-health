@@ -184,12 +184,17 @@ export async function runCrawl({
         });
 
         const status = bundle.workflows.length > 0 ? 'success' : 'partial';
+        const sourcePageUrl =
+          fetched.sourceType === 'html'
+            ? fetched.finalUrl
+            : item.sourceContext?.sourceUrl || null;
 
         const sourceDocumentId = await saveExtractionResult({
           sourceDocument: {
             hospitalSystemId: system.systemId,
             facilityId: item.facilityId,
             sourceUrl: fetched.finalUrl,
+            sourcePageUrl,
             sourceType: fetched.sourceType,
             title: fetched.title || derivePdfTitleFallback(item.sourceContext) || null,
             fetchedAt: fetched.fetchedAt,
@@ -208,6 +213,7 @@ export async function runCrawl({
             evidenceSnippets: bundle.evidenceSnippets,
             metadata: {
               sourceUrl: fetched.finalUrl,
+              sourcePageUrl,
               sourceType: fetched.sourceType,
               httpStatus: fetched.status,
               documentClassificationBasis: documentClassification.basis,
