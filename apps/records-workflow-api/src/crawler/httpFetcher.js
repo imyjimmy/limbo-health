@@ -1,10 +1,12 @@
 import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from '../utils/pythonRuntime.js';
 
 const execFile = promisify(execFileCallback);
 const SCRAPLING_FETCHER_PATH = fileURLToPath(new URL('./scrapling_fetch.py', import.meta.url));
 const MAX_FETCH_BUFFER_BYTES = 100 * 1024 * 1024;
+const SCRAPLING_PYTHON_BIN = resolvePythonExecutable({ overrideEnvVar: 'RECORDS_FETCH_PYTHON_BIN' });
 
 function normalizeHeaders(headers = {}) {
   if (!headers) return {};
@@ -46,7 +48,7 @@ async function fetchWithNode({ url, timeoutMs }) {
 }
 
 async function fetchWithScrapling({ url }) {
-  const { stdout } = await execFile('python3', [SCRAPLING_FETCHER_PATH, url], {
+  const { stdout } = await execFile(SCRAPLING_PYTHON_BIN, [SCRAPLING_FETCHER_PATH, url], {
     maxBuffer: MAX_FETCH_BUFFER_BYTES
   });
   const payload = JSON.parse(stdout || '{}');

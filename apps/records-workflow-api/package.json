@@ -7,8 +7,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "start:local": "node src/startLocal.js",
     "dev": "node --watch src/server.js",
     "migrate": "node src/migrate.js",
+    "migrate:local": "node src/runLocalTask.js ./migrate.js",
     "seed": "node src/seed.js",
     "crawl": "node src/crawl.js",
     "generate:reasonable-seeds": "node src/generateReasonableSeeds.js",
@@ -25,6 +27,10 @@
     "repartition:raw-storage-state": "node src/repartitionRawStorageByState.js",
     "cleanup:stale-crawl": "node src/cleanupStaleCrawlData.js --apply",
     "cleanup:stale-crawl:dry-run": "node src/cleanupStaleCrawlData.js",
+    "python:deps:install": "node src/installPythonDeps.js",
+    "python:deps:install:local": "node src/runLocalTask.js ./installPythonDeps.js",
+    "python:deps:verify": "node src/verifyPythonRuntime.js",
+    "python:deps:verify:local": "node src/runLocalTask.js ./verifyPythonRuntime.js",
     "test": "node --test --experimental-test-module-mocks"
   },
   "dependencies": {

@@ -103,9 +103,31 @@ Short version: `data -> seeds -> DB reseed -> crawl/fetch/parse -> link expansio
    - Single state: `npm run crawl:rollout -- --state CT`
    - Remaining states: `npm run crawl:rollout -- --all-remaining`
 
+## Local Operator Console
+
+For this machine, use the local convenience scripts instead of retyping env vars:
+
+1. Install Python deps into the preferred local interpreter:
+   - `npm run python:deps:install:local`
+2. Verify the runtime that Scrapling and PyMuPDF will use:
+   - `npm run python:deps:verify:local`
+3. Apply the schema against the local Postgres container on `localhost:5433`:
+   - `npm run migrate:local`
+4. Start the API on `http://localhost:3020`:
+   - `npm run start:local`
+
+These local scripts default to:
+- `DATABASE_URL=postgres://postgres:postgres@localhost:5433/records_workflow`
+- `PORT=3020`
+- `RECORDS_PYTHON_BIN=/opt/homebrew/Caskroom/miniconda/base/bin/python3` when that interpreter exists
+
+If you want a different interpreter or port, pass the env var explicitly, for example:
+- `PORT=3021 npm run start:local`
+- `RECORDS_PYTHON_BIN=/custom/python3 npm run python:deps:verify:local`
+
 ## Notes
 
-- Raw PDF snapshots are stored under `storage/raw/<state>/` such as `storage/raw/tx/` and `storage/raw/ma/`. HTML pages are parsed and persisted to the database but are no longer written to disk.
+- Raw PDF snapshots are stored under `storage/raw/<state>/` such as `storage/raw/tx/` and `storage/raw/ma/`. Crawled HTML snapshots are now also written under `storage/raw/<state>/crawl-html/` so fetch-stage artifacts can be re-opened and rerun later.
 - `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
 - No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
