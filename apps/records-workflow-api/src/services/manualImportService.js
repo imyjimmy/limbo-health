@@ -11,6 +11,7 @@ import {
   getHospitalSystemById,
   insertExtractionRun,
   saveExtractionResult,
+  upsertHospitalSystem,
   upsertSeedUrl,
 } from '../repositories/workflowRepository.js';
 import { ensureSourceDocumentStateDir, resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
@@ -85,6 +86,40 @@ async function resolveSystemContext({ hospitalSystemId, facilityId = null, state
     system,
     facility,
     state: resolvedState,
+  };
+}
+
+async function resolveSystemContextForManualUrl({
+  hospitalSystemId = null,
+  systemName = null,
+  domain = null,
+  facilityId = null,
+  state = null,
+}) {
+  if (hospitalSystemId) {
+    return resolveSystemContext({ hospitalSystemId, facilityId, state });
+  }
+
+  const normalizedSystemName = normalizeOptionalString(systemName);
+  const normalizedState = normalizeStateCode(state);
+  if (!normalizedSystemName || !normalizedState) {
+    throw new Error('Hospital system id or state/system name is required.');
+  }
+
+  if (facilityId) {
+    throw new Error('Facility-specific manual URLs require a hospital system id.');
+  }
+
+  const system = await upsertHospitalSystem({
+    systemName: normalizedSystemName,
+    domain: normalizeOptionalString(domain),
+    state: normalizedState,
+  });
+
+  return {
+    system,
+    facility: null,
+    state: normalizedState,
   };
 }
 
@@ -218,14 +253,24 @@ async function maybeInsertPdfFormUnderstanding({
 
 export async function addManualApprovedUrl({
   hospitalSystemId,
+  systemName = null,
+  domain = null,
   facilityId = null,
   officialPageUrl,
   directPdfUrl = null,
   notes = null,
   updateSeedFile = true,
   crawlNow = false,
+  state = null,
 }) {
-  const { system, facility, state } = await resolveSystemContext({ hospitalSystemId, facilityId });
+  const context = await resolveSystemContextForManualUrl({
+    hospitalSystemId,
+    systemName,
+    domain,
+    facilityId,
+    state,
+  });
+  const { system, facility } = context;
   const approvedUrls = [normalizeOptionalString(officialPageUrl), normalizeOptionalString(directPdfUrl)].filter(Boolean);
 
   if (approvedUrls.length === 0) {
@@ -255,7 +300,7 @@ export async function addManualApprovedUrl({
   let seedFile = null;
   if (updateSeedFile) {
     seedFile = await upsertHumanApprovedSeedInFile({
-      state,
+      state: context.state,
       systemName: system.system_name,
       domain: system.canonical_domain,
       seedUrls: approvedUrls,
@@ -271,14 +316,14 @@ export async function addManualApprovedUrl({
 
   const crawlSummary = crawlNow
     ? await runCrawl({
-        state,
+        state: context.state,
         systemId: system.id,
       })
     : null;
 
   return {
     status: 'ok',
-    state,
+    state: context.state,
     hospital_system_id: system.id,
     facility_id: facility?.id || null,
     seed_ids: seedIds,

@@ -260,6 +260,9 @@ internalRouter.post('/manual-url', async (req, res) => {
   try {
     const result = await addManualApprovedUrl({
       hospitalSystemId: req.body?.hospital_system_id || req.body?.hospitalSystemId,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      domain: req.body?.domain || null,
+      state: req.body?.state || null,
       facilityId: req.body?.facility_id || req.body?.facilityId || null,
       officialPageUrl: req.body?.official_page_url || req.body?.officialPageUrl,
       directPdfUrl: req.body?.direct_pdf_url || req.body?.directPdfUrl || null,

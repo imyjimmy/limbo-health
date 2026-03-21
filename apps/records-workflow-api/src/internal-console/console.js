@@ -316,6 +316,27 @@ function renderIconAction(action, label, dataAttributes = '') {
   `;
 }
 
+function renderPencilAction(action, label, dataAttributes = '') {
+  const safeLabel = escapeHtml(label || 'Edit');
+
+  return `
+    <button
+      type="button"
+      class="icon-link"
+      data-action="${escapeHtml(action)}"
+      ${dataAttributes}
+      aria-label="${safeLabel}"
+      title="${safeLabel}"
+    >
+      <svg class="icon-link-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="m12 20 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M18 6a2.83 2.83 0 1 1 4 4L11 21l-4 1 1-4Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span class="sr-only">${safeLabel}</span>
+    </button>
+  `;
+}
+
 function formatNumber(value) {
   return new Intl.NumberFormat().format(Number(value || 0));
 }
@@ -896,14 +917,17 @@ function deriveSystemUrl(system) {
 function uniqueSystemPdfSourcePages(system) {
   const pages = [];
   const seen = new Set();
-
-  for (const pdfLink of Array.isArray(system?.pdf_links) ? system.pdf_links : []) {
-    const url = String(pdfLink?.source_page_url || '').trim();
+  const addPage = (value) => {
+    const url = String(value || '').trim();
     if (!url || seen.has(url)) {
-      continue;
+      return;
     }
     seen.add(url);
     pages.push(url);
+  };
+
+  for (const pdfLink of Array.isArray(system?.pdf_links) ? system.pdf_links : []) {
+    addPage(pdfLink?.source_page_url);
   }
 
   if (pages.length > 0) {
@@ -920,8 +944,15 @@ function uniqueSystemPdfSourcePages(system) {
       continue;
     }
 
-    seen.add(url);
-    pages.push(url);
+    addPage(url);
+  }
+
+  if (pages.length > 0) {
+    return pages;
+  }
+
+  for (const url of Array.isArray(system?.seed_file?.seed_urls) ? system.seed_file.seed_urls : []) {
+    addPage(url);
   }
 
   return pages;
@@ -1018,31 +1049,29 @@ function renderSystemPdfPageLinks(system) {
   const pages = uniqueSystemPdfSourcePages(system);
 
   if (!pages.length) {
-    if (!system?.hospital_system_id) {
-      return '<span class="system-subtext">No source page</span>';
+    if (!system?.system_name) {
+      return '<span class="system-subtext">-</span>';
     }
 
-    return `
-      <div class="flex flex-col items-start gap-2">
-        <span class="system-subtext">No source page</span>
-        <button
-          type="button"
-          class="ghost-button"
-          data-action="add-system-source-page"
-          data-system-id="${escapeHtml(system.hospital_system_id)}"
-        >
-          Add source page
-        </button>
-      </div>
-    `;
-  }
+    const dataAttributes = [
+      system?.hospital_system_id ? `data-system-id="${escapeHtml(system.hospital_system_id)}"` : '',
+      system?.system_name ? `data-system-name="${escapeHtml(system.system_name)}"` : '',
+      system?.state ? `data-system-state="${escapeHtml(system.state)}"` : '',
+      system?.domain ? `data-system-domain="${escapeHtml(system.domain)}"` : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
 
-  const visiblePages = pages.slice(0, 2);
-  const remainingCount = pages.length - visiblePages.length;
+    return renderPencilAction(
+      'add-system-source-page',
+      `Add source page for ${system.system_name || 'system'}`,
+      dataAttributes,
+    );
+  }
 
   return `
     <div class="pdf-page-links">
-      ${visiblePages
+      ${pages
         .map((url, index) => {
           const label =
             pages.length === 1
@@ -1051,12 +1080,6 @@ function renderSystemPdfPageLinks(system) {
           return renderIconLink(url, label);
         })
         .join('')}
-      ${
-        pages.length > 1
-          ? `<span class="system-subtext">${escapeHtml(`${pages.length} pages`)}</span>`
-          : ''
-      }
-      ${remainingCount > 0 ? `<span class="system-subtext">+${remainingCount} more</span>` : ''}
     </div>
   `;
 }
@@ -3855,9 +3878,17 @@ async function runPipelineForSelectedSystem() {
   });
 }
 
-async function addSourcePageForSystem(systemId) {
-  const system = state.systems.find((entry) => entry.hospital_system_id === systemId) || null;
-  if (!system?.hospital_system_id) {
+async function addSourcePageForSystem({ systemId = null, systemName = null, systemState = null, systemDomain = null } = {}) {
+  const system =
+    state.systems.find(
+      (entry) =>
+        (systemId && entry.hospital_system_id === systemId) ||
+        (!systemId &&
+          systemName &&
+          entry.system_name === systemName &&
+          entry.state === (systemState || state.currentState)),
+    ) || null;
+  if (!system?.system_name) {
     throw new Error('Hospital system not found in the current state view.');
   }
 
@@ -3875,7 +3906,10 @@ async function addSourcePageForSystem(systemId) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      hospital_system_id: system.hospital_system_id,
+      hospital_system_id: system.hospital_system_id || systemId || null,
+      system_name: system.system_name || systemName || null,
+      state: system.state || systemState || state.currentState || null,
+      domain: system.domain || systemDomain || null,
       official_page_url: nextUrl,
       notes: 'Added from Systems view PDF Link',
       update_seed_file: true,
@@ -4185,8 +4219,13 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
-    if (button.dataset.action === 'add-system-source-page' && button.dataset.systemId) {
-      await addSourcePageForSystem(button.dataset.systemId);
+    if (button.dataset.action === 'add-system-source-page') {
+      await addSourcePageForSystem({
+        systemId: button.dataset.systemId || null,
+        systemName: button.dataset.systemName || null,
+        systemState: button.dataset.systemState || null,
+        systemDomain: button.dataset.systemDomain || null,
+      });
       return;
     }
 
