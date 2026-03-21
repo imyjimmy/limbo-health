@@ -1,7 +1,9 @@
-import fs from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { fetchAndParseDocument } from '../crawler/fetcher.js';
 import { expandCandidateLinks } from '../crawler/linkExpander.js';
 import { config } from '../config.js';
+import { completePipelineStageRun, insertFetchArtifact, insertPipelineStageRun, insertTriageDecision } from '../repositories/pipelineStageRepository.js';
+import { withTransaction } from '../db.js';
 import {
   insertSourceDocument,
   listActiveSeeds,
@@ -17,16 +19,6 @@ function normalizeForVisited(url) {
     return value.toString();
   } catch {
     return url;
-  }
-}
-
-async function removeIfPresent(filePath) {
-  try {
-    await fs.unlink(filePath);
-  } catch (error) {
-    if (error?.code !== 'ENOENT') {
-      throw error;
-    }
   }
 }
 
@@ -95,6 +87,45 @@ function isPinnedRecordsSeed(seed = null) {
   );
 }
 
+function buildFetchStageStatus({ fetchedDocuments, failedDocuments }) {
+  if (fetchedDocuments === 0 && failedDocuments > 0) return 'failed';
+  if (failedDocuments > 0) return 'partial';
+  return 'ok';
+}
+
+function buildTriageDecision({ fetched, documentClassification }) {
+  if (fetched.sourceType !== 'pdf') {
+    return {
+      decision: 'accepted',
+      basis: 'html',
+      reasonCode: null,
+      reasonDetail: null,
+      classifierName: 'source_type_auto_accept',
+      classifierVersion: 'v1',
+    };
+  }
+
+  if (documentClassification.accepted) {
+    return {
+      decision: 'accepted',
+      basis: documentClassification.basis || null,
+      reasonCode: null,
+      reasonDetail: null,
+      classifierName: 'medical_records_request_document_classifier',
+      classifierVersion: 'v1',
+    };
+  }
+
+  return {
+    decision: 'skipped',
+    basis: documentClassification.basis || null,
+    reasonCode: 'non_medical_records_pdf',
+    reasonDetail: 'Classifier rejected the PDF as not being a medical-records-request document.',
+    classifierName: 'medical_records_request_document_classifier',
+    classifierVersion: 'v1',
+  };
+}
+
 export async function runCrawl({
   systemName = null,
   systemId = null,
@@ -154,6 +185,29 @@ export async function runCrawl({
   const details = [];
 
   for (const system of perSystem.values()) {
+    const fetchStageRun = await insertPipelineStageRun({
+      stageKey: 'fetch_stage',
+      stageLabel: 'Fetch Stage',
+      state: system.state,
+      hospitalSystemId: system.systemId,
+      systemName: system.systemName,
+      status: 'running',
+      inputSummary: {
+        seed_urls: system.seeds.length,
+        max_depth: maxDepth,
+      },
+    });
+    const triageStageRun = await insertPipelineStageRun({
+      stageKey: 'triage_stage',
+      stageLabel: 'Document Triage Stage',
+      state: system.state,
+      hospitalSystemId: system.systemId,
+      systemName: system.systemName,
+      status: 'running',
+      inputSummary: {
+        seed_urls: system.seeds.length,
+      },
+    });
     const visited = new Set();
     const queue = system.seeds.map((seed) => ({
       url: seed.url,
@@ -163,6 +217,10 @@ export async function runCrawl({
       sourceContext: null,
       crawlMode: isPinnedRecordsSeed(seed) ? 'records_page' : 'general',
       }));
+    let systemFetched = 0;
+    let systemFetchFailed = 0;
+    let systemAccepted = 0;
+    let systemSkipped = 0;
 
     while (queue.length > 0) {
       const item = queue.shift();
@@ -173,6 +231,7 @@ export async function runCrawl({
       try {
         const fetched = await fetchAndParseDocument({ url: item.url, state: system.state });
         crawled += 1;
+        systemFetched += 1;
         const documentClassification =
           fetched.sourceType === 'pdf'
             ? classifyMedicalRecordsRequestDocument({
@@ -187,24 +246,13 @@ export async function runCrawl({
                 sourceLinkContext: item.sourceContext?.contextText || ''
               })
             : { accepted: true, basis: 'html' };
-
-        if (
-          fetched.sourceType === 'pdf' &&
-          !documentClassification.accepted
-        ) {
-          await removeIfPresent(fetched.storagePath);
-          details.push({
-            system: system.systemName,
-            state: system.state,
-            url: fetched.finalUrl,
-            skipped: 'non_medical_records_pdf',
-            pdfParseStatus: fetched.parsed?.parseStatus || null
-          });
-          continue;
-        }
+        const triageDecision = buildTriageDecision({
+          fetched,
+          documentClassification,
+        });
 
         let storagePath = fetched.storagePath;
-        if (fetched.sourceType === 'pdf') {
+        if (fetched.sourceType === 'pdf' && triageDecision.decision === 'accepted') {
           const fallbackTitle = derivePdfTitleFallback(item.sourceContext);
           const fallbackText = derivePdfTextFallback(item.sourceContext);
           storagePath = await assignPdfStoragePath({
@@ -225,23 +273,106 @@ export async function runCrawl({
           fetched.sourceType === 'html'
             ? fetched.finalUrl
             : item.sourceContext?.sourceUrl || null;
+        const discoveredFromUrl = item.sourceContext?.sourceUrl || sourcePageUrl || null;
+        const fetchArtifactId = randomUUID();
+        const triageDecisionId = randomUUID();
 
-        await insertSourceDocument({
-          hospitalSystemId: system.systemId,
-          facilityId: item.facilityId,
-          sourceUrl: fetched.finalUrl,
-          sourcePageUrl,
-          sourceType: fetched.sourceType,
-          title: fetched.title || derivePdfTitleFallback(item.sourceContext) || null,
-          fetchedAt: fetched.fetchedAt,
-          httpStatus: fetched.status,
-          contentHash: fetched.contentHash,
-          storagePath,
-          extractedText: fetched.extractedText,
-          parserVersion: fetched.parserVersion,
+        await withTransaction(async (client) => {
+          await insertFetchArtifact(
+            {
+              id: fetchArtifactId,
+              fetchStageRunId: fetchStageRun.id,
+              hospitalSystemId: system.systemId,
+              facilityId: item.facilityId,
+              requestedUrl: item.url,
+              finalUrl: fetched.finalUrl,
+              sourcePageUrl,
+              httpStatus: fetched.status,
+              contentType: fetched.contentType,
+              sourceType:
+                fetched.sourceType === 'html' || fetched.sourceType === 'pdf'
+                  ? fetched.sourceType
+                  : 'other',
+              title: fetched.title || derivePdfTitleFallback(item.sourceContext) || null,
+              contentHash: fetched.contentHash,
+              responseBytes: fetched.responseBytes || null,
+              fetchBackend: fetched.fetchBackend || null,
+              storagePath,
+              headers: fetched.headers || {},
+              fetchMetadata: {
+                depth: item.depth,
+                crawl_mode: item.crawlMode,
+                source_context: item.sourceContext || null,
+              },
+              fetchedAt: fetched.fetchedAt,
+            },
+            client,
+          );
+
+          await insertTriageDecision(
+            {
+              id: triageDecisionId,
+              triageStageRunId: triageStageRun.id,
+              fetchArtifactId,
+              decision: triageDecision.decision,
+              basis: triageDecision.basis,
+              reasonCode: triageDecision.reasonCode,
+              reasonDetail: triageDecision.reasonDetail,
+              classifierName: triageDecision.classifierName,
+              classifierVersion: triageDecision.classifierVersion,
+              evidence: {
+                source_context: item.sourceContext || null,
+                source_page_url: sourcePageUrl,
+                discovered_from_url: discoveredFromUrl,
+                pdf_parse_status: fetched.parsed?.parseStatus || null,
+                content_hash: fetched.contentHash,
+                crawl_mode: item.crawlMode,
+                depth: item.depth,
+              },
+            },
+            client,
+          );
+
+          if (triageDecision.decision === 'accepted') {
+            await insertSourceDocument(
+              {
+                hospitalSystemId: system.systemId,
+                facilityId: item.facilityId,
+                sourceUrl: fetched.finalUrl,
+                sourcePageUrl,
+                discoveredFromUrl,
+                fetchArtifactId,
+                triageDecisionId,
+                sourceType: fetched.sourceType,
+                title: fetched.title || derivePdfTitleFallback(item.sourceContext) || null,
+                fetchedAt: fetched.fetchedAt,
+                httpStatus: fetched.status,
+                contentHash: fetched.contentHash,
+                storagePath,
+                extractedText: fetched.extractedText,
+                parserVersion: fetched.parserVersion,
+              },
+              client,
+            );
+          }
         });
 
+        if (triageDecision.decision !== 'accepted') {
+          systemSkipped += 1;
+          details.push({
+            system: system.systemName,
+            state: system.state,
+            url: fetched.finalUrl,
+            fetch_artifact_id: fetchArtifactId,
+            triage_decision_id: triageDecisionId,
+            skipped: triageDecision.reasonCode || 'triage_rejected',
+            pdfParseStatus: fetched.parsed?.parseStatus || null,
+          });
+          continue;
+        }
+
         extracted += 1;
+        systemAccepted += 1;
 
         if (fetched.sourceType === 'html' && item.depth < maxDepth && item.crawlMode !== 'terminal') {
           const expansionMode = item.crawlMode === 'records_page' ? 'records_page' : 'general';
@@ -277,6 +408,7 @@ export async function runCrawl({
         }
       } catch (error) {
         failed += 1;
+        systemFetchFailed += 1;
         details.push({
           system: system.systemName,
           state: system.state,
@@ -285,6 +417,36 @@ export async function runCrawl({
         });
       }
     }
+
+    await completePipelineStageRun({
+      stageRunId: fetchStageRun.id,
+      status: buildFetchStageStatus({
+        fetchedDocuments: systemFetched,
+        failedDocuments: systemFetchFailed,
+      }),
+      outputSummary: {
+        fetched_documents: systemFetched,
+        failed_documents: systemFetchFailed,
+        accepted_documents: systemAccepted,
+        skipped_documents: systemSkipped,
+      },
+      errorSummary:
+        systemFetchFailed > 0
+          ? {
+              message: `${systemFetchFailed} fetches failed during crawl.`,
+            }
+          : null,
+    });
+
+    await completePipelineStageRun({
+      stageRunId: triageStageRun.id,
+      status: 'ok',
+      outputSummary: {
+        fetched_documents: systemFetched,
+        accepted_documents: systemAccepted,
+        skipped_documents: systemSkipped,
+      },
+    });
   }
 
   return {

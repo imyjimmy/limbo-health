@@ -37,6 +37,7 @@ async function fetchWithNode({ url, timeoutMs }) {
     });
 
     return {
+      backend: 'node',
       status: response.status,
       finalUrl: response.url,
       headers: normalizeHeaders(response.headers),
@@ -54,6 +55,7 @@ async function fetchWithScrapling({ url }) {
   const payload = JSON.parse(stdout || '{}');
 
   return {
+    backend: 'scrapling',
     status: Number(payload.status || 0),
     finalUrl: payload.finalUrl || url,
     headers: normalizeHeaders(payload.headers || {}),

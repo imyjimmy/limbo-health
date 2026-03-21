@@ -171,6 +171,53 @@ create index if not exists pipeline_stage_runs_system_stage_created_lookup
 create index if not exists pipeline_stage_runs_state_stage_created_lookup
   on pipeline_stage_runs (state, stage_key, created_at desc);
 
+create table if not exists fetch_artifacts (
+  id uuid primary key default gen_random_uuid(),
+  fetch_stage_run_id uuid not null references pipeline_stage_runs(id) on delete cascade,
+  hospital_system_id uuid references hospital_systems(id) on delete set null,
+  facility_id uuid references facilities(id) on delete set null,
+  requested_url text not null,
+  final_url text,
+  source_page_url text,
+  http_status int,
+  content_type text,
+  source_type text check (source_type in ('html', 'pdf', 'other')),
+  title text,
+  content_hash text,
+  response_bytes int,
+  fetch_backend text,
+  storage_path text,
+  headers jsonb,
+  fetch_metadata jsonb not null default '{}'::jsonb,
+  fetched_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists fetch_artifacts_stage_lookup
+  on fetch_artifacts (fetch_stage_run_id, fetched_at desc);
+
+create index if not exists fetch_artifacts_hash_lookup
+  on fetch_artifacts (content_hash);
+
+create table if not exists triage_decisions (
+  id uuid primary key default gen_random_uuid(),
+  triage_stage_run_id uuid not null references pipeline_stage_runs(id) on delete cascade,
+  fetch_artifact_id uuid not null references fetch_artifacts(id) on delete cascade,
+  decision text not null check (
+    decision in ('accepted', 'skipped', 'needs_review')
+  ),
+  basis text,
+  reason_code text,
+  reason_detail text,
+  classifier_name text not null,
+  classifier_version text not null,
+  evidence jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists triage_decisions_fetch_lookup
+  on triage_decisions (fetch_artifact_id, created_at desc);
+
 create table if not exists parsed_artifacts (
   id uuid primary key default gen_random_uuid(),
   parse_stage_run_id uuid not null references pipeline_stage_runs(id) on delete cascade,
@@ -189,6 +236,15 @@ create index if not exists parsed_artifacts_source_document_lookup
   on parsed_artifacts (source_document_id, created_at desc);
 
 alter table source_documents
+  add column if not exists fetch_artifact_id uuid references fetch_artifacts(id);
+
+alter table source_documents
+  add column if not exists triage_decision_id uuid references triage_decisions(id);
+
+alter table source_documents
+  add column if not exists discovered_from_url text;
+
+alter table source_documents
   add column if not exists parsed_artifact_id uuid references parsed_artifacts(id);
 
 alter table source_documents
@@ -201,6 +257,11 @@ update source_documents
 set source_page_url = source_url
 where source_page_url is null
   and source_type = 'html';
+
+update source_documents
+set discovered_from_url = coalesce(source_page_url, source_url)
+where discovered_from_url is null
+  and source_type = 'pdf';
 
 with latest_workflow_runs as (
   select distinct on (er.source_document_id)

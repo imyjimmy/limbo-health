@@ -118,6 +118,156 @@ export async function insertParsedArtifact(
   return result.rows[0] || null;
 }
 
+export async function insertFetchArtifact(
+  {
+    id = null,
+    fetchStageRunId,
+    hospitalSystemId = null,
+    facilityId = null,
+    requestedUrl,
+    finalUrl = null,
+    sourcePageUrl = null,
+    httpStatus = null,
+    contentType = null,
+    sourceType = null,
+    title = null,
+    contentHash = null,
+    responseBytes = null,
+    fetchBackend = null,
+    storagePath = null,
+    headers = null,
+    fetchMetadata = {},
+    fetchedAt = null,
+  },
+  client = null,
+) {
+  const q = client || { query };
+  const result = await q.query(
+    `insert into fetch_artifacts (
+       id,
+       fetch_stage_run_id,
+       hospital_system_id,
+       facility_id,
+       requested_url,
+       final_url,
+       source_page_url,
+       http_status,
+       content_type,
+       source_type,
+       title,
+       content_hash,
+       response_bytes,
+       fetch_backend,
+       storage_path,
+       headers,
+       fetch_metadata,
+       fetched_at
+     )
+     values (
+       coalesce($1, gen_random_uuid()),
+       $2,
+       $3,
+       $4,
+       $5,
+       $6,
+       $7,
+       $8,
+       $9,
+       $10,
+       $11,
+       $12,
+       $13,
+       $14,
+       $15,
+       $16,
+       $17,
+       coalesce($18, now())
+     )
+     returning *`,
+    [
+      id,
+      fetchStageRunId,
+      hospitalSystemId,
+      facilityId,
+      requestedUrl,
+      finalUrl,
+      sourcePageUrl,
+      httpStatus,
+      contentType,
+      sourceType,
+      title,
+      contentHash,
+      responseBytes,
+      fetchBackend,
+      storagePath,
+      headers,
+      fetchMetadata || {},
+      fetchedAt,
+    ],
+  );
+
+  return result.rows[0] || null;
+}
+
+export async function insertTriageDecision(
+  {
+    id = null,
+    triageStageRunId,
+    fetchArtifactId,
+    decision,
+    basis = null,
+    reasonCode = null,
+    reasonDetail = null,
+    classifierName,
+    classifierVersion,
+    evidence = {},
+  },
+  client = null,
+) {
+  const q = client || { query };
+  const result = await q.query(
+    `insert into triage_decisions (
+       id,
+       triage_stage_run_id,
+       fetch_artifact_id,
+       decision,
+       basis,
+       reason_code,
+       reason_detail,
+       classifier_name,
+       classifier_version,
+       evidence
+     )
+     values (
+       coalesce($1, gen_random_uuid()),
+       $2,
+       $3,
+       $4,
+       $5,
+       $6,
+       $7,
+       $8,
+       $9,
+       $10
+     )
+     returning *`,
+    [
+      id,
+      triageStageRunId,
+      fetchArtifactId,
+      decision,
+      basis,
+      reasonCode,
+      reasonDetail,
+      classifierName,
+      classifierVersion,
+      evidence || {},
+    ],
+  );
+
+  return result.rows[0] || null;
+}
+
 export async function linkParsedArtifactToSourceDocument(
   {
     sourceDocumentId,
