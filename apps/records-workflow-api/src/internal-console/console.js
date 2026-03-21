@@ -512,6 +512,22 @@ function latestQuestionStageResult() {
   return state.pipelineRunResult.question_stage || null;
 }
 
+function latestParseStageResult() {
+  if (!state.pipelineRunResult) return null;
+  if (state.pipelineRunResult.stage_key === 'parse_stage') {
+    return state.pipelineRunResult;
+  }
+  return state.pipelineRunResult.parse_stage || null;
+}
+
+function latestWorkflowStageResult() {
+  if (!state.pipelineRunResult) return null;
+  if (state.pipelineRunResult.stage_key === 'workflow_extraction_stage') {
+    return state.pipelineRunResult;
+  }
+  return state.pipelineRunResult.workflow_stage || null;
+}
+
 function renderPipelineRunButton({
   action,
   actionKey,
@@ -545,6 +561,8 @@ function setPipelineActionState(actionKey = null) {
   const hasSystem = Boolean(state.selectedSystemId);
   const actions = [
     { key: 'crawl_stage', element: elements.runCrawlStage, idleLabel: 'Run Crawl Stage' },
+    { key: 'parse_stage', element: null, idleLabel: 'Run Parse Stage' },
+    { key: 'workflow_extraction_stage', element: null, idleLabel: 'Run Workflow Stage' },
     { key: 'question_extraction_stage', element: elements.runQuestionStage, idleLabel: 'Run Question Stage' },
     { key: 'full_pipeline', element: elements.runPipeline, idleLabel: 'Run Full Pipeline' },
   ];
@@ -1531,7 +1549,7 @@ function renderPipelineInsights() {
         ${formatNumber(seedUrls.length)} seeds •
         ${formatNumber(sourceDocuments.length)} docs
       </div>
-      <p class="metric-note">The fetch, triage, parse, and workflow-extraction checkpoints all live inside the crawl job today.</p>
+      <p class="metric-note">Crawl gets documents into the accepted source-doc set. Parse and workflow reruns now have their own stage controls.</p>
     </article>
     <article class="metric-card">
       <div class="metric-label">Review Span</div>
@@ -2205,6 +2223,16 @@ function renderPipelineRunResult() {
   const result = state.pipelineRunResult;
   const stageLabel = result.stage_label || 'Pipeline Action';
   const stageStatus = result.stage_status || result.status || 'ok';
+  const parseDetails = Array.isArray(result.parse_stage?.details)
+    ? result.parse_stage.details
+    : result.stage_key === 'parse_stage' && Array.isArray(result.details)
+      ? result.details
+      : [];
+  const workflowDetails = Array.isArray(result.workflow_stage?.details)
+    ? result.workflow_stage.details
+    : result.stage_key === 'workflow_extraction_stage' && Array.isArray(result.details)
+      ? result.details
+      : [];
   const crawlDetails = Array.isArray(result.crawl_stage?.details)
     ? result.crawl_stage.details
     : result.stage_key === 'crawl_stage' && Array.isArray(result.details)
@@ -2215,6 +2243,11 @@ function renderPipelineRunResult() {
     : result.stage_key === 'question_extraction_stage' && Array.isArray(result.details)
       ? result.details
       : [];
+  const parseFailed = parseDetails.filter(
+    (detail) => detail?.status === 'failed' || detail?.status === 'empty_text',
+  ).length;
+  const workflowFailed = workflowDetails.filter((detail) => detail?.status === 'failed').length;
+  const workflowPartial = workflowDetails.filter((detail) => detail?.status === 'partial').length;
   const crawlFailed = crawlDetails.filter((detail) => Boolean(detail?.error)).length;
   const crawlSkipped = crawlDetails.filter((detail) => Boolean(detail?.skipped)).length;
   const questionFailed = questionDetails.filter((detail) => detail?.status === 'failed').length;
@@ -2233,6 +2266,23 @@ function renderPipelineRunResult() {
         copy: detail.skipped === 'non_medical_records_pdf'
           ? 'Skipped because it did not look like a medical-records-request PDF.'
           : String(detail.skipped),
+      })),
+    ...parseDetails
+      .filter((detail) => detail?.status === 'failed' || detail?.status === 'empty_text')
+      .map((detail) => ({
+        title: detail.title || detail.source_url || 'Parse issue',
+        copy: detail.error || `Parse status: ${detail.status}.`,
+      })),
+    ...workflowDetails
+      .filter((detail) => detail?.status === 'failed' || detail?.status === 'partial' || detail?.status === 'parse_failure')
+      .map((detail) => ({
+        title: detail.title || detail.source_url || 'Workflow extraction issue',
+        copy:
+          detail.status === 'partial'
+            ? 'Workflow extraction completed, but no structured workflow rows were recovered.'
+            : detail.status === 'parse_failure'
+              ? `Workflow extraction skipped because parse status was ${detail.parse_status || 'failed'}.`
+              : detail.error || 'Workflow extraction failed.',
       })),
     ...questionDetails
       .filter((detail) => detail?.status === 'failed' || detail?.supported === false)
@@ -2280,33 +2330,43 @@ function renderPipelineRunResult() {
         </article>
       </div>
       ${
-        crawlDetails.length || questionDetails.length
+        crawlDetails.length || parseDetails.length || workflowDetails.length || questionDetails.length
           ? `<div class="mt-5 grid gap-3 md:grid-cols-4">
               <article class="detail-item">
                 <div class="detail-item-title">Crawl Failures</div>
                 <div class="detail-item-copy">${formatNumber(crawlFailed)}</div>
               </article>
               <article class="detail-item">
-                <div class="detail-item-title">Skipped Docs</div>
-                <div class="detail-item-copy">${formatNumber(crawlSkipped)}</div>
+                <div class="detail-item-title">Parse Failures</div>
+                <div class="detail-item-copy">${formatNumber(parseFailed)}</div>
               </article>
               <article class="detail-item">
-                <div class="detail-item-title">Question Failures</div>
-                <div class="detail-item-copy">${formatNumber(questionFailed)}</div>
+                <div class="detail-item-title">Workflow Issues</div>
+                <div class="detail-item-copy">${formatNumber(workflowFailed + workflowPartial)}</div>
               </article>
               <article class="detail-item">
                 <div class="detail-item-title">Manual Review Needed</div>
-                <div class="detail-item-copy">${formatNumber(questionUnsupported)}</div>
+                <div class="detail-item-copy">${formatNumber(questionUnsupported + crawlSkipped + questionFailed)}</div>
               </article>
             </div>`
           : ''
       }
       ${
-        result.crawl_stage || result.question_stage
+        result.crawl_stage || result.parse_stage || result.workflow_stage || result.question_stage
           ? `<div class="history-deltas mt-5">
               ${
                 result.crawl_stage
                   ? `<span class="${statusPillClass(result.crawl_stage.status === 'failed' ? 'red' : result.crawl_stage.status === 'no_seeds' ? 'yellow' : 'green')}">${escapeHtml(result.crawl_stage.stage_label || 'Crawl Stage')} ${escapeHtml(result.crawl_stage.status || 'ok')}</span>`
+                  : ''
+              }
+              ${
+                result.parse_stage
+                  ? `<span class="${statusPillClass(result.parse_stage.stage_status === 'failed' ? 'red' : result.parse_stage.stage_status === 'partial' || result.parse_stage.stage_status === 'no_documents' ? 'yellow' : 'green')}">${escapeHtml(result.parse_stage.stage_label || 'Parse Stage')} ${escapeHtml(result.parse_stage.stage_status || result.parse_stage.status || 'ok')}</span>`
+                  : ''
+              }
+              ${
+                result.workflow_stage
+                  ? `<span class="${statusPillClass(result.workflow_stage.stage_status === 'failed' ? 'red' : result.workflow_stage.stage_status === 'partial' || result.workflow_stage.stage_status === 'no_documents' ? 'yellow' : 'green')}">${escapeHtml(result.workflow_stage.stage_label || 'Workflow Stage')} ${escapeHtml(result.workflow_stage.stage_status || result.workflow_stage.status || 'ok')}</span>`
                   : ''
               }
               ${
@@ -2366,6 +2426,8 @@ function renderPipelineVisual() {
   );
   const firstPdf = firstPdfDocument();
   const latestCrawl = latestCrawlStageResult();
+  const latestParse = latestParseStageResult();
+  const latestWorkflow = latestWorkflowStageResult();
   const latestQuestion = latestQuestionStageResult();
   const latestCrawlDetails = Array.isArray(latestCrawl?.details) ? latestCrawl.details : [];
   const latestCrawlSkipped = latestCrawlDetails.filter(
@@ -2478,18 +2540,24 @@ function renderPipelineVisual() {
       index: '4',
       title: 'PDF Parse and Storage',
       copy: 'Accepted PDFs are named, stored, and parsed for text and geometry so they can feed workflow and question extraction.',
-      runtime: 'Runs inside Run Crawl Stage.',
-      current: `${formatNumber(pdfDocuments.length)} stored PDFs • ${formatNumber(parseFailureDocuments.length)} parse failures • ${firstPdf ? sourceDocumentDisplayName(firstPdf) : 'no PDF sample yet'}`,
+      runtime: 'Runs inside Run Parse Stage.',
+      current: `${formatNumber(sourceDocuments.filter((document) => Boolean(document?.latest_parsed_artifact_id)).length)} parsed docs • ${formatNumber(parseFailureDocuments.length)} parse failures • ${latestParse?.parsed_documents ? `${formatNumber(latestParse.parsed_documents)} parsed in the latest run` : firstPdf ? sourceDocumentDisplayName(firstPdf) : 'no PDF sample yet'}`,
       breaks:
         parseFailureDocuments.length > 0
           ? `${formatNumber(parseFailureDocuments.length)} PDFs currently report empty_text or failed parse status.`
           : 'Empty-text PDFs and parser failures show up here before question extraction can do useful work.',
       humanMove:
-        pdfDocuments.length === 0
-          ? 'No PDFs means there is nothing for question extraction or PDF review yet.'
-          : 'Open Results and inspect the affected PDFs before rerunning later stages.',
-      tone: pdfDocuments.length === 0 ? 'yellow' : parseFailureDocuments.length > 0 ? 'red' : 'green',
+        sourceDocuments.length === 0
+          ? 'No accepted source docs means there is nothing to parse yet.'
+          : 'Run Parse Stage after crawl or source edits, then inspect the affected PDFs before rerunning later stages.',
+      tone: sourceDocuments.length === 0 ? 'yellow' : parseFailureDocuments.length > 0 ? 'red' : latestParse?.stage_status === 'partial' ? 'yellow' : 'green',
       actionButtons: [
+        renderPipelineRunButton({
+          action: 'run-parse-stage',
+          actionKey: 'parse_stage',
+          label: 'Run Parse Stage',
+          runningLabel: 'Parsing Documents...',
+        }),
         `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
         firstPdf
           ? `<button type="button" class="ghost-button" data-action="open-first-pdf-editor">Open First PDF</button>`
@@ -2500,8 +2568,8 @@ function renderPipelineVisual() {
       index: '5',
       title: 'Workflow Extraction',
       copy: 'Parsed source documents turn into portal profiles, request methods, instructions, forms, and records_workflows rows.',
-      runtime: 'Runs inside Run Crawl Stage.',
-      current: `${formatNumber(system.stats?.workflows || 0)} workflow rows • ${formatNumber(partialWorkflowDocuments.length)} partial docs • ${formatNumber(workflowFreeDocuments.length)} docs with no workflow result`,
+      runtime: 'Runs inside Run Workflow Stage.',
+      current: `${formatNumber(system.stats?.workflows || 0)} workflow rows • ${formatNumber(partialWorkflowDocuments.length)} partial docs • ${latestWorkflow?.workflow_rows ? `${formatNumber(latestWorkflow.workflow_rows)} rows written in the latest run` : formatNumber(workflowFreeDocuments.length) + ' docs with no workflow result'}`,
       breaks:
         partialWorkflowDocuments.length > 0
           ? 'Partial workflows mean the document was fetched but the extractor could not recover enough structured instructions.'
@@ -2509,21 +2577,21 @@ function renderPipelineVisual() {
       humanMove:
         sourceDocuments.length === 0
           ? 'Fix fetch and source coverage first.'
-          : 'If workflow rows are partial, improve the upstream source document quality or add better manual source material, then rerun crawl.',
+          : 'If workflow rows are partial, rerun Parse Stage if needed, then rerun Workflow Stage against the accepted source docs.',
       tone:
         sourceDocuments.length === 0
           ? 'yellow'
-          : partialWorkflowDocuments.length > 0
+          : partialWorkflowDocuments.length > 0 || latestWorkflow?.stage_status === 'partial'
             ? 'yellow'
             : Number(system.stats?.workflows || 0) > 0
               ? 'green'
               : 'red',
       actionButtons: [
         renderPipelineRunButton({
-          action: 'run-crawl-stage',
-          actionKey: 'crawl_stage',
-          label: 'Run Crawl Stage',
-          runningLabel: 'Crawling...',
+          action: 'run-workflow-stage',
+          actionKey: 'workflow_extraction_stage',
+          label: 'Run Workflow Stage',
+          runningLabel: 'Extracting Workflows...',
         }),
         `<button type="button" class="ghost-button" data-action="open-history-tab">Open Run History</button>`,
       ],
@@ -2959,6 +3027,22 @@ async function runCrawlStageForSelectedSystem() {
   });
 }
 
+async function runParseStageForSelectedSystem() {
+  await runPipelineActionForSelectedSystem({
+    actionKey: 'parse_stage',
+    endpoint: '/internal/pipeline/system/parse',
+    nextPipelineTab: 'flow',
+  });
+}
+
+async function runWorkflowStageForSelectedSystem() {
+  await runPipelineActionForSelectedSystem({
+    actionKey: 'workflow_extraction_stage',
+    endpoint: '/internal/pipeline/system/workflows',
+    nextPipelineTab: 'flow',
+  });
+}
+
 async function runQuestionStageForSelectedSystem() {
   await runPipelineActionForSelectedSystem({
     actionKey: 'question_extraction_stage',
@@ -3219,6 +3303,16 @@ document.addEventListener('click', async (event) => {
 
     if (button.dataset.action === 'run-crawl-stage') {
       await runCrawlStageForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'run-parse-stage') {
+      await runParseStageForSelectedSystem();
+      return;
+    }
+
+    if (button.dataset.action === 'run-workflow-stage') {
+      await runWorkflowStageForSelectedSystem();
       return;
     }
 
