@@ -10,18 +10,26 @@ import { publicRouter } from './routes/v1.js';
 import { internalRouter } from './routes/internal.js';
 
 export const RECORDS_WORKFLOW_PUBLIC_API_PREFIX = '/api/records-workflow';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const LEGACY_V1_ERROR = {
   error: `Records workflow routes moved to ${RECORDS_WORKFLOW_PUBLIC_API_PREFIX}/*.`,
 };
 
 export function createApp() {
   const app = express();
+  const internalConsoleDir = path.resolve(__dirname, 'internal-console');
 
   app.use(cors());
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '30mb' }));
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', service: 'records-workflow-api' });
+  });
+
+  app.use('/internal/console/assets', express.static(internalConsoleDir));
+  app.get('/internal/console', (_req, res) => {
+    res.sendFile(path.join(internalConsoleDir, 'index.html'));
   });
 
   app.use(RECORDS_WORKFLOW_PUBLIC_API_PREFIX, publicRouter);

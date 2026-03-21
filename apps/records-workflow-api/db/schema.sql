@@ -139,8 +139,16 @@ create table if not exists source_documents (
   storage_path text,
   extracted_text text,
   parser_version text,
+  import_mode text not null default 'crawl',
+  import_notes text,
   created_at timestamptz not null default now()
 );
+
+alter table source_documents
+  add column if not exists import_mode text not null default 'crawl';
+
+alter table source_documents
+  add column if not exists import_notes text;
 
 drop index if exists source_documents_unique_fetch;
 
@@ -157,6 +165,38 @@ create table if not exists extraction_runs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists pdf_question_templates (
+  id uuid primary key default gen_random_uuid(),
+  source_document_id uuid not null unique references source_documents(id) on delete cascade,
+  latest_extraction_run_id uuid references extraction_runs(id) on delete set null,
+  status text not null check (status in ('draft', 'approved', 'stale', 'unsupported')),
+  payload jsonb not null,
+  source_document_content_hash text,
+  confidence_summary jsonb,
+  review_notes text,
+  approved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists pdf_question_template_versions (
+  id uuid primary key default gen_random_uuid(),
+  pdf_question_template_id uuid not null references pdf_question_templates(id) on delete cascade,
+  source_document_id uuid not null references source_documents(id) on delete cascade,
+  source_document_content_hash text,
+  version_no int not null,
+  status text not null check (status in ('approved', 'unsupported', 'stale')),
+  payload jsonb not null,
+  created_at timestamptz not null default now(),
+  published_at timestamptz not null default now()
+);
+
+create unique index if not exists pdf_question_template_versions_unique_version
+  on pdf_question_template_versions (pdf_question_template_id, version_no);
+
+create index if not exists pdf_question_template_versions_source_document_lookup
+  on pdf_question_template_versions (source_document_id, published_at desc);
+
 create table if not exists seed_urls (
   id uuid primary key default gen_random_uuid(),
   hospital_system_id uuid not null references hospital_systems(id),
@@ -166,11 +206,46 @@ create table if not exists seed_urls (
     seed_type in ('system_records_page', 'facility_records_page', 'portal_page', 'forms_page', 'directory_page')
   ),
   active boolean not null default true,
+  approved_by_human boolean not null default false,
+  evidence_note text,
   created_at timestamptz not null default now()
 );
+
+alter table seed_urls
+  add column if not exists approved_by_human boolean not null default false;
+
+alter table seed_urls
+  add column if not exists evidence_note text;
 
 alter table seed_urls
   drop constraint if exists seed_urls_url_key;
 
 create unique index if not exists seed_urls_unique_system_url
   on seed_urls (hospital_system_id, url);
+
+alter table workflow_forms
+  add column if not exists published_question_template_version_id uuid references pdf_question_template_versions(id);
+
+create table if not exists pipeline_run_history (
+  id uuid primary key default gen_random_uuid(),
+  state char(2),
+  hospital_system_id uuid references hospital_systems(id) on delete set null,
+  system_name text,
+  run_scope text not null check (run_scope in ('system')),
+  status text not null check (status in ('ok', 'no_seeds', 'failed')),
+  crawled int not null default 0,
+  extracted int not null default 0,
+  failed int not null default 0,
+  systems int not null default 0,
+  crawl_summary jsonb not null default '{}'::jsonb,
+  before_snapshot jsonb,
+  after_snapshot jsonb,
+  change_summary jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists pipeline_run_history_state_created_lookup
+  on pipeline_run_history (state, created_at desc);
+
+create index if not exists pipeline_run_history_system_created_lookup
+  on pipeline_run_history (hospital_system_id, created_at desc);

@@ -1,18 +1,214 @@
 import { Router } from 'express';
-import { runCrawl } from '../services/crawlService.js';
-import { reseedFromFile } from '../services/seedService.js';
 import { getExtractionRunById } from '../repositories/workflowRepository.js';
+import { runCrawl } from '../services/crawlService.js';
+import {
+  addManualApprovedUrl,
+  importManualHtml,
+  importManualPdf,
+} from '../services/manualImportService.js';
+import {
+  getSourceDocumentQuestionReview,
+  publishQuestionReview,
+  reextractQuestionReview,
+  saveQuestionReviewDraft,
+} from '../services/questionReviewService.js';
+import {
+  listPipelineRunHistory,
+  runTrackedSystemPipeline,
+} from '../services/pipelineRunHistoryService.js';
+import { getStateReviewQueue } from '../services/reviewQueueService.js';
+import { saveStateSeedFile } from '../services/seedEditorService.js';
+import { reseedFromFile } from '../services/seedService.js';
+import { getHospitalSystemDetail } from '../services/systemDetailService.js';
+import {
+  getNationalStateOverview,
+  getStateSummary,
+  listStateSystems,
+} from '../services/stateSummaryService.js';
 
 export const internalRouter = Router();
+
+function toErrorPayload(error, fallbackMessage) {
+  const message =
+    error instanceof Error && error.message ? error.message : fallbackMessage;
+
+  if (/not found/i.test(message)) {
+    return { status: 404, body: { error: message } };
+  }
+
+  if (/required|valid|provide|must|belongs to/i.test(message)) {
+    return { status: 400, body: { error: message } };
+  }
+
+  return { status: 500, body: { error: fallbackMessage } };
+}
+
+internalRouter.get('/states/overview', async (req, res) => {
+  try {
+    const forceRefresh = req.query?.force === '1' || req.query?.force === 'true';
+    const overview = await getNationalStateOverview({ forceRefresh });
+    return res.json(overview);
+  } catch (error) {
+    console.error('Failed to load national state overview:', error);
+    const response = toErrorPayload(error, 'Failed to load national state overview.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/states/:state/summary', async (req, res) => {
+  try {
+    const summary = await getStateSummary(req.params.state);
+    return res.json(summary);
+  } catch (error) {
+    console.error('Failed to load state summary:', error);
+    const response = toErrorPayload(error, 'Failed to load state summary.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/states/:state/systems', async (req, res) => {
+  try {
+    const systems = await listStateSystems(req.params.state);
+    return res.json(systems);
+  } catch (error) {
+    console.error('Failed to load state systems:', error);
+    const response = toErrorPayload(error, 'Failed to load state systems.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/states/:state/review-queue', async (req, res) => {
+  try {
+    const reviewQueue = await getStateReviewQueue(req.params.state);
+    return res.json(reviewQueue);
+  } catch (error) {
+    console.error('Failed to load review queue:', error);
+    const response = toErrorPayload(error, 'Failed to load review queue.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.get('/hospital-systems/:id', async (req, res) => {
+  try {
+    const detail = await getHospitalSystemDetail(req.params.id);
+    if (!detail) {
+      return res.status(404).json({ error: 'Hospital system not found.' });
+    }
+    return res.json(detail);
+  } catch (error) {
+    console.error('Failed to load hospital-system detail:', error);
+    return res.status(500).json({ error: 'Failed to load hospital-system detail.' });
+  }
+});
+
+internalRouter.get('/pipeline-runs', async (req, res) => {
+  try {
+    const history = await listPipelineRunHistory({
+      state: req.query?.state || null,
+      systemId: req.query?.system_id || req.query?.systemId || null,
+      limit: req.query?.limit || null,
+    });
+    return res.json(history);
+  } catch (error) {
+    console.error('Failed to load pipeline run history:', error);
+    const response = toErrorPayload(error, 'Failed to load pipeline run history.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/seeds/save', async (req, res) => {
+  try {
+    const state = req.body?.state;
+    const systems = req.body?.systems;
+    const shouldReseed = req.body?.reseed_db === true || req.body?.reseedDb === true;
+    const saved = await saveStateSeedFile({ state, systems });
+    const reseedSummary = shouldReseed ? await reseedFromFile({ state }) : null;
+    return res.json({
+      status: 'ok',
+      saved,
+      reseed_summary: reseedSummary,
+    });
+  } catch (error) {
+    console.error('Failed to save seed file:', error);
+    const response = toErrorPayload(error, 'Failed to save seed file.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/manual-url', async (req, res) => {
+  try {
+    const result = await addManualApprovedUrl({
+      hospitalSystemId: req.body?.hospital_system_id || req.body?.hospitalSystemId,
+      facilityId: req.body?.facility_id || req.body?.facilityId || null,
+      officialPageUrl: req.body?.official_page_url || req.body?.officialPageUrl,
+      directPdfUrl: req.body?.direct_pdf_url || req.body?.directPdfUrl || null,
+      notes: req.body?.notes || null,
+      updateSeedFile:
+        req.body?.update_seed_file !== false && req.body?.updateSeedFile !== false,
+      crawlNow: req.body?.crawl_now === true || req.body?.crawlNow === true,
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to add manual URL:', error);
+    const response = toErrorPayload(error, 'Failed to add manual URL.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/manual-import/html', async (req, res) => {
+  try {
+    const result = await importManualHtml({
+      state: req.body?.state || null,
+      hospitalSystemId: req.body?.hospital_system_id || req.body?.hospitalSystemId,
+      facilityId: req.body?.facility_id || req.body?.facilityId || null,
+      sourceUrl: req.body?.source_url || req.body?.sourceUrl || null,
+      titleOverride: req.body?.title_override || req.body?.titleOverride || null,
+      notes: req.body?.notes || null,
+      localFilePath: req.body?.local_file_path || req.body?.localFilePath || null,
+      html: req.body?.html || null,
+      fileBase64: req.body?.file_base64 || req.body?.fileBase64 || null,
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to import manual HTML:', error);
+    const response = toErrorPayload(error, 'Failed to import manual HTML.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/manual-import/pdf', async (req, res) => {
+  try {
+    const result = await importManualPdf({
+      state: req.body?.state || null,
+      hospitalSystemId: req.body?.hospital_system_id || req.body?.hospitalSystemId,
+      facilityId: req.body?.facility_id || req.body?.facilityId || null,
+      sourceUrl: req.body?.source_url || req.body?.sourceUrl || null,
+      titleOverride: req.body?.title_override || req.body?.titleOverride || null,
+      notes: req.body?.notes || null,
+      localFilePath: req.body?.local_file_path || req.body?.localFilePath || null,
+      fileBase64: req.body?.file_base64 || req.body?.fileBase64 || null,
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to import manual PDF:', error);
+    const response = toErrorPayload(error, 'Failed to import manual PDF.');
+    return res.status(response.status).json(response.body);
+  }
+});
 
 internalRouter.post('/crawl/run', async (req, res) => {
   try {
     const summary = await runCrawl({
       state: req.body?.state || null,
-      systemName: req.body?.system_name || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      facilityId: req.body?.facility_id || req.body?.facilityId || null,
+      seedUrl: req.body?.seed_url || req.body?.seedUrl || null,
       maxDepth: Number.isInteger(req.body?.max_depth)
         ? req.body.max_depth
-        : undefined
+        : Number.isInteger(req.body?.maxDepth)
+          ? req.body.maxDepth
+          : undefined,
     });
 
     return res.json(summary);
@@ -22,16 +218,123 @@ internalRouter.post('/crawl/run', async (req, res) => {
   }
 });
 
+internalRouter.post('/crawl/system', async (req, res) => {
+  try {
+    const summary = await runTrackedSystemPipeline({
+      state: req.body?.state || null,
+      systemName: req.body?.system_name || req.body?.systemName || null,
+      systemId: req.body?.system_id || req.body?.systemId || null,
+      facilityId: req.body?.facility_id || req.body?.facilityId || null,
+      seedUrl: req.body?.seed_url || req.body?.seedUrl || null,
+      maxDepth: Number.isInteger(req.body?.max_depth)
+        ? req.body.max_depth
+        : Number.isInteger(req.body?.maxDepth)
+          ? req.body.maxDepth
+          : undefined,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Targeted crawl failed:', error);
+    return res.status(500).json({ error: 'Targeted crawl failed.' });
+  }
+});
+
+internalRouter.post('/crawl/zero-pdf-systems', async (req, res) => {
+  try {
+    const state = req.body?.state;
+    const stateSystems = await listStateSystems(state);
+    const hospitalSystemIds = stateSystems.systems
+      .filter((system) => system.zero_pdf && system.hospital_system_id)
+      .map((system) => system.hospital_system_id);
+
+    if (hospitalSystemIds.length === 0) {
+      return res.json({
+        status: 'no_targets',
+        systems: 0,
+        crawled: 0,
+        extracted: 0,
+        failed: 0,
+        details: [],
+      });
+    }
+
+    const summary = await runCrawl({
+      state,
+      hospitalSystemIds,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Zero-PDF crawl failed:', error);
+    const response = toErrorPayload(error, 'Zero-PDF crawl failed.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
 internalRouter.post('/crawl/reseed', async (req, res) => {
   try {
     const summary = await reseedFromFile({
       state: req.body?.state || null,
-      seedFilePath: req.body?.seed_file || null
+      seedFilePath: req.body?.seed_file || req.body?.seedFile || null,
     });
     return res.json({ status: 'ok', summary });
   } catch (error) {
     console.error('Reseed failed:', error);
     return res.status(500).json({ error: 'Reseed failed.' });
+  }
+});
+
+internalRouter.get('/source-documents/:id/question-review', async (req, res) => {
+  try {
+    const review = await getSourceDocumentQuestionReview(req.params.id);
+    return res.json(review);
+  } catch (error) {
+    console.error('Failed to load question review:', error);
+    const response = toErrorPayload(error, 'Failed to load question review.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/source-documents/:id/question-review/reextract', async (req, res) => {
+  try {
+    const review = await reextractQuestionReview(req.params.id, {
+      replaceDraft:
+        req.body?.replace_draft !== false && req.body?.replaceDraft !== false,
+    });
+    return res.json(review);
+  } catch (error) {
+    console.error('Failed to reextract question review:', error);
+    const response = toErrorPayload(error, 'Failed to reextract question review.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/source-documents/:id/question-review/draft', async (req, res) => {
+  try {
+    const review = await saveQuestionReviewDraft(req.params.id, {
+      payload: req.body?.payload,
+      reviewNotes: req.body?.review_notes || req.body?.reviewNotes || null,
+      markUnsupported:
+        req.body?.mark_unsupported === true || req.body?.markUnsupported === true,
+    });
+    return res.json(review);
+  } catch (error) {
+    console.error('Failed to save question-review draft:', error);
+    const response = toErrorPayload(error, 'Failed to save question-review draft.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/source-documents/:id/question-review/publish', async (req, res) => {
+  try {
+    const review = await publishQuestionReview(req.params.id, {
+      payload: req.body?.payload || null,
+      reviewNotes: req.body?.review_notes || req.body?.reviewNotes || null,
+    });
+    return res.json(review);
+  } catch (error) {
+    console.error('Failed to publish question review:', error);
+    const response = toErrorPayload(error, 'Failed to publish question review.');
+    return res.status(response.status).json(response.body);
   }
 });
 

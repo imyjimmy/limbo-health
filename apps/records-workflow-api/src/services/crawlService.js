@@ -67,10 +67,21 @@ function scoreSourceContext(sourceContext = null) {
 
 export async function runCrawl({
   systemName = null,
+  systemId = null,
+  facilityId = null,
+  seedUrl = null,
+  hospitalSystemIds = [],
   state = config.crawlState,
   maxDepth = config.crawl.maxDepth
 } = {}) {
-  const seeds = await listActiveSeeds({ systemName, state });
+  const seeds = await listActiveSeeds({
+    systemName,
+    systemId,
+    facilityId,
+    seedUrl,
+    hospitalSystemIds,
+    state
+  });
   if (seeds.length === 0) {
     return {
       status: 'no_seeds',
