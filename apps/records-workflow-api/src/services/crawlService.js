@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import {
   insertSourceDocument,
   listActiveSeeds,
+  listKnownPdfSourcePages,
 } from '../repositories/workflowRepository.js';
 import { assignPdfStoragePath } from '../utils/pdfStorage.js';
 import { classifyMedicalRecordsRequestDocument } from '../utils/urls.js';
@@ -62,6 +63,38 @@ function scoreSourceContext(sourceContext = null) {
   );
 }
 
+function scoreSeedPriority(seed = null) {
+  if (!seed) return 0;
+
+  let score = 0;
+  if (seed.seed_type === 'known_pdf_source_page') score += 40;
+  if (/records_page/i.test(seed.seed_type || '')) score += 20;
+  if (seed.approved_by_human) score += 10;
+  return score;
+}
+
+function dedupeSeeds(seeds = []) {
+  const deduped = new Map();
+
+  for (const seed of seeds) {
+    const key = `${seed?.hospital_system_id || ''}:${normalizeForVisited(seed?.url || '')}`;
+    const existing = deduped.get(key);
+    if (!existing || scoreSeedPriority(seed) > scoreSeedPriority(existing)) {
+      deduped.set(key, seed);
+    }
+  }
+
+  return Array.from(deduped.values());
+}
+
+function isPinnedRecordsSeed(seed = null) {
+  return (
+    Boolean(seed?.approved_by_human) ||
+    /records_page/i.test(seed?.seed_type || '') ||
+    seed?.seed_type === 'known_pdf_source_page'
+  );
+}
+
 export async function runCrawl({
   systemName = null,
   systemId = null,
@@ -71,7 +104,7 @@ export async function runCrawl({
   state = config.crawlState,
   maxDepth = config.crawl.maxDepth
 } = {}) {
-  const seeds = await listActiveSeeds({
+  const activeSeeds = await listActiveSeeds({
     systemName,
     systemId,
     facilityId,
@@ -79,6 +112,17 @@ export async function runCrawl({
     hospitalSystemIds,
     state
   });
+  const knownPdfSourcePageSeeds =
+    seedUrl
+      ? []
+      : await listKnownPdfSourcePages({
+          systemName,
+          systemId,
+          facilityId,
+          hospitalSystemIds,
+          state,
+        });
+  const seeds = dedupeSeeds([...knownPdfSourcePageSeeds, ...activeSeeds]);
   if (seeds.length === 0) {
     return {
       status: 'no_seeds',
@@ -116,8 +160,9 @@ export async function runCrawl({
       depth: 0,
       facilityId: seed.facility_id || null,
       facilityName: seed.facility_name || null,
-      sourceContext: null
-    }));
+      sourceContext: null,
+      crawlMode: isPinnedRecordsSeed(seed) ? 'records_page' : 'general',
+      }));
 
     while (queue.length > 0) {
       const item = queue.shift();
@@ -198,10 +243,12 @@ export async function runCrawl({
 
         extracted += 1;
 
-        if (fetched.sourceType === 'html' && item.depth < maxDepth) {
+        if (fetched.sourceType === 'html' && item.depth < maxDepth && item.crawlMode !== 'terminal') {
+          const expansionMode = item.crawlMode === 'records_page' ? 'records_page' : 'general';
           const nextLinks = expandCandidateLinks({
             document: fetched.parsed,
-            allowedDomain: system.canonicalDomain
+            allowedDomain: system.canonicalDomain,
+            mode: expansionMode,
           });
 
           for (const link of nextLinks) {
@@ -223,7 +270,8 @@ export async function runCrawl({
               depth: item.depth + 1,
               facilityId: item.facilityId,
               facilityName: item.facilityName,
-              sourceContext: link
+              sourceContext: link,
+              crawlMode: expansionMode === 'records_page' ? 'terminal' : 'general',
             });
           }
         }

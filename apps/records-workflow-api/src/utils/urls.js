@@ -30,6 +30,25 @@ const HTML_WORKFLOW_PATTERNS = [
   /\bportal\b/i
 ];
 
+const DIRECT_RECORDS_PAGE_HTML_PATTERNS = [
+  /\bmedical[-\s]?records?\b/i,
+  /\bhealth[-\s]?records?\b/i,
+  /\bmedical[-\s]?information\b/i,
+  /\bhealthcare[-\s]?information\b/i,
+  /\bauthori[sz](?:ation|e)\b/i,
+  /\brelease[-\s]*(?:of|for)?[-\s]*information\b/i,
+  /\brequest(?:ing)?\b/i,
+  /\broi\b/i,
+  /\bhealthmark\b/i,
+  /\brequest manager\b/i,
+  /\bmychart\b/i,
+  /\bmyhealthone\b/i,
+  /\bmybswhealth\b/i,
+  /\bverisma\b/i,
+  /\bpatient gateway\b/i,
+  /\bmedical[-\s]?records?\s+portal\b/i,
+];
+
 const SOURCE_MEDICAL_RECORD_PATTERNS = [
   /\bmedical[-\s]?records?\b/i,
   /\bhealth[-\s]?records?\b/i,
@@ -308,4 +327,42 @@ export function isLikelyWorkflowLink({
 
   const haystack = `${normalized} ${text}`;
   return matchesAny(haystack, HTML_WORKFLOW_PATTERNS);
+}
+
+export function isLikelyDirectRecordsPageLink({
+  href,
+  text = '',
+  contextText = '',
+  allowedDomain,
+  approvedExternal = [],
+  sourceTitle = '',
+  sourceText = '',
+}) {
+  const normalized = normalizeUrl(href);
+  if (!normalized) return false;
+
+  if (looksLikePdf(normalized)) {
+    return isLikelyMedicalRecordsPdfLink({
+      href: normalized,
+      text,
+      contextText,
+      sourceTitle,
+      sourceText,
+    });
+  }
+
+  const host = hostFromUrl(normalized);
+  const sameDomain = host === allowedDomain || host.endsWith(`.${allowedDomain}`);
+  const externalAllowed = approvedExternal.some(
+    (domain) => host === domain || host.endsWith(`.${domain}`),
+  );
+
+  if (!sameDomain && !externalAllowed) return false;
+
+  const haystack = `${normalized} ${text} ${contextText}`;
+  if (matchesAny(haystack, MEDICAL_RECORDS_DOCUMENT_NEGATIVE_PATTERNS)) {
+    return false;
+  }
+
+  return matchesAny(haystack, DIRECT_RECORDS_PAGE_HTML_PATTERNS);
 }

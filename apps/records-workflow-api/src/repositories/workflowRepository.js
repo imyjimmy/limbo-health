@@ -262,6 +262,83 @@ export async function listActiveSeeds({
   return result.rows;
 }
 
+export async function listKnownPdfSourcePages({
+  systemName = null,
+  state = null,
+  systemId = null,
+  facilityId = null,
+  hospitalSystemIds = [],
+} = {}) {
+  const params = [];
+  let where = 'where hs.active = true';
+
+  if (state) {
+    params.push(normalizeStateCode(state));
+    where += ` and hs.state = $${params.length}`;
+  }
+
+  if (systemName) {
+    params.push(systemName);
+    where += ` and hs.system_name = $${params.length}`;
+  }
+
+  if (systemId) {
+    params.push(systemId);
+    where += ` and hs.id = $${params.length}`;
+  }
+
+  if (facilityId) {
+    params.push(facilityId);
+    where += ` and source_pages.facility_id = $${params.length}`;
+  }
+
+  if (Array.isArray(hospitalSystemIds) && hospitalSystemIds.length > 0) {
+    params.push(hospitalSystemIds);
+    where += ` and hs.id = any($${params.length}::uuid[])`;
+  }
+
+  const result = await query(
+    `with source_pages as (
+       select distinct
+         sd.hospital_system_id,
+         sd.facility_id,
+         sd.source_page_url as url
+       from source_documents sd
+       where sd.source_type = 'pdf'
+         and coalesce(sd.source_page_url, '') <> ''
+
+       union
+
+       select distinct
+         rw.hospital_system_id,
+         rw.facility_id,
+         rw.official_page_url as url
+       from records_workflows rw
+       where coalesce(rw.official_page_url, '') <> ''
+     )
+     select distinct on (source_pages.hospital_system_id, source_pages.url)
+       gen_random_uuid() as id,
+       source_pages.url,
+       'known_pdf_source_page'::text as seed_type,
+       true as approved_by_human,
+       'derived from existing PDF/source-page provenance'::text as evidence_note,
+       source_pages.hospital_system_id,
+       source_pages.facility_id,
+       hs.system_name,
+       hs.canonical_domain,
+       hs.state as system_state,
+       f.facility_name
+     from source_pages
+     join hospital_systems hs on hs.id = source_pages.hospital_system_id
+     left join facilities f on f.id = source_pages.facility_id
+     ${where}
+     order by source_pages.hospital_system_id, source_pages.url, source_pages.facility_id nulls last`,
+    params,
+  );
+
+  return result.rows;
+}
+
 export async function insertSourceDocument(
   {
     hospitalSystemId,
