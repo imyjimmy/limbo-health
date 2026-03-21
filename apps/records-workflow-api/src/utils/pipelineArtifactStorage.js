@@ -28,3 +28,14 @@ export async function ensureWorkflowArtifactDir(state, sourceDocumentId) {
   await fs.mkdir(directory, { recursive: true });
   return directory;
 }
+
+export async function ensureQuestionArtifactDir(state, sourceDocumentId) {
+  const stateDir = await ensureStageStateDir(config.questionStorageDir, state);
+  const directory = path.join(stateDir, String(sourceDocumentId || '').trim());
+  await fs.mkdir(directory, { recursive: true });
+  return directory;
+}
+
+export async function ensureTriageArtifactStateDir(state) {
+  return ensureStageStateDir(config.triageStorageDir, state);
+}

@@ -22,6 +22,8 @@ export const config = {
   rawStorageDir: resolveFromServiceRoot(process.env.RAW_STORAGE_DIR, 'storage/raw'),
   parsedStorageDir: resolveFromServiceRoot(process.env.PARSED_STORAGE_DIR, 'storage/parsed'),
   workflowStorageDir: resolveFromServiceRoot(process.env.WORKFLOW_STORAGE_DIR, 'storage/workflows'),
+  questionStorageDir: resolveFromServiceRoot(process.env.QUESTION_STORAGE_DIR, 'storage/questions'),
+  triageStorageDir: resolveFromServiceRoot(process.env.TRIAGE_STORAGE_DIR, 'storage/triage'),
   seedFile: resolveFromServiceRoot(process.env.SEED_FILE, 'seeds/texas-systems.json'),
   crawlState: normalizeStateCode(process.env.CRAWL_STATE),
   crawl: {

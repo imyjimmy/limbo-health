@@ -1,7 +1,7 @@
 import { query } from '../db.js';
 import { runCrawl } from './crawlService.js';
-import { reextractQuestionReview } from './questionReviewService.js';
 import { runParseStage } from './pipeline/parseStageService.js';
+import { runQuestionExtractionStage } from './pipeline/questionExtractionStageService.js';
 import { runWorkflowExtractionStage } from './pipeline/workflowExtractionStageService.js';
 
 const SNAPSHOT_METRICS = [
@@ -258,44 +258,6 @@ function withStageSummary(summary = {}, { stageKey, stageLabel, stageStatus = nu
   };
 }
 
-async function listSystemPdfSourceDocuments(systemId) {
-  const result = await query(
-    `select
-       hs.id as hospital_system_id,
-       hs.system_name,
-       hs.state,
-       sd.id as source_document_id,
-       sd.title,
-       sd.source_url
-     from hospital_systems hs
-     left join source_documents sd
-       on sd.hospital_system_id = hs.id
-      and sd.source_type = 'pdf'
-     where hs.id = $1
-       and hs.active = true
-     order by sd.fetched_at desc nulls last, sd.created_at desc nulls last`,
-    [systemId],
-  );
-
-  const firstRow = result.rows[0];
-  if (!firstRow) {
-    throw new Error('Hospital system not found.');
-  }
-
-  return {
-    hospital_system_id: firstRow.hospital_system_id,
-    system_name: firstRow.system_name,
-    state: firstRow.state,
-    documents: result.rows
-      .filter((row) => row.source_document_id)
-      .map((row) => ({
-        source_document_id: row.source_document_id,
-        title: row.title,
-        source_url: row.source_url,
-      })),
-  };
-}
-
 async function runSystemQuestionExtractionBatch({
   systemId,
   replaceDraft = true,
@@ -304,91 +266,19 @@ async function runSystemQuestionExtractionBatch({
     throw new Error('systemId is required for question extraction.');
   }
 
-  const target = await listSystemPdfSourceDocuments(systemId);
-  const documents = Array.isArray(target.documents) ? target.documents : [];
+  const questionSummary = await runQuestionExtractionStage({
+    systemId,
+    replaceDraft,
+  });
 
-  if (documents.length === 0) {
-    return withStageSummary(
-      {
-        status: 'ok',
-        systems: 1,
-        crawled: 0,
-        extracted: 0,
-        failed: 0,
-        pdf_documents: 0,
-        reextracted: 0,
-        system_name: target.system_name,
-        state: target.state,
-        details: [],
-      },
-      {
-        stageKey: 'question_extraction_stage',
-        stageLabel: 'Question Extraction Stage',
-        stageStatus: 'no_pdfs',
-      },
-    );
-  }
+  const stageStatus =
+    questionSummary.stage_status === 'no_documents' ? 'no_pdfs' : questionSummary.stage_status;
 
-  let extracted = 0;
-  let failed = 0;
-  const details = [];
-
-  for (const document of documents) {
-    try {
-      const review = await reextractQuestionReview(document.source_document_id, {
-        replaceDraft,
-      });
-      const extractionStatus = review?.reextraction_run?.status || 'success';
-      const supported = review?.reextraction_run?.payload?.supported;
-      const confidence = Number(review?.reextraction_run?.payload?.confidence || 0);
-
-      if (extractionStatus === 'success') {
-        extracted += 1;
-      } else {
-        failed += 1;
-      }
-
-      details.push({
-        source_document_id: document.source_document_id,
-        title: document.title || null,
-        source_url: document.source_url || null,
-        status: extractionStatus,
-        supported: typeof supported === 'boolean' ? supported : null,
-        confidence,
-      });
-    } catch (error) {
-      failed += 1;
-      details.push({
-        source_document_id: document.source_document_id,
-        title: document.title || null,
-        source_url: document.source_url || null,
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Question extraction failed.',
-      });
-    }
-  }
-
-  const stageStatus = failed === 0 ? 'ok' : extracted > 0 ? 'partial_failed' : 'failed';
-
-  return withStageSummary(
-    {
-      status: stageStatus === 'failed' ? 'failed' : 'ok',
-      systems: 1,
-      crawled: 0,
-      extracted,
-      failed,
-      pdf_documents: documents.length,
-      reextracted: extracted,
-      system_name: target.system_name,
-      state: target.state,
-      details,
-    },
-    {
-      stageKey: 'question_extraction_stage',
-      stageLabel: 'Question Extraction Stage',
-      stageStatus,
-    },
-  );
+  return withStageSummary(questionSummary, {
+    stageKey: 'question_extraction_stage',
+    stageLabel: 'Question Extraction Stage',
+    stageStatus,
+  });
 }
 
 async function insertRunHistory({

@@ -487,6 +487,108 @@ function normalizeOptionalReviewNotes(value) {
   return normalized || null;
 }
 
+function buildQuestionExtractionDraftPayload(extraction, sourceDocument) {
+  const templateIdFallback = buildTemplateIdFallback(sourceDocument);
+  const nextPayload =
+    extraction?.structuredOutput?.form_understanding ||
+    buildUnsupportedAutofillPayload({
+      template_id: templateIdFallback,
+    });
+
+  return {
+    ...nextPayload,
+    template_id: normalizeString(nextPayload.template_id) || templateIdFallback,
+  };
+}
+
+async function persistQuestionExtractionResultInClient(
+  sourceDocumentId,
+  {
+    sourceDocument = null,
+    extraction,
+    replaceDraft = true,
+  } = {},
+  client,
+) {
+  const resolvedSourceDocument = sourceDocument || (await loadSourceDocument(sourceDocumentId, client));
+  if (!resolvedSourceDocument) {
+    throw new Error('Source document not found.');
+  }
+
+  if (resolvedSourceDocument.source_type !== 'pdf') {
+    throw new Error('Question review is only available for PDF source documents.');
+  }
+
+  const extractionRunId = await insertExtractionRun(
+    {
+      sourceDocumentId,
+      extractorName: extraction.extractorName,
+      extractorVersion: extraction.extractorVersion,
+      status: extraction.status,
+      structuredOutput: extraction.structuredOutput,
+    },
+    client,
+  );
+
+  const { template } = await ensureQuestionTemplate(sourceDocumentId, client);
+  if (replaceDraft) {
+    const nextPayload = buildQuestionExtractionDraftPayload(extraction, resolvedSourceDocument);
+
+    await client.query(
+      `update pdf_question_templates
+       set latest_extraction_run_id = $2,
+           status = 'draft',
+           payload = $3,
+           source_document_content_hash = $4,
+           confidence_summary = $5,
+           updated_at = now()
+       where id = $1`,
+      [
+        template.id,
+        extractionRunId,
+        nextPayload,
+        resolvedSourceDocument.content_hash || null,
+        buildConfidenceSummary(nextPayload),
+      ],
+    );
+  } else {
+    await client.query(
+      `update pdf_question_templates
+       set latest_extraction_run_id = $2,
+           updated_at = now()
+       where id = $1`,
+      [template.id, extractionRunId],
+    );
+  }
+
+  const review = await buildQuestionReview(sourceDocumentId, client);
+  return {
+    ...review,
+    extraction_run_id: extractionRunId,
+    reextraction_run: {
+      id: extractionRunId,
+      status: extraction.status,
+      payload:
+        extraction.structuredOutput?.form_understanding || buildUnsupportedAutofillPayload(),
+      metadata: extraction.structuredOutput?.metadata || null,
+    },
+  };
+}
+
+export async function persistQuestionExtractionResult(
+  sourceDocumentId,
+  options = {},
+  client = null,
+) {
+  if (client) {
+    return persistQuestionExtractionResultInClient(sourceDocumentId, options, client);
+  }
+
+  return withTransaction(async (transactionClient) =>
+    persistQuestionExtractionResultInClient(sourceDocumentId, options, transactionClient),
+  );
+}
+
 export async function publishQuestionReview(
   sourceDocumentId,
   {
@@ -596,63 +698,9 @@ export async function reextractQuestionReview(
     sourceUrl: sourceDocument.source_url,
   });
 
-  return withTransaction(async (client) => {
-    const extractionRunId = await insertExtractionRun(
-      {
-        sourceDocumentId,
-        extractorName: extraction.extractorName,
-        extractorVersion: extraction.extractorVersion,
-        status: extraction.status,
-        structuredOutput: extraction.structuredOutput,
-      },
-      client,
-    );
-
-    const { template } = await ensureQuestionTemplate(sourceDocumentId, client);
-    if (replaceDraft) {
-      const nextPayload = extraction.structuredOutput?.form_understanding || buildUnsupportedAutofillPayload({
-        template_id: buildTemplateIdFallback(sourceDocument),
-      });
-
-      await client.query(
-        `update pdf_question_templates
-         set latest_extraction_run_id = $2,
-             status = 'draft',
-             payload = $3,
-             source_document_content_hash = $4,
-             confidence_summary = $5,
-             updated_at = now()
-         where id = $1`,
-        [
-          template.id,
-          extractionRunId,
-          {
-            ...nextPayload,
-            template_id: normalizeString(nextPayload.template_id) || buildTemplateIdFallback(sourceDocument),
-          },
-          sourceDocument.content_hash || null,
-          buildConfidenceSummary(nextPayload),
-        ],
-      );
-    } else {
-      await client.query(
-        `update pdf_question_templates
-         set latest_extraction_run_id = $2,
-             updated_at = now()
-         where id = $1`,
-        [template.id, extractionRunId],
-      );
-    }
-
-    const review = await buildQuestionReview(sourceDocumentId, client);
-    return {
-      ...review,
-      reextraction_run: {
-        id: extractionRunId,
-        status: extraction.status,
-        payload: extraction.structuredOutput?.form_understanding || buildUnsupportedAutofillPayload(),
-        metadata: extraction.structuredOutput?.metadata || null,
-      },
-    };
+  return persistQuestionExtractionResult(sourceDocumentId, {
+    sourceDocument,
+    extraction,
+    replaceDraft,
   });
 }
