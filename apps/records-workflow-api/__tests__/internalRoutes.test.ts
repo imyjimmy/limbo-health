@@ -61,6 +61,7 @@ vi.mock('../src/services/pipelineRunHistoryService.js', () => ({
   listPipelineRunHistory: vi.fn(),
   runTrackedAcceptanceStage: vi.fn(),
   runTrackedFetchStage: vi.fn(),
+  runTrackedFullStatePipelineBatch: vi.fn(),
   runTrackedFullSystemPipeline: vi.fn(),
   runTrackedParseStage: vi.fn(),
   runTrackedQuestionExtractionStage: vi.fn(),
@@ -91,6 +92,10 @@ vi.mock('../src/services/seedEditorService.js', () => ({
   saveStateSeedFile: vi.fn(),
 }));
 
+vi.mock('../src/services/stateDataMaterializationService.js', () => ({
+  runStateDataMaterializationStage: vi.fn(),
+}));
+
 import { createApp } from '../src/server.js';
 import { runCrawl } from '../src/services/crawlService.js';
 import { importManualPdf } from '../src/services/manualImportService.js';
@@ -100,6 +105,7 @@ import {
 import { runReviewPublishStage } from '../src/services/pipeline/reviewPublishStageService.js';
 import { reseedFromFile } from '../src/services/seedService.js';
 import { saveStateSeedFile } from '../src/services/seedEditorService.js';
+import { runStateDataMaterializationStage } from '../src/services/stateDataMaterializationService.js';
 import {
   getNationalStateOverview,
   getStateSummary,
@@ -118,6 +124,7 @@ import {
 } from '../src/services/pipeline/humanRescueService.js';
 import {
   runTrackedFetchStage,
+  runTrackedFullStatePipelineBatch,
   runTrackedParseStage,
   runTrackedSeedScopeStage,
   runTrackedWorkflowExtractionStage,
@@ -212,6 +219,49 @@ describe('records-workflow internal routes', () => {
         seeded_systems: 2,
       },
       systems: [],
+    });
+  });
+
+  it('runs the full state pipeline batch for a state route', async () => {
+    vi.mocked(runTrackedFullStatePipelineBatch).mockResolvedValue({
+      stage_key: 'full_state_pipeline',
+      stage_label: 'Full State Pipeline Batch',
+      status: 'partial',
+      state: 'NH',
+      targeted_systems: 2,
+      completed_systems: 2,
+      ok_systems: 1,
+      warning_systems: 1,
+      failed_systems: 0,
+      system_runs: [],
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/states/NH/pipeline/full`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        replace_draft: true,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(runTrackedFullStatePipelineBatch).toHaveBeenCalledWith({
+      state: 'NH',
+      hospitalSystemIds: [],
+      maxDepth: undefined,
+      replaceDraft: true,
+    });
+    await expect(response.json()).resolves.toEqual({
+      stage_key: 'full_state_pipeline',
+      stage_label: 'Full State Pipeline Batch',
+      status: 'partial',
+      state: 'NH',
+      targeted_systems: 2,
+      completed_systems: 2,
+      ok_systems: 1,
+      warning_systems: 1,
+      failed_systems: 0,
+      system_runs: [],
     });
   });
 
@@ -393,6 +443,37 @@ describe('records-workflow internal routes', () => {
       status: 'ok',
       stage_key: 'seed_scope_stage',
       seed_urls: 2,
+    });
+  });
+
+  it('runs the state data-intake stage for one state', async () => {
+    vi.mocked(runStateDataMaterializationStage).mockResolvedValue({
+      status: 'ok',
+      stage_key: 'state_data_materialization_stage',
+      state: 'NH',
+      matching_files: 3,
+      generated_systems: 2,
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/states/NH/data-intake`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reseed_db: true,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(runStateDataMaterializationStage).toHaveBeenCalledWith({
+      state: 'NH',
+      reseedDb: true,
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'ok',
+      stage_key: 'state_data_materialization_stage',
+      state: 'NH',
+      matching_files: 3,
+      generated_systems: 2,
     });
   });
 

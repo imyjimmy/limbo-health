@@ -138,6 +138,7 @@ const state = {
   currentState: null,
   currentStateTab: 'systems',
   currentPipelineTab: 'flow',
+  actionBanner: null,
   sidebarDesktopExpanded: true,
   sidebarMobileOpen: false,
   homePreviewState: 'WA',
@@ -152,6 +153,9 @@ const state = {
   stageInspectorDetail: null,
   stageInspectorCache: {},
   stageInspectorLoading: false,
+  stateDataStageRunId: null,
+  stateDataStageDetail: null,
+  stateDataStageLoading: false,
   runHistory: null,
   runHistoryFilterSystemId: '',
   expandedRunHistoryIds: new Set(),
@@ -209,6 +213,9 @@ const elements = {
   stateSelect: document.querySelector('#state-select'),
   refreshState: document.querySelector('#refresh-state'),
   stateSummary: document.querySelector('#state-summary'),
+  stateActionBanner: document.querySelector('#state-action-banner'),
+  stateDataPipeline: document.querySelector('#state-data-pipeline'),
+  stateDataStageInspector: document.querySelector('#state-data-stage-inspector'),
   systemsTab: document.querySelector('#systems-tab'),
   pipelineTab: document.querySelector('#pipeline-tab'),
   historyTab: document.querySelector('#history-tab'),
@@ -256,6 +263,7 @@ const elements = {
 };
 
 const DESKTOP_SIDEBAR_MEDIA_QUERY = window.matchMedia('(min-width: 1280px)');
+let actionBannerTimeoutId = null;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => {
@@ -580,6 +588,68 @@ function notify(message, isError = false) {
   console.log(message);
 }
 
+function waitForNextPaint() {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+}
+
+function clearActionBannerTimeout() {
+  if (!actionBannerTimeoutId) return;
+  window.clearTimeout(actionBannerTimeoutId);
+  actionBannerTimeoutId = null;
+}
+
+function setActionBanner(banner = null, { autoClearMs = 0 } = {}) {
+  clearActionBannerTimeout();
+  state.actionBanner = banner;
+  renderStateActionBanner();
+
+  if (!banner || autoClearMs <= 0) return;
+  actionBannerTimeoutId = window.setTimeout(() => {
+    state.actionBanner = null;
+    actionBannerTimeoutId = null;
+    renderStateActionBanner();
+  }, autoClearMs);
+}
+
+function renderStateActionBanner() {
+  if (!elements.stateActionBanner) return;
+
+  if (!state.stateSummary || !state.actionBanner) {
+    elements.stateActionBanner.innerHTML = '';
+    return;
+  }
+
+  const banner = state.actionBanner;
+  const tone = banner.tone || 'info';
+  const toneClasses =
+    tone === 'success'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+      : tone === 'warning'
+        ? 'border-amber-200 bg-amber-50 text-amber-900'
+        : tone === 'error'
+          ? 'border-rose-200 bg-rose-50 text-rose-900'
+          : 'border-blue-200 bg-blue-50 text-blue-900';
+  const badgeTone = tone === 'success' ? 'green' : tone === 'error' ? 'red' : 'yellow';
+
+  elements.stateActionBanner.innerHTML = `
+    <div class="rounded-xl border px-4 py-3 shadow-sm ${toneClasses}">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div class="text-sm font-semibold">${escapeHtml(banner.title || 'Pipeline update')}</div>
+          ${
+            banner.message
+              ? `<p class="mt-1 text-sm opacity-90">${escapeHtml(banner.message)}</p>`
+              : ''
+          }
+        </div>
+        <span class="${statusPillClass(badgeTone)}">${escapeHtml(banner.badge || 'Running')}</span>
+      </div>
+    </div>
+  `;
+}
+
 function overviewEntryForState(stateCode) {
   return state.nationalOverview?.states?.find((entry) => entry.state === stateCode) || null;
 }
@@ -605,12 +675,18 @@ function latestPipelineStageRun(stageKey) {
   return currentPipelineStageRuns().find((run) => run.stage_key === stageKey) || null;
 }
 
+function latestStateDataRun() {
+  return state.stateSummary?.data_pipeline?.latest_run || null;
+}
+
 function currentStageInspectorRun() {
   return currentPipelineStageRuns().find((run) => run.id === state.stageInspectorRunId) || null;
 }
 
 function stageKeyLabel(stageKey) {
   const labels = {
+    state_data_materialization_stage: 'Data Intake Stage',
+    full_state_pipeline: 'Full State Pipeline',
     seed_scope_stage: 'Seed Scope Stage',
     fetch_stage: 'Fetch Stage',
     triage_stage: 'Document Triage Stage',
@@ -621,6 +697,117 @@ function stageKeyLabel(stageKey) {
     review_publish_stage: 'Review / Publish Stage',
   };
   return labels[stageKey] || stageKey || 'Pipeline Stage';
+}
+
+function pipelineActionLabel(actionKey) {
+  if (actionKey === 'full_pipeline') return 'Full Pipeline';
+  if (actionKey === 'full_state_pipeline') return 'Full State Pipeline';
+  return stageKeyLabel(actionKey);
+}
+
+function formatStageStatusLabel(status) {
+  const value = String(status || 'ok').trim();
+  if (!value) return 'ok';
+  return value.replace(/_/g, ' ');
+}
+
+function statusToneForStatus(status, fallbackTone = 'yellow') {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (!normalized) return fallbackTone;
+  if (normalized === 'ok' || normalized === 'success') return 'green';
+  if (normalized === 'failed') return 'red';
+  if (
+    [
+      'partial',
+      'no_seeds',
+      'no_documents',
+      'no_pdfs',
+      'no_targets',
+      'question_stage_empty',
+    ].includes(normalized)
+  ) {
+    return 'yellow';
+  }
+  return fallbackTone;
+}
+
+function actionBannerToneForStatus(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'failed') return 'error';
+  if (['partial', 'no_seeds', 'no_documents', 'no_pdfs', 'no_targets'].includes(normalized)) {
+    return 'warning';
+  }
+  return 'success';
+}
+
+function buildSystemActionBannerMessage({ actionKey, system, result }) {
+  const systemName = system?.system_name || 'the selected system';
+  if (actionKey === 'seed_scope_stage') {
+    return `${formatNumber(result?.seed_urls || 0)} seed URLs scoped for ${systemName}.`;
+  }
+  if (actionKey === 'fetch_stage') {
+    return `${formatNumber(result?.fetched_documents || result?.crawled || 0)} documents fetched for ${systemName}.`;
+  }
+  if (actionKey === 'triage_stage') {
+    return `${formatNumber(result?.accepted_documents || 0)} accepted, ${formatNumber(result?.review_needed_documents || 0)} flagged for review.`;
+  }
+  if (actionKey === 'acceptance_stage') {
+    return `${formatNumber(result?.source_documents || result?.accepted_documents || 0)} source documents are ready for parsing.`;
+  }
+  if (actionKey === 'parse_stage') {
+    return `${formatNumber(result?.parsed_artifacts || 0)} parsed artifacts were refreshed for ${systemName}.`;
+  }
+  if (actionKey === 'workflow_extraction_stage') {
+    return `${formatNumber(result?.workflow_rows || 0)} workflow rows were extracted for ${systemName}.`;
+  }
+  if (actionKey === 'question_extraction_stage') {
+    return `${formatNumber(result?.question_drafts || result?.extracted || 0)} question drafts were refreshed for ${systemName}.`;
+  }
+  if (actionKey === 'full_pipeline') {
+    return `All pipeline checkpoints were rerun for ${systemName}.`;
+  }
+  return `${pipelineActionLabel(actionKey)} finished for ${systemName}.`;
+}
+
+function buildStateDataActionBannerMessage(result) {
+  const generatedSystems =
+    Number(
+      result?.generated_systems ||
+        result?.output_summary?.generated_systems ||
+        result?.generated_summary?.generated_systems ||
+        0,
+    );
+  const matchedFiles = Number(
+    result?.matching_files || result?.output_summary?.matched_files || result?.counts?.matched_files || 0,
+  );
+  const stateCode = result?.state || state.currentState || 'the selected state';
+
+  if (generatedSystems > 0) {
+    return `${formatNumber(generatedSystems)} systems were materialized from ${formatNumber(matchedFiles)} matched data files for ${stateCode}.`;
+  }
+
+  return `${formatNumber(matchedFiles)} matched data files were evaluated for ${stateCode}.`;
+}
+
+function buildStateBatchActionBannerMessage(result) {
+  const targetCount = Number(result?.targeted_systems || result?.systems || 0);
+  const okSystems = Number(result?.ok_systems || 0);
+  const warningSystems = Number(result?.warning_systems || 0);
+  const failedSystems = Number(result?.failed_systems || 0);
+  const unresolvedSystems = Number(result?.unresolved_systems || 0);
+  const seedFileName =
+    fileNameFromPath(result?.seed_file_path || state.stateSummary?.seed_file_path) || 'state seed file';
+  const parts = [
+    `${formatNumber(targetCount)} seeded systems queued from ${seedFileName}`,
+    `${formatNumber(okSystems)} ok`,
+  ];
+
+  if (warningSystems > 0) parts.push(`${formatNumber(warningSystems)} with warnings`);
+  if (failedSystems > 0) parts.push(`${formatNumber(failedSystems)} failed`);
+  if (unresolvedSystems > 0) parts.push(`${formatNumber(unresolvedSystems)} need reseed`);
+  parts.push('Per-system runs were saved to Run History.');
+
+  return parts.join(' • ');
 }
 
 function stageRunInputCount(stageRun, key) {
@@ -635,7 +822,14 @@ function stageRunTone(stageRun, fallbackTone = 'yellow') {
   const status = String(stageRun?.status || '').toLowerCase();
   if (!status) return fallbackTone;
   if (status === 'ok' || status === 'success') return 'green';
-  if (status === 'partial' || status === 'no_documents' || status === 'no_seeds') return 'yellow';
+  if (
+    status === 'partial' ||
+    status === 'no_documents' ||
+    status === 'no_seeds' ||
+    status === 'no_targets'
+  ) {
+    return 'yellow';
+  }
   if (status === 'failed') return 'red';
   return fallbackTone;
 }
@@ -644,6 +838,13 @@ function formatStageRunHeadline(stageRun, fallback = 'Not run yet') {
   if (!stageRun) return fallback;
   const at = stageRun.completed_at || stageRun.created_at || null;
   return `${stageRun.status || 'ok'}${at ? ` • ${formatDateTime(at)}` : ''}`;
+}
+
+function formatRunningAwareStageHeadline(stageRun, actionKey, fallback = 'Not run yet') {
+  if (state.pipelineActionInFlight === actionKey) {
+    return `running • ${formatDateTime(new Date().toISOString())}`;
+  }
+  return formatStageRunHeadline(stageRun, fallback);
 }
 
 function formatInspectorUrl(value) {
@@ -747,9 +948,10 @@ function renderPipelineRunButton({
   label,
   runningLabel,
   primary = false,
+  requiresSystem = true,
 }) {
   const running = state.pipelineActionInFlight === actionKey;
-  const disabled = !state.selectedSystemId || Boolean(state.pipelineActionInFlight);
+  const disabled = (requiresSystem && !state.selectedSystemId) || Boolean(state.pipelineActionInFlight);
 
   return `
     <button
@@ -787,7 +989,9 @@ function setPipelineActionState(actionKey = null) {
   state.pipelineActionInFlight = actionKey;
   const hasSystem = Boolean(state.selectedSystemId);
   const actions = [
-    { key: 'seed_scope_stage', element: null, idleLabel: 'Run Seed Stage' },
+    { key: 'state_data_materialization_stage', element: null, idleLabel: 'Run Data Intake Stage' },
+    { key: 'full_state_pipeline', element: null, idleLabel: 'Run Full State Pipeline' },
+    { key: 'seed_scope_stage', element: null, idleLabel: 'Run Seed Scope Stage' },
     { key: 'fetch_stage', element: elements.runCrawlStage, idleLabel: 'Run Fetch Stage' },
     { key: 'triage_stage', element: null, idleLabel: 'Run Triage Stage' },
     { key: 'acceptance_stage', element: null, idleLabel: 'Run Accept Stage' },
@@ -806,6 +1010,12 @@ function setPipelineActionState(actionKey = null) {
 
   if (state.currentStateTab === 'pipeline') {
     renderPipelineVisual();
+    renderPipelineRunResult();
+    renderStateDataPipeline();
+    renderStateDataStageInspector();
+  }
+  if (state.currentStateTab === 'systems') {
+    renderStateDataPipeline();
   }
 }
 
@@ -849,6 +1059,7 @@ function systemFailures(system) {
 
 function mapStatus(entry) {
   const counts = entry?.counts || {};
+  const dataSourceFiles = Number(counts.data_source_files || 0);
   const seededSystems = Number(counts.seeded_systems || 0);
   const dbSystems = Number(counts.db_systems || 0);
   const activeSeedUrls = Number(counts.active_seed_urls || 0);
@@ -869,6 +1080,10 @@ function mapStatus(entry) {
     pdfSourceDocuments > 0 ||
     workflows > 0
   ) {
+    return 'yellow';
+  }
+
+  if (dataSourceFiles > 0) {
     return 'yellow';
   }
 
@@ -1284,6 +1499,11 @@ function renderSidebarStateSummary() {
     <div class="mt-4 text-lg font-semibold text-gray-900">${escapeHtml(STATE_NAMES[state.currentState] || state.currentState)}</div>
     <p class="mt-3 text-sm leading-6 text-gray-500">
       ${formatNumber(state.systems.length)} systems in scope.
+      ${
+        Number(state.stateSummary?.counts?.data_source_files || 0) > 0
+          ? `${formatNumber(state.stateSummary?.counts?.data_source_files || 0)} data files staged. `
+          : ''
+      }
       ${system ? `Focused system: ${escapeHtml(system.system_name)}.` : 'Choose a system to focus the pipeline.'}
     </p>
     <div class="sidebar-metric-grid">
@@ -1470,13 +1690,15 @@ function renderHomeStatePreview() {
   }
 
   const status = mapStatus(entry);
+  const dataSourceFiles = Number(entry.counts?.data_source_files || 0);
   elements.homeStatePreview.innerHTML = `
     <div class="${statusPillClass(status)}">${escapeHtml(mapStatusLabel(status))}</div>
     <h3 class="preview-title">${escapeHtml(entry.state_name || entry.state)}</h3>
     <p class="preview-copy">
       ${formatNumber(entry.counts?.db_systems || 0)} hospital systems,
       ${formatNumber(entry.counts?.pdf_source_documents || 0)} PDFs,
-      ${formatNumber(entry.counts?.workflows || 0)} workflows.
+      ${formatNumber(entry.counts?.workflows || 0)} workflows
+      ${dataSourceFiles > 0 ? `, ${formatNumber(dataSourceFiles)} staged data files.` : '.'}
     </p>
     <div class="preview-grid">
       <div class="detail-item">
@@ -1484,8 +1706,8 @@ function renderHomeStatePreview() {
         <div class="detail-item-copy">${formatNumber(entry.counts?.seeded_systems || 0)}</div>
       </div>
       <div class="detail-item">
-        <div class="detail-item-title">Workflows</div>
-        <div class="detail-item-copy">${formatNumber(entry.counts?.workflows || 0)}</div>
+        <div class="detail-item-title">Data Files</div>
+        <div class="detail-item-copy">${formatNumber(dataSourceFiles)}</div>
       </div>
     </div>
     <button type="button" class="preview-button" data-action="open-state" data-state="${escapeHtml(entry.state)}">
@@ -1525,6 +1747,11 @@ function renderHomeAttentionList() {
                 ${formatNumber(entry.counts?.db_systems || 0)} systems •
                 ${formatNumber(entry.counts?.pdf_source_documents || 0)} PDFs •
                 ${formatNumber(entry.counts?.failures || 0)} failures
+                ${
+                  Number(entry.counts?.data_source_files || 0) > 0
+                    ? ` • ${formatNumber(entry.counts?.data_source_files || 0)} data files`
+                    : ''
+                }
               </div>
             </div>
             <span class="${statusPillClass(status)}">${escapeHtml(mapStatusLabel(status))}</span>
@@ -1641,11 +1868,13 @@ function renderStateSummary() {
 
   const counts = state.stateSummary.counts || {};
   const cards = [
+    ['Data Files', counts.data_source_files, 'State-prefixed files currently discovered under data/.'],
     ['Seeded Systems', counts.seeded_systems, 'Systems currently present in the seed file.'],
     ['Source Documents', counts.source_documents, 'HTML and PDF source documents cached in the DB.'],
     ['PDFs', counts.pdf_source_documents, 'PDF-backed documents discovered for this state.'],
     ['Workflows', counts.workflows, 'Structured workflow rows extracted from crawled documents.'],
     ['Failures', counts.failures, 'Parse failures, partial workflows, and weak PDF drafts.'],
+    ['Last Data Intake', counts.last_data_intake_at ? formatDateTime(counts.last_data_intake_at) : 'n/a', 'Most recent data-to-seed materialization run for this state.'],
     ['Last Crawl', counts.last_crawl_at ? formatDateTime(counts.last_crawl_at) : 'n/a', 'Most recent document fetch seen for this state.'],
   ];
 
@@ -1761,6 +1990,245 @@ function renderSystemsTable() {
       focusSystemSourcePageEditor();
     });
   }
+}
+
+function renderStateDataStageInspectorHeader(detail) {
+  return `
+    <div class="inspector-header">
+      <div>
+        <p class="section-kicker">Data Intake Inspector</p>
+        <h3 class="section-title">${escapeHtml(STATE_NAMES[state.currentState] || state.currentState || 'State')} • ${escapeHtml(stageKeyLabel(detail.stage_key))}</h3>
+        <p class="section-copy">${escapeHtml(formatStageRunHeadline(detail))}</p>
+      </div>
+      <span class="${statusPillClass(stageRunTone(detail))}">${escapeHtml(detail.status || 'ok')}</span>
+    </div>
+  `;
+}
+
+function renderDataMaterializationInspector(detail) {
+  const artifact = detail.data_materialization || null;
+  if (!artifact) {
+    return '<div class="empty-state">No persisted data-intake artifact was found for this stage run.</div>';
+  }
+
+  const fileResults = Array.isArray(artifact.file_results) ? artifact.file_results : [];
+  const generatedEntries = Array.isArray(artifact.generated_summary?.entries)
+    ? artifact.generated_summary.entries
+    : [];
+
+  return `
+    <div class="inspector-grid">
+      <article class="history-detail-item">
+        <div class="detail-item-title">Files</div>
+        <div class="detail-item-copy">${formatNumber(artifact.counts?.matched_files || 0)} matched • ${formatNumber(artifact.counts?.supported_files || 0)} supported • ${formatNumber(artifact.counts?.unsupported_files || 0)} unsupported</div>
+      </article>
+      <article class="history-detail-item">
+        <div class="detail-item-title">Extracted Hospitals</div>
+        <div class="detail-item-copy">${formatNumber(artifact.extracted_hospital_identities?.length || 0)}</div>
+      </article>
+      <article class="history-detail-item">
+        <div class="detail-item-title">Generated Systems</div>
+        <div class="detail-item-copy">${formatNumber(artifact.generated_summary?.generated_systems || 0)}</div>
+      </article>
+    </div>
+    <div class="inspector-list mt-5">
+      ${fileResults
+        .slice(0, 8)
+        .map(
+          (result) => `
+            <article class="inspector-item">
+              <div class="inspector-item-header">
+                <div>
+                  <div class="inspector-item-title">${escapeHtml(result.relative_path || result.file_name || 'Data file')}</div>
+                  <div class="inspector-item-copy">${escapeHtml(result.notes || `${formatNumber(result.extracted_hospital_count || 0)} provider identities extracted.`)}</div>
+                </div>
+                <span class="${statusPillClass(result.status === 'ok' ? 'green' : result.status === 'unsupported' || result.status === 'empty' ? 'yellow' : 'red')}">${escapeHtml(result.status || 'unknown')}</span>
+              </div>
+              <div class="inspector-meta">
+                ${renderInspectorMetaPill('Type', result.source_type || result.kind || 'other')}
+                ${renderInspectorMetaPill('Hospitals', result.extracted_hospital_count || 0)}
+                ${renderInspectorMetaPill('Match', result.matched_by || 'n/a')}
+              </div>
+            </article>
+          `,
+        )
+        .join('')}
+      ${
+        generatedEntries.length
+          ? generatedEntries
+              .slice(0, 6)
+              .map(
+                (entry) => `
+                  <article class="inspector-item">
+                    <div class="inspector-item-header">
+                      <div>
+                        <div class="inspector-item-title">${escapeHtml(entry.system_name || 'Generated system')}</div>
+                        <div class="inspector-item-copy">${escapeHtml(entry.domain || 'No canonical domain found')}</div>
+                      </div>
+                      <span class="${statusPillClass(entry.discovery_confidence === 'high' ? 'green' : entry.discovery_confidence === 'medium' ? 'yellow' : 'red')}">${escapeHtml(entry.discovery_confidence || 'unknown')}</span>
+                    </div>
+                    <div class="inspector-meta">
+                      ${renderInspectorMetaPill('Seed URLs', entry.seed_urls?.length || 0)}
+                      ${renderInspectorMetaPill('Facilities', entry.facilities?.length || 0)}
+                    </div>
+                  </article>
+                `,
+              )
+              .join('')
+          : ''
+      }
+    </div>
+  `;
+}
+
+function buildStateDataPipelineStage({ isLast = false } = {}) {
+  const dataPipeline = state.stateSummary.data_pipeline || {};
+  const counts = dataPipeline.counts || {};
+  const latestRun = dataPipeline.latest_run || null;
+  const files = Array.isArray(dataPipeline.matching_files) ? dataPipeline.matching_files : [];
+  const seededSystems = Number(state.stateSummary?.counts?.seeded_systems || 0);
+  const running = state.pipelineActionInFlight === 'state_data_materialization_stage';
+  const batchRunning = state.pipelineActionInFlight === 'full_state_pipeline';
+  const disabled = Boolean(state.pipelineActionInFlight);
+  const tone =
+    Number(counts.matched_files || 0) === 0
+      ? 'red'
+      : latestRun
+        ? stageRunTone(latestRun, seededSystems > 0 ? 'green' : 'yellow')
+        : seededSystems > 0
+          ? 'green'
+          : 'yellow';
+
+  return `
+    <article class="pipeline-stage">
+      <div class="pipeline-stage-rail">
+        <div class="pipeline-stage-node">1</div>
+        ${isLast ? '' : '<div class="pipeline-stage-line"></div>'}
+      </div>
+      <div class="pipeline-stage-body">
+        <div class="pipeline-stage-header">
+          <div>
+            <div class="pipeline-stage-kicker">Stage 1</div>
+            <h4 class="step-title">Data Files To Seed Registry</h4>
+            <p class="step-copy">Discover state-prefixed files in data/, normalize them into hospital identities with OpenAI, then materialize the canonical state seed file and reseed the same state DB.</p>
+            <p class="system-subtext">${escapeHtml(formatRunningAwareStageHeadline(latestRun, 'state_data_materialization_stage', 'Not run yet'))}</p>
+          </div>
+          <span class="${statusPillClass(tone)}">${escapeHtml(STATUS_LABELS[tone] || tone)}</span>
+        </div>
+        <div class="pipeline-stage-grid">
+          <div>
+            <span class="step-item-label">Current Signal</span>
+            <div class="step-item-value">
+              ${escapeHtml(
+                [
+                  `${formatNumber(counts.matched_files || 0)} matched files`,
+                  `${formatNumber(counts.supported_files || 0)} supported`,
+                  `${formatNumber(state.stateSummary?.counts?.seeded_systems || 0)} seeded systems`,
+                ].join(' • '),
+              )}
+            </div>
+          </div>
+          <div>
+            <span class="step-item-label">Failure Points</span>
+            <div class="step-item-value">
+              ${escapeHtml(
+                Number(counts.matched_files || 0) === 0
+                  ? 'No state-prefixed data files were discovered, so there is no raw intake surface to materialize.'
+                  : 'Messy spreadsheets, unsupported binaries, and ambiguous provider names can weaken the materialized seed registry.',
+              )}
+            </div>
+          </div>
+          <div>
+            <span class="step-item-label">Operator Move</span>
+            <div class="step-item-value">
+              ${escapeHtml(
+                Number(counts.matched_files || 0) === 0
+                  ? 'Place state-prefixed source files in data/ or edit the seed file directly.'
+                  : 'Run Data Intake Stage whenever new state source files land in data/ so the canonical seed file and DB stay aligned, then batch the downstream pipeline from that registry.',
+              )}
+            </div>
+          </div>
+        </div>
+        <div class="pipeline-stage-actions">
+          <button
+            type="button"
+            class="primary-button"
+            data-action="run-state-data-stage"
+            ${disabled ? 'disabled' : ''}
+          >
+            ${escapeHtml(running ? 'Materializing Seeds...' : 'Run Data Intake Stage')}
+          </button>
+          <button
+            type="button"
+            class="ghost-button"
+            data-action="run-full-state-pipeline"
+            ${disabled || seededSystems === 0 ? 'disabled' : ''}
+          >
+            ${escapeHtml(batchRunning ? 'Running State Pipeline...' : 'Run Full State Pipeline')}
+          </button>
+          ${
+            latestRun?.id
+              ? `<button type="button" class="ghost-button" data-action="inspect-state-data-stage" data-run-id="${escapeHtml(latestRun.id)}">Inspect Latest Intake</button>`
+              : ''
+          }
+        </div>
+        ${
+          files.length
+            ? `<div class="mt-5 grid gap-3 lg:grid-cols-2">
+                ${files
+                  .slice(0, 6)
+                  .map(
+                    (file) => `
+                      <article class="detail-item">
+                        <div class="detail-item-title">${escapeHtml(file.relative_path || file.file_name || 'Data file')}</div>
+                        <div class="detail-item-copy">${escapeHtml(`${file.kind || 'other'} • ${file.supported ? 'supported' : 'unsupported'}`)}</div>
+                      </article>
+                    `,
+                  )
+                  .join('')}
+              </div>`
+            : ''
+        }
+      </div>
+    </article>
+  `;
+}
+
+function renderStateDataPipeline() {
+  if (!elements.stateDataPipeline) return;
+
+  if (!state.stateSummary) {
+    elements.stateDataPipeline.innerHTML =
+      '<div class="empty-state">Open a state to inspect its data-intake stage.</div>';
+    return;
+  }
+
+  elements.stateDataPipeline.innerHTML = buildStateDataPipelineStage({ isLast: false });
+}
+
+function renderStateDataStageInspector() {
+  if (!elements.stateDataStageInspector) return;
+
+  if (!state.stateSummary) {
+    elements.stateDataStageInspector.innerHTML = '';
+    return;
+  }
+
+  if (state.stateDataStageLoading) {
+    elements.stateDataStageInspector.innerHTML = '<div class="empty-state">Loading data-intake detail...</div>';
+    return;
+  }
+
+  if (!state.stateDataStageDetail) {
+    elements.stateDataStageInspector.innerHTML =
+      '<div class="empty-state">Inspect the latest data-intake run to review matched files, extracted hospital identities, and generated seed systems.</div>';
+    return;
+  }
+
+  elements.stateDataStageInspector.innerHTML = `
+    ${renderStateDataStageInspectorHeader(state.stateDataStageDetail)}
+    ${renderDataMaterializationInspector(state.stateDataStageDetail)}
+  `;
 }
 
 function renderPriorityBuckets() {
@@ -2544,9 +3012,24 @@ function renderPdfEditor() {
 
 function renderPipelineRunResult() {
   if (!state.pipelineRunResult) {
+    if (state.pipelineActionInFlight) {
+      elements.pipelineRunResult.innerHTML = `
+        <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-blue-900">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div class="text-sm font-semibold">${escapeHtml(`${pipelineActionLabel(state.pipelineActionInFlight)} in progress`)}</div>
+              <p class="mt-1 text-sm opacity-90">The dashboard has started the request and will refresh this state view when the stage completes.</p>
+            </div>
+            <span class="${statusPillClass('yellow')}">Running</span>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     elements.pipelineRunResult.innerHTML = `
       <div class="empty-state">
-        Pick a hospital system above, then use the stage cards below to run seed, fetch, triage, accept, parse, workflow, question, or the full pipeline.
+        Use Stage 1 to run the full state batch from the canonical seed file, or pick a hospital system above to run seed scope, fetch, triage, accept, parse, workflow, question, or the per-system full pipeline.
       </div>
     `;
     return;
@@ -2660,7 +3143,7 @@ function renderPipelineRunResult() {
               : ''
           }
         </div>
-        <span class="${statusPillClass(stageStatus === 'failed' ? 'red' : stageStatus === 'no_pdfs' || stageStatus === 'no_seeds' || stageStatus === 'question_stage_empty' ? 'yellow' : 'green')}">
+        <span class="${statusPillClass(statusToneForStatus(stageStatus, 'green'))}">
           ${escapeHtml(stageStatus)}
         </span>
       </div>
@@ -2779,7 +3262,10 @@ function renderPipelineRunResult() {
 function renderPipelineVisual() {
   const system = currentSystem();
   if (!system) {
-    elements.pipelineVisual.innerHTML = '<div class="empty-state">Choose a hospital system to see its pipeline.</div>';
+    elements.pipelineVisual.innerHTML = `
+      ${state.stateSummary ? buildStateDataPipelineStage({ isLast: true }) : ''}
+      <div class="empty-state">Use Stage 1 to refresh canonical seeds or run the full state batch. Choose a hospital system only when you want to inspect or rerun the downstream stages one by one.</div>
+    `;
     return;
   }
 
@@ -2811,10 +3297,10 @@ function renderPipelineVisual() {
 
   const stepCards = [
     {
-      index: '1',
-      title: 'Target and Seeds',
-      copy: 'Confirm the selected hospital system and freeze the exact seed URLs that define the crawl scope.',
-      runtime: formatStageRunHeadline(seedRun),
+      index: '2',
+      title: 'Scope Existing Seeds',
+      copy: 'Confirm the selected hospital system and freeze the exact seed URLs already in the DB for this system. This stage does not read raw data/ files or call OpenAI.',
+      runtime: formatRunningAwareStageHeadline(seedRun, 'seed_scope_stage'),
       current: [
         `${formatNumber(seedUrls.length)} active seeds`,
         `${formatNumber(approvedSeedUrls.length)} human-approved`,
@@ -2829,7 +3315,7 @@ function renderPipelineVisual() {
       humanMove:
         seedUrls.length === 0
           ? 'Fix the seed URLs in Systems before running any later stage.'
-          : 'Run Seed Stage after changing seeds so every later stage reads the updated scope.',
+          : 'Run Seed Scope Stage after changing system seed URLs so every later stage reads the updated scope.',
       tone:
         seedUrls.length === 0
           ? 'red'
@@ -2843,7 +3329,7 @@ function renderPipelineVisual() {
         renderPipelineRunButton({
           action: 'run-seed-stage',
           actionKey: 'seed_scope_stage',
-          label: 'Run Seed Stage',
+          label: 'Run Seed Scope Stage',
           runningLabel: 'Scoping Seeds...',
         }),
         renderStageInspectButton(seedRun),
@@ -2857,10 +3343,10 @@ function renderPipelineVisual() {
       ],
     },
     {
-      index: '2',
+      index: '3',
       title: 'Fetch and Reachability',
       copy: 'Fetch the targeted records page and its adjacent pages/PDFs into stage-tracked fetch artifacts.',
-      runtime: formatStageRunHeadline(fetchRun),
+      runtime: formatRunningAwareStageHeadline(fetchRun, 'fetch_stage'),
       current: [
         `${reachability.label}`,
         `input ${formatNumber(stageRunInputCount(fetchRun, 'seed_urls') || seedUrls.length)} seeds`,
@@ -2893,10 +3379,10 @@ function renderPipelineVisual() {
       ],
     },
     {
-      index: '3',
+      index: '4',
       title: 'Document Triage',
       copy: 'Classify fetched artifacts into accepted, skipped, or review-needed before they become source documents.',
-      runtime: formatStageRunHeadline(triageRun),
+      runtime: formatRunningAwareStageHeadline(triageRun, 'triage_stage'),
       current: [
         `input ${formatNumber(stageRunInputCount(triageRun, 'fetch_artifacts'))} fetched artifacts`,
         `accepted ${formatNumber(stageRunOutputCount(triageRun, 'accepted_documents'))}`,
@@ -2929,10 +3415,10 @@ function renderPipelineVisual() {
       ],
     },
     {
-      index: '4',
+      index: '5',
       title: 'Acceptance and Source Docs',
       copy: 'Promote accepted triage decisions into durable source documents that later stages can rerun against.',
-      runtime: formatStageRunHeadline(acceptanceRun),
+      runtime: formatRunningAwareStageHeadline(acceptanceRun, 'acceptance_stage'),
       current: [
         `input ${formatNumber(stageRunInputCount(acceptanceRun, 'triage_decisions'))} triage decisions`,
         `accepted ${formatNumber(stageRunOutputCount(acceptanceRun, 'accepted_documents'))}`,
@@ -2965,10 +3451,10 @@ function renderPipelineVisual() {
       ],
     },
     {
-      index: '5',
+      index: '6',
       title: 'Parse',
       copy: 'Turn accepted HTML and PDF source docs into persisted parsed artifacts for downstream reruns.',
-      runtime: formatStageRunHeadline(parseRun),
+      runtime: formatRunningAwareStageHeadline(parseRun, 'parse_stage'),
       current: [
         `input ${formatNumber(stageRunInputCount(parseRun, 'source_documents') || sourceDocuments.length)} source docs`,
         `output ${formatNumber(stageRunOutputCount(parseRun, 'parsed_documents'))} parsed`,
@@ -3002,10 +3488,10 @@ function renderPipelineVisual() {
       ],
     },
     {
-      index: '6',
+      index: '7',
       title: 'Workflow Extraction',
       copy: 'Extract request workflows from persisted parsed artifacts instead of refetching or reparsing documents.',
-      runtime: formatStageRunHeadline(workflowRun),
+      runtime: formatRunningAwareStageHeadline(workflowRun, 'workflow_extraction_stage'),
       current: [
         `input ${formatNumber(stageRunInputCount(workflowRun, 'parsed_artifacts'))}`,
         `output ${formatNumber(stageRunOutputCount(workflowRun, 'workflow_rows') || Number(system.stats?.workflows || 0))} workflow rows`,
@@ -3038,10 +3524,10 @@ function renderPipelineVisual() {
       ],
     },
     {
-      index: '7',
+      index: '8',
       title: 'Question Extraction',
       copy: 'Run the OpenAI form-understanding stage against persisted parsed PDF artifacts only.',
-      runtime: formatStageRunHeadline(questionRun),
+      runtime: formatRunningAwareStageHeadline(questionRun, 'question_extraction_stage'),
       current: [
         `input ${formatNumber(stageRunInputCount(questionRun, 'parsed_artifacts') || pdfDocuments.length)}`,
         `output ${formatNumber(stageRunOutputCount(questionRun, 'reextracted'))}`,
@@ -3076,7 +3562,7 @@ function renderPipelineVisual() {
       ],
     },
     {
-      index: '8',
+      index: '9',
       title: 'Review and Publish',
       copy: 'Inspect the PDFs, validate mappings, and publish usable templates for downstream autofill.',
       runtime: firstPdf ? 'Operator review step' : 'Waiting for PDFs',
@@ -3111,8 +3597,9 @@ function renderPipelineVisual() {
     },
   ];
 
-  elements.pipelineVisual.innerHTML = stepCards
-    .map((step, index) => {
+  const stageMarkup = [
+    buildStateDataPipelineStage({ isLast: false }),
+    ...stepCards.map((step, index) => {
       const isLast = index === stepCards.length - 1;
       return `
         <article class="pipeline-stage">
@@ -3148,8 +3635,10 @@ function renderPipelineVisual() {
           </div>
         </article>
       `;
-    })
-    .join('');
+    }),
+  ];
+
+  elements.pipelineVisual.innerHTML = stageMarkup.join('');
 }
 
 function renderInspectorMetaPill(label, value) {
@@ -3614,7 +4103,7 @@ function renderRunHistoryList() {
               <p class="history-copy">${escapeHtml(formatDateTime(run.created_at))}</p>
             </div>
             <div class="history-header-actions">
-              <span class="${statusPillClass(run.status === 'failed' ? 'red' : run.status === 'no_seeds' ? 'yellow' : 'green')}">
+              <span class="${statusPillClass(statusToneForStatus(run.status, 'green'))}">
                 ${escapeHtml(run.status || 'ok')}
               </span>
               <button
@@ -3674,6 +4163,15 @@ function renderRunHistoryList() {
 function renderStateView() {
   if (!state.stateSummary) {
     elements.stateSummary.innerHTML = '<div class="empty-state">Open a state from the map to load this view.</div>';
+    if (elements.stateActionBanner) {
+      elements.stateActionBanner.innerHTML = '';
+    }
+    if (elements.stateDataPipeline) {
+      elements.stateDataPipeline.innerHTML = '';
+    }
+    if (elements.stateDataStageInspector) {
+      elements.stateDataStageInspector.innerHTML = '';
+    }
     elements.systemsTable.innerHTML = '<div class="empty-state">Hospital systems appear here after a state is selected.</div>';
     elements.priorityBuckets.innerHTML = '';
     elements.pipelineVisual.innerHTML = '';
@@ -3693,6 +4191,9 @@ function renderStateView() {
 
   elements.stateSelect.value = state.currentState;
   renderStateSummary();
+  renderStateActionBanner();
+  renderStateDataPipeline();
+  renderStateDataStageInspector();
   renderSystemsTable();
   renderPriorityBuckets();
   renderPipelineSystemSelect();
@@ -3728,6 +4229,13 @@ async function loadNationalOverview(forceRefresh = false) {
 async function loadStateView(stateCode, options = {}) {
   const normalizedState = String(stateCode || '').toUpperCase();
   if (!normalizedState) return;
+
+  if (state.currentState && state.currentState !== normalizedState) {
+    state.stateDataStageRunId = null;
+    state.stateDataStageDetail = null;
+    state.stateDataStageLoading = false;
+    setActionBanner(null);
+  }
 
   state.currentState = normalizedState;
   state.homePreviewState = normalizedState;
@@ -3788,7 +4296,15 @@ async function runPipelineActionForSelectedSystem({
     throw new Error('Pick a hospital system before running the pipeline.');
   }
 
+  const actionLabel = pipelineActionLabel(actionKey);
   setPipelineActionState(actionKey);
+  setActionBanner({
+    tone: 'info',
+    title: `${actionLabel} started`,
+    message: `Running for ${system.system_name} in ${state.currentState}.`,
+    badge: 'Running',
+  });
+  await waitForNextPaint();
   try {
     const result = await fetchJson(endpoint, {
       method: 'POST',
@@ -3826,6 +4342,175 @@ async function runPipelineActionForSelectedSystem({
     if (inspectorRunId) {
       await openStageInspector(inspectorRunId, { force: true });
     }
+    setActionBanner(
+      {
+        tone: actionBannerToneForStatus(result.stage_status || result.status),
+        title: `${actionLabel} finished`,
+        message: buildSystemActionBannerMessage({ actionKey, system, result }),
+        badge: formatStageStatusLabel(result.stage_status || result.status),
+      },
+      { autoClearMs: 8000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: `${actionLabel} failed`,
+        message: error?.message || `The ${actionLabel} request failed.`,
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
+async function openStateDataStageInspector(runId, { force = false } = {}) {
+  if (!runId) {
+    state.stateDataStageRunId = null;
+    state.stateDataStageDetail = null;
+    state.stateDataStageLoading = false;
+    renderStateDataStageInspector();
+    return;
+  }
+
+  state.stateDataStageRunId = runId;
+  if (!force && state.stageInspectorCache[runId]) {
+    state.stateDataStageDetail = state.stageInspectorCache[runId];
+    state.stateDataStageLoading = false;
+    renderStateDataStageInspector();
+    return;
+  }
+
+  state.stateDataStageLoading = true;
+  renderStateDataStageInspector();
+  const detail = await fetchJson(`/internal/pipeline/stage-runs/${encodeURIComponent(runId)}`);
+  state.stageInspectorCache[runId] = detail;
+  if (state.stateDataStageRunId === runId) {
+    state.stateDataStageDetail = detail;
+    state.stateDataStageLoading = false;
+    renderStateDataStageInspector();
+  }
+}
+
+async function runStateDataStageForCurrentState() {
+  if (!state.currentState) {
+    throw new Error('Open a state before running the data-intake stage.');
+  }
+
+  const actionLabel = pipelineActionLabel('state_data_materialization_stage');
+  setPipelineActionState('state_data_materialization_stage');
+  setActionBanner({
+    tone: 'info',
+    title: `${actionLabel} started`,
+    message: `Scanning state-prefixed data files for ${state.currentState} and materializing the canonical seed registry.`,
+    badge: 'Running',
+  });
+  await waitForNextPaint();
+  try {
+    const result = await fetchJson(`/internal/states/${encodeURIComponent(state.currentState)}/data-intake`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reseed_db: true,
+      }),
+    });
+
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      stateTab: 'pipeline',
+      pipelineTab: 'flow',
+    });
+
+    if (result.stage_run_id) {
+      await openStateDataStageInspector(result.stage_run_id, { force: true });
+    }
+    setActionBanner(
+      {
+        tone: actionBannerToneForStatus(result.status),
+        title: `${actionLabel} finished`,
+        message: buildStateDataActionBannerMessage(result),
+        badge: formatStageStatusLabel(result.status),
+      },
+      { autoClearMs: 9000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: `${actionLabel} failed`,
+        message: error?.message || `The ${actionLabel} request failed.`,
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
+async function runFullPipelineForCurrentState() {
+  if (!state.currentState) {
+    throw new Error('Open a state before running the full state pipeline.');
+  }
+
+  const seededSystems = Number(state.stateSummary?.counts?.seeded_systems || 0);
+  if (seededSystems === 0) {
+    throw new Error('No seeded systems are available for this state yet. Run Stage 1 first.');
+  }
+
+  const actionLabel = pipelineActionLabel('full_state_pipeline');
+  const stateName = STATE_NAMES[state.currentState] || state.currentState;
+  const seedFileName = fileNameFromPath(state.stateSummary?.seed_file_path) || 'state seed file';
+
+  setPipelineActionState('full_state_pipeline');
+  setActionBanner({
+    tone: 'info',
+    title: `${actionLabel} started`,
+    message: `Queuing ${formatNumber(seededSystems)} seeded systems for ${stateName} from ${seedFileName}.`,
+    badge: 'Running',
+  });
+  await waitForNextPaint();
+  try {
+    const result = await fetchJson(`/internal/states/${encodeURIComponent(state.currentState)}/pipeline/full`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        replace_draft: true,
+      }),
+    });
+
+    state.runHistoryFilterSystemId = '__all__';
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'pipeline',
+      pipelineTab: 'flow',
+    });
+
+    setActionBanner(
+      {
+        tone: actionBannerToneForStatus(result.status),
+        title: `${actionLabel} finished`,
+        message: buildStateBatchActionBannerMessage(result),
+        badge: formatStageStatusLabel(result.status),
+      },
+      { autoClearMs: 10000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: `${actionLabel} failed`,
+        message: error?.message || `The ${actionLabel} request failed.`,
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
   } finally {
     setPipelineActionState(null);
   }
@@ -4376,6 +5061,21 @@ document.addEventListener('click', async (event) => {
 
     if (button.dataset.action === 'inspect-stage-run' && button.dataset.runId) {
       await openStageInspector(button.dataset.runId, { force: true });
+      return;
+    }
+
+    if (button.dataset.action === 'inspect-state-data-stage' && button.dataset.runId) {
+      await openStateDataStageInspector(button.dataset.runId, { force: true });
+      return;
+    }
+
+    if (button.dataset.action === 'run-state-data-stage') {
+      await runStateDataStageForCurrentState();
+      return;
+    }
+
+    if (button.dataset.action === 'run-full-state-pipeline') {
+      await runFullPipelineForCurrentState();
       return;
     }
 

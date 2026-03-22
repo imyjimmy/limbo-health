@@ -324,12 +324,24 @@ export async function getStageRunDetail(id) {
   const detail = {
     ...mapped,
     seed_scope: null,
+    data_materialization: null,
     frontier_items: [],
     fetch_artifacts: [],
     triage_decisions: [],
     accepted_source_documents: [],
     parsed_artifacts: [],
   };
+
+  if (stageRun.stage_key === 'state_data_materialization_stage') {
+    const artifactPath = stageRun.output_summary?.artifact_path || null;
+    if (artifactPath) {
+      try {
+        detail.data_materialization = JSON.parse(await fs.readFile(artifactPath, 'utf8'));
+      } catch {
+        detail.data_materialization = null;
+      }
+    }
+  }
 
   if (stageRun.stage_key === 'seed_scope_stage') {
     const artifactPath = stageRun.output_summary?.artifact_path || null;

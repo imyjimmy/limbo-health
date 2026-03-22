@@ -22,6 +22,10 @@ export async function ensureParsedArtifactStateDir(state) {
   return ensureStageStateDir(config.parsedStorageDir, state);
 }
 
+export async function ensureDataIntakeArtifactStateDir(state) {
+  return ensureStageStateDir(config.dataIntakeStorageDir, state);
+}
+
 export async function ensureSeedScopeArtifactStateDir(state) {
   return ensureStageStateDir(config.seedScopeStorageDir, state);
 }

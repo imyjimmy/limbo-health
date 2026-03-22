@@ -15,23 +15,16 @@ export function isOpenAiApiError(error) {
   return error instanceof OpenAiApiError;
 }
 
-export async function extractPdfFormUnderstandingWithOpenAI({
+export async function requestStructuredOutputWithOpenAI({
   apiKey,
   baseUrl,
   model,
   systemPrompt,
   userPrompt,
   schema,
+  schemaName = 'structured_output',
   timeoutMs = 30000,
 }) {
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is required for PDF form understanding.');
-  }
-
-  if (!model) {
-    throw new Error('OPENAI_PDF_FORM_MODEL is required for PDF form understanding.');
-  }
-
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
@@ -51,7 +44,7 @@ export async function extractPdfFormUnderstandingWithOpenAI({
         response_format: {
           type: 'json_schema',
           json_schema: {
-            name: 'pdf_form_understanding',
+            name: schemaName,
             strict: true,
             schema,
           },
@@ -85,4 +78,33 @@ export async function extractPdfFormUnderstandingWithOpenAI({
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+export async function extractPdfFormUnderstandingWithOpenAI({
+  apiKey,
+  baseUrl,
+  model,
+  systemPrompt,
+  userPrompt,
+  schema,
+  timeoutMs = 30000,
+}) {
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is required for PDF form understanding.');
+  }
+
+  if (!model) {
+    throw new Error('OPENAI_PDF_FORM_MODEL is required for PDF form understanding.');
+  }
+
+  return requestStructuredOutputWithOpenAI({
+    apiKey,
+    baseUrl,
+    model,
+    systemPrompt,
+    userPrompt,
+    schema,
+    schemaName: 'pdf_form_understanding',
+    timeoutMs,
+  });
 }

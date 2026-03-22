@@ -644,14 +644,16 @@ export async function listPipelineStageRuns(
 
 export async function getLatestPipelineStageRun(
   {
-    systemId,
+    systemId = null,
+    state = null,
     stageKey,
   } = {},
   client = null,
 ) {
-  if (!systemId || !stageKey) return null;
+  if ((!systemId && !state) || !stageKey) return null;
 
   const q = client || { query };
+  const scopeClause = systemId ? 'hospital_system_id = $1' : 'state = $1 and hospital_system_id is null';
   const result = await q.query(
     `select
        id,
@@ -667,11 +669,11 @@ export async function getLatestPipelineStageRun(
        created_at,
        completed_at
      from pipeline_stage_runs
-     where hospital_system_id = $1
+     where ${scopeClause}
        and stage_key = $2
      order by created_at desc
      limit 1`,
-    [systemId, stageKey],
+    [systemId || state, stageKey],
   );
 
   return result.rows[0] || null;

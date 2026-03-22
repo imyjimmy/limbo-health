@@ -436,7 +436,7 @@ create table if not exists pipeline_run_history (
   hospital_system_id uuid references hospital_systems(id) on delete set null,
   system_name text,
   run_scope text not null check (run_scope in ('system')),
-  status text not null check (status in ('ok', 'no_seeds', 'failed')),
+  status text not null check (status in ('ok', 'partial', 'no_seeds', 'no_documents', 'no_pdfs', 'no_targets', 'failed')),
   crawled int not null default 0,
   extracted int not null default 0,
   failed int not null default 0,
@@ -447,6 +447,30 @@ create table if not exists pipeline_run_history (
   change_summary jsonb,
   created_at timestamptz not null default now()
 );
+
+alter table pipeline_run_history
+  drop constraint if exists pipeline_run_history_status_check;
+
+alter table pipeline_run_history
+  add constraint pipeline_run_history_status_check
+  check (status in ('ok', 'partial', 'no_seeds', 'no_documents', 'no_pdfs', 'no_targets', 'failed'));
+
+with normalized_history_status as (
+  select
+    id,
+    case
+      when lower(coalesce(crawl_summary->>'stage_status', crawl_summary->>'status', status)) = 'success' then 'ok'
+      when lower(coalesce(crawl_summary->>'stage_status', crawl_summary->>'status', status)) in ('ok', 'partial', 'no_seeds', 'no_documents', 'no_pdfs', 'no_targets', 'failed')
+        then lower(coalesce(crawl_summary->>'stage_status', crawl_summary->>'status', status))
+      else status
+    end as next_status
+  from pipeline_run_history
+)
+update pipeline_run_history as history
+set status = normalized_history_status.next_status
+from normalized_history_status
+where history.id = normalized_history_status.id
+  and history.status is distinct from normalized_history_status.next_status;
 
 create index if not exists pipeline_run_history_state_created_lookup
   on pipeline_run_history (state, created_at desc);

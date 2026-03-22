@@ -92,7 +92,24 @@ export function sanitizeSeedSystems(systems = [], state) {
 export async function readStateSeedFile(state) {
   const normalizedState = normalizeStateCode(state);
   const seedFilePath = resolveSeedFilePath({ state: normalizedState });
-  const raw = await fs.readFile(seedFilePath, 'utf8');
+  let raw = null;
+  try {
+    raw = await fs.readFile(seedFilePath, 'utf8');
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  if (raw == null) {
+    return {
+      state: normalizedState,
+      seed_file_path: seedFilePath,
+      systems: [],
+      counts: buildSeedEditorCounts([]),
+    };
+  }
+
   const parsed = JSON.parse(raw);
 
   if (!Array.isArray(parsed)) {

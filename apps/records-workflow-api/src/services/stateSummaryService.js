@@ -6,6 +6,10 @@ import {
   normalizeStateCode,
 } from '../utils/states.js';
 import { readStateSeedFile } from './seedEditorService.js';
+import {
+  getStateDataPipelineSummary,
+  getStateDataSourceCounts,
+} from './stateDataMaterializationService.js';
 
 const NATIONAL_OVERVIEW_CACHE_TTL_MS = 60_000;
 const NATIONAL_OVERVIEW_BATCH_SIZE = 6;
@@ -76,6 +80,8 @@ function groupPdfLinksBySystemId(rows = []) {
 
 function createEmptySummaryCounts() {
   return {
+    data_source_files: 0,
+    supported_data_source_files: 0,
     seeded_systems: 0,
     seeded_facilities: 0,
     active_seed_urls: 0,
@@ -88,33 +94,49 @@ function createEmptySummaryCounts() {
     stale_templates: 0,
     zero_pdf_systems: 0,
     failures: 0,
+    last_data_intake_at: null,
     last_crawl_at: null,
   };
 }
 
 function summarizeStateSystems(stateSystems) {
-  return stateSystems.systems.reduce((totals, system) => {
-    totals.seeded_systems += system.in_seed_file ? 1 : 0;
-    totals.seeded_facilities += system.stats.seed_facilities;
-    totals.active_seed_urls += system.stats.seed_urls;
-    totals.db_systems += system.hospital_system_id ? 1 : 0;
-    totals.db_facilities += system.stats.db_facilities;
-    totals.source_documents += system.stats.source_documents;
-    totals.pdf_source_documents += system.stats.pdf_source_documents;
-    totals.workflows += system.stats.workflows;
-    totals.approved_templates += system.stats.approved_templates;
-    totals.stale_templates += system.stats.stale_templates;
-    totals.zero_pdf_systems += system.zero_pdf ? 1 : 0;
-    totals.failures +=
+  const totals = stateSystems.systems.reduce((summary, system) => {
+    summary.seeded_systems += system.in_seed_file ? 1 : 0;
+    summary.seeded_facilities += system.stats.seed_facilities;
+    summary.active_seed_urls += system.stats.seed_urls;
+    summary.db_systems += system.hospital_system_id ? 1 : 0;
+    summary.db_facilities += system.stats.db_facilities;
+    summary.source_documents += system.stats.source_documents;
+    summary.pdf_source_documents += system.stats.pdf_source_documents;
+    summary.workflows += system.stats.workflows;
+    summary.approved_templates += system.stats.approved_templates;
+    summary.stale_templates += system.stats.stale_templates;
+    summary.zero_pdf_systems += system.zero_pdf ? 1 : 0;
+    summary.failures +=
       system.stats.parse_failures +
       system.stats.partial_workflows +
       system.stats.low_confidence_question_drafts;
-    totals.last_crawl_at = maxIsoDate(totals.last_crawl_at, system.stats.last_crawl_at);
-    return totals;
+    summary.last_crawl_at = maxIsoDate(summary.last_crawl_at, system.stats.last_crawl_at);
+    return summary;
   }, createEmptySummaryCounts());
+
+  totals.data_source_files = Number(stateSystems.data_source_counts?.matched_files || 0);
+  totals.supported_data_source_files = Number(stateSystems.data_source_counts?.supported_files || 0);
+  totals.last_data_intake_at = stateSystems.data_pipeline?.latest_run?.completed_at || null;
+
+  return totals;
 }
 
 function classifyStateHealth(counts) {
+  if (counts.seeded_systems === 0 && counts.db_systems === 0 && counts.data_source_files > 0) {
+    return {
+      key: 'intake',
+      label: 'Data Ready',
+      tone: 'seeded',
+      reason: 'State-prefixed data files are present, but the canonical seed file has not been materialized yet.',
+    };
+  }
+
   if (counts.seeded_systems === 0 && counts.db_systems === 0) {
     return {
       key: 'empty',
@@ -176,6 +198,7 @@ function buildNationalOverviewTotals(states = []) {
     healthy: 0,
     attention: 0,
     active: 0,
+    intake: 0,
     seeded: 0,
     empty: 0,
     error: 0,
@@ -206,6 +229,7 @@ function buildNationalOverviewTotals(states = []) {
 
   totals.healthy_states = totals.by_health.healthy || 0;
   totals.attention_states = totals.by_health.attention || 0;
+  totals.data_ready_states = totals.by_health.intake || 0;
   totals.seeded_only_states = totals.by_health.seeded || 0;
   totals.unstarted_states = totals.by_health.empty || 0;
   totals.failed_states = totals.by_health.error || 0;
@@ -450,7 +474,10 @@ async function loadStateSystemStats(state) {
 
 export async function listStateSystems(state) {
   const normalizedState = assertState(state);
-  const seedSnapshot = await readStateSeedFile(normalizedState);
+  const [seedSnapshot, dataSourceCounts] = await Promise.all([
+    readStateSeedFile(normalizedState),
+    getStateDataSourceCounts(normalizedState),
+  ]);
   const { systemStatsByName, templateStatsByName, seedRowsBySystem, qualityStatsByName, pdfLinksBySystemId } =
     await loadStateSystemStats(normalizedState);
 
@@ -505,19 +532,27 @@ export async function listStateSystems(state) {
   return {
     state: normalizedState,
     seed_file_path: seedSnapshot.seed_file_path,
+    data_source_counts: dataSourceCounts,
     systems,
   };
 }
 
 export async function getStateSummary(state) {
   const normalizedState = assertState(state);
-  const stateSystems = await listStateSystems(normalizedState);
-  const counts = summarizeStateSystems(stateSystems);
+  const [stateSystems, dataPipeline] = await Promise.all([
+    listStateSystems(normalizedState),
+    getStateDataPipelineSummary(normalizedState),
+  ]);
+  const counts = summarizeStateSystems({
+    ...stateSystems,
+    data_pipeline: dataPipeline,
+  });
 
   return {
     state: normalizedState,
     seed_file_path: stateSystems.seed_file_path,
     counts,
+    data_pipeline: dataPipeline,
     systems: stateSystems.systems,
   };
 }

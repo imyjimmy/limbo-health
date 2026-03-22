@@ -29,6 +29,7 @@ import {
   listPipelineRunHistory,
   runTrackedAcceptanceStage,
   runTrackedFetchStage,
+  runTrackedFullStatePipelineBatch,
   runTrackedFullSystemPipeline,
   runTrackedParseStage,
   runTrackedQuestionExtractionStage,
@@ -46,6 +47,7 @@ import {
   getStateSummary,
   listStateSystems,
 } from '../services/stateSummaryService.js';
+import { runStateDataMaterializationStage } from '../services/stateDataMaterializationService.js';
 
 export const internalRouter = Router();
 
@@ -105,6 +107,41 @@ internalRouter.get('/states/:state/review-queue', async (req, res) => {
   } catch (error) {
     console.error('Failed to load review queue:', error);
     const response = toErrorPayload(error, 'Failed to load review queue.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/states/:state/data-intake', async (req, res) => {
+  try {
+    const result = await runStateDataMaterializationStage({
+      state: req.params.state,
+      reseedDb: req.body?.reseed_db !== false && req.body?.reseedDb !== false,
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to materialize state seeds from data:', error);
+    const response = toErrorPayload(error, 'Failed to materialize state seeds from data.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/states/:state/pipeline/full', async (req, res) => {
+  try {
+    const summary = await runTrackedFullStatePipelineBatch({
+      state: req.params.state,
+      hospitalSystemIds: req.body?.hospital_system_ids || req.body?.hospitalSystemIds || [],
+      maxDepth: Number.isInteger(req.body?.max_depth)
+        ? req.body.max_depth
+        : Number.isInteger(req.body?.maxDepth)
+          ? req.body.maxDepth
+          : undefined,
+      replaceDraft:
+        req.body?.replace_draft !== false && req.body?.replaceDraft !== false,
+    });
+    return res.json(summary);
+  } catch (error) {
+    console.error('Full state pipeline failed:', error);
+    const response = toErrorPayload(error, 'Full state pipeline failed.');
     return res.status(response.status).json(response.body);
   }
 });
