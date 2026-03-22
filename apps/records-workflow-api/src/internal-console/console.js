@@ -540,10 +540,11 @@ function renderRunHistoryIssuesSection(run) {
 }
 
 function renderRunHistoryExpandedBody(run) {
+  const reportedStatus = runHistoryReportedStatus(run);
   const summaryRows = [
     ['Stage', run.crawl_summary?.stage_label || 'Pipeline Action'],
     ['Scope', run.run_scope || 'system'],
-    ['Status', run.crawl_summary?.stage_status || run.status || 'ok'],
+    ['Status', reportedStatus],
     ['Systems', run.systems || 0],
   ];
 
@@ -4105,6 +4106,30 @@ function runHistorySummaryScopeRuns(runs = []) {
   return fullPipelineRuns.length > 0 ? fullPipelineRuns : normalizedRuns;
 }
 
+function runHistoryReportedStatus(run = null) {
+  const candidates = [
+    run?.reported_status,
+    run?.crawl_summary?.stage_status,
+    run?.crawl_summary?.status,
+    run?.status,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = String(candidate || '').trim().toLowerCase();
+    if (!normalized) continue;
+    if (normalized === 'success') return 'ok';
+    if (
+      ['ok', 'partial', 'no_seeds', 'no_documents', 'no_pdfs', 'no_targets', 'failed', 'running'].includes(
+        normalized,
+      )
+    ) {
+      return normalized;
+    }
+  }
+
+  return 'ok';
+}
+
 function deriveRunHistorySummaryMetrics(runs = []) {
   const summaryRuns = runHistorySummaryScopeRuns(runs);
   const positivePdfDelta = summaryRuns.reduce((total, run) => {
@@ -4123,8 +4148,7 @@ function deriveRunHistorySummaryMetrics(runs = []) {
     (run) => Number(run?.extracted || 0) > 0,
   ).length;
   const noPdfOutcomes = summaryRuns.filter(
-    (run) =>
-      run?.crawl_summary?.question_stage?.stage_status === 'no_pdfs' || run?.status === 'no_pdfs',
+    (run) => runHistoryReportedStatus(run) === 'no_pdfs',
   ).length;
   const scopeLabel =
     summaryRuns.length > 0 && summaryRuns.length !== runs.length
@@ -4272,6 +4296,7 @@ function renderRunHistoryList() {
       const changedMetrics = Array.isArray(run.change_summary?.metrics) ? run.change_summary.metrics : [];
       const visibleMetrics = changedMetrics.slice(0, 6);
       const expanded = isRunHistoryExpanded(run.id);
+      const reportedStatus = runHistoryReportedStatus(run);
 
       return `
         <article class="history-card ${expanded ? 'history-card-expanded' : ''}">
@@ -4282,8 +4307,8 @@ function renderRunHistoryList() {
               <p class="history-copy">${escapeHtml(formatDateTime(run.created_at))}</p>
             </div>
             <div class="history-header-actions">
-              <span class="${statusPillClass(statusToneForStatus(run.status, 'green'))}">
-                ${escapeHtml(run.status || 'ok')}
+              <span class="${statusPillClass(statusToneForStatus(reportedStatus, 'green'))}">
+                ${escapeHtml(reportedStatus)}
               </span>
               <button
                 type="button"

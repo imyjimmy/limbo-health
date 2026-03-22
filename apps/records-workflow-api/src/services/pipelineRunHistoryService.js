@@ -284,6 +284,27 @@ export function stageSummaryToHistoryStatus(
   return 'ok';
 }
 
+function reportedRunHistoryStatus(row = null) {
+  const candidates = [
+    row?.reported_status,
+    row?.crawl_summary?.stage_status,
+    row?.crawl_summary?.status,
+    row?.status,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = String(candidate || '')
+      .trim()
+      .toLowerCase();
+    if (!normalized) continue;
+    if (normalized === 'success') return 'ok';
+    if (normalized === 'running') return 'running';
+    if (HISTORY_STATUSES.has(normalized)) return normalized;
+  }
+
+  return 'ok';
+}
+
 export function combineFullPipelineStatus({
   seedStage,
   fetchStage,
@@ -503,6 +524,7 @@ async function insertRunHistory({
 }
 
 function mapHistoryRow(row) {
+  const reportedStatus = reportedRunHistoryStatus(row);
   return {
     id: row.id,
     state: row.state,
@@ -510,6 +532,7 @@ function mapHistoryRow(row) {
     system_name: row.system_name,
     run_scope: row.run_scope,
     status: row.status,
+    reported_status: reportedStatus,
     crawled: toInt(row.crawled),
     extracted: toInt(row.extracted),
     failed: toInt(row.failed),

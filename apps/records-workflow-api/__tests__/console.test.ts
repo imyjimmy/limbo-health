@@ -231,9 +231,11 @@ globalThis.__consoleTest = {
   state,
   elements,
   runHistorySummaryScopeRuns,
+  runHistoryReportedStatus,
   deriveRunHistorySummaryMetrics,
   manualPdfUploadNotesForSourceView,
   renderRunHistorySummary,
+  renderRunHistoryList,
   renderSystemActionButtonGroup,
   promptManualPdfUploadForSystem
 };
@@ -247,9 +249,11 @@ globalThis.__consoleTest = {
       state: Record<string, unknown>;
       elements: Record<string, FakeElement>;
       runHistorySummaryScopeRuns: (runs: unknown[]) => unknown[];
+      runHistoryReportedStatus: (run?: Record<string, unknown> | null) => string;
       deriveRunHistorySummaryMetrics: (runs: unknown[]) => Record<string, unknown>;
       manualPdfUploadNotesForSourceView: (sourceView?: string) => string;
       renderRunHistorySummary: () => void;
+      renderRunHistoryList: () => void;
       renderSystemActionButtonGroup: (system: Record<string, unknown>) => string;
       promptManualPdfUploadForSystem: (options: Record<string, unknown>) => void;
     },
@@ -278,7 +282,7 @@ describe('internal console helpers', () => {
         },
       },
       {
-        status: 'no_pdfs',
+        status: 'no_seeds',
         extracted: 0,
         change_summary: {
           metrics: [
@@ -288,6 +292,7 @@ describe('internal console helpers', () => {
         },
         crawl_summary: {
           stage_label: 'Full Pipeline',
+          stage_status: 'no_pdfs',
           question_stage: { stage_status: 'no_pdfs' },
         },
       },
@@ -358,6 +363,43 @@ describe('internal console helpers', () => {
     expect(api.elements.runHistorySummary.innerHTML).toContain('Systems With Questions');
     expect(api.elements.runHistorySummary.innerHTML).toContain('No PDF Outcomes');
     expect(api.elements.runHistorySummary.innerHTML).toContain('2 visible runs shown');
+  });
+
+  it('prefers the run-reported status over the stored history status in Run History', () => {
+    const { api } = createConsoleHarness();
+
+    api.state.runHistory = {
+      runs: [
+        {
+          id: 'run-1',
+          created_at: '2026-03-22T02:12:46.206Z',
+          system_name: 'Wentworth-Douglass Hospital',
+          status: 'no_seeds',
+          extracted: 0,
+          crawled: 2,
+          failed: 38,
+          systems: 1,
+          change_summary: { metrics: [] },
+          crawl_summary: {
+            stage_label: 'Full Pipeline',
+            stage_status: 'no_pdfs',
+            question_stage: { stage_status: 'no_pdfs' },
+          },
+        },
+      ],
+    };
+
+    expect(
+      api.runHistoryReportedStatus({
+        status: 'no_seeds',
+        crawl_summary: { stage_status: 'no_pdfs' },
+      }),
+    ).toBe('no_pdfs');
+
+    api.renderRunHistoryList();
+
+    expect(api.elements.runHistoryList.innerHTML).toContain('no_pdfs');
+    expect(api.elements.runHistoryList.innerHTML).not.toContain('>no_seeds<');
   });
 
   it('keeps Upload PDF hidden behind the Systems action chevron until expanded', () => {
