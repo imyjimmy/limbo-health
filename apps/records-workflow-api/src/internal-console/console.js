@@ -163,6 +163,8 @@ const state = {
   systemSortKey: 'system_name',
   systemSortDirection: 'asc',
   systemSourcePageEditor: null,
+  systemPdfUploadTarget: null,
+  systemPdfUploadInFlightKey: null,
   pipelineRunResult: null,
   pipelineActionInFlight: null,
   pdfEditorReview: null,
@@ -214,6 +216,7 @@ const elements = {
   refreshState: document.querySelector('#refresh-state'),
   stateSummary: document.querySelector('#state-summary'),
   stateActionBanner: document.querySelector('#state-action-banner'),
+  manualPdfUploadInput: document.querySelector('#manual-pdf-upload-input'),
   stateDataPipeline: document.querySelector('#state-data-pipeline'),
   stateDataStageInspector: document.querySelector('#state-data-stage-inspector'),
   systemsTab: document.querySelector('#systems-tab'),
@@ -1140,6 +1143,11 @@ function currentSystemSourcePageEditor(system) {
   return state.systemSourcePageEditor?.key === key ? state.systemSourcePageEditor : null;
 }
 
+function isSystemPdfUploadInFlight(system) {
+  const key = systemIdentityKey(system);
+  return Boolean(key) && state.systemPdfUploadInFlightKey === key;
+}
+
 function focusSystemSourcePageEditor() {
   const key = state.systemSourcePageEditor?.key;
   if (!key || !elements.systemsTable) return;
@@ -1357,6 +1365,28 @@ function renderSystemPdfPageLinks(system) {
         })
         .join('')}
     </div>
+  `;
+}
+
+function renderSystemPdfUploadAction(system) {
+  if (!system?.hospital_system_id) {
+    return '<span class="system-subtext">Unavailable</span>';
+  }
+
+  const uploading = isSystemPdfUploadInFlight(system);
+
+  return `
+    <button
+      type="button"
+      class="ghost-button"
+      data-action="upload-system-pdf"
+      data-system-id="${escapeHtml(system.hospital_system_id)}"
+      data-system-name="${escapeHtml(system.system_name || '')}"
+      data-system-state="${escapeHtml(system.state || state.currentState || '')}"
+      ${uploading ? 'disabled' : ''}
+    >
+      ${escapeHtml(uploading ? 'Uploading PDF...' : 'Upload PDF')}
+    </button>
   `;
 }
 
@@ -1971,11 +2001,14 @@ function renderSystemsTable() {
                 <td class="data-cell">${formatNumber(system.stats?.workflows || 0)}</td>
                 <td class="data-cell">${formatNumber(failures)}</td>
                 <td class="data-cell">
-                  ${
-                    system.hospital_system_id
-                      ? `<button type="button" class="ghost-button" data-action="use-in-pipeline" data-system-id="${escapeHtml(system.hospital_system_id)}">Pipeline</button>`
-                      : '<span class="system-subtext">Unavailable</span>'
-                  }
+                  <div class="flex flex-col gap-2">
+                    ${
+                      system.hospital_system_id
+                        ? `<button type="button" class="ghost-button" data-action="use-in-pipeline" data-system-id="${escapeHtml(system.hospital_system_id)}">Pipeline</button>`
+                        : '<span class="system-subtext">Unavailable</span>'
+                    }
+                    ${renderSystemPdfUploadAction(system)}
+                  </div>
                 </td>
               </tr>
             `;
@@ -4234,6 +4267,7 @@ async function loadStateView(stateCode, options = {}) {
     state.stateDataStageRunId = null;
     state.stateDataStageDetail = null;
     state.stateDataStageLoading = false;
+    resetSystemPdfUploadState();
     setActionBanner(null);
   }
 
@@ -4724,6 +4758,131 @@ async function addSourcePageForSystem(options = {}) {
   openSourcePageEditorForSystem(options);
 }
 
+function resetSystemPdfUploadState() {
+  state.systemPdfUploadTarget = null;
+  state.systemPdfUploadInFlightKey = null;
+  if (elements.manualPdfUploadInput) {
+    elements.manualPdfUploadInput.value = '';
+  }
+}
+
+function promptManualPdfUploadForSystem({ systemId = null, systemName = null, systemState = null } = {}) {
+  const system =
+    state.systems.find(
+      (entry) =>
+        (systemId && entry.hospital_system_id === systemId) ||
+        (!systemId &&
+          systemName &&
+          entry.system_name === systemName &&
+          entry.state === (systemState || state.currentState)),
+    ) || null;
+  if (!system?.hospital_system_id) {
+    throw new Error('Hospital system is not ready for direct PDF upload yet.');
+  }
+  if (!elements.manualPdfUploadInput) {
+    throw new Error('The PDF upload control is not available in this dashboard build.');
+  }
+
+  state.systemPdfUploadTarget = {
+    key: systemIdentityKey(system),
+    systemId: system.hospital_system_id,
+    systemName: system.system_name,
+    systemState: system.state || systemState || state.currentState || null,
+  };
+  state.systemPdfUploadInFlightKey = null;
+  renderSystemsTable();
+  elements.manualPdfUploadInput.value = '';
+  elements.manualPdfUploadInput.click();
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Failed to read the selected PDF.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadManualPdfForTarget(file) {
+  const target = state.systemPdfUploadTarget;
+  if (!target?.systemId) {
+    throw new Error('Choose a hospital system before uploading a PDF.');
+  }
+  if (!file) {
+    resetSystemPdfUploadState();
+    renderSystemsTable();
+    return;
+  }
+
+  const fileName = String(file.name || '').trim();
+  if (!/\.pdf$/i.test(fileName) && !/pdf/i.test(String(file.type || ''))) {
+    resetSystemPdfUploadState();
+    renderSystemsTable();
+    throw new Error('Select a PDF file to import.');
+  }
+
+  state.systemPdfUploadInFlightKey = target.key;
+  renderSystemsTable();
+  setActionBanner({
+    tone: 'info',
+    title: 'Manual PDF upload started',
+    message: `Importing ${fileName || 'selected PDF'} for ${target.systemName}.`,
+    badge: 'Running',
+  });
+
+  try {
+    const fileBase64 = await readFileAsBase64(file);
+    const result = await fetchJson('/internal/manual-import/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        state: target.systemState || state.currentState || null,
+        hospital_system_id: target.systemId,
+        title_override: fileName || null,
+        notes: 'Uploaded from Systems view',
+        file_base64: fileBase64,
+      }),
+    });
+
+    notify(`Imported ${result.title || fileName || 'PDF'} for ${target.systemName}.`);
+    setActionBanner(
+      {
+        tone: 'success',
+        title: 'Manual PDF upload finished',
+        message: `${result.title || fileName || 'PDF'} was attached to ${target.systemName}.`,
+        badge: 'Imported',
+      },
+      { autoClearMs: 8000 },
+    );
+
+    resetSystemPdfUploadState();
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: state.currentStateTab || 'systems',
+      pipelineTab: state.currentPipelineTab || 'flow',
+    });
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: 'Manual PDF upload failed',
+        message: error?.message || 'The dashboard could not import the selected PDF.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    resetSystemPdfUploadState();
+    renderSystemsTable();
+    throw error;
+  }
+}
+
 async function runSeedStageForSelectedSystem() {
   await runPipelineActionForSelectedSystem({
     actionKey: 'seed_scope_stage',
@@ -5028,6 +5187,15 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (button.dataset.action === 'upload-system-pdf') {
+      promptManualPdfUploadForSystem({
+        systemId: button.dataset.systemId || null,
+        systemName: button.dataset.systemName || null,
+        systemState: button.dataset.systemState || null,
+      });
+      return;
+    }
+
     if (button.dataset.action === 'save-system-source-page') {
       await saveSourcePageEditor(button.dataset.systemKey || null);
       return;
@@ -5225,6 +5393,16 @@ elements.systemsTable?.addEventListener('keydown', (event) => {
     event.preventDefault();
     cancelSourcePageEditor(input.dataset.sourcePageEditorInput || null);
   }
+});
+
+elements.manualPdfUploadInput?.addEventListener('change', (event) => {
+  const input = event.target;
+  const file = input?.files?.[0] || null;
+  Promise.resolve()
+    .then(() => uploadManualPdfForTarget(file))
+    .catch((error) => {
+      notify(error.message || 'Failed to import the selected PDF.', true);
+    });
 });
 
 elements.systemsTable?.addEventListener('click', (event) => {

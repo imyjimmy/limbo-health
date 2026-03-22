@@ -317,8 +317,10 @@ describe('records-workflow internal routes', () => {
       body: JSON.stringify({
         state: 'WA',
         hospital_system_id: 'system-1',
+        title_override: 'Release Form.pdf',
         source_url: 'https://example.org/forms/release.pdf',
         notes: 'Human-confirmed import',
+        file_base64: 'JVBERi0xLjQK',
       }),
     });
 
@@ -328,10 +330,10 @@ describe('records-workflow internal routes', () => {
       hospitalSystemId: 'system-1',
       facilityId: null,
       sourceUrl: 'https://example.org/forms/release.pdf',
-      titleOverride: null,
+      titleOverride: 'Release Form.pdf',
       notes: 'Human-confirmed import',
       localFilePath: null,
-      fileBase64: null,
+      fileBase64: 'JVBERi0xLjQK',
     });
     await expect(response.json()).resolves.toEqual({
       status: 'ok',
