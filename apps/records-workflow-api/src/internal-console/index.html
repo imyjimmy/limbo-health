@@ -323,7 +323,7 @@
         }
 
         .data-table {
-          @apply w-full table-auto border-separate border-spacing-0;
+          @apply w-full min-w-0 table-auto border-separate border-spacing-0;
         }
 
         .data-head {
@@ -342,6 +342,18 @@
           @apply px-3 py-3 align-top text-sm text-gray-500;
         }
 
+        .system-cell {
+          @apply max-w-[15rem];
+        }
+
+        .pdf-link-cell {
+          @apply w-[6.5rem];
+        }
+
+        .system-action-cell {
+          @apply w-[8.5rem];
+        }
+
         .data-row {
           @apply border-b border-gray-100;
         }
@@ -355,7 +367,7 @@
         }
 
         .system-name {
-          @apply text-sm font-medium text-gray-900;
+          @apply text-sm font-medium break-words text-gray-900;
         }
 
         .system-subtext {
@@ -363,7 +375,7 @@
         }
 
         .system-subtext-link {
-          @apply mt-1 inline-flex text-xs font-medium text-gray-500 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-700;
+          @apply mt-1 block max-w-full break-all text-xs font-medium text-gray-500 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-700;
         }
 
         .system-link {
@@ -383,7 +395,39 @@
         }
 
         .pdf-page-links {
-          @apply flex flex-wrap items-center gap-2;
+          @apply flex min-w-0 flex-wrap items-center gap-2;
+        }
+
+        .combo-button-shell {
+          @apply relative inline-flex w-full justify-end;
+        }
+
+        .combo-button-group {
+          @apply inline-flex w-full items-stretch justify-end;
+        }
+
+        .combo-button-main {
+          @apply inline-flex min-w-0 flex-1 items-center justify-center rounded-l-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
+        .combo-button-toggle {
+          @apply inline-flex w-10 items-center justify-center rounded-r-lg border border-l-0 border-gray-200 bg-white text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
+        .combo-button-chevron {
+          @apply h-4 w-4 transition-transform duration-150;
+        }
+
+        .combo-button-chevron-open {
+          transform: rotate(180deg);
+        }
+
+        .combo-button-menu {
+          @apply absolute right-0 top-[calc(100%+0.35rem)] z-20 min-w-[10rem] rounded-lg border border-gray-200 bg-white p-1 shadow-lg;
+        }
+
+        .combo-button-menu-item {
+          @apply flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:text-gray-400;
         }
 
         .inline-source-editor {

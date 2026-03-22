@@ -162,6 +162,7 @@ const state = {
   systemFilter: '',
   systemSortKey: 'system_name',
   systemSortDirection: 'asc',
+  systemActionMenuKey: null,
   systemSourcePageEditor: null,
   systemPdfUploadTarget: null,
   systemPdfUploadInFlightKey: null,
@@ -1143,9 +1144,28 @@ function currentSystemSourcePageEditor(system) {
   return state.systemSourcePageEditor?.key === key ? state.systemSourcePageEditor : null;
 }
 
+function currentSystemActionMenuKey(system) {
+  return systemIdentityKey(system);
+}
+
 function isSystemPdfUploadInFlight(system) {
   const key = systemIdentityKey(system);
   return Boolean(key) && state.systemPdfUploadInFlightKey === key;
+}
+
+function closeSystemActionMenu({ rerender = true } = {}) {
+  if (!state.systemActionMenuKey) return;
+  state.systemActionMenuKey = null;
+  if (rerender) {
+    renderSystemsTable();
+  }
+}
+
+function toggleSystemActionMenu(system) {
+  const key = currentSystemActionMenuKey(system);
+  if (!key) return;
+  state.systemActionMenuKey = state.systemActionMenuKey === key ? null : key;
+  renderSystemsTable();
 }
 
 function focusSystemSourcePageEditor() {
@@ -1368,7 +1388,15 @@ function renderSystemPdfPageLinks(system) {
   `;
 }
 
-function renderSystemPdfUploadAction(system) {
+function renderSystemPdfUploadAction(
+  system,
+  {
+    sourceView = 'systems',
+    className = 'ghost-button',
+    label = 'Upload PDF',
+    runningLabel = 'Uploading PDF...',
+  } = {},
+) {
   if (!system?.hospital_system_id) {
     return '<span class="system-subtext">Unavailable</span>';
   }
@@ -1378,15 +1406,68 @@ function renderSystemPdfUploadAction(system) {
   return `
     <button
       type="button"
-      class="ghost-button"
+      class="${escapeHtml(className)}"
       data-action="upload-system-pdf"
       data-system-id="${escapeHtml(system.hospital_system_id)}"
       data-system-name="${escapeHtml(system.system_name || '')}"
       data-system-state="${escapeHtml(system.state || state.currentState || '')}"
+      data-source-view="${escapeHtml(sourceView)}"
       ${uploading ? 'disabled' : ''}
     >
-      ${escapeHtml(uploading ? 'Uploading PDF...' : 'Upload PDF')}
+      ${escapeHtml(uploading ? runningLabel : label)}
     </button>
+  `;
+}
+
+function renderSystemActionButtonGroup(system) {
+  if (!system?.hospital_system_id) {
+    return '<span class="system-subtext">Unavailable</span>';
+  }
+
+  const key = currentSystemActionMenuKey(system);
+  const menuOpen = key && state.systemActionMenuKey === key;
+
+  return `
+    <div class="combo-button-shell" data-system-action-shell="${escapeHtml(key)}">
+      <div class="combo-button-group">
+        <button
+          type="button"
+          class="combo-button-main"
+          data-action="use-in-pipeline"
+          data-system-id="${escapeHtml(system.hospital_system_id)}"
+        >
+          Pipeline
+        </button>
+        <button
+          type="button"
+          class="combo-button-toggle"
+          data-action="toggle-system-action-menu"
+          data-system-id="${escapeHtml(system.hospital_system_id)}"
+          aria-haspopup="menu"
+          aria-expanded="${String(menuOpen)}"
+          aria-label="Open more actions for ${escapeHtml(system.system_name || 'system')}"
+        >
+          <svg
+            class="combo-button-chevron ${menuOpen ? 'combo-button-chevron-open' : ''}"
+            viewBox="0 0 20 20"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path d="M6 8.5 10 12.5 14 8.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+      ${
+        menuOpen
+          ? `<div class="combo-button-menu" role="menu">
+              ${renderSystemPdfUploadAction(system, {
+                sourceView: 'systems',
+                className: 'combo-button-menu-item',
+              })}
+            </div>`
+          : ''
+      }
+    </div>
   `;
 }
 
@@ -1946,15 +2027,15 @@ function renderSystemsTable() {
     <table class="data-table">
       <thead>
         <tr>
-          <th class="data-head min-w-[16rem]">${renderSystemSortHeader('System', 'system_name')}</th>
+          <th class="data-head min-w-[12.5rem] w-[24%]">${renderSystemSortHeader('System', 'system_name')}</th>
           <th class="data-head min-w-[10rem]">${renderSystemSortHeader('Bot Reachability', 'reachability')}</th>
-          <th class="data-head min-w-[8.5rem]">${renderSystemSortHeader('PDF Link', 'pdf_links')}</th>
+          <th class="data-head min-w-[5.5rem] w-[6.5rem]">${renderSystemSortHeader('PDF Link', 'pdf_links')}</th>
           <th class="data-head min-w-[6.5rem] text-center">Results</th>
           <th class="data-head min-w-[4.5rem]">${renderSystemSortHeader('PDFs', 'pdf_source_documents')}</th>
           <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Source Docs', 'source_documents')}</th>
           <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Workflows', 'workflows')}</th>
           <th class="data-head min-w-[5.5rem]">${renderSystemSortHeader('Failures', 'failures')}</th>
-          <th class="data-head min-w-[8.5rem]">Action</th>
+          <th class="data-head min-w-[7.5rem] w-[8.5rem]">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -1975,7 +2056,7 @@ function renderSystemsTable() {
 
             return `
               <tr class="${rowClass}" ${system.hospital_system_id ? `data-system-id="${escapeHtml(system.hospital_system_id)}"` : ''}>
-                <td class="data-cell">
+                <td class="data-cell system-cell">
                   <div class="system-name">${escapeHtml(system.system_name)}</div>
                   ${
                     entryUrl
@@ -1986,7 +2067,7 @@ function renderSystemsTable() {
                 <td class="data-cell">
                   <span class="${statusPillClass(reachability.tone)}">${escapeHtml(reachability.label)}</span>
                 </td>
-                <td class="data-cell">
+                <td class="data-cell pdf-link-cell">
                   ${renderSystemPdfPageLinks(system)}
                 </td>
                 <td class="data-cell text-center">
@@ -2000,15 +2081,8 @@ function renderSystemsTable() {
                 <td class="data-cell">${formatNumber(system.stats?.source_documents || 0)}</td>
                 <td class="data-cell">${formatNumber(system.stats?.workflows || 0)}</td>
                 <td class="data-cell">${formatNumber(failures)}</td>
-                <td class="data-cell">
-                  <div class="flex flex-col gap-2">
-                    ${
-                      system.hospital_system_id
-                        ? `<button type="button" class="ghost-button" data-action="use-in-pipeline" data-system-id="${escapeHtml(system.hospital_system_id)}">Pipeline</button>`
-                        : '<span class="system-subtext">Unavailable</span>'
-                    }
-                    ${renderSystemPdfUploadAction(system)}
-                  </div>
+                <td class="data-cell system-action-cell">
+                  ${renderSystemActionButtonGroup(system)}
                 </td>
               </tr>
             `;
@@ -3464,7 +3538,7 @@ function renderPipelineVisual() {
           : 'If this stage has not run, parse is still operating on stale accepted source docs.',
       humanMove:
         triageRun
-          ? 'Run Accept Stage after triage whenever new artifacts were accepted.'
+          ? 'Run Accept Stage after triage whenever new artifacts were accepted. If the site never exposes the PDF cleanly, upload it here directly.'
           : 'Run Triage Stage first so there is something to promote.',
       tone:
         acceptanceRun
@@ -3480,6 +3554,9 @@ function renderPipelineVisual() {
           runningLabel: 'Accepting...',
         }),
         renderStageInspectButton(acceptanceRun),
+        renderSystemPdfUploadAction(system, {
+          sourceView: 'pipeline',
+        }),
         `<button type="button" class="ghost-button" data-action="open-results-tab">Open Results</button>`,
       ],
     },
@@ -4020,6 +4097,55 @@ async function loadPipelineStageRuns() {
   state.pipelineStageRuns = await fetchJson(`/internal/pipeline/stage-runs?${search.toString()}`);
 }
 
+function runHistorySummaryScopeRuns(runs = []) {
+  const normalizedRuns = Array.isArray(runs) ? runs : [];
+  const fullPipelineRuns = normalizedRuns.filter(
+    (run) => run?.crawl_summary?.stage_label === 'Full Pipeline',
+  );
+  return fullPipelineRuns.length > 0 ? fullPipelineRuns : normalizedRuns;
+}
+
+function deriveRunHistorySummaryMetrics(runs = []) {
+  const summaryRuns = runHistorySummaryScopeRuns(runs);
+  const positivePdfDelta = summaryRuns.reduce((total, run) => {
+    const metric = run?.change_summary?.metrics?.find((entry) => entry.key === 'pdf_source_documents');
+    return total + Math.max(Number(metric?.delta || 0), 0);
+  }, 0);
+  const positiveWorkflowDelta = summaryRuns.reduce((total, run) => {
+    const metric = run?.change_summary?.metrics?.find((entry) => entry.key === 'workflows');
+    return total + Math.max(Number(metric?.delta || 0), 0);
+  }, 0);
+  const questionOutputs = summaryRuns.reduce(
+    (total, run) => total + Math.max(Number(run?.extracted || 0), 0),
+    0,
+  );
+  const systemsWithQuestionOutput = summaryRuns.filter(
+    (run) => Number(run?.extracted || 0) > 0,
+  ).length;
+  const noPdfOutcomes = summaryRuns.filter(
+    (run) =>
+      run?.crawl_summary?.question_stage?.stage_status === 'no_pdfs' || run?.status === 'no_pdfs',
+  ).length;
+  const scopeLabel =
+    summaryRuns.length > 0 && summaryRuns.length !== runs.length
+      ? `${formatNumber(summaryRuns.length)} full-pipeline runs shown`
+      : `${formatNumber(summaryRuns.length)} visible runs shown`;
+
+  return {
+    summaryRuns,
+    positivePdfDelta,
+    positiveWorkflowDelta,
+    questionOutputs,
+    systemsWithQuestionOutput,
+    noPdfOutcomes,
+    scopeLabel,
+  };
+}
+
+function manualPdfUploadNotesForSourceView(sourceView = 'systems') {
+  return sourceView === 'pipeline' ? 'Uploaded from Pipeline view' : 'Uploaded from Systems view';
+}
+
 async function loadRunHistory() {
   if (!state.currentState) {
     state.runHistory = null;
@@ -4032,7 +4158,7 @@ async function loadRunHistory() {
       : null;
   const search = new URLSearchParams({
     state: state.currentState,
-    limit: '30',
+    limit: '60',
   });
   if (filterSystemId) {
     search.set('system_id', filterSystemId);
@@ -4054,20 +4180,20 @@ function renderRunHistorySummary() {
   }
 
   const lastRun = runs[0];
-  const positivePdfDelta = runs.reduce((total, run) => {
-    const metric = run.change_summary?.metrics?.find((entry) => entry.key === 'pdf_source_documents');
-    return total + Math.max(Number(metric?.delta || 0), 0);
-  }, 0);
-  const positiveWorkflowDelta = runs.reduce((total, run) => {
-    const metric = run.change_summary?.metrics?.find((entry) => entry.key === 'workflows');
-    return total + Math.max(Number(metric?.delta || 0), 0);
-  }, 0);
+  const {
+    positivePdfDelta,
+    positiveWorkflowDelta,
+    questionOutputs,
+    systemsWithQuestionOutput,
+    noPdfOutcomes,
+    scopeLabel,
+  } = deriveRunHistorySummaryMetrics(runs);
 
   elements.runHistorySummary.innerHTML = `
     <article class="metric-card">
       <div class="metric-label">Runs</div>
       <div class="metric-value">${formatNumber(runs.length)}</div>
-      <p class="metric-note">Recorded pipeline invocations in this scope.</p>
+      <p class="metric-note">Recorded pipeline invocations in this scope. ${escapeHtml(scopeLabel)} drive the summary below.</p>
     </article>
     <article class="metric-card">
       <div class="metric-label">Last Run</div>
@@ -4082,7 +4208,22 @@ function renderRunHistorySummary() {
     <article class="metric-card">
       <div class="metric-label">Workflow Gains</div>
       <div class="metric-value">${formatNumber(positiveWorkflowDelta)}</div>
-      <p class="metric-note">Net new workflow rows added across the runs shown.</p>
+      <p class="metric-note">Net new workflow rows added across the summary scope.</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-label">Question Outputs</div>
+      <div class="metric-value">${formatNumber(questionOutputs)}</div>
+      <p class="metric-note">Question drafts/extractions recorded across the summary scope.</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-label">Systems With Questions</div>
+      <div class="metric-value">${formatNumber(systemsWithQuestionOutput)}</div>
+      <p class="metric-note">Distinct visible runs where question extraction produced output.</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-label">No PDF Outcomes</div>
+      <div class="metric-value">${formatNumber(noPdfOutcomes)}</div>
+      <p class="metric-note">Runs that reached question extraction but still had no accepted PDFs.</p>
     </article>
   `;
 }
@@ -4091,6 +4232,11 @@ function renderRunHistoryInsights() {
   const system =
     state.systems.find((entry) => entry.hospital_system_id === state.runHistoryFilterSystemId) || null;
   const runs = Array.isArray(state.runHistory?.runs) ? state.runHistory.runs : [];
+  const { summaryRuns } = deriveRunHistorySummaryMetrics(runs);
+  const summaryScopeCopy =
+    summaryRuns.length > 0 && summaryRuns.length !== runs.length
+      ? `Summary cards focus on the ${formatNumber(summaryRuns.length)} visible Full Pipeline rows first.`
+      : `Summary cards use all ${formatNumber(runs.length)} visible rows because no Full Pipeline rows are currently in view.`;
 
   elements.runHistoryInsights.innerHTML = `
     <article class="focus-card">
@@ -4103,12 +4249,12 @@ function renderRunHistoryInsights() {
       <div class="focus-copy">${formatNumber(runs.length)} recorded runs in the current filter.</div>
     </article>
     <article class="focus-card">
-      <div class="focus-label">What Counts As Change</div>
-      <div class="focus-copy">Each run stores before and after snapshots for PDFs, workflows, templates, and failure signals.</div>
+      <div class="focus-label">How To Read This</div>
+      <div class="focus-copy">${escapeHtml(summaryScopeCopy)}</div>
     </article>
     <article class="focus-card">
       <div class="focus-label">Recorded Here</div>
-      <div class="focus-copy">New PDFs, new workflows, template changes, and failure reductions after each targeted pipeline run.</div>
+      <div class="focus-copy">New PDFs, question outputs, workflows, template changes, and failure reductions after each targeted pipeline run.</div>
     </article>
   `;
 }
@@ -4267,12 +4413,14 @@ async function loadStateView(stateCode, options = {}) {
     state.stateDataStageRunId = null;
     state.stateDataStageDetail = null;
     state.stateDataStageLoading = false;
+    state.systemActionMenuKey = null;
     resetSystemPdfUploadState();
     setActionBanner(null);
   }
 
   state.currentState = normalizedState;
   state.homePreviewState = normalizedState;
+  state.systemActionMenuKey = null;
   state.pipelineRunResult = options.keepPipelineResult ? state.pipelineRunResult : null;
   state.systemSourcePageEditor = null;
   if (!options.keepPdfEditor) {
@@ -4758,15 +4906,28 @@ async function addSourcePageForSystem(options = {}) {
   openSourcePageEditorForSystem(options);
 }
 
+function renderPdfUploadSurfaces() {
+  renderSystemsTable();
+  if (state.currentStateTab === 'pipeline') {
+    renderPipelineVisual();
+  }
+}
+
 function resetSystemPdfUploadState() {
   state.systemPdfUploadTarget = null;
   state.systemPdfUploadInFlightKey = null;
+  state.systemActionMenuKey = null;
   if (elements.manualPdfUploadInput) {
     elements.manualPdfUploadInput.value = '';
   }
 }
 
-function promptManualPdfUploadForSystem({ systemId = null, systemName = null, systemState = null } = {}) {
+function promptManualPdfUploadForSystem({
+  systemId = null,
+  systemName = null,
+  systemState = null,
+  sourceView = 'systems',
+} = {}) {
   const system =
     state.systems.find(
       (entry) =>
@@ -4788,9 +4949,11 @@ function promptManualPdfUploadForSystem({ systemId = null, systemName = null, sy
     systemId: system.hospital_system_id,
     systemName: system.system_name,
     systemState: system.state || systemState || state.currentState || null,
+    sourceView,
   };
+  state.systemActionMenuKey = null;
   state.systemPdfUploadInFlightKey = null;
-  renderSystemsTable();
+  renderPdfUploadSurfaces();
   elements.manualPdfUploadInput.value = '';
   elements.manualPdfUploadInput.click();
 }
@@ -4815,19 +4978,19 @@ async function uploadManualPdfForTarget(file) {
   }
   if (!file) {
     resetSystemPdfUploadState();
-    renderSystemsTable();
+    renderPdfUploadSurfaces();
     return;
   }
 
   const fileName = String(file.name || '').trim();
   if (!/\.pdf$/i.test(fileName) && !/pdf/i.test(String(file.type || ''))) {
     resetSystemPdfUploadState();
-    renderSystemsTable();
+    renderPdfUploadSurfaces();
     throw new Error('Select a PDF file to import.');
   }
 
   state.systemPdfUploadInFlightKey = target.key;
-  renderSystemsTable();
+  renderPdfUploadSurfaces();
   setActionBanner({
     tone: 'info',
     title: 'Manual PDF upload started',
@@ -4837,6 +5000,7 @@ async function uploadManualPdfForTarget(file) {
 
   try {
     const fileBase64 = await readFileAsBase64(file);
+    const uploadNotes = manualPdfUploadNotesForSourceView(target.sourceView);
     const result = await fetchJson('/internal/manual-import/pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -4844,7 +5008,7 @@ async function uploadManualPdfForTarget(file) {
         state: target.systemState || state.currentState || null,
         hospital_system_id: target.systemId,
         title_override: fileName || null,
-        notes: 'Uploaded from Systems view',
+        notes: uploadNotes,
         file_base64: fileBase64,
       }),
     });
@@ -4878,7 +5042,7 @@ async function uploadManualPdfForTarget(file) {
       { autoClearMs: 12000 },
     );
     resetSystemPdfUploadState();
-    renderSystemsTable();
+    renderPdfUploadSurfaces();
     throw error;
   }
 }
@@ -4953,6 +5117,7 @@ async function loadSelectedSystemDetail() {
 async function selectSystem(systemId) {
   const previousSystemId = state.selectedSystemId;
   state.selectedSystemId = systemId || null;
+  state.systemActionMenuKey = null;
   setPipelineActionState(state.pipelineActionInFlight);
   resetPdfEditorState();
   state.stageInspectorRunId = null;
@@ -5170,6 +5335,16 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (button.dataset.action === 'toggle-system-action-menu') {
+      const system = state.systems.find(
+        (entry) => entry.hospital_system_id === (button.dataset.systemId || null),
+      );
+      if (system) {
+        toggleSystemActionMenu(system);
+      }
+      return;
+    }
+
     if (button.dataset.action === 'open-system-results' && button.dataset.systemId) {
       await selectSystem(button.dataset.systemId);
       setStateTab('pipeline');
@@ -5192,6 +5367,7 @@ document.addEventListener('click', async (event) => {
         systemId: button.dataset.systemId || null,
         systemName: button.dataset.systemName || null,
         systemState: button.dataset.systemState || null,
+        sourceView: button.dataset.sourceView || 'systems',
       });
       return;
     }
@@ -5403,6 +5579,12 @@ elements.manualPdfUploadInput?.addEventListener('change', (event) => {
     .catch((error) => {
       notify(error.message || 'Failed to import the selected PDF.', true);
     });
+});
+
+document.addEventListener('click', (event) => {
+  if (!state.systemActionMenuKey) return;
+  if (event.target.closest('[data-system-action-shell]')) return;
+  closeSystemActionMenu();
 });
 
 elements.systemsTable?.addEventListener('click', (event) => {
