@@ -386,6 +386,26 @@
           @apply flex flex-wrap items-center gap-2;
         }
 
+        .inline-source-editor {
+          @apply flex min-w-[16rem] flex-col gap-2;
+        }
+
+        .inline-source-input {
+          @apply h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100;
+        }
+
+        .inline-source-actions {
+          @apply flex items-center gap-2;
+        }
+
+        .inline-source-save {
+          @apply inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300;
+        }
+
+        .inline-source-cancel {
+          @apply inline-flex items-center rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
         .pdf-page-link {
           @apply inline-flex text-xs font-medium text-gray-600 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-900;
         }

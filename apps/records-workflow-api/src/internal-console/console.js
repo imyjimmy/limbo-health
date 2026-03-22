@@ -158,6 +158,7 @@ const state = {
   systemFilter: '',
   systemSortKey: 'system_name',
   systemSortDirection: 'asc',
+  systemSourcePageEditor: null,
   pipelineRunResult: null,
   pipelineActionInFlight: null,
   pdfEditorReview: null,
@@ -914,6 +915,29 @@ function deriveSystemUrl(system) {
   );
 }
 
+function systemIdentityKey(system) {
+  if (!system) return '';
+  return system.hospital_system_id || `${system.state || state.currentState || ''}::${system.system_name || ''}`;
+}
+
+function currentSystemSourcePageEditor(system) {
+  const key = systemIdentityKey(system);
+  return state.systemSourcePageEditor?.key === key ? state.systemSourcePageEditor : null;
+}
+
+function focusSystemSourcePageEditor() {
+  const key = state.systemSourcePageEditor?.key;
+  if (!key || !elements.systemsTable) return;
+
+  const input = elements.systemsTable.querySelector(
+    `[data-source-page-editor-input="${CSS.escape(key)}"]`,
+  );
+  if (!input) return;
+
+  input.focus();
+  input.select();
+}
+
 function uniqueSystemPdfSourcePages(system) {
   const pages = [];
   const seen = new Set();
@@ -1047,6 +1071,43 @@ function renderSystemSortHeader(label, key, className = '') {
 
 function renderSystemPdfPageLinks(system) {
   const pages = uniqueSystemPdfSourcePages(system);
+  const editor = currentSystemSourcePageEditor(system);
+
+  if (editor) {
+    return `
+      <div class="inline-source-editor">
+        <input
+          type="url"
+          class="inline-source-input"
+          data-source-page-editor-input="${escapeHtml(editor.key)}"
+          value="${escapeHtml(editor.value || '')}"
+          placeholder="https://records-page.example"
+          aria-label="Medical-records source page URL for ${escapeHtml(system.system_name || 'system')}"
+          ${editor.saving ? 'disabled' : ''}
+        />
+        <div class="inline-source-actions">
+          <button
+            type="button"
+            class="inline-source-save"
+            data-action="save-system-source-page"
+            data-system-key="${escapeHtml(editor.key)}"
+            ${editor.saving ? 'disabled' : ''}
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            class="inline-source-cancel"
+            data-action="cancel-system-source-page"
+            data-system-key="${escapeHtml(editor.key)}"
+            ${editor.saving ? 'disabled' : ''}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    `;
+  }
 
   if (!pages.length) {
     if (!system?.system_name) {
@@ -1694,6 +1755,12 @@ function renderSystemsTable() {
       </tbody>
     </table>
   `;
+
+  if (state.systemSourcePageEditor) {
+    window.requestAnimationFrame(() => {
+      focusSystemSourcePageEditor();
+    });
+  }
 }
 
 function renderPriorityBuckets() {
@@ -3665,6 +3732,7 @@ async function loadStateView(stateCode, options = {}) {
   state.currentState = normalizedState;
   state.homePreviewState = normalizedState;
   state.pipelineRunResult = options.keepPipelineResult ? state.pipelineRunResult : null;
+  state.systemSourcePageEditor = null;
   if (!options.keepPdfEditor) {
     resetPdfEditorState();
   }
@@ -3878,7 +3946,7 @@ async function runPipelineForSelectedSystem() {
   });
 }
 
-async function addSourcePageForSystem({ systemId = null, systemName = null, systemState = null, systemDomain = null } = {}) {
+function openSourcePageEditorForSystem({ systemId = null, systemName = null, systemState = null, systemDomain = null } = {}) {
   const system =
     state.systems.find(
       (entry) =>
@@ -3892,37 +3960,83 @@ async function addSourcePageForSystem({ systemId = null, systemName = null, syst
     throw new Error('Hospital system not found in the current state view.');
   }
 
-  const suggestedUrl = deriveSystemUrl(system) || '';
-  const enteredUrl = window.prompt(
-    `Add the medical-records source page for ${system.system_name}`,
-    suggestedUrl,
-  );
-  const nextUrl = String(enteredUrl || '').trim();
+  state.systemSourcePageEditor = {
+    key: systemIdentityKey(system),
+    systemId: system.hospital_system_id || systemId || null,
+    systemName: system.system_name || systemName || null,
+    systemState: system.state || systemState || state.currentState || null,
+    systemDomain: system.domain || systemDomain || null,
+    value: '',
+    saving: false,
+  };
+  renderSystemsTable();
+}
+
+function cancelSourcePageEditor(expectedKey = null) {
+  if (!state.systemSourcePageEditor) {
+    return;
+  }
+  if (expectedKey && state.systemSourcePageEditor.key !== expectedKey) {
+    return;
+  }
+  state.systemSourcePageEditor = null;
+  renderSystemsTable();
+}
+
+async function saveSourcePageEditor(expectedKey = null) {
+  const editor = state.systemSourcePageEditor;
+  if (!editor) return;
+  if (expectedKey && editor.key !== expectedKey) return;
+  const nextUrl = String(editor.value || '').trim();
   if (!nextUrl) {
+    notify('Enter the page that contains the records-request PDFs.', true);
+    focusSystemSourcePageEditor();
     return;
   }
 
-  await fetchJson('/internal/manual-url', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      hospital_system_id: system.hospital_system_id || systemId || null,
-      system_name: system.system_name || systemName || null,
-      state: system.state || systemState || state.currentState || null,
-      domain: system.domain || systemDomain || null,
-      official_page_url: nextUrl,
-      notes: 'Added from Systems view PDF Link',
-      update_seed_file: true,
-      crawl_now: false,
-    }),
-  });
+  state.systemSourcePageEditor = {
+    ...editor,
+    value: nextUrl,
+    saving: true,
+  };
+  renderSystemsTable();
 
-  notify(`Saved ${nextUrl} as the focused source page for ${system.system_name}.`);
-  await loadStateView(state.currentState, {
-    preserveSelectedSystem: true,
-    keepPipelineResult: true,
-    stateTab: 'systems',
-  });
+  try {
+    await fetchJson('/internal/manual-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        hospital_system_id: editor.systemId || null,
+        system_name: editor.systemName || null,
+        state: editor.systemState || state.currentState || null,
+        domain: editor.systemDomain || null,
+        official_page_url: nextUrl,
+        notes: 'Added from Systems view PDF Link',
+        update_seed_file: true,
+        crawl_now: false,
+      }),
+    });
+
+    notify(`Saved ${nextUrl} as the focused source page for ${editor.systemName}.`);
+    state.systemSourcePageEditor = null;
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'systems',
+    });
+  } catch (error) {
+    state.systemSourcePageEditor = {
+      ...editor,
+      value: nextUrl,
+      saving: false,
+    };
+    renderSystemsTable();
+    throw error;
+  }
+}
+
+async function addSourcePageForSystem(options = {}) {
+  openSourcePageEditorForSystem(options);
 }
 
 async function runSeedStageForSelectedSystem() {
@@ -4229,6 +4343,16 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (button.dataset.action === 'save-system-source-page') {
+      await saveSourcePageEditor(button.dataset.systemKey || null);
+      return;
+    }
+
+    if (button.dataset.action === 'cancel-system-source-page') {
+      cancelSourcePageEditor(button.dataset.systemKey || null);
+      return;
+    }
+
     if (button.dataset.action === 'open-systems-tab') {
       setStateTab('systems');
       return;
@@ -4371,6 +4495,36 @@ elements.stateSelect.addEventListener('change', async () => {
 elements.systemFilter.addEventListener('input', () => {
   state.systemFilter = elements.systemFilter.value || '';
   renderSystemsTable();
+});
+
+elements.systemsTable?.addEventListener('input', (event) => {
+  const input = event.target.closest('[data-source-page-editor-input]');
+  if (!input || !state.systemSourcePageEditor) return;
+  if (input.dataset.sourcePageEditorInput !== state.systemSourcePageEditor.key) return;
+  state.systemSourcePageEditor = {
+    ...state.systemSourcePageEditor,
+    value: input.value || '',
+  };
+});
+
+elements.systemsTable?.addEventListener('keydown', (event) => {
+  const input = event.target.closest('[data-source-page-editor-input]');
+  if (!input) return;
+
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    Promise.resolve()
+      .then(() => saveSourcePageEditor(input.dataset.sourcePageEditorInput || null))
+      .catch((error) => {
+        notify(error.message || 'Failed to save the source page.', true);
+      });
+    return;
+  }
+
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    cancelSourcePageEditor(input.dataset.sourcePageEditorInput || null);
+  }
 });
 
 elements.systemsTable?.addEventListener('click', (event) => {
