@@ -29,11 +29,11 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 ## Data Acquisition Pipeline
 
 ```text
-data/[state].[html|txt|xlsx]
-=> human-guided rostering + src/generateReasonableSeeds.js
-   (we start from a human-sourced hospital list for the state; this step turns that roster into a reasonable set of official hospital/system targets and records-page candidates)
-=> seeds/[state]-systems.json
-   (authoritative crawler input; each JSON entry has:
+data/[state-prefixed files]
+=> src/services/stateDataMaterializationService.js
+   (Stage 1 "Data Intake": scans data/ for state-prefixed files, can use OpenAI to normalize non-homologous source files into hospital identities, writes run artifacts to storage/data-intake/<state>, merges the result into the canonical state seed file, and can reseed the DB)
+=> seeds/[state-name]-systems.json
+   (canonical seed registry; each JSON entry has:
     - system_name
     - state
     - domain
@@ -46,23 +46,23 @@ data/[state].[html|txt|xlsx]
       - facility_page_url
       - external_facility_id)
 => src/services/seedService.js via src/seed.js
-   (reads the seed file and upserts hospital_systems, facilities, and seed_urls into Postgres; this is the reseed step)
+   (reads the canonical seed file and upserts hospital_systems, facilities, and seed_urls into Postgres)
 => src/services/crawlService.js via src/crawl.js
-   (loads active seeds from the database, groups them by hospital system, and runs the crawl queue)
+   (loads active DB seeds by hospital system and runs the crawl queue)
 => src/crawler/fetcher.js
-   (fetches each URL and decides whether it is HTML or PDF)
+   (fetches each URL and decides whether it is HTML or PDF; fetch artifacts are written under storage/fetch/<state>/...)
 => src/parsers/htmlParser.js or src/parsers/pdfParser.js
-   (HTML: extracts title, body text, links, and nearby link context; PDF: extracts text, header lines, and metadata)
+   (HTML: extracts title, body text, links, and nearby link context; PDF: extracts text, header lines, and metadata; parsed artifacts are written under storage/parsed/<state>/...)
 => src/crawler/linkExpander.js + src/utils/urls.js
    (scores pages and links to decide which ones look like medical-records workflow pages or medical-records PDFs and should be followed)
 => src/extractors/workflowExtractor.js
-   (turns parsed pages/docs into structured workflow data such as portal info, request methods, forms, contacts, and instructions)
-=> src/utils/pdfStorage.js + src/utils/pdfNaming.js + src/utils/pdfHeader.js + src/utils/rawStorage.js
-   (for PDFs only: builds the final readable filename from the facility/system name, descriptive phrase, and language code, then writes it into the correct state folder)
-=> storage/raw/[state]/[facility-or-system]-[descriptive-phrase]-[language][-N].pdf
+   (turns parsed pages/docs into structured workflow data such as portal info, request methods, forms, contacts, and instructions; downstream artifacts are written under storage/triage, storage/workflows, storage/questions, and storage/published)
+=> src/utils/pdfStorage.js + src/utils/pdfNaming.js + src/utils/pdfHeader.js + src/utils/sourceDocumentStorage.js
+   (for accepted PDFs: builds the final readable filename from the facility/system name, descriptive phrase, and language code, then writes it into the canonical source-document state folder)
+=> storage/source-documents/[state]/[facility-or-system]-[descriptive-phrase]-[language][-N].pdf
 ```
 
-Short version: `data -> seeds -> DB reseed -> crawl/fetch/parse -> link expansion -> workflow extraction -> final named PDF in storage/raw/<state>/`.
+Short version: `data -> canonical seeds -> DB reseed -> crawl/fetch/parse -> link expansion -> workflow extraction -> accepted PDFs in storage/source-documents/<state>/`.
 
 ## Setup
 
@@ -92,7 +92,7 @@ Short version: `data -> seeds -> DB reseed -> crawl/fetch/parse -> link expansio
    - `npm run start`
 11. Build the official CMS national hospital roster and compare processed states against it:
    - Build roster: `npm run build:national-roster`
-   - Audit states currently represented under `storage/raw/*`: `npm run report:national-roster-coverage`
+   - Audit states currently represented under the legacy raw-state footprint in `storage/raw/*`: `npm run report:national-roster-coverage`
 12. Generate import-compatible seed candidates from the CMS roster:
    - Single state: `npm run generate:seed-candidates -- --state CT`
    - Remaining states: `npm run generate:seed-candidates -- --all-remaining`
@@ -127,9 +127,49 @@ If you want a different interpreter or port, pass the env var explicitly, for ex
 - `PORT=3021 npm run start:local`
 - `RECORDS_PYTHON_BIN=/custom/python3 npm run python:deps:verify:local`
 
+## Storage Contract
+
+`seeds/` and `storage/` serve different roles:
+
+- `seeds/<state-name>-systems.json` is the canonical registry for hospital systems and their seed URLs.
+- The database is the runtime materialization of the canonical seed registry plus extracted downstream state.
+- `storage/` holds artifacts, blobs, and derived outputs produced by the pipeline.
+- Nothing in `storage/` should silently override `seeds/`. A storage artifact only changes canonical seeds when an explicit promotion/materialization step writes back into `seeds/`.
+
+### Canonical vs artifact
+
+- Canonical seed definitions: `seeds/<state-name>-systems.json`
+- Canonical accepted PDF blobs: `storage/source-documents/<state>/`
+- Legacy/fallback PDF/blob location: `storage/raw/<state>/`
+- Stage artifacts and caches: most other `storage/*` subdirectories
+
+### Directory meanings
+
+- `storage/data-intake/<state>`: Stage 1 data-intake run artifacts. These document how `data/*` was interpreted and whether canonical seeds were updated.
+- `storage/generated-seeds/`: generated seed candidates from the roster/search pipeline. These are not canonical until explicitly promoted into `seeds/<state-name>-systems.json`.
+- `storage/seed-scopes/<state>`: seed-scope stage artifacts and run metadata.
+- `storage/fetch/<state>/<run-id>`: fetched HTML/PDF artifacts and crawl-stage metadata for a run.
+- `storage/parsed/<state>`: parsed page/document artifacts derived from fetched content.
+- `storage/triage/<state>`: triage/acceptance artifacts derived from parsed content.
+- `storage/source-documents/<state>`: canonical home for accepted, live, DB-backed source documents, especially PDFs.
+- `storage/raw/<state>`: legacy/raw storage. Keep for backward compatibility and old artifacts, but do not treat it as the intended finished corpus for accepted PDFs.
+- `storage/workflows/<state>/<source-document-id>`: extracted workflow artifacts.
+- `storage/questions/<state>/<source-document-id>`: question-extraction artifacts and drafts.
+- `storage/published/<state>/<source-document-id>`: published downstream artifacts.
+
+### What can be deleted or regenerated
+
+- Usually safe to regenerate from upstream state: `storage/data-intake`, `storage/generated-seeds`, `storage/seed-scopes`, `storage/fetch`, `storage/parsed`, `storage/triage`, `storage/workflows`, `storage/questions`
+- Not safe to treat as disposable: `seeds/` and `storage/source-documents/`
+- Conditionally safe to clean: `storage/raw/`
+  Only after confirming active DB-backed `source_documents.storage_path` rows no longer depend on it and canonical copies exist under `storage/source-documents/`
+- Conditionally safe to clean: `storage/published/`
+  Only if you are deliberately republishing or rebuilding those outputs
+
 ## Notes
 
-- Raw PDF snapshots are stored under `storage/raw/<state>/` such as `storage/raw/tx/` and `storage/raw/ma/`. Crawled HTML snapshots are now also written under `storage/raw/<state>/crawl-html/` so fetch-stage artifacts can be re-opened and rerun later.
+- Accepted source-document PDFs now live canonically under `storage/source-documents/<state>/`.
+- `storage/raw/<state>/` remains a legacy/fallback location for older artifacts and backward-compatible reads. Do not assume the newest accepted PDFs will land there.
 - `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
 - No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
@@ -137,7 +177,7 @@ If you want a different interpreter or port, pass the env var explicitly, for ex
 - `npm run reset:crawl-state -- --state MA --include-derived` performs a clean, state-scoped reset of crawl-derived Massachusetts data without touching Texas seeds or data.
 - `npm run repartition:raw-storage-state -- --apply` performs a one-time move of existing PDF artifacts into state subdirectories and updates `source_documents.storage_path` without refetching anything.
 - `npm run build:national-roster` writes a CMS-based active-hospital roster to `data/national-roster/cms-pos-q4-2025-active-hospitals.json`.
-- `npm run report:national-roster-coverage` compares the processed raw-state footprint against that official roster and writes a phase-1 audit report to `logs/reports/<date>-national-roster-audit.json`.
+- `npm run report:national-roster-coverage` currently compares the legacy raw-state footprint against the official roster and writes a phase-1 audit report to `logs/reports/<date>-national-roster-audit.json`.
 - `npm run generate:seed-candidates` writes generated seed files to `storage/generated-seeds/<state>-systems.generated.json` and includes `discovery_confidence` plus evidence metadata without breaking the existing seed schema.
 - `npm run import:generated-seeds` promotes only high-confidence generated seed entries into the canonical `seeds/<state>-systems.json` file, then reseeds the DB from disk.
 - `npm run crawl:rollout` generates candidates, promotes high-confidence entries into canonical seeds, reseeds the DB from disk, crawls by state, audits coverage, appends to a cumulative report, and keeps going even when a state lands in `not_ready`.
