@@ -1,6 +1,12 @@
 #!/bin/bash
 # Deploy to production (Umbrel)
 set -e
+cd "$(dirname "$0")/.."
+
+if [[ -f .env.production ]]; then
+    # shellcheck disable=SC1091
+    source .env.production
+fi
 
 echo "🐧 Deploying to production (Umbrel)..."
 
@@ -8,9 +14,14 @@ echo "🐧 Deploying to production (Umbrel)..."
 REMOVE_REPOS=${1:-Y}
 SKIP_APPOINTMENTS=${2:-}
 REBUILD=${3:-Y}  # Default: rebuild for production deployments
+CONTAINER_PREFIX=${CONTAINER_PREFIX:-limbo}
+POSTGRES_CONTAINER="${CONTAINER_PREFIX}_records_workflow_postgres_1"
+POSTGRES_USER="${RECORDS_WORKFLOW_DB_USER:-postgres}"
+POSTGRES_DB="${RECORDS_WORKFLOW_DB_NAME:-records_workflow}"
+POSTGRES_PASSWORD="${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}"
 
 # Create required directories
-sudo mkdir -p /opt/plebdoc-scheduler-service/{mysql,openldap/{certificates,slapd/{database,config}},mailpit,baikal/{config,data}}
+sudo mkdir -p /opt/plebdoc-scheduler-service/{openldap/{certificates,slapd/{database,config}},mailpit,baikal/{config,data}}
 sudo mkdir -p /home/imyjimmy/umbrel/app-data/mgitreposerver-mgit-repo-server/repos
 
 # Handle repository cleanup
@@ -22,17 +33,13 @@ else
 fi
 
 # Backup existing data before destroying containers
-BACKUP_PATH="/home/imyjimmy/umbrel/app-data/mgitreposerver-mgit-repo-server/mysql-backups"
+BACKUP_PATH="./postgres-backups"
 mkdir -p "$BACKUP_PATH"
 
-echo "💾 Backing up MySQL data..."
-if docker ps --format "table {{.Names}}" | grep -q "mgitreposerver-mgit-repo-server_plebdoc_mysql_1"; then
-    docker exec mgitreposerver-mgit-repo-server_plebdoc_mysql_1 mysqldump \
-        -u user -ppassword \
-        --single-transaction \
-        --routines \
-        --triggers \
-        easyappointments > "${BACKUP_PATH}/easyappointments_latest.sql" 2>/dev/null || \
+echo "💾 Backing up shared Postgres data..."
+if docker ps --format "table {{.Names}}" | grep -q "^${POSTGRES_CONTAINER}$"; then
+    docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${POSTGRES_CONTAINER}" \
+        pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" > "${BACKUP_PATH}/shared_latest.sql" 2>/dev/null || \
         echo "⚠️ Backup failed, continuing..."
 fi
 
@@ -67,21 +74,10 @@ else
     docker-compose -f docker-compose.yml -f docker-compose.production.yml --env-file .env.production up -d
 fi
 
-# Restore backup if available
-if [[ -n "$RESTORE_FLAG" && -f "$BACKUP_PATH" ]]; then
-    echo "⏳ Waiting for MySQL to be ready..."
-    sleep 15
-    
-    echo "📥 Restoring database from backup..."
-    docker exec -i mgitreposerver-mgit-repo-server_plebdoc_mysql_1 mysql \
-        -u user -ppassword easyappointments < "$BACKUP_PATH" || \
-        echo "⚠️ Backup restore failed (this is OK if starting fresh)"
-fi
-
 echo "✅ Production deployment complete!"
 echo ""
 echo "🌐 Services available at:"
 echo "   📝 Patient Frontend: http://$(hostname -I | awk '{print $1}'):3003"
-echo "   💾 PHPMyAdmin: http://$(hostname -I | awk '{print $1}'):8089"
+echo "   🐘 Postgres: http://$(hostname -I | awk '{print $1}'):5433"
 echo "   🔧 Scheduler API: http://$(hostname -I | awk '{print $1}'):3005"
 echo "   📖 Swagger UI: http://$(hostname -I | awk '{print $1}'):8090"

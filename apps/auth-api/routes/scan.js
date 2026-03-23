@@ -115,7 +115,7 @@ router.post('/api/auth/scan/cleanup', requireInternalAuth, async (req, res) => {
     // Expired sessions (with 15-minute grace period)
     const [expired] = await db.execute(
       `SELECT staging_repo_id FROM scan_sessions
-       WHERE expires_at < NOW() - INTERVAL 15 MINUTE
+       WHERE expires_at < NOW() - INTERVAL '15 minutes'
        AND is_revoked = FALSE`
     );
 
@@ -123,7 +123,7 @@ router.post('/api/auth/scan/cleanup', requireInternalAuth, async (req, res) => {
     const [revoked] = await db.execute(
       `SELECT staging_repo_id FROM scan_sessions
        WHERE is_revoked = TRUE
-       AND created_at < NOW() - INTERVAL 5 MINUTE`
+       AND created_at < NOW() - INTERVAL '5 minutes'`
     );
 
     const expiredRepos = expired.map(r => r.staging_repo_id);

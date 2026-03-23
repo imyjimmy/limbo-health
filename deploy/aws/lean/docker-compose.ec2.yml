@@ -33,15 +33,11 @@ services:
     container_name: limbo-aws-auth-api
     restart: unless-stopped
     depends_on:
-      - mysql
+      - records-workflow-postgres
     environment:
       NODE_ENV: production
       PORT: 3010
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
+      DATABASE_URL: postgres://${RECORDS_WORKFLOW_DB_USER}:${RECORDS_WORKFLOW_DB_PASSWORD}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME}
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       NOSTR_RELAYS: ${NOSTR_RELAYS}
@@ -77,15 +73,11 @@ services:
     container_name: limbo-aws-scheduler-api
     restart: unless-stopped
     depends_on:
-      - mysql
+      - records-workflow-postgres
     environment:
       NODE_ENV: production
       PORT: 3005
-      DB_HOST: mysql
-      DB_PORT: 3306
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
+      DATABASE_URL: postgres://${RECORDS_WORKFLOW_DB_USER}:${RECORDS_WORKFLOW_DB_PASSWORD}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME}
       JWT_SECRET: ${JWT_SECRET}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
@@ -97,21 +89,7 @@ services:
       ADMIN_NOSTR_PRIVATE_KEY: ${ADMIN_NOSTR_PRIVATE_KEY:-}
       BASE_URL: ${PUBLIC_BASE_URL}
     volumes:
-      - ${LIMBO_DATA_DIR}/uploads:/app/uploads
-
-  mysql:
-    image: mysql:8.0
-    container_name: limbo-aws-mysql
-    restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - ${LIMBO_DATA_DIR}/mysql:/var/lib/mysql
-      - ../../../apps/scheduler-api/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+      - ${LIMBO_DATA_DIR}/uploads:/app/apps/scheduler-api/uploads
 
   records-workflow-postgres:
     image: postgres:16-alpine

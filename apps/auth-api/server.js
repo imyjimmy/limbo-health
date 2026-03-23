@@ -2,22 +2,19 @@ import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
-import mysql from 'mysql2/promise';
+import {
+  ensureCoreDatabaseReady,
+} from '../../packages/core-db/bootstrap.mjs';
+import { resolveCoreDatabaseConfig } from '../../packages/core-db/config.mjs';
+import { createPostgresCompatPool } from '../../packages/core-db/postgresCompat.mjs';
 
 import reposRouter from './routes/repos.js';
 import scanRouter from './routes/scan.js';
 import { NostrAuthService } from './services/NostrAuthService.js';
 import { GoogleAuthService } from './services/GoogleAuthService.js';
 
-const db = mysql.createPool({
-  host: process.env.DB_HOST || 'mysql',
-  user: process.env.DB_USER || 'user',
-  password: process.env.DB_PASSWORD || 'password',
-  database: process.env.DB_NAME || process.env.MYSQL_DATABASE ||'limbo_health',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+const db = createPostgresCompatPool(resolveCoreDatabaseConfig());
+const coreDatabaseSummary = await ensureCoreDatabaseReady(db);
 
 const app = express();
 const PORT = process.env.PORT || 3010;
@@ -117,7 +114,7 @@ app.post('/api/auth/nostr/verify', async (req, res) => {
       const roleId = userType === 'patient' ? 3 : 2; // Verify these IDs match your roles table
       
       const [insertResult] = await db.query(
-        'INSERT INTO users (nostr_pubkey, id_roles) VALUES (?, ?)',
+        'INSERT INTO users (nostr_pubkey, id_roles) VALUES (?, ?) RETURNING id',
         [result.pubkey, roleId]
       );
       
@@ -195,7 +192,9 @@ app.post('/api/auth/google/callback', async (req, res) => {
       // New Google user — create user + oauth_connection
       const roleId = 2; // default to provider
       const [insertResult] = await db.query(
-        'INSERT INTO users (email, first_name, last_name, id_roles, create_datetime) VALUES (?, ?, ?, ?, NOW())',
+        `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
+         VALUES (?, ?, ?, ?, NOW())
+         RETURNING id`,
         [userInfo.email, firstName, lastName, roleId]
       );
       userId = insertResult.insertId;
@@ -280,7 +279,9 @@ app.post('/api/auth/google/token', async (req, res) => {
     if (connections.length === 0) {
       // New Google user — create user + oauth_connection
       const [insertResult] = await db.query(
-        'INSERT INTO users (email, first_name, last_name, id_roles, create_datetime) VALUES (?, ?, ?, ?, NOW())',
+        `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
+         VALUES (?, ?, ?, ?, NOW())
+         RETURNING id`,
         [userInfo.email, firstName, lastName, roleId]
       );
       userId = insertResult.insertId;
@@ -423,7 +424,8 @@ app.post('/api/auth/link-nostr', async (req, res) => {
           `INSERT INTO repository_access (user_id, repo_id, access_level)
            SELECT ?, repo_id, access_level
            FROM repository_access WHERE user_id = ?
-           ON DUPLICATE KEY UPDATE access_level = VALUES(access_level)`,
+           ON CONFLICT (repo_id, user_id) DO UPDATE
+           SET access_level = EXCLUDED.access_level`,
           [googleUserId, oldUserId]
         );
         await conn.query(
@@ -664,4 +666,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔐 Auth API running on port ${PORT}`);
   console.log(`✅ Nostr auth: enabled`);
   console.log(`✅ Google auth: ${googleAuth.clientId ? 'enabled' : 'not configured'}`);
+  console.log('✅ Core database ready:', coreDatabaseSummary);
 });

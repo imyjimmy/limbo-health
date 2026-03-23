@@ -1,5 +1,3 @@
-import { Connection } from 'mysql2/promise';
-
 interface User {
   userId?: number;
   pubkey?: string;
@@ -7,7 +5,11 @@ interface User {
   oauthProvider?: string;
 }
 
-export async function getUserId(connection: Connection, user: User): Promise<number | null> {
+interface QueryableConnection {
+  execute(sql: string, params?: unknown[]): Promise<[any[], unknown[]]>;
+}
+
+export async function getUserId(connection: QueryableConnection, user: User): Promise<number | null> {
   if (user.loginMethod === 'google' || user.oauthProvider === 'google') {
     // Google users already have userId in JWT
     const [rows] = await connection.execute(

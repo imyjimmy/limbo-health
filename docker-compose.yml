@@ -7,8 +7,11 @@ services:
       context: .
       dockerfile: apps/auth-api/Dockerfile
     container_name: ${CONTAINER_PREFIX}_auth_api_1
+    depends_on:
+      - records-workflow-postgres
     environment:
       - NODE_ENV=${NODE_ENV}
+      - DATABASE_URL=postgres://${RECORDS_WORKFLOW_DB_USER:-postgres}:${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME:-records_workflow}
       - JWT_SECRET=${JWT_SECRET:-your-secret-key}
     restart: unless-stopped
 
@@ -36,8 +39,6 @@ services:
     volumes:
       - ./private_repos:/repos  # ADD THIS - mount your repos
       - ./users:/app/users      # ADD THIS - mount user data
-    depends_on:
-      - mysql
     restart: unless-stopped
 
   gateway:
@@ -54,29 +55,13 @@ services:
       - scheduler-api
       - records-workflow-api
 
-  mysql:
-    image: mysql:8.0
-    container_name: ${CONTAINER_PREFIX}_mysql_1
+  adminer:
+    image: adminer:4.8.1
+    container_name: ${CONTAINER_PREFIX}_adminer_1
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
-      MYSQL_DATABASE: limbo_health
-      MYSQL_USER: ${MYSQL_USER:-user}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-password}
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./apps/scheduler-api/db:/docker-entrypoint-initdb.d
-
-  phpmyadmin:
-    image: phpmyadmin:5.2.1
-    container_name: ${CONTAINER_PREFIX}_phpmyadmin_1
-    environment:
-      - PMA_HOST=mysql
-      - PMA_PORT=3306
-      - PMA_USER=${MYSQL_USER:-user}
-      - PMA_PASSWORD=${MYSQL_PASSWORD:-password}
-      - UPLOAD_LIMIT=100M
+      - ADMINER_DEFAULT_SERVER=records-workflow-postgres
     depends_on:
-      - mysql
+      - records-workflow-postgres
     restart: unless-stopped
 
   scheduler-api:
@@ -85,17 +70,13 @@ services:
       dockerfile: apps/scheduler-api/Dockerfile
     container_name: ${CONTAINER_PREFIX}_scheduler_api_1
     depends_on:
-      - mysql
+      - records-workflow-postgres
     environment:
       - NODE_ENV=production
-      - DB_HOST=mysql
-      - DB_NAME=limbo_health
-      - DB_USER=${MYSQL_USER:-user}
-      - DB_PASSWORD=${MYSQL_PASSWORD:-password}
-      - DB_PORT=3306
+      - DATABASE_URL=postgres://${RECORDS_WORKFLOW_DB_USER:-postgres}:${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME:-records_workflow}
       - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
     volumes:
-      - ./apps/scheduler-api/uploads:/app/uploads
+      - ./apps/scheduler-api/uploads:/app/apps/scheduler-api/uploads
 
   records-workflow-postgres:
     image: postgres:16-alpine
@@ -157,6 +138,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql_data:
   repos_data:
   records_workflow_pg_data:

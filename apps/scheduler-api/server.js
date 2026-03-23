@@ -5,10 +5,13 @@ import { setupWebRTCRoutes } from './routes/webrtc.js';
 import { setupBillingRoutes } from './routes/billing.js';
 import { setupGoogleRoutes } from './routes/google-auth.js';
 import { setupUserKeysRoutes } from './routes/user-keys.js';
+import { ensureCoreDatabaseReady } from '../../packages/core-db/bootstrap.mjs';
+import { pool } from './config/database.js';
 
 import { swaggerSpec } from './docs/swagger.js';
 
 const PORT = process.env.PORT || 3005;
+const coreDatabaseSummary = await ensureCoreDatabaseReady(pool);
 
 // Route registry - collect all routes here
 const routes = {
@@ -154,6 +157,7 @@ const server = Bun.serve({
 });
 
 console.log(`🚀 Plebdoc Appointments Service running on port ${PORT}`);
+console.log('✅ Core database ready:', coreDatabaseSummary);
 
 // Helper functions (same as before)
 function matchPath(pathname, pattern) {

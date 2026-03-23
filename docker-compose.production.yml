@@ -2,8 +2,6 @@
 # Extends docker-compose.yml with prod-specific settings
 # Use: docker-compose -f docker-compose.yml -f docker-compose.production.yml up
 
-version: '3.8'
-
 services:
   # Auth API - Nostr & Google OAuth authentication
   auth-api:
@@ -13,10 +11,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3010
-      - DB_HOST=mysql.railway.internal
-      - DB_USER=${DB_USER:-root}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME:-railway}
+      - DATABASE_URL=postgres://${RECORDS_WORKFLOW_DB_USER:-postgres}:${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME:-records_workflow}
       - JWT_SECRET=${JWT_SECRET}
       - NOSTR_RELAYS=${NOSTR_RELAYS}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
@@ -26,7 +21,7 @@ services:
     networks:
       - limbo-network
     depends_on:
-      - mysql
+      - records-workflow-postgres
     restart: unless-stopped
 
   # MGit API - Encrypted medical record repositories
@@ -55,11 +50,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3005
-      - DB_HOST=mysql
-      - DB_USER=${DB_USER:-root}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME:-railway}
-      - DB_PORT=3306
+      - DATABASE_URL=postgres://${RECORDS_WORKFLOW_DB_USER:-postgres}:${RECORDS_WORKFLOW_DB_PASSWORD:-postgres}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME:-records_workflow}
       - JWT_SECRET=${JWT_SECRET}
       - ALBY_CLIENT_ID=${ALBY_CLIENT_ID}
       - ALBY_CLIENT_SECRET=${ALBY_CLIENT_SECRET}
@@ -70,7 +61,7 @@ services:
     networks:
       - limbo-network
     depends_on:
-      - mysql
+      - records-workflow-postgres
     restart: unless-stopped
 
   # Records workflow API - Public records crawler and read API
@@ -125,22 +116,6 @@ services:
     volumes:
       - ./apps/gateway/nginx.conf:/etc/nginx/nginx.conf:ro
 
-  # MySQL Database
-  mysql:
-    image: mysql:9.4
-    environment:
-      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
-      - MYSQL_DATABASE=${DB_NAME:-railway}
-    volumes:
-      - mysql-data:/var/lib/mysql
-      - ./apps/scheduler-api/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
-    ports:
-      - "3306:3306"
-    networks:
-      - limbo-network
-    restart: unless-stopped
-    command: --default-authentication-plugin=mysql_native_password
-
   # Records workflow Postgres
   records-workflow-postgres:
     image: postgres:16-alpine
@@ -161,8 +136,6 @@ networks:
     driver: bridge
 
 volumes:
-  mysql-data:
-    driver: local
   repos-data:
     driver: local
   records_workflow_pg_data:

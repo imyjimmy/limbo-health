@@ -1,23 +1,12 @@
 import { google } from 'googleapis';
 import { GoogleAuthService } from '../services/GoogleAuthService.js';
 import { authenticateSession } from '../middleware/auth.js';
-import mysql from 'mysql2/promise';
+import { pool } from '../config/database.js';
 import jwt from 'jsonwebtoken';
 
 const googleAuthService = new GoogleAuthService();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-// Database connection pool
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'user',
-  password: process.env.DB_PASSWORD || 'password',
-  database: process.env.DB_NAME || 'limbo_health',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
 
 /**
  * Helper function to get userId from authenticated session
@@ -210,7 +199,8 @@ export function setupGoogleRoutes(app) {
 
           const [insertResult] = await connection.execute(
             `INSERT INTO users (id_roles, first_name, last_name, email, create_datetime, update_datetime)
-             VALUES (?, ?, ?, ?, NOW(), NOW())`,
+             VALUES (?, ?, ?, ?, NOW(), NOW())
+             RETURNING id`,
             [roleResult[0].id, firstName, lastName, userInfo.email]
           );
 

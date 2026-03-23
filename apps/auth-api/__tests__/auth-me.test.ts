@@ -5,7 +5,7 @@
  * Verifies auth guarding, profile payload shape, and oauth_connections mapping.
  */
 import { describe, it, expect } from 'vitest';
-import { execSync } from 'child_process';
+import { Client } from 'pg';
 import { authenticate } from './setup/nostrHelpers';
 import { request } from './setup/testClient';
 
@@ -27,33 +27,18 @@ interface MeResponse {
   }>;
 }
 
-const MYSQL_HOST = process.env.MYSQL_HOST || 'localhost';
-const MYSQL_PORT = process.env.MYSQL_PORT || '3306';
-const MYSQL_DATABASE = process.env.MYSQL_DATABASE || 'limbo_health';
-const MYSQL_USER = process.env.MYSQL_USER || 'root';
-const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD || 'password';
+const TEST_DATABASE_URL =
+  process.env.DATABASE_URL ||
+  'postgres://postgres:postgres@localhost:5433/records_workflow';
 
-function sqlString(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "''")}'`;
-}
-
-function runSql(sql: string): void {
-  const escapedSql = sql.replace(/"/g, '\\"');
-  const cmd = [
-    'mysql',
-    '--protocol=TCP',
-    '-h', MYSQL_HOST,
-    '-P', MYSQL_PORT,
-    '-u', MYSQL_USER,
-    `-p${MYSQL_PASSWORD}`,
-    MYSQL_DATABASE,
-    '-N',
-    '-B',
-    '-e',
-    `"${escapedSql}"`,
-  ].join(' ');
-
-  execSync(cmd, { stdio: 'pipe' });
+async function runSql(sql: string, params: unknown[] = []): Promise<void> {
+  const client = new Client({ connectionString: TEST_DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(sql, params);
+  } finally {
+    await client.end();
+  }
 }
 
 describe('GET /api/auth/me', () => {
@@ -86,14 +71,16 @@ describe('GET /api/auth/me', () => {
     const providerEmail = `itest-${userId}@example.com`;
 
     // Seed oauth_connections + name fields to verify /api/auth/me mapping.
-    runSql(
+    await runSql(
       `INSERT INTO oauth_connections (user_id, provider, provider_user_id, provider_email, access_token)
-       VALUES (${userId}, 'google', ${sqlString(providerUserId)}, ${sqlString(providerEmail)}, 'test-token')`
+       VALUES ($1, 'google', $2, $3, 'test-token')`,
+      [userId, providerUserId, providerEmail]
     );
-    runSql(
+    await runSql(
       `UPDATE users
        SET first_name = 'Integration', last_name = 'Tester'
-       WHERE id = ${userId}`
+       WHERE id = $1`,
+      [userId]
     );
 
     const seeded = await request<MeResponse>('/api/auth/me', { jwt });

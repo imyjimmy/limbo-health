@@ -5,7 +5,7 @@
  * Generates secp256k1 keypairs for two test users and exports them.
  */
 import { schnorr } from '@noble/curves/secp256k1.js';
-import { bytesToHex, randomBytes } from '@noble/hashes/utils';
+import { bytesToHex, randomBytes } from '@noble/hashes/utils.js';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import 'fake-indexeddb/auto';
