@@ -7,10 +7,7 @@ services:
     port: 3010
     variables:
       PORT: "3010"
-      DB_HOST: "${{MySQL.RAILWAY_PRIVATE_DOMAIN}}"
-      DB_USER: "${{MySQL.MYSQLUSER}}"
-      DB_PASSWORD: "${{MySQL.MYSQLPASSWORD}}"
-      DB_NAME: "${{MySQL.MYSQLDATABASE}}"
+      DATABASE_URL: "${{Postgres.DATABASE_URL}}"
       JWT_SECRET: "<SECRET>"
       NOSTR_RELAYS: "wss://relay.damus.io,wss://relay.primal.net"
       GOOGLE_CLIENT_ID: "<SECRET>"
@@ -32,11 +29,7 @@ services:
     port: 3005
     variables:
       PORT: "3005"
-      DB_HOST: "${{MySQL.RAILWAY_PRIVATE_DOMAIN}}"
-      DB_USER: "${{MySQL.MYSQLUSER}}"
-      DB_PASSWORD: "${{MySQL.MYSQLPASSWORD}}"
-      DB_NAME: "${{MySQL.MYSQLDATABASE}}"
-      DB_PORT: "3306"
+      DATABASE_URL: "${{Postgres.DATABASE_URL}}"
       JWT_SECRET: "${{auth-api.JWT_SECRET}}"
       ALBY_CLIENT_ID: "<SECRET>"
       ALBY_CLIENT_SECRET: "<SECRET>"
