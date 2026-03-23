@@ -12,6 +12,10 @@ import reposRouter from './routes/repos.js';
 import scanRouter from './routes/scan.js';
 import { NostrAuthService } from './services/NostrAuthService.js';
 import { GoogleAuthService } from './services/GoogleAuthService.js';
+import {
+  backfillUserNameFromGoogle,
+  resolveGoogleNameParts,
+} from './services/googleProfileBackfill.js';
 
 const db = createPostgresCompatPool(resolveCoreDatabaseConfig());
 const coreDatabaseSummary = await ensureCoreDatabaseReady(db);
@@ -26,56 +30,6 @@ app.use(express.json());
 
 const nostrAuth = new NostrAuthService();
 const googleAuth = new GoogleAuthService();
-
-function asCleanString(value) {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length ? trimmed : null;
-}
-
-function splitHumanName(fullName) {
-  const cleaned = asCleanString(fullName);
-  if (!cleaned) return { firstName: null, lastName: null };
-
-  const parts = cleaned.split(/\s+/).filter(Boolean);
-  if (parts.length === 1) {
-    return { firstName: parts[0], lastName: null };
-  }
-
-  return {
-    firstName: parts[0],
-    lastName: parts.slice(1).join(' '),
-  };
-}
-
-function resolveGoogleNameParts(userInfo) {
-  const givenName = asCleanString(userInfo?.givenName);
-  const familyName = asCleanString(userInfo?.familyName);
-  if (givenName || familyName) {
-    return { firstName: givenName, lastName: familyName };
-  }
-  return splitHumanName(userInfo?.name);
-}
-
-async function backfillUserNameFromGoogle(userId, userInfo) {
-  const { firstName, lastName } = resolveGoogleNameParts(userInfo);
-  const email = asCleanString(userInfo?.email);
-
-  await db.query(
-    `UPDATE users
-     SET email = COALESCE(NULLIF(?, ''), email),
-         first_name = CASE
-           WHEN (first_name IS NULL OR first_name = '') AND ? IS NOT NULL THEN ?
-           ELSE first_name
-         END,
-         last_name = CASE
-           WHEN (last_name IS NULL OR last_name = '') AND ? IS NOT NULL THEN ?
-           ELSE last_name
-         END
-     WHERE id = ?`,
-    [email, firstName, firstName, lastName, lastName, userId]
-  );
-}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -216,7 +170,7 @@ app.post('/api/auth/google/callback', async (req, res) => {
         [tokens.accessToken, userInfo.googleId]
       );
 
-      await backfillUserNameFromGoogle(userId, userInfo);
+      await backfillUserNameFromGoogle(db, userId, userInfo);
     }
 
     // Generate JWT with DB userId (integer), not googleId
@@ -304,7 +258,7 @@ app.post('/api/auth/google/token', async (req, res) => {
         [accessToken, userInfo.googleId]
       );
 
-      await backfillUserNameFromGoogle(userId, userInfo);
+      await backfillUserNameFromGoogle(db, userId, userInfo);
     }
 
     const token = jwt.sign({
