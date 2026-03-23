@@ -5,7 +5,10 @@ import { closePool, query } from './db.js';
 import { resolveFromServiceRoot } from './config.js';
 import { runCrawl } from './services/crawlService.js';
 import { importGeneratedSeeds } from './services/generatedSeedImportService.js';
-import { generateStateSeedCandidates } from './services/generatedSeedService.js';
+import {
+  DEFAULT_GENERATED_SEED_DIR,
+  generateStateSeedCandidates,
+} from './services/generatedSeedService.js';
 import {
   buildNationalRosterCoverageReport,
   loadOrBuildRoster
@@ -172,7 +175,8 @@ async function main() {
     const chunkHospitals = hospitalChunks[index];
     const chunkNumber = index + 1;
     const chunkLabel = String(chunkNumber).padStart(3, '0');
-    const chunkOutputPath = `data/generated-seeds/${state.toLowerCase()}-systems.generated.chunk-${chunkLabel}.json`;
+    const chunkOutputPath =
+      `${DEFAULT_GENERATED_SEED_DIR}/${state.toLowerCase()}-systems.generated.chunk-${chunkLabel}.json`;
 
     const generated = await generateStateSeedCandidates({
       state,

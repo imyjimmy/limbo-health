@@ -21,6 +21,7 @@ const BLOCKED_HOST_PATTERNS = [
   /webmd\.com$/i,
   /vitals\.com$/i,
   /healthcare4ppl\.com$/i,
+  /npino\.com$/i,
   /medicalrecords\.com$/i,
   /mapquest\.com$/i,
   /officialmediaguide\.com$/i,

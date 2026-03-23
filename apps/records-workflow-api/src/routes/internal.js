@@ -41,6 +41,7 @@ import {
 import { getStateReviewQueue } from '../services/reviewQueueService.js';
 import { saveStateSeedFile } from '../services/seedEditorService.js';
 import { reseedFromFile } from '../services/seedService.js';
+import { promoteGeneratedSeedsFromStateDataStage } from '../services/stateDataSeedPromotionService.js';
 import { getHospitalSystemDetail } from '../services/systemDetailService.js';
 import {
   getNationalStateOverview,
@@ -113,14 +114,33 @@ internalRouter.get('/states/:state/review-queue', async (req, res) => {
 
 internalRouter.post('/states/:state/data-intake', async (req, res) => {
   try {
+    const promoteToSeedFile =
+      req.body?.promote_to_seed_file === true || req.body?.promoteToSeedFile === true;
     const result = await runStateDataMaterializationStage({
       state: req.params.state,
-      reseedDb: req.body?.reseed_db !== false && req.body?.reseedDb !== false,
+      promoteToSeedFile,
+      reseedDb:
+        promoteToSeedFile && req.body?.reseed_db !== false && req.body?.reseedDb !== false,
     });
     return res.json(result);
   } catch (error) {
     console.error('Failed to materialize state seeds from data:', error);
     const response = toErrorPayload(error, 'Failed to materialize state seeds from data.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/pipeline/stage-runs/:id/promote-generated-seeds', async (req, res) => {
+  try {
+    const result = await promoteGeneratedSeedsFromStateDataStage({
+      stageRunId: req.params.id,
+      systemNames: req.body?.system_names || req.body?.systemNames || req.body?.system_name || req.body?.systemName || [],
+      reseedDb: req.body?.reseed_db !== false && req.body?.reseedDb !== false,
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to promote generated seeds from data-intake stage:', error);
+    const response = toErrorPayload(error, 'Failed to promote generated seeds from the data-intake stage.');
     return res.status(response.status).json(response.body);
   }
 });

@@ -138,9 +138,9 @@ If you want a different interpreter or port, pass the env var explicitly, for ex
 - `npm run repartition:raw-storage-state -- --apply` performs a one-time move of existing PDF artifacts into state subdirectories and updates `source_documents.storage_path` without refetching anything.
 - `npm run build:national-roster` writes a CMS-based active-hospital roster to `data/national-roster/cms-pos-q4-2025-active-hospitals.json`.
 - `npm run report:national-roster-coverage` compares the processed raw-state footprint against that official roster and writes a phase-1 audit report to `logs/reports/<date>-national-roster-audit.json`.
-- `npm run generate:seed-candidates` writes generated seed files to `data/generated-seeds/<state>-systems.generated.json` and includes `discovery_confidence` plus evidence metadata without breaking the existing seed schema.
-- `npm run import:generated-seeds` automatically imports only high-confidence generated seed entries unless you later add broader confidence thresholds.
-- `npm run crawl:rollout` generates seeds, imports high-confidence candidates, crawls by state, audits coverage, appends to a cumulative report, and keeps going even when a state lands in `not_ready`.
+- `npm run generate:seed-candidates` writes generated seed files to `storage/generated-seeds/<state>-systems.generated.json` and includes `discovery_confidence` plus evidence metadata without breaking the existing seed schema.
+- `npm run import:generated-seeds` promotes only high-confidence generated seed entries into the canonical `seeds/<state>-systems.json` file, then reseeds the DB from disk.
+- `npm run crawl:rollout` generates candidates, promotes high-confidence entries into canonical seeds, reseeds the DB from disk, crawls by state, audits coverage, appends to a cumulative report, and keeps going even when a state lands in `not_ready`.
 - The nationwide `--all-remaining` rollout scope now means the 50 U.S. states only; `DC` is intentionally excluded from automatic generate/import/crawl rollout targets.
 - Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
 - Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.

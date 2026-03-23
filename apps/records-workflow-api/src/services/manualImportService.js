@@ -42,8 +42,8 @@ function inferSeedType(url) {
   if (/mychart|myhealthone|mybilh|mytuftsmed|mybaystate|mychildren|portal|gateway/i.test(url)) {
     return 'portal_page';
   }
-  if (/forms?|authorization|release|roi|pdf/i.test(url)) return 'forms_page';
-  if (/locations|facility|medical-records/i.test(url)) return 'facility_records_page';
+  if (/(^|[^a-z])(forms?|authorization|release|roi|pdf)([^a-z]|$)/i.test(url)) return 'forms_page';
+  if (/(^|[^a-z])(locations?|facility|medical-records)([^a-z]|$)/i.test(url)) return 'facility_records_page';
   if (/directory/i.test(url)) return 'directory_page';
   return 'system_records_page';
 }

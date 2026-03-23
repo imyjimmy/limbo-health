@@ -89,6 +89,44 @@ export function sanitizeSeedSystems(systems = [], state) {
   ).sort((left, right) => left.system_name.localeCompare(right.system_name));
 }
 
+export function mergeSeedSystems(existingSystems = [], incomingSystems = [], state) {
+  const normalizedState = normalizeStateCode(state);
+  if (!isUsStateCode(normalizedState)) {
+    throw new Error(`A valid US state code is required: ${state}`);
+  }
+
+  const merged = sanitizeSeedSystems(existingSystems, normalizedState);
+
+  for (const incomingSystem of Array.isArray(incomingSystems) ? incomingSystems : []) {
+    const normalizedIncoming = normalizeSeedSystem(incomingSystem, normalizedState);
+    const matchIndex = merged.findIndex(
+      (system) =>
+        system.system_name.toLowerCase() === normalizedIncoming.system_name.toLowerCase() ||
+        (system.domain &&
+          normalizedIncoming.domain &&
+          system.domain.toLowerCase() === normalizedIncoming.domain.toLowerCase()),
+    );
+
+    if (matchIndex === -1) {
+      merged.push(normalizedIncoming);
+      continue;
+    }
+
+    const existing = merged[matchIndex];
+    merged[matchIndex] = normalizeSeedSystem(
+      {
+        ...existing,
+        domain: existing.domain || normalizedIncoming.domain,
+        seed_urls: [...(existing.seed_urls || []), ...(normalizedIncoming.seed_urls || [])],
+        facilities: [...(existing.facilities || []), ...(normalizedIncoming.facilities || [])],
+      },
+      normalizedState,
+    );
+  }
+
+  return sanitizeSeedSystems(merged, normalizedState);
+}
+
 export async function readStateSeedFile(state) {
   const normalizedState = normalizeStateCode(state);
   const seedFilePath = resolveSeedFilePath({ state: normalizedState });
@@ -138,6 +176,16 @@ export async function saveStateSeedFile({ state, systems }) {
     systems: sanitizedSystems,
     counts: buildSeedEditorCounts(sanitizedSystems),
   };
+}
+
+export async function mergeSystemsIntoStateSeedFile({ state, systems = [] }) {
+  const snapshot = await readStateSeedFile(state);
+  const mergedSystems = mergeSeedSystems(snapshot.systems, systems, snapshot.state);
+
+  return saveStateSeedFile({
+    state: snapshot.state,
+    systems: mergedSystems,
+  });
 }
 
 export async function upsertHumanApprovedSeedInFile({

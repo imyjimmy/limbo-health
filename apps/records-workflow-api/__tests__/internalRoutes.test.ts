@@ -96,6 +96,10 @@ vi.mock('../src/services/stateDataMaterializationService.js', () => ({
   runStateDataMaterializationStage: vi.fn(),
 }));
 
+vi.mock('../src/services/stateDataSeedPromotionService.js', () => ({
+  promoteGeneratedSeedsFromStateDataStage: vi.fn(),
+}));
+
 import { createApp } from '../src/server.js';
 import { runCrawl } from '../src/services/crawlService.js';
 import { importManualPdf } from '../src/services/manualImportService.js';
@@ -106,6 +110,7 @@ import { runReviewPublishStage } from '../src/services/pipeline/reviewPublishSta
 import { reseedFromFile } from '../src/services/seedService.js';
 import { saveStateSeedFile } from '../src/services/seedEditorService.js';
 import { runStateDataMaterializationStage } from '../src/services/stateDataMaterializationService.js';
+import { promoteGeneratedSeedsFromStateDataStage } from '../src/services/stateDataSeedPromotionService.js';
 import {
   getNationalStateOverview,
   getStateSummary,
@@ -468,7 +473,8 @@ describe('records-workflow internal routes', () => {
     expect(response.status).toBe(200);
     expect(runStateDataMaterializationStage).toHaveBeenCalledWith({
       state: 'NH',
-      reseedDb: true,
+      promoteToSeedFile: false,
+      reseedDb: false,
     });
     await expect(response.json()).resolves.toMatchObject({
       status: 'ok',
@@ -476,6 +482,41 @@ describe('records-workflow internal routes', () => {
       state: 'NH',
       matching_files: 3,
       generated_systems: 2,
+    });
+  });
+
+  it('promotes generated seed candidates from a data-intake stage run', async () => {
+    vi.mocked(promoteGeneratedSeedsFromStateDataStage).mockResolvedValue({
+      status: 'ok',
+      stage_run_id: 'run-1',
+      state: 'NH',
+      promoted_systems: 1,
+      canonical_seed_file: {
+        seed_file_path: '/tmp/new-hampshire-systems.json',
+      },
+      reseed_summary: {
+        systems: 1,
+      },
+    } as never);
+
+    const response = await fetch(`${baseUrl}/internal/pipeline/stage-runs/run-1/promote-generated-seeds`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_names: ['Cottage Hospital'],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(promoteGeneratedSeedsFromStateDataStage).toHaveBeenCalledWith({
+      stageRunId: 'run-1',
+      systemNames: ['Cottage Hospital'],
+      reseedDb: true,
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'ok',
+      stage_run_id: 'run-1',
+      promoted_systems: 1,
     });
   });
 

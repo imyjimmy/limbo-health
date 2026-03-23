@@ -237,6 +237,8 @@ globalThis.__consoleTest = {
   renderRunHistorySummary,
   renderRunHistoryList,
   renderSystemActionButtonGroup,
+  renderSystemPdfPageLinks,
+  renderStateDataStageInspector,
   promptManualPdfUploadForSystem
 };
 `;
@@ -255,6 +257,8 @@ globalThis.__consoleTest = {
       renderRunHistorySummary: () => void;
       renderRunHistoryList: () => void;
       renderSystemActionButtonGroup: (system: Record<string, unknown>) => string;
+      renderSystemPdfPageLinks: (system: Record<string, unknown>) => string;
+      renderStateDataStageInspector: () => void;
       promptManualPdfUploadForSystem: (options: Record<string, unknown>) => void;
     },
     fetch,
@@ -418,6 +422,78 @@ describe('internal console helpers', () => {
     api.state.systemActionMenuKey = 'system-1';
     const openMarkup = api.renderSystemActionButtonGroup(system);
     expect(openMarkup).toContain('Upload PDF');
+  });
+
+  it('keeps source-page editing available when a system already has source links', () => {
+    const { api } = createConsoleHarness();
+    const system = {
+      hospital_system_id: 'system-1',
+      system_name: 'Cottage Hospital',
+      state: 'NH',
+      domain: 'cottagehospital.org',
+      seed_file: {
+        seed_urls: ['https://www.cottagehospital.org/department/medical-records-health-information-management-him'],
+      },
+      db_seed_urls: [],
+      pdf_links: [],
+    };
+
+    const markup = api.renderSystemPdfPageLinks(system);
+
+    expect(markup).toContain('https://www.cottagehospital.org/department/medical-records-health-information-management-him');
+    expect(markup).toContain('data-action="add-system-source-page"');
+  });
+
+  it('renders promote actions for staged data-intake candidates', () => {
+    const { api } = createConsoleHarness();
+
+    api.state.currentState = 'NH';
+    api.state.stateSummary = {
+      counts: {
+        seeded_systems: 1,
+      },
+    };
+    api.state.systems = [
+      {
+        system_name: 'Existing System',
+        domain: 'existing.example.org',
+        in_seed_file: true,
+      },
+    ];
+    api.state.stateDataStageDetail = {
+      id: 'run-1',
+      stage_key: 'state_data_materialization_stage',
+      status: 'ok',
+      data_materialization: {
+        counts: {
+          matched_files: 2,
+          supported_files: 2,
+          unsupported_files: 0,
+        },
+        extracted_hospital_identities: [{ facility_name: 'Cottage Hospital' }],
+        generated_summary: {
+          generated_systems: 1,
+          output_path: '/tmp/storage/generated-seeds/nh-systems.generated.json',
+          entries: [
+            {
+              system_name: 'Cottage Hospital',
+              domain: 'cottagehospital.org',
+              discovery_confidence: 'high',
+              seed_urls: ['https://www.cottagehospital.org/department/medical-records-health-information-management-him'],
+              facilities: [],
+            },
+          ],
+        },
+        file_results: [],
+      },
+    };
+
+    api.renderStateDataStageInspector();
+
+    expect(api.elements.stateDataStageInspector.innerHTML).toContain('Promote 1 Candidate');
+    expect(api.elements.stateDataStageInspector.innerHTML).toContain('data-action="promote-state-generated-seed-entry"');
+    expect(api.elements.stateDataStageInspector.innerHTML).toContain('data-action="promote-state-generated-seeds"');
+    expect(api.elements.stateDataStageInspector.innerHTML).toContain('Canonical Seed');
   });
 
   it('tracks whether a manual PDF upload started from Pipeline or Systems', () => {

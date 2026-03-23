@@ -11,7 +11,11 @@ import {
 } from '../repositories/pipelineStageRepository.js';
 import { parsePdfDocument } from '../parsers/pdfParser.js';
 import { requestStructuredOutputWithOpenAI } from '../providers/openaiPdfFormUnderstandingClient.js';
-import { readStateSeedFile, saveStateSeedFile } from './seedEditorService.js';
+import {
+  mergeSeedSystems,
+  mergeSystemsIntoStateSeedFile,
+  readStateSeedFile,
+} from './seedEditorService.js';
 import { generateStateSeedCandidates } from './generatedSeedService.js';
 import { reseedFromFile } from './seedService.js';
 import { normalizeHospitalName } from '../utils/hospitalRoster.js';
@@ -625,40 +629,6 @@ function mergeExtractedHospitalIdentities(fileResults = [], state) {
     });
 }
 
-function mergeSeedSystems(existingSystems = [], generatedSystems = [], state) {
-  const merged = [...existingSystems];
-
-  for (const generatedSystem of generatedSystems) {
-    const matchIndex = merged.findIndex(
-      (system) =>
-        normalizeString(system?.system_name).toLowerCase() ===
-          normalizeString(generatedSystem?.system_name).toLowerCase() ||
-        (system?.domain &&
-          generatedSystem?.domain &&
-          String(system.domain).toLowerCase() === String(generatedSystem.domain).toLowerCase()),
-    );
-
-    if (matchIndex === -1) {
-      merged.push({
-        ...generatedSystem,
-        state,
-      });
-      continue;
-    }
-
-    const existing = merged[matchIndex];
-    merged[matchIndex] = {
-      ...existing,
-      state,
-      domain: existing.domain || generatedSystem.domain || null,
-      seed_urls: [...(existing.seed_urls || []), ...(generatedSystem.seed_urls || [])],
-      facilities: [...(existing.facilities || []), ...(generatedSystem.facilities || [])],
-    };
-  }
-
-  return merged;
-}
-
 function buildStageStatus(summary) {
   if (
     summary.file_results.some((result) => result.status === 'failed') &&
@@ -718,7 +688,8 @@ export async function getStateDataPipelineSummary(state, { forceRefresh = false 
 
 export async function materializeStateSeedsFromData({
   state,
-  reseedDb = true,
+  reseedDb = false,
+  promoteToSeedFile = false,
   dryRun = false,
   fetchImpl = fetch,
   searchFn = undefined,
@@ -767,12 +738,10 @@ export async function materializeStateSeedsFromData({
         };
 
   const existingSnapshot = await readStateSeedFile(normalizedState);
-  const mergedSystems = mergeSeedSystems(
-    existingSnapshot.systems,
-    generatedSummary.entries || [],
-    normalizedState,
-  );
-  const shouldPersistSeedFile = generatedSummary.generated_systems > 0;
+  const shouldPersistSeedFile = promoteToSeedFile && generatedSummary.generated_systems > 0;
+  const mergedPreviewSystems = shouldPersistSeedFile
+    ? mergeSeedSystems(existingSnapshot.systems, generatedSummary.entries || [], normalizedState)
+    : existingSnapshot.systems;
 
   const savedSeedFile = !shouldPersistSeedFile
     ? existingSnapshot
@@ -780,22 +749,22 @@ export async function materializeStateSeedsFromData({
     ? {
         state: normalizedState,
         seed_file_path: existingSnapshot.seed_file_path,
-        systems: mergedSystems,
+        systems: mergedPreviewSystems,
         counts: {
-          systems: mergedSystems.length,
-          facilities: mergedSystems.reduce(
+          systems: mergedPreviewSystems.length,
+          facilities: mergedPreviewSystems.reduce(
             (total, system) => total + (Array.isArray(system.facilities) ? system.facilities.length : 0),
             0,
           ),
-          seed_urls: mergedSystems.reduce(
+          seed_urls: mergedPreviewSystems.reduce(
             (total, system) => total + (Array.isArray(system.seed_urls) ? system.seed_urls.length : 0),
             0,
           ),
         },
       }
-    : await saveStateSeedFile({
+    : await mergeSystemsIntoStateSeedFile({
         state: normalizedState,
-        systems: mergedSystems,
+        systems: generatedSummary.entries || [],
       });
 
   const reseedSummary =
@@ -813,15 +782,19 @@ export async function materializeStateSeedsFromData({
     extracted_hospital_identities: extractedHospitalIdentities,
     generated_summary: generatedSummary,
     seed_file: savedSeedFile,
+    seed_file_updated: shouldPersistSeedFile && !dryRun,
+    promoted_systems: shouldPersistSeedFile ? generatedSummary.generated_systems : 0,
     reseed_summary: reseedSummary,
-    reseed_db: reseedDb,
+    reseed_db: shouldPersistSeedFile && reseedDb,
+    promote_to_seed_file: promoteToSeedFile,
     dry_run: dryRun,
   };
 }
 
 export async function runStateDataMaterializationStage({
   state,
-  reseedDb = true,
+  reseedDb = false,
+  promoteToSeedFile = false,
   dryRun = false,
   fetchImpl = fetch,
   searchFn = undefined,
@@ -842,7 +815,8 @@ export async function runStateDataMaterializationStage({
       matched_files: counts.matched_files,
       supported_files: counts.supported_files,
       unsupported_files: counts.unsupported_files,
-      reseed_db: reseedDb,
+      reseed_db: promoteToSeedFile && reseedDb,
+      promote_to_seed_file: promoteToSeedFile,
       dry_run: dryRun,
     },
     outputSummary: {},
@@ -852,6 +826,7 @@ export async function runStateDataMaterializationStage({
     const summary = await materializeStateSeedsFromData({
       state: normalizedState,
       reseedDb,
+      promoteToSeedFile,
       dryRun,
       fetchImpl,
       ...(searchFn ? { searchFn } : {}),
@@ -873,7 +848,9 @@ export async function runStateDataMaterializationStage({
         unsupported_files: summary.counts.unsupported_files,
         extracted_hospital_identities: summary.extracted_hospital_identities.length,
         generated_systems: summary.generated_summary.generated_systems,
-        materialized_seed_systems: summary.seed_file.counts?.systems || 0,
+        generated_output_path: summary.generated_summary.output_path || null,
+        canonical_seeded_systems: summary.seed_file.counts?.systems || 0,
+        promoted_generated_systems: summary.promoted_systems || 0,
         reseeded_db_systems: summary.reseed_summary?.systems || 0,
         seed_file_path: summary.seed_file.seed_file_path,
         artifact_path: dryRun ? null : artifactPath,
@@ -891,7 +868,9 @@ export async function runStateDataMaterializationStage({
       matching_files: summary.counts.matched_files,
       extracted_hospital_identities: summary.extracted_hospital_identities.length,
       generated_systems: summary.generated_summary.generated_systems,
-      materialized_seed_systems: summary.seed_file.counts?.systems || 0,
+      generated_output_path: summary.generated_summary.output_path || null,
+      canonical_seeded_systems: summary.seed_file.counts?.systems || 0,
+      promoted_systems: summary.promoted_systems || 0,
       reseeded_db_systems: summary.reseed_summary?.systems || 0,
       artifact_path: dryRun ? null : artifactPath,
       summary,

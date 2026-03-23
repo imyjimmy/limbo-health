@@ -133,7 +133,7 @@ function classifyStateHealth(counts) {
       key: 'intake',
       label: 'Data Ready',
       tone: 'seeded',
-      reason: 'State-prefixed data files are present, but the canonical seed file has not been materialized yet.',
+      reason: 'State-prefixed data files are present, but no canonical seed registry has been accepted from them yet.',
     };
   }
 

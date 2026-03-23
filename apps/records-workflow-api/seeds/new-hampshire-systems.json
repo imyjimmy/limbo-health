@@ -203,25 +203,8 @@
     "state": "NH",
     "domain": "cottagehospital.org",
     "seed_urls": [
-      "https://www.cottagehospital.org/"
-    ],
-    "facilities": [
-      {
-        "facility_name": "Cottage Hospital",
-        "city": null,
-        "state": "NH",
-        "facility_type": null,
-        "facility_page_url": null,
-        "external_facility_id": null
-      }
-    ]
-  },
-  {
-    "system_name": "Cottage Hospital in Woodsville, New Hampshire",
-    "state": "NH",
-    "domain": "npino.com",
-    "seed_urls": [
-      "https://npino.com/hospital/1003320995-cottage-hospital/"
+      "https://www.cottagehospital.org/",
+      "https://www.cottagehospital.org/department/medical-records-health-information-management-him"
     ],
     "facilities": [
       {
