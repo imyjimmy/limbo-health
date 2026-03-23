@@ -195,18 +195,36 @@ export default function HomeScreen() {
                 <IconMedicalCross size={20} color={theme.colors.danger} strokeWidth={2} />
               </View>
               <View style={styles.infoHeadingWrap}>
-                <Text style={styles.infoTitle}>Medical Records</Text>
-                <Text style={styles.infoSubtitle}>Request Assistant</Text>
+                <Text style={styles.infoTitle}>Request Your Records</Text>
+                <Text style={styles.infoSubtitle}>Guided request packets</Text>
               </View>
             </View>
 
             <Text style={styles.infoBody}>
-              Easily generate official medical records request forms. Search for your hospital, fill
-              out your details, and get a ready-to-send PDF.
+              Search supported hospital systems, reuse your saved request details, and generate a
+              ready-to-send PDF without starting from scratch.
             </Text>
+
+            <View style={styles.infoPillRow}>
+              <View style={styles.infoPill}>
+                <Text style={styles.infoPillText}>Supported systems</Text>
+              </View>
+              <View style={styles.infoPill}>
+                <Text style={styles.infoPillText}>Official form links</Text>
+              </View>
+              <View style={styles.infoPill}>
+                <Text style={styles.infoPillText}>Reusable profile</Text>
+              </View>
+            </View>
           </View>
 
           <View style={styles.hospitalLogoPanel}>
+            <View style={styles.logoPanelHeader}>
+              <Text style={styles.logoPanelTitle}>Featured systems</Text>
+              <Text style={styles.logoPanelCaption}>
+                Examples from current verified request coverage.
+              </Text>
+            </View>
             <LogoMarqueeRow
               logos={logoRows[0]}
               direction="left"
@@ -232,6 +250,11 @@ export default function HomeScreen() {
             <Text style={styles.ctaText}>Start Records Request</Text>
             <IconChevronRight size={20} color={theme.colors.primaryForeground} strokeWidth={2} />
           </Pressable>
+
+          <Text style={styles.supportNote}>
+            Coverage expands as more hospital workflows are verified. Binder tools stay available
+            once records arrive.
+          </Text>
         </View>
       </View>
     </View>
@@ -273,6 +296,21 @@ const createStyles = createThemedStyles((theme) => ({
     paddingVertical: 14,
     marginBottom: 16,
     justifyContent: 'center',
+  },
+  logoPanelHeader: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 4,
+  },
+  logoPanelTitle: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  logoPanelCaption: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
   },
   marqueeRow: {
     height: LOGO_TILE_HEIGHT + 14,
@@ -366,6 +404,25 @@ const createStyles = createThemedStyles((theme) => ({
     lineHeight: 24,
     paddingRight: 6,
   },
+  infoPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
+  infoPill: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  infoPillText: {
+    color: theme.colors.secondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   ctaButton: {
     alignItems: 'center',
     backgroundColor: theme.colors.primary,
@@ -383,5 +440,12 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 19,
     fontWeight: '600',
     marginLeft: 10,
+  },
+  supportNote: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 12,
+    paddingHorizontal: 4,
   },
 }));

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Limbo Health",
     "slug": "limbo-health",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -38,6 +38,18 @@
     "plugins": [
       "expo-secure-store",
       "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to capture photos of your ID and supporting records."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photo library so you can attach ID images and supporting records."
+        }
+      ],
       [
         "expo-av",
         {

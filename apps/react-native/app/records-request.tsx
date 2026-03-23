@@ -133,6 +133,37 @@ function getWorkflowStepDescription(
   }
 }
 
+function formatLastVerifiedAt(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function getRecommendedPathSummary(packet: RecordsRequestPacket): string {
+  const availablePaths = packet.recommendedPaths
+    .filter((path) => path.available)
+    .map((path) => path.label);
+
+  if (availablePaths.length > 0) {
+    return availablePaths.slice(0, 2).join(' • ');
+  }
+
+  if (packet.forms.length > 0) {
+    return 'Official forms found for manual review';
+  }
+
+  if (packet.portal.url) {
+    return 'Portal details found';
+  }
+
+  return 'Coverage still being verified';
+}
+
 export default function RecordsRequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -328,6 +359,13 @@ export default function RecordsRequestScreen() {
   const currentStepDescription = getWorkflowStepDescription(currentWorkflowStep);
   const currentQuestionIsDate = currentQuestion ? isDateAutofillQuestion(currentQuestion) : false;
   const nextWorkflowStep = workflowSteps[currentStepIndex + 1] || null;
+  const availablePathSummary = packet ? getRecommendedPathSummary(packet) : null;
+  const lastVerifiedLabel = packet
+    ? formatLastVerifiedAt(
+        packet.sources.find((source) => Boolean(source.lastVerifiedAt))?.lastVerifiedAt || null,
+      )
+    : null;
+  const previewInstructions = packet?.instructions.slice(0, 2) || [];
 
   useEffect(() => {
     if (rawCurrentStepIndex !== -1) return;
@@ -700,7 +738,7 @@ export default function RecordsRequestScreen() {
                 <TextInput
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  placeholder="Search hospital systems"
+                  placeholder="Search supported hospital systems"
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.searchInput}
                   autoCapitalize="words"
@@ -744,7 +782,7 @@ export default function RecordsRequestScreen() {
 
                     {systems.length === 0 && (
                       <Text style={styles.emptyStateText}>
-                        No hospital systems matched that search.
+                        No supported hospital systems matched that search yet.
                       </Text>
                     )}
                   </View>
@@ -793,12 +831,44 @@ export default function RecordsRequestScreen() {
                         </View>
                       ))}
                     </View>
+                    <View style={styles.supportSnapshotCard}>
+                      <Text style={styles.supportSnapshotTitle}>Support snapshot</Text>
+                      <View style={styles.supportSnapshotRow}>
+                        <Text style={styles.supportSnapshotLabel}>Best path</Text>
+                        <Text style={styles.supportSnapshotValue}>{availablePathSummary}</Text>
+                      </View>
+                      <View style={styles.supportSnapshotRow}>
+                        <Text style={styles.supportSnapshotLabel}>Portal</Text>
+                        <Text style={styles.supportSnapshotValue}>
+                          {packet.portal.url
+                            ? packet.portal.name || 'Portal available'
+                            : 'Portal not surfaced yet'}
+                        </Text>
+                      </View>
+                      <View style={styles.supportSnapshotRow}>
+                        <Text style={styles.supportSnapshotLabel}>Photo ID</Text>
+                        <Text style={styles.supportSnapshotValue}>
+                          {packet.requiresPhotoId ? 'Required by this workflow' : 'Optional'}
+                        </Text>
+                      </View>
+                      <View style={styles.supportSnapshotRow}>
+                        <Text style={styles.supportSnapshotLabel}>Last verified</Text>
+                        <Text style={styles.supportSnapshotValue}>
+                          {lastVerifiedLabel || 'Verification date unavailable'}
+                        </Text>
+                      </View>
+                      {packet.specialCases[0] && (
+                        <Text style={styles.supportFootnote}>
+                          Special case: {packet.specialCases[0].label}
+                        </Text>
+                      )}
+                    </View>
                     <Text style={styles.selectionSummaryMeta}>
                       {primaryDisplayForm
                         ? `Ready to fill: ${primaryDisplayForm.name}`
                         : packet.forms.length > 0
                           ? 'Official form links were found, but no preferred PDF was selected yet.'
-                          : 'No official form links were attached.'}
+                          : 'No official form links were attached yet.'}
                     </Text>
                     {templatePrefetchState === 'loading' && (
                       <Text style={styles.selectionSummaryMeta}>
@@ -824,6 +894,22 @@ export default function RecordsRequestScreen() {
                     )}
                     {templatePrefetchState === 'error' && templatePrefetchError && (
                       <Text style={styles.errorInlineText}>{templatePrefetchError}</Text>
+                    )}
+                    {previewInstructions.length > 0 && (
+                      <View style={styles.selectionInstructionCard}>
+                        <Text style={styles.supportSnapshotTitle}>Before you send</Text>
+                        {previewInstructions.map((instruction) => (
+                          <View
+                            key={`${instruction.sequenceNo}:${instruction.details}`}
+                            style={styles.instructionRow}
+                          >
+                            <Text style={styles.instructionBullet}>
+                              {instruction.sequenceNo || '•'}
+                            </Text>
+                            <Text style={styles.instructionText}>{instruction.details}</Text>
+                          </View>
+                        ))}
+                      </View>
                     )}
                   </>
                 )}
@@ -1572,6 +1658,48 @@ const createStyles = createThemedStyles((theme) => ({
   selectionSummaryMeta: {
     color: theme.colors.textSecondary,
     fontSize: 14,
+  },
+  supportSnapshotCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 10,
+  },
+  supportSnapshotTitle: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  supportSnapshotRow: {
+    gap: 4,
+  },
+  supportSnapshotLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  supportSnapshotValue: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+  },
+  supportFootnote: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  selectionInstructionCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 10,
   },
   changeSelectionButton: {
     alignSelf: 'flex-start',

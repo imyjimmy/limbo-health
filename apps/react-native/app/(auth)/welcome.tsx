@@ -60,9 +60,9 @@ export default function WelcomeScreen() {
       eyebrow: 'Workflow over chaos',
       title: 'Turn hospital bureaucracy into steps.',
       body:
-        'Pick a Texas hospital system, review exactly what it requires, attach ID only when needed, and move through a guided request flow.',
+        'Pick a supported hospital system, review exactly what it requires, attach ID only when needed, and move through a guided request flow.',
       accent: theme.colors.secondary,
-      pills: ['System workflows', 'ID requirement detection', 'Official form links'],
+      pills: ['Supported systems', 'ID requirement detection', 'Official form links'],
     },
   ] as const;
 
@@ -178,7 +178,10 @@ export default function WelcomeScreen() {
               <Text style={styles.slideTitle}>Generate requests without starting from scratch.</Text>
               <Text style={styles.slideBody}>
                 Sign in once, add your personal info on the next screen, and start generating
-                request packets for Texas hospital systems.
+                request packets for supported hospital systems.
+              </Text>
+              <Text style={styles.supportNote}>
+                Coverage varies by hospital system and keeps expanding as workflows are verified.
               </Text>
             </View>
 
@@ -413,6 +416,12 @@ const createStyles = createThemedStyles((theme) => ({
   },
   finalHero: {
     marginBottom: 24,
+  },
+  supportNote: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 12,
   },
   authButton: {
     backgroundColor: theme.colors.surfaceSubtle,
