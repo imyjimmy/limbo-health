@@ -12,6 +12,7 @@ const { promisify } = require('util'); // Add this line
 const jwt = require('jsonwebtoken');
 const QRCode = require('qrcode');
 const authApiClient = require('./authApiClient');
+const { normalizeUserRepositories } = require('./repoListing');
 const { authMiddleware, jwtOnly } = require('./authMiddleware');
 
 console.log('=== MGit Server Starting - Build Version 2025-06-08-v2 ===');
@@ -1226,14 +1227,7 @@ app.get('/api/mgit/user/repositories', jwtOnly, async (req, res) => {
     const repos = await authApiClient.getUserRepositories(userId);
 
     // Map to the shape the frontend expects
-    const userRepositories = repos.map(r => ({
-      name: r.repoId,
-      id: r.repoId,
-      description: r.description || '',
-      created: r.createdAt || new Date().toISOString(),
-      type: r.repoType || 'repository',
-      access: r.access || 'read-only'
-    }));
+    const userRepositories = normalizeUserRepositories(repos);
 
     console.log('user repos:', userRepositories);
     res.json(userRepositories);

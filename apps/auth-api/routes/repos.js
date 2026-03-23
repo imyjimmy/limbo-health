@@ -145,8 +145,8 @@ router.get('/api/auth/user/repositories', requireInternalAuth, async (req, res) 
     const db = req.app.get('db');
 
     const [rows] = await db.execute(
-      `SELECT r.id AS repoId, r.description, r.repo_type AS repoType,
-              ra.access_level AS access, r.created_at AS createdAt
+      `SELECT r.id AS "repoId", r.description, r.repo_type AS "repoType",
+              ra.access_level AS access, r.created_at AS "createdAt"
        FROM repositories r
        JOIN repository_access ra ON r.id = ra.repo_id
        WHERE ra.user_id = ?

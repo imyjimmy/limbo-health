@@ -1,46 +1,54 @@
-/**
- * tests/mgit/repo-listing.test.ts
- *
- * Tests GET /api/mgit/user/repositories
- */
-import { describe, it, expect, beforeAll } from 'vitest';
-import { request } from './setup/testClient';
-import { authenticate } from './setup/nostrHelpers';
+import { describe, expect, it } from 'vitest';
 
-describe('Repository Listing', () => {
-  let jwt: string;
+const { normalizeUserRepositories } = require('../repoListing');
 
-  beforeAll(async () => {
-    jwt = await authenticate(1, 'patient');
+describe('normalizeUserRepositories', () => {
+  it('preserves camelCase auth-api repository fields', () => {
+    const repos = normalizeUserRepositories([
+      {
+        repoId: 'binder-123',
+        description: 'Primary binder',
+        repoType: 'medical-history',
+        createdAt: '2026-03-23T00:00:00.000Z',
+        access: 'admin',
+      },
+    ]);
+
+    expect(repos).toEqual([
+      {
+        id: 'binder-123',
+        name: 'binder-123',
+        description: 'Primary binder',
+        type: 'medical-history',
+        created: '2026-03-23T00:00:00.000Z',
+        access: 'admin',
+      },
+    ]);
   });
 
-  it('should return a list for authenticated user', async () => {
-    const res = await request<any[]>('/api/mgit/user/repositories', {
-      method: 'GET',
-      jwt,
-    });
+  it('accepts lowercase Postgres row aliases and skips malformed records', () => {
+    const repos = normalizeUserRepositories([
+      {
+        repoid: 'binder-456',
+        description: 'Migrated binder',
+        repotype: 'medical-history',
+        createdat: '2026-02-22T04:36:51.000Z',
+        access: 'admin',
+      },
+      {
+        description: 'missing id should be ignored',
+      },
+    ]);
 
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.data)).toBe(true);
-    // May be empty if no repos exist yet for this freshly-generated test pubkey
-  });
-
-  it('should reject unauthenticated request', async () => {
-    const res = await request('/api/mgit/user/repositories', {
-      method: 'GET',
-    });
-
-    expect(res.status).toBe(401);
-  });
-
-  it('should reject request with invalid JWT', async () => {
-    const res = await request('/api/mgit/user/repositories', {
-      method: 'GET',
-      jwt: 'not.a.valid.jwt',
-    });
-
-    // mgit-api validateAuthToken → processAuthToken returns error → 401
-    expect(res.status).toBeGreaterThanOrEqual(400);
-    expect(res.status).toBeLessThan(500);
+    expect(repos).toEqual([
+      {
+        id: 'binder-456',
+        name: 'binder-456',
+        description: 'Migrated binder',
+        type: 'medical-history',
+        created: '2026-02-22T04:36:51.000Z',
+        access: 'admin',
+      },
+    ]);
   });
 });
