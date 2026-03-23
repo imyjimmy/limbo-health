@@ -36,12 +36,15 @@ if [[ $REBUILD =~ ^[Yy]$ ]] || [[ $REBUILD == "rebuild" ]]; then
 fi
 
 # Check for backup and restore if available
-# easyappointments_backup_20250929_181442
-BACKUP_PATH="./mysql-backups/easyappointments_latest.sql"
+# limbo_shared_postgres_backup_20260322_120000.sql
+BACKUP_PATH="./postgres-backups/shared_latest.sql"
+POSTGRES_CONTAINER="${CONTAINER_PREFIX}_records_workflow_postgres_1"
+POSTGRES_USER="${RECORDS_WORKFLOW_DB_USER:-postgres}"
+POSTGRES_DB="${RECORDS_WORKFLOW_DB_NAME:-records_workflow}"
 RESTORE_FLAG=""
 if [[ -f "$BACKUP_PATH" && $RESTORE_BACKUP =~ ^[Yy]$ ]]; then
     echo "📋 Found backup: $BACKUP_PATH"
-    echo "🔄 Will restore after MySQL starts..."
+    echo "🔄 Will restore after Postgres starts..."
     RESTORE_FLAG="--restore"
 fi
 
@@ -49,16 +52,18 @@ fi
 echo "🚀 Starting development services..."
 docker-compose -f docker-compose.yml -f docker-compose.development.yml --env-file .env.development up -d
 
-# local mysql_container="${CONTAINER_PREFIX}_plebdoc_mysql_1"
-
 # Restore backup if available
 if [[ -n "$RESTORE_FLAG" && -f "$BACKUP_PATH" ]]; then
-    echo "⏳ Waiting for MySQL to be ready..."
-    sleep 10
-    
+    echo "⏳ Waiting for Postgres to be ready..."
+    for attempt in {1..30}; do
+        if docker exec "$POSTGRES_CONTAINER" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
+            break
+        fi
+        sleep 2
+    done
+
     echo "📥 Restoring database from backup. CONTAINER_PREFIX: ${CONTAINER_PREFIX}"
-    docker exec -i ${CONTAINER_PREFIX}_plebdoc_mysql_1 mysql \
-        -u user -ppassword easyappointments < "$BACKUP_PATH" || \
+    docker exec -i "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < "$BACKUP_PATH" || \
         echo "⚠️ Backup restore failed (this is OK if starting fresh)"
 fi
 
@@ -66,7 +71,7 @@ echo "✅ Development environment started!"
 echo ""
 echo "🌐 Services available at:"
 echo "   📝 Patient Frontend: http://localhost:3003"
-echo "   💾 PHPMyAdmin: http://localhost:8089"
-echo "   📊 MySQL: localhost:3306"
+echo "   💾 Adminer: http://localhost:8089"
+echo "   🐘 Postgres: localhost:5433"
 echo "   🔧 Scheduler API: http://localhost:3005"
 echo "   📖 Swagger UI: http://localhost:8090"

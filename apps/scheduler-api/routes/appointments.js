@@ -19,7 +19,7 @@ const createNewCustomer = async (connection, bookingData, signedEvent) => {
   console.log('🆕 Creating new customer user: ', connection, bookingData, signedEvent);
   // Create new customer user (existing code)
   const [customerRole] = await connection.execute(
-    'SELECT id FROM roles WHERE slug = "customer"'
+    `SELECT id FROM roles WHERE slug = 'customer'`
   );
   
   if (customerRole.length === 0) {
@@ -28,7 +28,8 @@ const createNewCustomer = async (connection, bookingData, signedEvent) => {
 
   const [customerResult] = await connection.execute(
     `INSERT INTO users (id_roles, first_name, last_name, email, phone_number, nostr_pubkey, create_datetime, update_datetime) 
-    VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+    RETURNING id`,
     [
       customerRole[0].id,
       bookingData.patientInfo.firstName,
@@ -98,7 +99,8 @@ export const setupAppointmentRoutes = (app) => {
         if (authResult && authResult.user && authResult.user.pubkey === signedEvent.pubkey) {
           // User is already authenticated and pubkeys match
           const [existingUser] = await connection.execute(
-            'SELECT u.id FROM users u JOIN roles r ON u.id_roles = r.id WHERE u.nostr_pubkey = ? AND r.slug = "customer"',
+            `SELECT u.id FROM users u JOIN roles r ON u.id_roles = r.id
+             WHERE u.nostr_pubkey = ? AND r.slug = 'customer'`,
             [signedEvent.pubkey]
           );
           
@@ -112,7 +114,8 @@ export const setupAppointmentRoutes = (app) => {
         } else {
           // Fallback: Check if customer exists or create new one (for unauthenticated bookings)
           const [existingCustomers] = await connection.execute(
-            'SELECT u.id FROM users u JOIN roles r ON u.id_roles = r.id WHERE u.nostr_pubkey = ? AND r.slug = "customer"',
+            `SELECT u.id FROM users u JOIN roles r ON u.id_roles = r.id
+             WHERE u.nostr_pubkey = ? AND r.slug = 'customer'`,
             [signedEvent.pubkey]
           );
 
@@ -154,7 +157,8 @@ export const setupAppointmentRoutes = (app) => {
             id_users_provider, id_users_customer, id_services, 
             start_datetime, end_datetime, notes, 
             book_datetime, create_datetime, update_datetime, hash, location
-          ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW(), ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW(), ?, ?)
+          RETURNING id`,
           [
             bookingData.providerId,
             customerId,
@@ -378,7 +382,7 @@ export const setupAppointmentRoutes = (app) => {
         JOIN services s ON a.id_services = s.id
         WHERE a.id_users_provider = ?
           AND a.end_datetime < NOW()
-          AND a.is_unavailability = 0
+          AND a.is_unavailability = false
         ORDER BY a.start_datetime DESC
         LIMIT 50
       `, [providerId]);
@@ -436,6 +440,7 @@ export const setupAppointmentRoutes = (app) => {
           status,
           created_at
         ) VALUES (?, ?, ?, ?, 'pending', NOW())
+        RETURNING id
       `, [id, payment_request, amount_sats, invoice_hash]);
       
       connection.release();

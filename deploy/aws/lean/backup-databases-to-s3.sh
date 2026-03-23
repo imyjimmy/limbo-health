@@ -21,26 +21,15 @@ timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 
-if docker ps --format '{{.Names}}' | grep -q '^limbo-aws-mysql$'; then
-  docker exec limbo-aws-mysql sh -lc \
-    "mysqldump -u\"\$MYSQL_USER\" -p\"\$MYSQL_PASSWORD\" --single-transaction --routines --triggers \"\$MYSQL_DATABASE\"" \
-    > "$workdir/mysql-${timestamp}.sql"
-
-  aws s3 cp \
-    "$workdir/mysql-${timestamp}.sql" \
-    "s3://${BACKUP_S3_BUCKET}/database/mysql/mysql-${timestamp}.sql" \
-    --region "$AWS_REGION"
-fi
-
 if docker ps --format '{{.Names}}' | grep -q '^limbo-aws-records-workflow-postgres$'; then
   docker exec -e PGPASSWORD="$RECORDS_WORKFLOW_DB_PASSWORD" limbo-aws-records-workflow-postgres sh -lc \
     "pg_dump -U \"$RECORDS_WORKFLOW_DB_USER\" \"$RECORDS_WORKFLOW_DB_NAME\"" \
-    > "$workdir/records-workflow-${timestamp}.sql"
+    > "$workdir/shared-postgres-${timestamp}.sql"
 
   aws s3 cp \
-    "$workdir/records-workflow-${timestamp}.sql" \
-    "s3://${BACKUP_S3_BUCKET}/database/records-workflow/records-workflow-${timestamp}.sql" \
+    "$workdir/shared-postgres-${timestamp}.sql" \
+    "s3://${BACKUP_S3_BUCKET}/database/shared-postgres/shared-postgres-${timestamp}.sql" \
     --region "$AWS_REGION"
 fi
 
-echo "Database backups uploaded for ${timestamp}."
+echo "Database backup uploaded for ${timestamp}."

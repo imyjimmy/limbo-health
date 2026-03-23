@@ -39,7 +39,7 @@ export const setupProviderRoutes = (app) => {
         SELECT s.id, s.name, s.duration, s.price, s.description
         FROM services s
         INNER JOIN services_providers sp ON s.id = sp.id_services
-        WHERE sp.id_users = ? AND s.is_private = 0
+        WHERE sp.id_users = ? AND s.is_private = false
       `, [providerId]);
       
       const formattedServices = services.map(service => ({
@@ -241,7 +241,8 @@ export const setupProviderRoutes = (app) => {
           // User doesn't exist - create them as a provider (id_roles = 2)
           const [insertResult] = await connection.execute(
             `INSERT INTO users (id_roles, first_name, last_name, email) 
-            VALUES (2, ?, ?, ?)`,
+            VALUES (2, ?, ?, ?)
+            RETURNING id`,
             [
               req.body.first_name || '',
               req.body.last_name || '',
@@ -269,7 +270,8 @@ export const setupProviderRoutes = (app) => {
           // User doesn't exist - create them as a provider (id_roles = 2)
           const [insertResult] = await connection.execute(
             `INSERT INTO users (nostr_pubkey, id_roles, first_name, last_name, email) 
-            VALUES (?, 2, ?, ?, ?)`,
+            VALUES (?, 2, ?, ?, ?)
+            RETURNING id`,
             [
               user.pubkey,
               req.body.first_name || '',
@@ -317,6 +319,13 @@ export const setupProviderRoutes = (app) => {
       } = req.body;
 
       const toNull = (value) => value === undefined ? null : value;
+      const toJsonbOrNull = (value) => {
+        if (value === undefined || value === null || value === '') return null;
+        if (typeof value === 'string') {
+          return JSON.parse(value);
+        }
+        return value;
+      };
 
       // 3. Upsert into provider_profiles (now we know userId exists)
       await connection.execute(
@@ -329,30 +338,31 @@ export const setupProviderRoutes = (app) => {
           primary_specialty, secondary_specialty, board_certifications,
           year_of_birth, place_of_birth, gender, working_plan, timezone
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-          username = VALUES(username),
-          first_name = VALUES(first_name),
-          last_name = VALUES(last_name),
-          suffix = VALUES(suffix),
-          bio = VALUES(bio),
-          license_number = VALUES(license_number),
-          license_state = VALUES(license_state),
-          license_issued_date = VALUES(license_issued_date),
-          license_expiration_date = VALUES(license_expiration_date),
-          registration_status = VALUES(registration_status),
-          registration_date = VALUES(registration_date),
-          method_of_licensure = VALUES(method_of_licensure),
-          medical_school = VALUES(medical_school),
-          graduation_year = VALUES(graduation_year),
-          degree_type = VALUES(degree_type),
-          primary_specialty = VALUES(primary_specialty),
-          secondary_specialty = VALUES(secondary_specialty),
-          board_certifications = VALUES(board_certifications),
-          year_of_birth = VALUES(year_of_birth),
-          place_of_birth = VALUES(place_of_birth),
-          gender = VALUES(gender),
-          working_plan = VALUES(working_plan),
-          timezone = VALUES(timezone)
+        ON CONFLICT (user_id) DO UPDATE SET
+          username = EXCLUDED.username,
+          first_name = EXCLUDED.first_name,
+          last_name = EXCLUDED.last_name,
+          suffix = EXCLUDED.suffix,
+          bio = EXCLUDED.bio,
+          license_number = EXCLUDED.license_number,
+          license_state = EXCLUDED.license_state,
+          license_issued_date = EXCLUDED.license_issued_date,
+          license_expiration_date = EXCLUDED.license_expiration_date,
+          registration_status = EXCLUDED.registration_status,
+          registration_date = EXCLUDED.registration_date,
+          method_of_licensure = EXCLUDED.method_of_licensure,
+          medical_school = EXCLUDED.medical_school,
+          graduation_year = EXCLUDED.graduation_year,
+          degree_type = EXCLUDED.degree_type,
+          primary_specialty = EXCLUDED.primary_specialty,
+          secondary_specialty = EXCLUDED.secondary_specialty,
+          board_certifications = EXCLUDED.board_certifications,
+          year_of_birth = EXCLUDED.year_of_birth,
+          place_of_birth = EXCLUDED.place_of_birth,
+          gender = EXCLUDED.gender,
+          working_plan = EXCLUDED.working_plan,
+          timezone = EXCLUDED.timezone,
+          updated_at = NOW()
         `,
         [
           userId,
@@ -373,11 +383,11 @@ export const setupProviderRoutes = (app) => {
           toNull(degree_type),
           toNull(primary_specialty),
           toNull(secondary_specialty),
-          toNull(board_certifications),
+          toJsonbOrNull(board_certifications),
           toNull(year_of_birth),
           toNull(place_of_birth),
           toNull(gender),
-          toNull(working_plan),
+          toJsonbOrNull(working_plan),
           toNull(timezone),
         ]
       );
@@ -504,7 +514,9 @@ export const setupProviderRoutes = (app) => {
       await connection.execute(
         `INSERT INTO provider_profiles (user_id, profile_pic_url) 
         VALUES (?, ?)
-        ON DUPLICATE KEY UPDATE profile_pic_url = VALUES(profile_pic_url)`,
+        ON CONFLICT (user_id) DO UPDATE
+        SET profile_pic_url = EXCLUDED.profile_pic_url,
+            updated_at = NOW()`,
         [userId, urlPath]
       );
 

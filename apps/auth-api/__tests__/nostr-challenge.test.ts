@@ -6,7 +6,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { finalizeEvent, type UnsignedEvent } from 'nostr-tools/pure';
-import { hexToBytes } from '@noble/hashes/utils';
+import { hexToBytes } from '@noble/hashes/utils.js';
 import { request } from './setup/testClient';
 import {
   getChallenge,

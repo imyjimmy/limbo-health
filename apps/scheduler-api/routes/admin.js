@@ -245,6 +245,7 @@ export const setupAdminRoutes = (app) => {
           nostr_pubkey,
           id_roles
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
       `, [
         new Date().toISOString().slice(0, 19).replace('T', ' '),
         new Date().toISOString().slice(0, 19).replace('T', ' '),
@@ -467,6 +468,7 @@ export const setupAdminRoutes = (app) => {
           attendants_number,
           id_service_categories
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
       `, [
         new Date().toISOString().slice(0, 19).replace('T', ' '),
         new Date().toISOString().slice(0, 19).replace('T', ' '),

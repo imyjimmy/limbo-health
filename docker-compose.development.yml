@@ -8,8 +8,10 @@ services:
     ports:
       - "3010:3010"
     volumes:
-      - ./apps/auth-api:/app
-      - /app/node_modules
+      - ./apps/auth-api:/app/apps/auth-api
+      - ./packages/core-db:/app/packages/core-db
+      - /app/packages/core-db/node_modules
+      - /app/apps/auth-api/node_modules
     command: npx nodemon server.js
     networks:
       - limbo_network
@@ -52,17 +54,9 @@ services:
     networks:
       - limbo_network
 
-  mysql:
-    env_file:
-      - .env.development
+  adminer:
     ports:
-      - "3306:3306"              # Expose MySQL for local development
-    networks:
-      - limbo_network
-
-  phpmyadmin:
-    ports:
-      - "8089:80"
+      - "8089:8080"
     networks:
       - limbo_network
 
@@ -72,8 +66,10 @@ services:
     ports:
       - "3005:3005"
     volumes:
-      - ./apps/scheduler-api:/app
-      - /app/node_modules
+      - ./apps/scheduler-api:/app/apps/scheduler-api
+      - ./packages/core-db:/app/packages/core-db
+      - /app/packages/core-db/node_modules
+      - /app/apps/scheduler-api/node_modules
     command: bun --watch server.js
     networks:
       - limbo_network

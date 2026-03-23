@@ -2,7 +2,7 @@ import { NostrWebLNProvider } from "@getalby/sdk";
 import { finalizeEvent } from 'nostr-tools/pure';
 import { SimplePool } from 'nostr-tools/pool';
 import { nip04, nip19 } from 'nostr-tools';
-import { hexToBytes } from '@noble/hashes/utils';
+import { hexToBytes } from '@noble/hashes/utils.js';
 
 import { pool } from '../config/database.js';
 import { validateAuthToken } from '../middleware/auth.js';
@@ -380,13 +380,13 @@ export const setupBillingRoutes = (app) => {
           COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_invoices,
           COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_invoices
         FROM invoices 
-        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        WHERE created_at >= NOW() - INTERVAL '30 days'
       `);
 
       const [appointmentCount] = await connection.execute(`
         SELECT COUNT(*) as total_appointments 
         FROM appointments 
-        WHERE start_datetime >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        WHERE start_datetime >= NOW() - INTERVAL '30 days'
       `);
 
       return res.json({
@@ -530,6 +530,7 @@ export const setupBillingRoutes = (app) => {
       const [result] = await connection.execute(`
         INSERT INTO invoices (appointment_id, payment_request, amount_sats, invoice_hash, status, created_at)
         VALUES (?, ?, ?, ?, 'pending', NOW())
+        RETURNING id
       `, [appointmentId, invoice.paymentRequest, amountSats, invoiceHash]);
 
       return res.json({

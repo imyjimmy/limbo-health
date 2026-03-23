@@ -34,14 +34,16 @@ router.post('/api/auth/register-repo', requireInternalAuth, async (req, res) => 
       await conn.execute(
         `INSERT INTO repositories (id, description, repo_type, owner_user_id)
          VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE updated_at = NOW()`,
+         ON CONFLICT (id) DO UPDATE
+         SET updated_at = NOW()`,
         [repoId, description || '', repoType || 'medical-history', ownerUserId]
       );
 
       await conn.execute(
         `INSERT INTO repository_access (repo_id, user_id, access_level)
          VALUES (?, ?, 'admin')
-         ON DUPLICATE KEY UPDATE access_level = 'admin'`,
+         ON CONFLICT (repo_id, user_id) DO UPDATE
+         SET access_level = 'admin'`,
         [repoId, ownerUserId]
       );
 

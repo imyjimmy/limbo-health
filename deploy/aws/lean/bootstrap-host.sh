@@ -67,7 +67,6 @@ ensure_data_volume() {
 ensure_data_volume
 
 mkdir -p \
-  "$LIMBO_DATA_DIR/mysql" \
   "$LIMBO_DATA_DIR/records-workflow-postgres" \
   "$LIMBO_DATA_DIR/repos" \
   "$LIMBO_DATA_DIR/users" \
@@ -119,7 +118,7 @@ Host bootstrap complete.
 
 Next steps:
 1. Verify Docker is running.
-2. Import MySQL and records-workflow Postgres data.
+2. Run the MySQL-to-Postgres import if you are migrating existing auth/scheduler data.
 3. Sync repos, uploads, and records raw storage into $LIMBO_DATA_DIR.
 4. Run ./deploy/aws/lean/deploy.sh
 EOF

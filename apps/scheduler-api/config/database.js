@@ -1,18 +1,10 @@
-import mysql from 'mysql2/promise';
+import { resolveCoreDatabaseConfig } from '../../../packages/core-db/config.mjs';
+import { createPostgresCompatPool } from '../../../packages/core-db/postgresCompat.mjs';
 
-const getMySQLHost = () => {
-  return process.env.DB_HOST || 'localhost';
+const getDatabaseUrl = () => {
+  return resolveCoreDatabaseConfig().connectionString;
 };
 
-const pool = mysql.createPool({
-  host: getMySQLHost(),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'password',
-  database: process.env.DB_NAME || 'limbo_health',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+const pool = createPostgresCompatPool(resolveCoreDatabaseConfig());
 
-export { pool, getMySQLHost };
+export { pool, getDatabaseUrl };
