@@ -1,42 +1,82 @@
 [
   {
-    "system_name": "Dartmouth Health",
+    "system_name": "Androscoggin Valley Hospital",
     "state": "NH",
-    "domain": "dartmouth-health.org",
+    "domain": "avhnh.org",
     "seed_urls": [
-      "https://www.dartmouth-health.org/patients/medical-records-release-forms",
-      "https://www.dartmouth-health.org/patient-login"
+      "https://avhnh.org/",
+      "https://avhnh.org/about-us/health-information-management/",
+      "https://myavh.avhnh.org/Phm-PhmHome.HomePage.WR.mthr?hcis=ANV.LIVEF&application=phm",
+      "https://northcountryhealth.org/androscoggin-valley-hospital/#",
+      "https://northcountryhealth.org/location/androscoggin-valley-hospital/#"
     ],
     "facilities": [
       {
-        "facility_name": "Alice Peck Day Memorial Hospital",
-        "city": "Lebanon",
-        "state": "NH"
+        "facility_name": "Androscoggin Valley Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Upper Connecticut Valley Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Catholic Medical Center",
+    "state": "NH",
+    "domain": "catholicmc.com",
+    "seed_urls": [
+      "https://catholicmc.com/patients-visitors/",
+      "https://catholicmc.com/patients-visitors/medical-records.dot",
+      "https://catholicmedicalcenter.followmyhealth.com/Login/Home/Index?authproviders=0&returnArea=PatientAccess#!/default"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Catholic Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Cheshire Medical Center",
+    "state": "NH",
+    "domain": "cheshiremed.org",
+    "seed_urls": [
+      "https://mydh.org/",
+      "https://www.cheshiremed.org/patients-visitors/about-mydh-patient-portal",
+      "https://www.cheshiremed.org/patients-visitors/about-mydh-patient-portal#main-content",
+      "https://www.mychart.com/",
+      "https://www.mydh.org/portal/",
+      "https://www.mydh.org/portal/faq.aspx"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Cheshire Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
       },
       {
         "facility_name": "Cheshire Medical Center",
         "city": "Keene",
-        "state": "NH"
-      },
-      {
-        "facility_name": "Dartmouth Hitchcock Medical Center",
-        "city": "Lebanon",
-        "state": "NH"
-      },
-      {
-        "facility_name": "Hampstead Hospital",
-        "city": "Hampstead",
-        "state": "NH"
-      },
-      {
-        "facility_name": "New London Hospital",
-        "city": "New London",
-        "state": "NH"
-      },
-      {
-        "facility_name": "Valley Regional Hospital",
-        "city": "Claremont",
-        "state": "NH"
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
       }
     ]
   },
@@ -45,41 +85,117 @@
     "state": "NH",
     "domain": "concordhospital.org",
     "seed_urls": [
-      "https://www.concordhospital.org/"
+      "https://cernerhealth.com/oauth/authenticate?redirect_uri=https%3A%2F%2Fcernerhealth.com%2Fsaml%2Fsso%2Fresponse%3Fmessage_id%3D_a6f1c3b3-5d2e-4134-a53b-76cf21d1b256%26issuer%3Dhttps%253A%252F%252Fcentralnhhealthcare.iqhealth.com%252Fsession-api%252Fprotocol%252Fsaml2%252Fmetadata&sign_in_only=on&client_id=37ba8c9a0ec24b8e8449189e02eacc54",
+      "https://mypatientconnect.iqhealth.com/self-enroll/",
+      "https://www.concordhospital.org/",
+      "https://www.concordhospital.org/about-us/about-concord-hospital-laconia/",
+      "https://www.concordhospital.org/patients-visitors/medical-records/",
+      "https://www.concordhospital.org/patients-visitors/my-patient-connect/",
+      "https://www.nhha.org/hospital_members/alice-peck-day-memorial-hospital/",
+      "https://www.nhha.org/hospital_members/cheshire-medical-center/",
+      "https://www.nhha.org/hospital_members/concord-hospital-franklin/",
+      "https://www.nhha.org/hospital_members/concord-hospital-laconia-franklin/",
+      "https://www.nhha.org/hospital_members/exeter-hospital/",
+      "https://www.nhha.org/hospital_members/new-london-hospital/",
+      "https://www.nhha.org/hospital_members/valley-regional-hospital/"
     ],
     "facilities": [
       {
         "facility_name": "Concord Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Concord Hospital – Franklin",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Concord Hospital – Laconia",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Concord Hospital",
         "city": "Concord",
-        "state": "NH"
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
       },
       {
         "facility_name": "Concord Hospital Franklin",
         "city": "Franklin",
-        "state": "NH"
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
       },
       {
         "facility_name": "Concord Hospital Laconia",
         "city": "Laconia",
-        "state": "NH"
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Concord Hospital-Laconia",
+        "city": "Laconia",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Dartmouth Health: Alice Peck Day Memorial Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Dartmouth Health: Cheshire Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Dartmouth Health: New London Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Dartmouth Health: Valley Regional Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Exeter Hospital, part of Beth Israel Lahey Health",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
       }
-    ]
-  },
-  {
-    "system_name": "Androscoggin Valley Hospital",
-    "state": "NH",
-    "domain": "avhnh.org",
-    "seed_urls": [
-      "https://avhnh.org/"
-    ]
-  },
-  {
-    "system_name": "Catholic Medical Center",
-    "state": "NH",
-    "domain": "catholicmc.com",
-    "seed_urls": [
-      "https://catholicmc.com/patients-visitors/medical-records.dot",
-      "https://catholicmc.com/patients-visitors/"
     ]
   },
   {
@@ -87,7 +203,156 @@
     "state": "NH",
     "domain": "cottagehospital.org",
     "seed_urls": [
-      "https://www.cottagehospital.org/"
+      "https://www.cottagehospital.org/",
+      "https://www.cottagehospital.org/department/medical-records-health-information-management-him"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Cottage Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Dartmouth Health",
+    "state": "NH",
+    "domain": "dartmouth-health.org",
+    "seed_urls": [
+      "https://www.dartmouth-health.org/patient-login",
+      "https://www.dartmouth-health.org/patients/medical-records-release-forms"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Alice Peck Day Memorial Hospital",
+        "city": "Lebanon",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Cheshire Medical Center",
+        "city": "Keene",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Dartmouth Hitchcock Medical Center",
+        "city": "Lebanon",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Hampstead Hospital",
+        "city": "Hampstead",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "New London Hospital",
+        "city": "New London",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Valley Regional Hospital",
+        "city": "Claremont",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Dartmouth Health: Dartmouth Hitchcock Medical Center (Mary Hitchcock Memorial Hospital)",
+    "state": "NH",
+    "domain": null,
+    "seed_urls": [],
+    "facilities": [
+      {
+        "facility_name": "Dartmouth Health: Dartmouth Hitchcock Medical Center (Mary Hitchcock Memorial Hospital)",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Dartmouth Hitchcock Medical Center",
+    "state": "NH",
+    "domain": "dartmouth-hitchcock.org",
+    "seed_urls": [
+      "https://portal.mydh.org/mychart/Signup",
+      "https://www.castleconnolly.com/top-hospitals/dartmouth-hitchcock-medical-center-ntl0394",
+      "https://www.castleconnolly.com/top-hospitals/southern-new-hampshire-medical-center-ntl210153",
+      "https://www.dartmouth-hitchcock.org/patients-visitors/contact-medical-records",
+      "https://www.dartmouth-hitchcock.org/patients-visitors/medical-records-release-forms",
+      "https://www.dartmouth-hitchcock.org/patients-visitors/medical-records-release-forms#main-content"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Dartmouth Hitchcock Medical Center",
+        "city": "Lebanon",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Dartmouth-Hitchcock Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Southern New Hampshire Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Southern New Hampshire Medical Center",
+        "city": "Nashua",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Dartmouth-Hitchcock Medical Center",
+    "state": "NH",
+    "domain": null,
+    "seed_urls": [],
+    "facilities": [
+      {
+        "facility_name": "Dartmouth-Hitchcock Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -95,7 +360,28 @@
     "state": "NH",
     "domain": "elliothospital.org",
     "seed_urls": [
-      "https://www.elliothospital.org/"
+      "https://mychart.solutionhealth.org/mychartprd/Authentication/Login",
+      "https://www.elliothospital.org/",
+      "https://www.elliothospital.org/patients-and-visitors/patient-information/medical-records",
+      "https://www.elliothospital.org/patients-and-visitors/patient-information/solutionhealth-mychart"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Elliot Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Elliot Hospital",
+        "city": "Manchester",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -103,7 +389,19 @@
     "state": "NH",
     "domain": "encompasshealth.com",
     "seed_urls": [
-      "https://www.encompasshealth.com/"
+      "https://on-mend.com/providers/profiles/hospitals/encompass-health-rehabilitation-hospital-of-concord-concord-new-hampshire-united-states",
+      "https://www.encompasshealth.com/",
+      "https://www.encompasshealth.com/locations/concord-rehab"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Encompass Health Rehabilitation Hospital of Concord",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -112,14 +410,70 @@
     "domain": "exeterhospital.com",
     "seed_urls": [
       "https://www.exeterhospital.com/"
-    ]
+    ],
+    "facilities": []
   },
   {
     "system_name": "Frisbie Memorial Hospital",
     "state": "NH",
     "domain": "frisbiehospital.com",
     "seed_urls": [
-      "https://frisbiehospital.com/patients-and-visitors/patient-resources/medical-records.dot"
+      "https://frisbiehospital.com/patients-and-visitors/patient-resources/medical-records.dot",
+      "https://frisbiehospital.com/patients-and-visitors/patient-resources/medical-records.dot#",
+      "https://frisbiehospital.com/patients-and-visitors/patient-resources/medical-records.dot#page",
+      "https://myhealthone.com/",
+      "https://www.myhealthone.net/mh1/public/mh1"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Frisbie Memorial Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Frisbie Memorial Hospital",
+        "city": "Rochester",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "How to Access Concord Hospital Medical Records [3 Steps]",
+    "state": "NH",
+    "domain": "donotpay.com",
+    "seed_urls": [
+      "https://donotpay.com/learn/concord-hospital-medical-records/",
+      "https://donotpay.com/learn/how-to-get-my-medical-records/",
+      "https://donotpay.com/learn/how-to-request-medical-records/",
+      "https://donotpay.com/learn/kaiser-medical-records/",
+      "https://donotpay.com/learn/medical-records-release-form/",
+      "https://donotpay.com/learn/medical-records/",
+      "https://donotpay.com/learn/mercy-medical-records/",
+      "https://donotpay.com/learn/request-medical-records/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Concord Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Concord Hospital",
+        "city": "Concord",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -127,7 +481,25 @@
     "state": "NH",
     "domain": "hugginshospital.org",
     "seed_urls": [
-      "https://www.hugginshospital.org/"
+      "https://www.hugginshospital.org/",
+      "https://www.hugginshospital.org/resources/health-information",
+      "https://www.hugginshospital.org/resources/medical-records-request",
+      "https://www.hugginshospital.org/resources/patient-portal",
+      "https://www.hugginshospital.org/resources/patient-portal#",
+      "https://www.hugginshospital.org/resources/patient-portal#about",
+      "https://www.hugginshospital.org/resources/patient-portal#careers",
+      "https://www.hugginshospital.org/resources/patient-portal#resources",
+      "https://www.hugginshospital.org/resources/patient-portal#support"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Huggins Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -135,7 +507,25 @@
     "state": "NH",
     "domain": "littletonhealthcare.org",
     "seed_urls": [
-      "https://littletonhealthcare.org/patients-and-visitors/patient-services/"
+      "https://littletonhealthcare.iqhealth.com/",
+      "https://littletonhealthcare.org/departments/health-information-management-medical-records/",
+      "https://littletonhealthcare.org/patients-and-visitors/patient-services/",
+      "https://littletonhealthcare.org/patients-and-visitors/portal/",
+      "https://littletonhealthcare.org/patients-and-visitors/portal/#",
+      "https://littletonhealthcare.org/patients-and-visitors/portal/#content",
+      "https://littletonhealthcare.org/patients-and-visitors/portal/#elementor-action%3Aaction%3Dpopup%3Aopen%26settings%3DeyJpZCI6IjY3OCIsInRvZ2dsZSI6ZmFsc2V9",
+      "https://littletonhealthcare.org/wp-content/uploads/2023/11/2023-Patient-Portal-Reg-Form.pdf",
+      "https://littletonhealthcare.org/wp-content/uploads/2024/11/Starting-Video-Visit-as-a-Member.pdf"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Littleton Regional Healthcare",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -143,7 +533,118 @@
     "state": "NH",
     "domain": "mainehealth.org",
     "seed_urls": [
-      "https://www.mainehealth.org/mainehealth-memorial-hospital"
+      "https://mychart.mainehealth.org/",
+      "https://www.mainehealth.org/mainehealth-memorial-hospital",
+      "https://www.myhospitalnow.com/hospitals/mainehealth-memorial-hospital"
+    ],
+    "facilities": [
+      {
+        "facility_name": "MaineHealth Memorial Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Medical Records",
+    "state": "NH",
+    "domain": "cmcproviders.com",
+    "seed_urls": [
+      "https://cmcproviders.com/patient-center/medical-records.dot",
+      "https://cmcproviders.com/patient-center/medical-records.dot#",
+      "https://cmcproviders.com/patient-center/medical-records.dot#page",
+      "https://cmcproviders.com/patient-center/patient-portal.dot",
+      "https://exeterhospital.org/patients-visitors/medical-records",
+      "https://mycw39.eclinicalweb.com/region6/jsp/100mp/login_otp.jsp",
+      "https://parklandmedicalcenter.com/medical-professionals/remote-access.dot",
+      "https://parklandmedicalcenter.com/myhealthone/",
+      "https://parklandmedicalcenter.com/patient-portal/",
+      "https://parklandmedicalcenter.com/patients-and-visitors/preparing-for-your-visit/request-for-medical-records.dot",
+      "https://parklandmedicalcenter.com/patients-and-visitors/request-for-medical-records.dot",
+      "https://parklandmedicalcenter.com/patients-and-visitors/request-for-medical-records.dot#",
+      "https://parklandmedicalcenter.com/patients-and-visitors/request-for-medical-records.dot#page",
+      "https://spearehospital.com/patientportal/",
+      "https://spearehospital.com/patientportal/online-bill-pay/",
+      "https://spearehospital.com/patients-visitors/medical-records/",
+      "https://spearehospital.com/patients-visitors/medical-records/#!",
+      "https://spearehospital.com/patients-visitors/medical-records/#content",
+      "https://spearehospital.com/wp-content/uploads/2017/04/smh-medical-records-release_04_10_2017.pdf",
+      "https://www.medfusion.net/theseacoastcancercenter-23694/portal/#/user/login",
+      "https://www.myhealthone.net/mh1/public/mh1",
+      "https://www.nextmd.com/ud2/Login/Login.aspx",
+      "https://www.wdhospital.org/wdh/patients-and-visitors/medical-records",
+      "https://www.wdhospital.org/wdh/patients-and-visitors/patient-portals",
+      "https://www.wdhospital.org/wdh/patients-and-visitors/patient-portals/electronic-health-information-exchange-hie",
+      "https://www.youtube.com/playlist?list=PLogA9DP2_vSfhXIAvUbo3YP4ssObNem2a"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Catholic Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Catholic Medical Center",
+        "city": "Manchester",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Exeter Hospital",
+        "city": "Exeter",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Memorial Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Parkland Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Parkland Medical Center",
+        "city": "Derry",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Speare Memorial Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Wentworth-Douglass Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -151,7 +652,37 @@
     "state": "NH",
     "domain": "monadnockcommunityhospital.com",
     "seed_urls": [
-      "https://monadnockcommunityhospital.com/"
+      "https://monadnockcommunityhospital.com/",
+      "https://monadnockcommunityhospital.com/patient-portal-access/",
+      "https://monadnockcommunityhospital.com/patient-portal-access/followmyhealth-account/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Monadnock Community Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "MOSES-LUDINGTON HOSPITAL IN TICONDEROGA, NY",
+    "state": "NH",
+    "domain": "healthcarecomps.com",
+    "seed_urls": [
+      "https://healthcarecomps.com/hospitals/ny/331306/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Moses-Ludington Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -159,7 +690,28 @@
     "state": "NH",
     "domain": "dhhs.nh.gov",
     "seed_urls": [
-      "https://www.dhhs.nh.gov/programs-services/health-care/new-hampshire-hospital"
+      "https://www.dhhs.nh.gov/about-dhhs/locations-facilities/new-hampshire-hospital/nhh-medical-records-requests",
+      "https://www.dhhs.nh.gov/locations/hampstead-hospital-residential-treatment-facility/hampstead-hospital-residential",
+      "https://www.dhhs.nh.gov/programs-services/health-care/new-hampshire-hospital",
+      "https://www.nh.gov/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Hampstead Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "New Hampshire Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -167,7 +719,39 @@
     "state": "NH",
     "domain": "northeastrehab.com",
     "seed_urls": [
+      "https://www.nationalhealthratings.com/inpatient-rehab/l/636/northeast-rehabilitation-hospital",
       "https://www.northeastrehab.com/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Northeast Rehabilitation Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Online Medical Records",
+    "state": "NH",
+    "domain": "vrh.org",
+    "seed_urls": [
+      "https://16301.portal.athenahealth.com/",
+      "https://vrh.org/patients-visitors/myvrh-patient-portal-medical-records/",
+      "https://vrh.org/patients-visitors/myvrh-patient-portal-medical-records/#content",
+      "https://vrhc.yourcarecommunity.com/#/?lang=en"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Valley Regional Healthcare",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -175,8 +759,31 @@
     "state": "NH",
     "domain": "parklandmedicalcenter.com",
     "seed_urls": [
-      "https://parklandmedicalcenter.com/patients-and-visitors/request-for-medical-records.dot",
-      "https://parklandmedicalcenter.com/my-health-resources/"
+      "https://businessyab.com/explore/united_states/new_hampshire/rockingham_county/derry/parkland_drive/1/parkland-medical-center-603-432-1500.html",
+      "https://parklandmedicalcenter.com/blog/healthy-living",
+      "https://parklandmedicalcenter.com/medical-professionals/remote-access.dot",
+      "https://parklandmedicalcenter.com/my-health-resources/",
+      "https://parklandmedicalcenter.com/myhealthone/",
+      "https://parklandmedicalcenter.com/patients-and-visitors/preparing-for-your-visit/request-for-medical-records.dot",
+      "https://parklandmedicalcenter.com/patients-and-visitors/request-for-medical-records.dot"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Parkland Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Parkland Medical Center",
+        "city": "Derry",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -184,8 +791,48 @@
     "state": "NH",
     "domain": "portsmouthhospital.com",
     "seed_urls": [
+      "https://myhealthone.com/",
+      "https://www.myhealthone.net/mh1/public/mh1",
+      "https://www.portsmouthhospital.com/my-health-resources/",
       "https://www.portsmouthhospital.com/patient-resources/medical-records",
-      "https://www.portsmouthhospital.com/my-health-resources/"
+      "https://www.portsmouthhospital.com/patient-resources/medical-records#maincontent",
+      "https://www.swellbox.com/hca-healthcare-wizard.html"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Portsmouth Regional Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Portsmouth Regional Hospital",
+        "city": "Portsmouth",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
+    ]
+  },
+  {
+    "system_name": "Southern New Hampshire Health",
+    "state": "NH",
+    "domain": "snhhclean.saltwaterstage.com",
+    "seed_urls": [
+      "https://snhhclean.saltwaterstage.com/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Southern New Hampshire Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -193,7 +840,26 @@
     "state": "NH",
     "domain": "snhhealth.org",
     "seed_urls": [
+      "https://www.castleconnolly.com/top-hospitals/southern-new-hampshire-medical-center-ntl210153",
       "https://www.snhhealth.org/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Southern New Hampshire Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Southern New Hampshire Medical Center",
+        "city": "Nashua",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -201,7 +867,23 @@
     "state": "NH",
     "domain": "spearehospital.com",
     "seed_urls": [
-      "https://spearehospital.com/"
+      "https://spearehospital.com/",
+      "https://spearehospital.com/patientportal/",
+      "https://spearehospital.com/patientportal/online-bill-pay/",
+      "https://spearehospital.com/patients-visitors/medical-records/",
+      "https://spearehospital.com/patients-visitors/medical-records/#!",
+      "https://spearehospital.com/patients-visitors/medical-records/#content",
+      "https://spearehospital.com/wp-content/uploads/2017/04/smh-medical-records-release_04_10_2017.pdf"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Speare Memorial Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -209,7 +891,27 @@
     "state": "NH",
     "domain": "stjosephhospital.com",
     "seed_urls": [
-      "https://stjosephhospital.com/"
+      "https://stjosephhospital.com/",
+      "https://stjosephhospital.com/patients-visitors/forms-resources/",
+      "https://stjosephhospital.com/patients-visitors/mychart-and-your-health-records/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Saint Joseph Hospital",
+        "city": "Nashua",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "St. Joseph Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -218,14 +920,34 @@
     "domain": "ucvh.org",
     "seed_urls": [
       "https://www.ucvh.org/"
-    ]
+    ],
+    "facilities": []
   },
   {
     "system_name": "VA Manchester Healthcare System",
     "state": "NH",
     "domain": "va.gov",
     "seed_urls": [
-      "https://www.va.gov/manchester-health-care/"
+      "https://www.va.gov/manchester-health-care/",
+      "https://www.va.gov/manchester-health-care/locations/manchester-va-medical-center/"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Manchester VA Medical Center",
+        "city": "Manchester",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "VA Manchester Healthcare System",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -233,7 +955,25 @@
     "state": "NH",
     "domain": "weeksmedical.org",
     "seed_urls": [
-      "https://weeksmedical.org/"
+      "http://northcountryhealth.org/NCHPatientPortalFAQ.pdf",
+      "https://myavh.avhnh.org/Phm-PhmHome.HomePage.WR.mthr?hcis=ANV.LIVEF&application=phm",
+      "https://myavh.avhnh.org/templates/selfsignup-ANV.LIVEF-Phm-en-us.html",
+      "https://mycw7.eclinicalweb.com/wmcc/jsp/100mp/login_otp.jsp",
+      "https://weeksmedical.org/",
+      "https://weeksmedical.org/about-us/health-information-management/",
+      "https://weeksmedical.org/patient-portal/",
+      "https://weeksmedical.org/patient-portal/#",
+      "https://weeksmedical.org/patient-portal/#content"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Weeks Medical Center",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   },
   {
@@ -241,7 +981,38 @@
     "state": "NH",
     "domain": "wdhospital.org",
     "seed_urls": [
-      "https://www.wdhospital.org/wdh/patients-and-visitors/medical-records"
+      "https://www.massgeneralbrigham.org/en/patient-care/patient-visitor-information/health-information",
+      "https://www.medfusion.net/theseacoastcancercenter-23694/portal/#/user/login",
+      "https://www.nextmd.com/ud2/Login/Login.aspx",
+      "https://www.wdhospital.org/wdh/patients-and-visitors/medical-records",
+      "https://www.wdhospital.org/wdh/patients-and-visitors/patient-portals",
+      "https://www.wdhospital.org/wdh/patients-and-visitors/patient-portals/electronic-health-information-exchange-hie"
+    ],
+    "facilities": [
+      {
+        "facility_name": "Mass General Brigham Wentworth-Douglass Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Wentworth-Douglass Hospital",
+        "city": null,
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      },
+      {
+        "facility_name": "Wentworth-Douglass Hospital",
+        "city": "Dover",
+        "state": "NH",
+        "facility_type": null,
+        "facility_page_url": null,
+        "external_facility_id": null
+      }
     ]
   }
 ]

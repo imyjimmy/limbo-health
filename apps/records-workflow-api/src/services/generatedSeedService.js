@@ -9,7 +9,7 @@ import {
 } from '../utils/hospitalRoster.js';
 import { getStateName, normalizeStateCode } from '../utils/states.js';
 
-export const DEFAULT_GENERATED_SEED_DIR = 'data/generated-seeds';
+export const DEFAULT_GENERATED_SEED_DIR = 'storage/generated-seeds';
 export const DEFAULT_GENERATED_SEED_CONCURRENCY = 10;
 const DEFAULT_FETCH_TIMEOUT_MS = 5000;
 const MAX_OFFICIAL_CANDIDATE_FETCHES = 4;
@@ -28,6 +28,7 @@ const BLOCKED_RESULT_HOST_PATTERNS = [
   /addisoncounty\.com$/i,
   /carelistings\.com$/i,
   /healthcare4ppl\.com$/i,
+  /npino\.com$/i,
   /mapquest\.com$/i,
   /npiprofile\.com$/i,
   /ahd\.com$/i,

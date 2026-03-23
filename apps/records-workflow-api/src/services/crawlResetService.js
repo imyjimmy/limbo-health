@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import { query, withTransaction } from '../db.js';
-import { resolveRawStoragePath } from '../utils/rawStorage.js';
+import { resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
 import { normalizeStateCode } from '../utils/states.js';
 
 async function deleteFileIfPresent(filePath) {
@@ -97,7 +97,7 @@ export async function resetCrawlState({ state = null, includeDerived = false } =
 
   for (const storagePath of candidateStoragePaths) {
     if (!storagePath || stillReferencedPaths.has(storagePath)) continue;
-    if (await deleteFileIfPresent(resolveRawStoragePath(storagePath))) {
+    if (await deleteFileIfPresent(resolveSourceDocumentPath(storagePath))) {
       deletedRawFiles += 1;
     }
   }

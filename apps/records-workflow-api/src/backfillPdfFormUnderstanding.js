@@ -8,7 +8,7 @@ import {
 } from './extractors/pdfFormUnderstandingExtractor.js';
 import { parsePdfDocument } from './parsers/pdfParser.js';
 import { insertExtractionRun } from './repositories/workflowRepository.js';
-import { resolveRawStoragePath } from './utils/rawStorage.js';
+import { resolveSourceDocumentPath } from './utils/sourceDocumentStorage.js';
 import { getCliIntegerOptionValue, getCliOptionValue } from './utils/cliArgs.js';
 import { PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME } from './utils/pdfFormUnderstanding.js';
 import {
@@ -346,7 +346,7 @@ export async function backfillPdfFormUnderstanding({
   };
 
   for (const document of documents) {
-    const resolvedPath = resolveRawStoragePath(document.storage_path);
+    const resolvedPath = resolveSourceDocumentPath(document.storage_path);
 
     try {
       const buffer = await fs.readFile(resolvedPath);

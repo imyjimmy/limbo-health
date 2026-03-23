@@ -2,7 +2,6 @@ import path from 'node:path';
 import { query, withTransaction } from '../db.js';
 import {
   buildUnsupportedAutofillPayload,
-  PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,
 } from '../utils/pdfFormUnderstanding.js';
 import { normalizeStateCode } from '../utils/states.js';
 import { collapseWhitespace, uniqueBy } from '../utils/text.js';
@@ -165,28 +164,47 @@ export async function upsertSeedUrl(
     facilityId = null,
     url,
     seedType = 'system_records_page',
-    active = true
+    active = true,
+    approvedByHuman = false,
+    evidenceNote = null,
   },
   client = null
 ) {
   const q = client || { query };
 
   const result = await q.query(
-    `insert into seed_urls (hospital_system_id, facility_id, url, seed_type, active)
-     values ($1, $2, $3, $4, $5)
+    `insert into seed_urls (
+       hospital_system_id,
+       facility_id,
+       url,
+       seed_type,
+       active,
+       approved_by_human,
+       evidence_note
+     )
+     values ($1, $2, $3, $4, $5, $6, $7)
      on conflict (hospital_system_id, url)
      do update set hospital_system_id = excluded.hospital_system_id,
                    facility_id = excluded.facility_id,
                    seed_type = excluded.seed_type,
-                   active = excluded.active
+                   active = excluded.active,
+                   approved_by_human = excluded.approved_by_human,
+                   evidence_note = excluded.evidence_note
      returning id`,
-    [hospitalSystemId, facilityId, url, seedType, active]
+    [hospitalSystemId, facilityId, url, seedType, active, approvedByHuman, evidenceNote]
   );
 
   return result.rows[0].id;
 }
 
-export async function listActiveSeeds({ systemName = null, state = null } = {}) {
+export async function listActiveSeeds({
+  systemName = null,
+  state = null,
+  systemId = null,
+  facilityId = null,
+  seedUrl = null,
+  hospitalSystemIds = [],
+} = {}) {
   const params = [];
   let where = 'where su.active = true and hs.active = true';
 
@@ -200,11 +218,33 @@ export async function listActiveSeeds({ systemName = null, state = null } = {}) 
     where += ` and hs.system_name = $${params.length}`;
   }
 
+  if (systemId) {
+    params.push(systemId);
+    where += ` and hs.id = $${params.length}`;
+  }
+
+  if (facilityId) {
+    params.push(facilityId);
+    where += ` and su.facility_id = $${params.length}`;
+  }
+
+  if (seedUrl) {
+    params.push(seedUrl);
+    where += ` and su.url = $${params.length}`;
+  }
+
+  if (Array.isArray(hospitalSystemIds) && hospitalSystemIds.length > 0) {
+    params.push(hospitalSystemIds);
+    where += ` and hs.id = any($${params.length}::uuid[])`;
+  }
+
   const result = await query(
     `select
        su.id,
        su.url,
        su.seed_type,
+       su.approved_by_human,
+       su.evidence_note,
        su.hospital_system_id,
        su.facility_id,
        hs.system_name,
@@ -222,11 +262,93 @@ export async function listActiveSeeds({ systemName = null, state = null } = {}) 
   return result.rows;
 }
 
+export async function listKnownPdfSourcePages({
+  systemName = null,
+  state = null,
+  systemId = null,
+  facilityId = null,
+  hospitalSystemIds = [],
+} = {}) {
+  const params = [];
+  let where = 'where hs.active = true';
+
+  if (state) {
+    params.push(normalizeStateCode(state));
+    where += ` and hs.state = $${params.length}`;
+  }
+
+  if (systemName) {
+    params.push(systemName);
+    where += ` and hs.system_name = $${params.length}`;
+  }
+
+  if (systemId) {
+    params.push(systemId);
+    where += ` and hs.id = $${params.length}`;
+  }
+
+  if (facilityId) {
+    params.push(facilityId);
+    where += ` and source_pages.facility_id = $${params.length}`;
+  }
+
+  if (Array.isArray(hospitalSystemIds) && hospitalSystemIds.length > 0) {
+    params.push(hospitalSystemIds);
+    where += ` and hs.id = any($${params.length}::uuid[])`;
+  }
+
+  const result = await query(
+    `with source_pages as (
+       select distinct
+         sd.hospital_system_id,
+         sd.facility_id,
+         sd.source_page_url as url
+       from source_documents sd
+       where sd.source_type = 'pdf'
+         and coalesce(sd.source_page_url, '') <> ''
+
+       union
+
+       select distinct
+         rw.hospital_system_id,
+         rw.facility_id,
+         rw.official_page_url as url
+       from records_workflows rw
+       where coalesce(rw.official_page_url, '') <> ''
+     )
+     select distinct on (source_pages.hospital_system_id, source_pages.url)
+       gen_random_uuid() as id,
+       source_pages.url,
+       'known_pdf_source_page'::text as seed_type,
+       true as approved_by_human,
+       'derived from existing PDF/source-page provenance'::text as evidence_note,
+       source_pages.hospital_system_id,
+       source_pages.facility_id,
+       hs.system_name,
+       hs.canonical_domain,
+       hs.state as system_state,
+       f.facility_name
+     from source_pages
+     join hospital_systems hs on hs.id = source_pages.hospital_system_id
+     left join facilities f on f.id = source_pages.facility_id
+     ${where}
+     order by source_pages.hospital_system_id, source_pages.url, source_pages.facility_id nulls last`,
+    params,
+  );
+
+  return result.rows;
+}
+
 export async function insertSourceDocument(
   {
     hospitalSystemId,
     facilityId = null,
     sourceUrl,
+    sourcePageUrl = null,
+    discoveredFromUrl = null,
+    acceptedStageRunId = null,
+    fetchArtifactId = null,
+    triageDecisionId = null,
     sourceType,
     title,
     fetchedAt,
@@ -234,7 +356,9 @@ export async function insertSourceDocument(
     contentHash,
     storagePath,
     extractedText,
-    parserVersion
+    parserVersion,
+    importMode = 'crawl',
+    importNotes = null,
   },
   client = null
 ) {
@@ -245,6 +369,11 @@ export async function insertSourceDocument(
        hospital_system_id,
        facility_id,
        source_url,
+       source_page_url,
+       discovered_from_url,
+       accepted_stage_run_id,
+       fetch_artifact_id,
+       triage_decision_id,
        source_type,
        title,
        fetched_at,
@@ -252,9 +381,11 @@ export async function insertSourceDocument(
        content_hash,
        storage_path,
        extracted_text,
-       parser_version
+       parser_version,
+       import_mode,
+       import_notes
      )
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      on conflict (hospital_system_id, source_url, content_hash)
      do update set hospital_system_id = case
                      when excluded.facility_id is not null then excluded.hospital_system_id
@@ -264,14 +395,26 @@ export async function insertSourceDocument(
                    fetched_at = excluded.fetched_at,
                    http_status = excluded.http_status,
                    title = excluded.title,
+                   source_page_url = coalesce(excluded.source_page_url, source_documents.source_page_url),
+                   discovered_from_url = coalesce(excluded.discovered_from_url, source_documents.discovered_from_url),
+                   accepted_stage_run_id = coalesce(excluded.accepted_stage_run_id, source_documents.accepted_stage_run_id),
+                   fetch_artifact_id = coalesce(excluded.fetch_artifact_id, source_documents.fetch_artifact_id),
+                   triage_decision_id = coalesce(excluded.triage_decision_id, source_documents.triage_decision_id),
                    storage_path = excluded.storage_path,
                    extracted_text = excluded.extracted_text,
-                   parser_version = excluded.parser_version
+                   parser_version = excluded.parser_version,
+                   import_mode = excluded.import_mode,
+                   import_notes = excluded.import_notes
      returning id`,
     [
       hospitalSystemId,
       facilityId,
       sourceUrl,
+      sourcePageUrl,
+      discoveredFromUrl,
+      acceptedStageRunId,
+      fetchArtifactId,
+      triageDecisionId,
       sourceType,
       title,
       fetchedAt,
@@ -279,7 +422,9 @@ export async function insertSourceDocument(
       contentHash,
       storagePath,
       extractedText,
-      parserVersion
+      parserVersion,
+      importMode,
+      importNotes,
     ]
   );
 
@@ -641,6 +786,77 @@ export async function upsertWorkflowBundle(
   return workflowIds;
 }
 
+export async function markStaleQuestionTemplatesForSourceDocument(
+  {
+    hospitalSystemId,
+    sourceUrl,
+    sourceDocumentId,
+    contentHash = null,
+  },
+  client = null
+) {
+  const q = client || { query };
+
+  if (!hospitalSystemId || !sourceUrl || !sourceDocumentId) {
+    return {
+      previousSourceDocumentIds: [],
+      staleVersionIds: [],
+    };
+  }
+
+  const previousDocuments = await q.query(
+    `select id
+     from source_documents
+     where hospital_system_id = $1
+       and source_url = $2
+       and id <> $3
+       and coalesce(content_hash, '') <> coalesce($4, '')`,
+    [hospitalSystemId, sourceUrl, sourceDocumentId, contentHash]
+  );
+
+  const previousSourceDocumentIds = previousDocuments.rows.map((row) => row.id).filter(Boolean);
+  if (previousSourceDocumentIds.length === 0) {
+    return {
+      previousSourceDocumentIds: [],
+      staleVersionIds: [],
+    };
+  }
+
+  await q.query(
+    `update pdf_question_templates
+     set status = 'stale',
+         updated_at = now()
+     where source_document_id = any($1::uuid[])
+       and status in ('approved', 'unsupported')`,
+    [previousSourceDocumentIds]
+  );
+
+  const staleVersions = await q.query(
+    `update pdf_question_template_versions
+     set status = 'stale'
+     where source_document_id = any($1::uuid[])
+       and status in ('approved', 'unsupported')
+     returning id`,
+    [previousSourceDocumentIds]
+  );
+
+  const staleVersionIds = staleVersions.rows.map((row) => row.id).filter(Boolean);
+  if (staleVersionIds.length > 0) {
+    await q.query(
+      `update workflow_forms
+       set published_question_template_version_id = null,
+           updated_at = now()
+       where published_question_template_version_id = any($1::uuid[])`,
+      [staleVersionIds]
+    );
+  }
+
+  return {
+    previousSourceDocumentIds,
+    staleVersionIds,
+  };
+}
+
 export async function saveExtractionResult(payload) {
   return withTransaction(async (client) => {
     const sourceDocumentId = await insertSourceDocument(payload.sourceDocument, client);
@@ -678,6 +894,16 @@ export async function saveExtractionResult(payload) {
         contentHash: payload.sourceDocument.contentHash,
         verifiedAt: payload.sourceDocument.fetchedAt,
         workflows: payload.workflows
+      },
+      client
+    );
+
+    await markStaleQuestionTemplatesForSourceDocument(
+      {
+        hospitalSystemId: payload.sourceDocument.hospitalSystemId,
+        sourceUrl: payload.sourceDocument.sourceUrl,
+        sourceDocumentId,
+        contentHash: payload.sourceDocument.contentHash,
       },
       client
     );
@@ -1068,7 +1294,7 @@ async function attachCachedDocumentsToForms(
   return [...hydratedForms, ...fallbackForms];
 }
 
-async function listLatestPdfFormUnderstanding(sourceDocumentIds = []) {
+async function listLatestPublishedQuestionTemplatePayloads(sourceDocumentIds = []) {
   const normalizedIds = sourceDocumentIds.filter(Boolean);
   if (normalizedIds.length === 0) {
     return new Map();
@@ -1077,19 +1303,18 @@ async function listLatestPdfFormUnderstanding(sourceDocumentIds = []) {
   const result = await query(
     `select distinct on (source_document_id)
        source_document_id,
-       status,
-       structured_output
-     from extraction_runs
+       payload
+     from pdf_question_template_versions
      where source_document_id = any($1::uuid[])
-       and extractor_name = $2
-     order by source_document_id, created_at desc`,
-    [normalizedIds, PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME]
+       and status in ('approved', 'unsupported')
+     order by source_document_id, version_no desc, published_at desc`,
+    [normalizedIds]
   );
 
   return new Map(
     result.rows.map((row) => [
       row.source_document_id,
-      row.structured_output?.form_understanding || buildUnsupportedAutofillPayload(),
+      row.payload || buildUnsupportedAutofillPayload(),
     ])
   );
 }
@@ -1098,7 +1323,7 @@ async function attachAutofillMetadataToForms(forms = []) {
   const sourceDocumentIds = forms
     .map((form) => form?.cached_source_document_id)
     .filter((value) => typeof value === 'string' && value);
-  const bySourceDocumentId = await listLatestPdfFormUnderstanding(sourceDocumentIds);
+  const bySourceDocumentId = await listLatestPublishedQuestionTemplatePayloads(sourceDocumentIds);
 
   return forms.map((form) => ({
     ...form,
@@ -1363,11 +1588,12 @@ export async function getSystemRequestPacket(systemId) {
 export async function getSourceDocumentById(sourceDocumentId) {
   const result = await query(
     `select
-       id,
-       source_url,
-       source_type,
-       storage_path,
-       fetched_at
+      id,
+      source_url,
+      source_page_url,
+      source_type,
+      storage_path,
+      fetched_at
      from source_documents
      where id = $1`,
     [sourceDocumentId]

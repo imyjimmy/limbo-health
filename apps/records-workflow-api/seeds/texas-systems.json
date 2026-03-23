@@ -1,75 +1,36 @@
 [
   {
-    "system_name": "Baylor Scott & White Health",
-    "domain": "bswhealth.com",
+    "system_name": "24/7 ER Care in Lumberton",
+    "state": "TX",
+    "domain": "altusemergency.com",
     "seed_urls": [
-      "https://www.bswhealth.com/patient-tools/request-copies-of-your-medical-records"
-    ]
+      "https://altusemergency.com/locations/lumberton"
+    ],
+    "facilities": []
   },
   {
-    "system_name": "St. David's HealthCare",
-    "domain": "stdavids.com",
+    "system_name": "AdventHealth Central Texas",
+    "state": "TX",
+    "domain": "adventhealth.com",
     "seed_urls": [
-      "https://www.stdavids.com/locations/st-davids-medical-center/for-patients/medical-records",
-      "https://www.stdavids.com/about-us/managing-your-care-with-myhealthone"
+      "https://www.adventhealth.com/locations/hospitals/central-texas",
+      "https://www.adventhealth.com/locations/hospitals/central-texas/medical-records"
     ],
     "facilities": [
       {
-        "facility_name": "St. David's Medical Center",
-        "city": "Austin",
+        "facility_name": "AdventHealth Central Texas",
+        "city": "Killeen",
         "state": "TX",
-        "facility_page_url": "https://www.stdavids.com/locations/st-davids-medical-center"
+        "facility_type": null,
+        "facility_page_url": "https://www.adventhealth.com/locations/hospitals/central-texas",
+        "external_facility_id": null
       }
-    ]
-  },
-  {
-    "system_name": "Texas Health Resources",
-    "domain": "texashealth.org",
-    "seed_urls": [
-      "https://www.texashealth.org/About-Texas-Health/Request-Medical-Records"
-    ]
-  },
-  {
-    "system_name": "UT Southwestern Medical Center",
-    "domain": "utswmed.org",
-    "seed_urls": [
-      "https://utswmed.org/patient-resources/medical-records/",
-      "https://utswmed.org/patient-resources/medical-records/requesting-your-record/"
-    ]
-  },
-  {
-    "system_name": "Methodist Health System",
-    "domain": "methodisthealthsystem.org",
-    "seed_urls": [
-      "https://www.methodisthealthsystem.org/patients-visitors/patient-tools-support/accessing-your-medical-records",
-      "https://www.methodisthealthsystem.org/patients-visitors/patient-tools-support/mychart"
-    ]
-  },
-  {
-    "system_name": "Houston Methodist",
-    "domain": "houstonmethodist.org",
-    "seed_urls": [
-      "https://www.houstonmethodist.org/medical-records/"
-    ]
-  },
-  {
-    "system_name": "Memorial Hermann Health System",
-    "domain": "memorialhermann.org",
-    "seed_urls": [
-      "https://memorialhermann.org/patients-visitors/patient-services/release-medical-records",
-      "https://memorialhermann.org/services/specialties/imaging/request-imaging-records"
-    ]
-  },
-  {
-    "system_name": "Ascension Seton",
-    "domain": "healthcare.ascension.org",
-    "seed_urls": [
-      "https://healthcare.ascension.org/medical-records"
     ]
   },
   {
     "system_name": "Ascension Providence",
     "state": "TX",
+    "domain": null,
     "seed_urls": [
       "https://healthcare.ascension.org/locations/texas/txwac/waco-ascension-providence",
       "https://healthcare.ascension.org/patient-portal/texas-ascension-providence"
@@ -79,84 +40,75 @@
         "facility_name": "Ascension Providence",
         "city": "Waco",
         "state": "TX",
-        "facility_page_url": "https://healthcare.ascension.org/locations/texas/txwac/waco-ascension-providence"
+        "facility_type": null,
+        "facility_page_url": "https://healthcare.ascension.org/locations/texas/txwac/waco-ascension-providence",
+        "external_facility_id": null
       }
     ]
   },
   {
-    "system_name": "AdventHealth Central Texas",
+    "system_name": "Ascension Seton",
     "state": "TX",
-    "domain": "adventhealth.com",
+    "domain": "healthcare.ascension.org",
     "seed_urls": [
-      "https://www.adventhealth.com/locations/hospitals/central-texas/medical-records",
-      "https://www.adventhealth.com/locations/hospitals/central-texas"
+      "https://healthcare.ascension.org/medical-records"
     ],
-    "facilities": [
-      {
-        "facility_name": "AdventHealth Central Texas",
-        "city": "Killeen",
-        "state": "TX",
-        "facility_page_url": "https://www.adventhealth.com/locations/hospitals/central-texas"
-      }
-    ]
+    "facilities": []
   },
   {
-    "system_name": "Texas Children's",
+    "system_name": "Baptist Health System (San Antonio)",
     "state": "TX",
-    "domain": "texaschildrens.org",
+    "domain": "baptisthealthsystem.com",
     "seed_urls": [
-      "https://www.texaschildrens.org/patients-families/medical-and-health-records"
-    ]
+      "https://www.baptisthealthsystem.com/patients/request-medical-records"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Baylor Scott & White Health",
+    "state": "TX",
+    "domain": "bswhealth.com",
+    "seed_urls": [
+      "https://www.bswhealth.com/patient-tools/request-copies-of-your-medical-records"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "CHI St. Luke's Health",
+    "state": "TX",
+    "domain": "stlukeshealth.org",
+    "seed_urls": [
+      "https://www.stlukeshealth.org/patients-visitors/patients/request-patient-records"
+    ],
+    "facilities": []
   },
   {
     "system_name": "Children's Health",
     "state": "TX",
     "domain": "childrens.com",
     "seed_urls": [
-      "https://www.childrens.com/patient-families/parent-resources",
-      "https://es.childrens.com/patient-families/parent-resources/medical-records-request"
-    ]
+      "https://es.childrens.com/patient-families/parent-resources/medical-records-request",
+      "https://www.childrens.com/patient-families/parent-resources"
+    ],
+    "facilities": []
   },
   {
-    "system_name": "Parkland Health",
+    "system_name": "CHRISTUS Health",
     "state": "TX",
-    "domain": "parklandhealth.org",
+    "domain": "christushealth.org",
     "seed_urls": [
-      "https://www.parklandhealth.org/patient-information-tools",
-      "https://www.parklandhealth.org/contact-us"
-    ]
+      "https://www.christushealth.org/patient-resources/request-medical-records"
+    ],
+    "facilities": []
   },
   {
-    "system_name": "Harris Health",
+    "system_name": "Community Hospital Corporation",
     "state": "TX",
-    "domain": "harrishealth.org",
+    "domain": "chc.com",
     "seed_urls": [
-      "https://www.harrishealth.org/patients-hh/Pages/medical-records.aspx"
-    ]
-  },
-  {
-    "system_name": "University Health",
-    "state": "TX",
-    "domain": "universityhealth.com",
-    "seed_urls": [
-      "https://www.universityhealth.com/patients/billing-insurance/medical-records"
-    ]
-  },
-  {
-    "system_name": "UTMB Health",
-    "state": "TX",
-    "domain": "utmbhealth.com",
-    "seed_urls": [
-      "https://www.utmbhealth.com/online-services/medical-records"
-    ]
-  },
-  {
-    "system_name": "UT MD Anderson Cancer Center",
-    "state": "TX",
-    "domain": "mdanderson.org",
-    "seed_urls": [
-      "https://www.mdanderson.org/patients-family/becoming-our-patient/services-amenities/medical-records.html"
-    ]
+      "https://www.chc.com/"
+    ],
+    "facilities": []
   },
   {
     "system_name": "Cook Children's",
@@ -164,125 +116,246 @@
     "domain": "cookchildrens.org",
     "seed_urls": [
       "https://www.cookchildrens.org/patients-families/medical-records"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Ernest Health",
+    "state": "TX",
+    "domain": "ernesthealth.com",
+    "seed_urls": [
+      "https://www.ernesthealth.com/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Exceptional Community Hospitals",
+    "state": "TX",
+    "domain": "ehc24.com",
+    "seed_urls": [
+      "https://www.ehc24.com/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Harris Health",
+    "state": "TX",
+    "domain": "harrishealth.org",
+    "seed_urls": [
+      "https://www.harrishealth.org/patients-hh/Pages/medical-records.aspx"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "HCA Gulf Coast Division (HCA Houston Healthcare)",
+    "state": "TX",
+    "domain": "hcahoustonhealthcare.com",
+    "seed_urls": [
+      "https://hcahoustonhealthcare.com/patients-and-visitors/medical-records.dot"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "HCA Medical City Healthcare (North Texas Division)",
+    "state": "TX",
+    "domain": "medicalcityhealthcare.com",
+    "seed_urls": [
+      "https://www.medicalcityhealthcare.com/contact-us"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "HCA San Antonio Division (Methodist Healthcare of San Antonio)",
+    "state": "TX",
+    "domain": "sahealth.com",
+    "seed_urls": [
+      "https://www.sahealth.com/contact-us/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Houston Methodist",
+    "state": "TX",
+    "domain": "houstonmethodist.org",
+    "seed_urls": [
+      "https://www.houstonmethodist.org/medical-records/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Memorial Hermann Health System",
+    "state": "TX",
+    "domain": "memorialhermann.org",
+    "seed_urls": [
+      "https://memorialhermann.org/patients-visitors/patient-services/release-medical-records",
+      "https://memorialhermann.org/services/specialties/imaging/request-imaging-records"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Methodist Health System",
+    "state": "TX",
+    "domain": "methodisthealthsystem.org",
+    "seed_urls": [
+      "https://www.methodisthealthsystem.org/patients-visitors/patient-tools-support/accessing-your-medical-records",
+      "https://www.methodisthealthsystem.org/patients-visitors/patient-tools-support/mychart"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Nobis Rehabilitation Partners",
+    "state": "TX",
+    "domain": "nobisrehabpartners.com",
+    "seed_urls": [
+      "https://www.nobisrehabpartners.com/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Nutex Health",
+    "state": "TX",
+    "domain": "nutexhealth.com",
+    "seed_urls": [
+      "https://www.nutexhealth.com/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Oceans Healthcare",
+    "state": "TX",
+    "domain": "oceanshealthcare.com",
+    "seed_urls": [
+      "https://www.oceanshealthcare.com/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "Parkland Health",
+    "state": "TX",
+    "domain": "parklandhealth.org",
+    "seed_urls": [
+      "https://www.parklandhealth.org/contact-us",
+      "https://www.parklandhealth.org/patient-information-tools"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "St. David's HealthCare",
+    "state": "TX",
+    "domain": "stdavids.com",
+    "seed_urls": [
+      "https://www.stdavids.com/about-us/managing-your-care-with-myhealthone",
+      "https://www.stdavids.com/locations/st-davids-medical-center/for-patients/medical-records"
+    ],
+    "facilities": [
+      {
+        "facility_name": "St. David's Medical Center",
+        "city": "Austin",
+        "state": "TX",
+        "facility_type": null,
+        "facility_page_url": "https://www.stdavids.com/locations/st-davids-medical-center",
+        "external_facility_id": null
+      }
     ]
   },
   {
     "system_name": "Tenet Healthcare",
+    "state": "TX",
     "domain": "tenethealth.com",
     "seed_urls": [
       "https://www.tenethealth.com/"
-    ]
+    ],
+    "facilities": []
   },
   {
-    "system_name": "CHRISTUS Health",
-    "domain": "christushealth.org",
+    "system_name": "Texas Children's",
+    "state": "TX",
+    "domain": "texaschildrens.org",
     "seed_urls": [
-      "https://www.christushealth.org/patient-resources/request-medical-records"
-    ]
+      "https://www.texaschildrens.org/patients-families/medical-and-health-records"
+    ],
+    "facilities": []
   },
   {
-    "system_name": "Ernest Health",
-    "domain": "ernesthealth.com",
+    "system_name": "Texas Health Resources",
+    "state": "TX",
+    "domain": "texashealth.org",
     "seed_urls": [
-      "https://www.ernesthealth.com/"
-    ]
-  },
-  {
-    "system_name": "Oceans Healthcare",
-    "domain": "oceanshealthcare.com",
-    "seed_urls": [
-      "https://www.oceanshealthcare.com/"
-    ]
-  },
-  {
-    "system_name": "HCA Medical City Healthcare (North Texas Division)",
-    "domain": "medicalcityhealthcare.com",
-    "seed_urls": [
-      "https://www.medicalcityhealthcare.com/contact-us"
-    ]
-  },
-  {
-    "system_name": "Nutex Health",
-    "domain": "nutexhealth.com",
-    "seed_urls": [
-      "https://www.nutexhealth.com/"
-    ]
-  },
-  {
-    "system_name": "Baptist Health System (San Antonio)",
-    "domain": "baptisthealthsystem.com",
-    "seed_urls": [
-      "https://www.baptisthealthsystem.com/patients/request-medical-records"
-    ]
-  },
-  {
-    "system_name": "Community Hospital Corporation",
-    "domain": "chc.com",
-    "seed_urls": [
-      "https://www.chc.com/"
-    ]
-  },
-  {
-    "system_name": "Nobis Rehabilitation Partners",
-    "domain": "nobisrehabpartners.com",
-    "seed_urls": [
-      "https://www.nobisrehabpartners.com/"
-    ]
-  },
-  {
-    "system_name": "HCA San Antonio Division (Methodist Healthcare of San Antonio)",
-    "domain": "sahealth.com",
-    "seed_urls": [
-      "https://www.sahealth.com/contact-us/"
-    ]
-  },
-  {
-    "system_name": "HCA Gulf Coast Division (HCA Houston Healthcare)",
-    "domain": "hcahoustonhealthcare.com",
-    "seed_urls": [
-      "https://hcahoustonhealthcare.com/patients-and-visitors/medical-records.dot"
-    ]
-  },
-  {
-    "system_name": "University of Texas System",
-    "domain": "utsystem.edu",
-    "seed_urls": [
-      "https://www.utsystem.edu/"
-    ]
-  },
-  {
-    "system_name": "UT Health East Texas",
-    "domain": "uthealtheasttexas.com",
-    "seed_urls": [
-      "https://uthealtheasttexas.com/medical-records-request"
-    ]
-  },
-  {
-    "system_name": "CHI St. Luke's Health",
-    "domain": "stlukeshealth.org",
-    "seed_urls": [
-      "https://www.stlukeshealth.org/patients-visitors/patients/request-patient-records"
-    ]
+      "https://www.texashealth.org/About-Texas-Health/Request-Medical-Records"
+    ],
+    "facilities": []
   },
   {
     "system_name": "The Hospitals of Providence",
+    "state": "TX",
     "domain": "thehospitalsofprovidence.com",
     "seed_urls": [
       "https://www.thehospitalsofprovidence.com/patients/request-medical-records"
-    ]
-  },
-  {
-    "system_name": "Exceptional Community Hospitals",
-    "domain": "ehc24.com",
-    "seed_urls": [
-      "https://www.ehc24.com/"
-    ]
+    ],
+    "facilities": []
   },
   {
     "system_name": "United Surgical Partners International (USPI)",
+    "state": "TX",
     "domain": "uspi.com",
     "seed_urls": [
       "https://www.uspi.com/"
-    ]
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "University Health",
+    "state": "TX",
+    "domain": "universityhealth.com",
+    "seed_urls": [
+      "https://www.universityhealth.com/patients/billing-insurance/medical-records"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "University of Texas System",
+    "state": "TX",
+    "domain": "utsystem.edu",
+    "seed_urls": [
+      "https://www.utsystem.edu/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "UT Health East Texas",
+    "state": "TX",
+    "domain": "uthealtheasttexas.com",
+    "seed_urls": [
+      "https://uthealtheasttexas.com/medical-records-request"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "UT MD Anderson Cancer Center",
+    "state": "TX",
+    "domain": "mdanderson.org",
+    "seed_urls": [
+      "https://www.mdanderson.org/patients-family/becoming-our-patient/services-amenities/medical-records.html"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "UT Southwestern Medical Center",
+    "state": "TX",
+    "domain": "utswmed.org",
+    "seed_urls": [
+      "https://utswmed.org/patient-resources/medical-records/",
+      "https://utswmed.org/patient-resources/medical-records/requesting-your-record/"
+    ],
+    "facilities": []
+  },
+  {
+    "system_name": "UTMB Health",
+    "state": "TX",
+    "domain": "utmbhealth.com",
+    "seed_urls": [
+      "https://www.utmbhealth.com/online-services/medical-records"
+    ],
+    "facilities": []
   }
 ]

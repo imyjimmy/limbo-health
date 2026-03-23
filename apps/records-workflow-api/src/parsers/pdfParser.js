@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { collapseWhitespace, uniqueBy } from '../utils/text.js';
 import { buildPdfHeaderText, normalizePdfHeaderLineText } from '../utils/pdfHeader.js';
+import { resolvePythonExecutable } from '../utils/pythonRuntime.js';
 
 const URL_PATTERN = /https?:\/\/[^\s)\]]+/gi;
 const PHONE_PATTERN =
@@ -65,7 +66,8 @@ export async function parsePdfDocument({ buffer, filePath = null }) {
   const { pdfPath, cleanup } = await withTemporaryPdfPath(buffer, filePath);
 
   try {
-    const { stdout } = await execFile('python3', [PDF_EXTRACTOR_PATH, pdfPath], {
+    const pythonBin = resolvePythonExecutable({ overrideEnvVar: 'RECORDS_PDF_PYTHON_BIN' });
+    const { stdout } = await execFile(pythonBin, [PDF_EXTRACTOR_PATH, pdfPath], {
       maxBuffer: 20 * 1024 * 1024
     });
     const parsed = JSON.parse(stdout || '{}');

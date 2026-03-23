@@ -19,7 +19,28 @@ export const config = {
   databaseUrl:
     process.env.DATABASE_URL ||
     'postgres://postgres:postgres@localhost:5432/records_workflow',
+  dataIntakeStorageDir: resolveFromServiceRoot(
+    process.env.DATA_INTAKE_STORAGE_DIR,
+    'storage/data-intake',
+  ),
   rawStorageDir: resolveFromServiceRoot(process.env.RAW_STORAGE_DIR, 'storage/raw'),
+  sourceDocumentStorageDir: resolveFromServiceRoot(
+    process.env.SOURCE_DOCUMENT_STORAGE_DIR,
+    'storage/source-documents',
+  ),
+  seedScopeStorageDir: resolveFromServiceRoot(
+    process.env.SEED_SCOPE_STORAGE_DIR,
+    'storage/seed-scopes',
+  ),
+  fetchStorageDir: resolveFromServiceRoot(process.env.FETCH_STORAGE_DIR, 'storage/fetch'),
+  parsedStorageDir: resolveFromServiceRoot(process.env.PARSED_STORAGE_DIR, 'storage/parsed'),
+  workflowStorageDir: resolveFromServiceRoot(process.env.WORKFLOW_STORAGE_DIR, 'storage/workflows'),
+  questionStorageDir: resolveFromServiceRoot(process.env.QUESTION_STORAGE_DIR, 'storage/questions'),
+  triageStorageDir: resolveFromServiceRoot(process.env.TRIAGE_STORAGE_DIR, 'storage/triage'),
+  publishedStorageDir: resolveFromServiceRoot(
+    process.env.PUBLISHED_STORAGE_DIR,
+    'storage/published',
+  ),
   seedFile: resolveFromServiceRoot(process.env.SEED_FILE, 'seeds/texas-systems.json'),
   crawlState: normalizeStateCode(process.env.CRAWL_STATE),
   crawl: {
@@ -31,6 +52,10 @@ export const config = {
     apiKey: process.env.OPENAI_API_KEY || '',
     baseUrl: process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1',
     pdfFormUnderstandingModel: process.env.OPENAI_PDF_FORM_MODEL || '',
+    seedMaterializationModel:
+      process.env.OPENAI_SEED_MATERIALIZATION_MODEL ||
+      process.env.OPENAI_PDF_FORM_MODEL ||
+      '',
     timeoutMs: Number.parseInt(process.env.OPENAI_TIMEOUT_MS || '30000', 10),
   }
 };

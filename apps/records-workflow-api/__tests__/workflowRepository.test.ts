@@ -85,42 +85,39 @@ describe('workflowRepository request packet PDF hydration', () => {
         rows: [
           {
             source_document_id: 'doc-1',
-            status: 'success',
-            structured_output: {
-              form_understanding: {
-                supported: true,
-                mode: 'overlay',
-                template_id: 'multicare-release-template',
-                confidence: 0.91,
-                questions: [
-                  {
-                    id: 'record-types',
-                    label: 'What kind of records do you want?',
-                    kind: 'multi_select',
-                    required: true,
-                    help_text: null,
-                    confidence: 0.9,
-                    bindings: [],
-                    options: [
-                      {
-                        id: 'xrays',
-                        label: 'X-rays',
-                        confidence: 0.94,
-                        bindings: [
-                          {
-                            type: 'overlay_mark',
-                            page_index: 0,
-                            x: 118,
-                            y: 420,
-                            mark: 'x',
-                            size: 12,
-                          },
-                        ],
-                      },
-                    ],
-                  },
-                ],
-              },
+            payload: {
+              supported: true,
+              mode: 'overlay',
+              template_id: 'multicare-release-template',
+              confidence: 0.91,
+              questions: [
+                {
+                  id: 'record-types',
+                  label: 'What kind of records do you want?',
+                  kind: 'multi_select',
+                  required: true,
+                  help_text: null,
+                  confidence: 0.9,
+                  bindings: [],
+                  options: [
+                    {
+                      id: 'xrays',
+                      label: 'X-rays',
+                      confidence: 0.94,
+                      bindings: [
+                        {
+                          type: 'overlay_mark',
+                          page_index: 0,
+                          x: 118,
+                          y: 420,
+                          mark: 'x',
+                          size: 12,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
             },
           },
         ],

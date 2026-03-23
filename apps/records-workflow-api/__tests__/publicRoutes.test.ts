@@ -7,12 +7,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 
 vi.mock('../src/repositories/workflowRepository.js', () => ({
   getEffectiveWorkflowForFacility: vi.fn(),
+  getFacilityById: vi.fn(),
+  getHospitalSystemById: vi.fn(),
   getSourceDocumentById: vi.fn(),
   getSystemRequestPacket: vi.fn(),
   getSystemWorkflows: vi.fn(),
   listHospitalSystems: vi.fn(),
   searchFacilities: vi.fn(),
   getExtractionRunById: vi.fn(),
+  insertExtractionRun: vi.fn(),
   upsertHospitalSystem: vi.fn(),
   upsertFacility: vi.fn(),
   upsertSeedUrl: vi.fn(),

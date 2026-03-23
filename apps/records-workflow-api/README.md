@@ -103,9 +103,33 @@ Short version: `data -> seeds -> DB reseed -> crawl/fetch/parse -> link expansio
    - Single state: `npm run crawl:rollout -- --state CT`
    - Remaining states: `npm run crawl:rollout -- --all-remaining`
 
+## Local Operator Console
+
+For this machine, use the local convenience scripts instead of retyping env vars:
+
+1. Install Python deps into the preferred local interpreter:
+   - `npm run python:deps:install:local`
+2. Verify the runtime that Scrapling and PyMuPDF will use:
+   - `npm run python:deps:verify:local`
+3. Apply the schema against the local Postgres container on `localhost:5433`:
+   - `npm run migrate:local`
+4. Start the API on `http://localhost:3020`:
+   - `npm run start:local`
+
+These local scripts default to:
+- `DATABASE_URL=postgres://postgres:postgres@localhost:5433/records_workflow`
+- `PORT=3020`
+- `RECORDS_FETCH_BACKEND=scrapling`
+- `RECORDS_PYTHON_BIN=/opt/homebrew/Caskroom/miniconda/base/bin/python3` when that interpreter exists
+- `RECORDS_FETCH_PYTHON_BIN` matching `RECORDS_PYTHON_BIN`
+
+If you want a different interpreter or port, pass the env var explicitly, for example:
+- `PORT=3021 npm run start:local`
+- `RECORDS_PYTHON_BIN=/custom/python3 npm run python:deps:verify:local`
+
 ## Notes
 
-- Raw PDF snapshots are stored under `storage/raw/<state>/` such as `storage/raw/tx/` and `storage/raw/ma/`. HTML pages are parsed and persisted to the database but are no longer written to disk.
+- Raw PDF snapshots are stored under `storage/raw/<state>/` such as `storage/raw/tx/` and `storage/raw/ma/`. Crawled HTML snapshots are now also written under `storage/raw/<state>/crawl-html/` so fetch-stage artifacts can be re-opened and rerun later.
 - `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
 - No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.
@@ -114,9 +138,9 @@ Short version: `data -> seeds -> DB reseed -> crawl/fetch/parse -> link expansio
 - `npm run repartition:raw-storage-state -- --apply` performs a one-time move of existing PDF artifacts into state subdirectories and updates `source_documents.storage_path` without refetching anything.
 - `npm run build:national-roster` writes a CMS-based active-hospital roster to `data/national-roster/cms-pos-q4-2025-active-hospitals.json`.
 - `npm run report:national-roster-coverage` compares the processed raw-state footprint against that official roster and writes a phase-1 audit report to `logs/reports/<date>-national-roster-audit.json`.
-- `npm run generate:seed-candidates` writes generated seed files to `data/generated-seeds/<state>-systems.generated.json` and includes `discovery_confidence` plus evidence metadata without breaking the existing seed schema.
-- `npm run import:generated-seeds` automatically imports only high-confidence generated seed entries unless you later add broader confidence thresholds.
-- `npm run crawl:rollout` generates seeds, imports high-confidence candidates, crawls by state, audits coverage, appends to a cumulative report, and keeps going even when a state lands in `not_ready`.
+- `npm run generate:seed-candidates` writes generated seed files to `storage/generated-seeds/<state>-systems.generated.json` and includes `discovery_confidence` plus evidence metadata without breaking the existing seed schema.
+- `npm run import:generated-seeds` promotes only high-confidence generated seed entries into the canonical `seeds/<state>-systems.json` file, then reseeds the DB from disk.
+- `npm run crawl:rollout` generates candidates, promotes high-confidence entries into canonical seeds, reseeds the DB from disk, crawls by state, audits coverage, appends to a cumulative report, and keeps going even when a state lands in `not_ready`.
 - The nationwide `--all-remaining` rollout scope now means the 50 U.S. states only; `DC` is intentionally excluded from automatic generate/import/crawl rollout targets.
 - Use `npm run cleanup:stale-crawl` to discard superseded `source_documents`, old `extraction_runs`, and orphaned raw files from earlier crawl attempts.
 - Do not use table truncation for routine crawl maintenance unless you explicitly want a full reset.

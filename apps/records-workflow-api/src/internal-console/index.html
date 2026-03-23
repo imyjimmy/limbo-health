@@ -1,0 +1,1214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+    />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Records Workflow Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      @layer base {
+        body {
+          font-family: "Outfit", sans-serif;
+          background: #f9fafb;
+          color: #111827;
+        }
+
+        button:not(:disabled),
+        [role="button"]:not(:disabled) {
+          cursor: pointer;
+        }
+      }
+
+      @layer components {
+        .app-shell {
+          @apply flex h-screen overflow-hidden;
+        }
+
+        .sidebar-backdrop {
+          @apply fixed inset-0 z-30 hidden bg-slate-950/40 xl:hidden;
+        }
+
+        .app-sidebar {
+          @apply fixed inset-y-0 left-0 z-40 flex w-[290px] flex-col overflow-y-hidden border-r border-gray-200 bg-white px-5 transition-all duration-300 ease-in-out xl:static;
+          transform: translateX(-100%);
+        }
+
+        .app-shell.sidebar-mobile-open .app-sidebar {
+          transform: translateX(0);
+        }
+
+        .app-shell.sidebar-mobile-open .sidebar-backdrop {
+          display: block;
+        }
+
+        .sidebar-toggle-button {
+          @apply z-[60] flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-all duration-300 xl:h-11 xl:w-11 xl:border xl:border-gray-200;
+        }
+
+        .sidebar-toggle-button-active {
+          @apply bg-gray-100;
+        }
+
+        @media (min-width: 1280px) {
+          .app-sidebar {
+            transform: translateX(0);
+          }
+
+          .app-shell.sidebar-desktop-collapsed .app-sidebar {
+            width: 88px;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+          }
+
+          .app-shell.sidebar-desktop-collapsed .sidebar-header {
+            gap: 0;
+          }
+
+          .app-shell.sidebar-desktop-collapsed .menu-item {
+            justify-content: center;
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+          }
+
+          .app-shell.sidebar-desktop-collapsed .sidebar-brand-copy {
+            max-width: 0;
+            opacity: 0;
+            transform: translateX(-8px);
+            margin: 0;
+            pointer-events: none;
+          }
+
+          .app-shell.sidebar-desktop-collapsed .sidebar-section-title {
+            max-height: 0;
+            opacity: 0;
+            transform: translateY(-4px);
+            margin: 0;
+            pointer-events: none;
+          }
+
+          .app-shell.sidebar-desktop-collapsed #sidebar-state-summary {
+            max-height: 0;
+            opacity: 0;
+            transform: translateY(-6px);
+            margin: 0;
+            padding: 0;
+            border-width: 0;
+            pointer-events: none;
+          }
+
+          .app-shell.sidebar-desktop-collapsed .menu-item > span:last-child {
+            max-width: 0;
+            opacity: 0;
+            transform: translateX(-6px);
+            margin: 0;
+            pointer-events: none;
+          }
+        }
+
+        .menu-item {
+          @apply relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors;
+        }
+
+        .menu-item > span:last-child {
+          @apply max-w-[140px] overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out;
+        }
+
+        .menu-item-inactive {
+          @apply text-gray-700 hover:bg-gray-100 hover:text-gray-900;
+        }
+
+        .menu-item-active {
+          @apply bg-blue-50 text-blue-700;
+        }
+
+        .menu-item-icon {
+          @apply h-5 w-5 shrink-0;
+        }
+
+        .menu-item-icon-active {
+          @apply text-blue-600;
+        }
+
+        .menu-item-icon-inactive {
+          @apply text-gray-400;
+        }
+
+        .menu-item:hover .menu-item-icon-inactive {
+          color: #374151;
+        }
+
+        .sidebar-summary-card {
+          @apply overflow-hidden rounded-xl border border-gray-200 bg-gray-50 p-3 transition-all duration-300 ease-in-out;
+        }
+
+        .sidebar-header {
+          @apply flex items-center gap-3 pb-7 pt-8 transition-all duration-300 ease-in-out;
+        }
+
+        .sidebar-logo-badge {
+          @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-sm font-bold tracking-[0.2em] text-white;
+          transform: translateZ(0);
+        }
+
+        .sidebar-brand-copy {
+          @apply max-w-[220px] overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out;
+        }
+
+        .sidebar-section-title {
+          @apply overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out;
+        }
+
+        .sidebar-metric-grid {
+          @apply mt-4 grid gap-3;
+        }
+
+        .sidebar-metric {
+          @apply rounded-xl border border-gray-200 bg-white px-3 py-3;
+        }
+
+        .sidebar-metric-label {
+          @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400;
+        }
+
+        .sidebar-metric-value {
+          @apply mt-2 text-sm font-semibold text-gray-900;
+        }
+
+        .app-card {
+          @apply rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-5;
+        }
+
+        .metric-card {
+          @apply rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-5;
+        }
+
+        .ghost-button {
+          @apply inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
+        .primary-button {
+          @apply inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm transition disabled:cursor-not-allowed disabled:bg-gray-300;
+          background: #465fff;
+        }
+
+        .primary-button:hover {
+          background: #3641f5;
+        }
+
+        .input-shell {
+          @apply h-11 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100;
+        }
+
+        .section-kicker {
+          @apply text-xs font-medium uppercase tracking-[0.22em] text-gray-400;
+        }
+
+        .section-title {
+          @apply mt-1 text-lg font-semibold text-gray-900;
+        }
+
+        .section-copy {
+          @apply mt-1 text-sm text-gray-500;
+        }
+
+        .metric-label {
+          @apply text-sm text-gray-500;
+        }
+
+        .metric-value {
+          @apply mt-2 text-3xl font-bold text-gray-900;
+        }
+
+        .metric-note {
+          @apply mt-3 text-sm text-gray-500;
+        }
+
+        .status-pill {
+          @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+        }
+
+        .status-green {
+          @apply bg-emerald-100 text-emerald-700;
+        }
+
+        .status-yellow {
+          @apply bg-amber-100 text-amber-700;
+        }
+
+        .status-red {
+          @apply bg-rose-100 text-rose-700;
+        }
+
+        .empty-state {
+          @apply rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-500;
+        }
+
+        .nav-pill {
+          @apply rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-900;
+        }
+
+        .nav-pill-active {
+          @apply bg-white text-gray-900 shadow-sm;
+        }
+
+        .subnav-shell {
+          @apply inline-flex gap-1 rounded-lg bg-gray-100 p-1;
+        }
+
+        .subnav-pill {
+          @apply rounded-lg px-3 py-2 text-sm font-medium text-gray-500 transition hover:text-gray-900;
+        }
+
+        .subnav-pill-active {
+          @apply bg-white text-gray-900 shadow-sm;
+        }
+
+        .map-shell svg {
+          @apply h-full w-full;
+        }
+
+        .preview-title {
+          @apply text-lg font-semibold text-gray-900;
+        }
+
+        .preview-copy {
+          @apply mt-2 text-sm text-gray-500;
+        }
+
+        .preview-grid {
+          @apply mt-4 grid gap-3 sm:grid-cols-2;
+        }
+
+        .detail-item {
+          @apply rounded-xl border border-gray-200 bg-gray-50 p-3;
+        }
+
+        .detail-item-title {
+          @apply text-xs uppercase tracking-[0.18em] text-gray-400;
+        }
+
+        .detail-item-copy {
+          @apply mt-2 text-sm font-semibold text-gray-900;
+        }
+
+        .preview-button {
+          @apply mt-5 inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm transition;
+          background: #465fff;
+        }
+
+        .preview-button:hover {
+          background: #3641f5;
+        }
+
+        .attention-item {
+          @apply rounded-xl border border-gray-200 bg-gray-50 p-3;
+        }
+
+        .attention-title {
+          @apply text-sm font-semibold text-gray-900;
+        }
+
+        .attention-copy {
+          @apply mt-2 text-sm text-gray-500;
+        }
+
+        .data-table {
+          @apply w-full min-w-0 table-auto border-separate border-spacing-0;
+        }
+
+        .data-head {
+          @apply px-3 py-3 text-left text-xs font-medium uppercase tracking-[0.15em] leading-5 text-gray-500;
+        }
+
+        .data-head-button {
+          @apply inline-flex w-full items-center justify-between gap-2 text-left text-xs font-medium uppercase tracking-[0.15em] leading-5 text-gray-500 transition hover:text-gray-700;
+        }
+
+        .sort-indicator {
+          @apply text-[10px] text-gray-400;
+        }
+
+        .data-cell {
+          @apply px-3 py-3 align-top text-sm text-gray-500;
+        }
+
+        .system-cell {
+          @apply max-w-[15rem];
+        }
+
+        .pdf-link-cell {
+          @apply w-[6.5rem];
+        }
+
+        .system-action-cell {
+          @apply w-[8.5rem];
+        }
+
+        .data-row {
+          @apply border-b border-gray-100;
+        }
+
+        .data-row-selectable {
+          @apply cursor-pointer transition-colors hover:bg-slate-50;
+        }
+
+        .data-row-selected {
+          background: rgba(70, 95, 255, 0.06);
+        }
+
+        .system-name {
+          @apply text-sm font-medium break-words text-gray-900;
+        }
+
+        .system-subtext {
+          @apply mt-1 text-xs text-gray-500;
+        }
+
+        .system-subtext-link {
+          @apply mt-1 block max-w-full break-all text-xs font-medium text-gray-500 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-700;
+        }
+
+        .system-link {
+          @apply text-sm font-medium text-gray-700 underline decoration-gray-300 underline-offset-4;
+        }
+
+        .icon-link {
+          @apply inline-flex h-5 w-5 shrink-0 items-center justify-center text-gray-500 transition hover:text-blue-600;
+        }
+
+        .icon-link-icon {
+          @apply h-4 w-4;
+        }
+
+        .icon-link-row {
+          @apply flex items-center gap-2;
+        }
+
+        .pdf-page-links {
+          @apply flex min-w-0 flex-wrap items-center gap-2;
+        }
+
+        .combo-button-shell {
+          @apply relative inline-flex w-full justify-end;
+        }
+
+        .combo-button-group {
+          @apply inline-flex w-full items-stretch justify-end;
+        }
+
+        .combo-button-main {
+          @apply inline-flex min-w-0 flex-1 items-center justify-center rounded-l-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
+        .combo-button-toggle {
+          @apply inline-flex w-10 items-center justify-center rounded-r-lg border border-l-0 border-gray-200 bg-white text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
+        .combo-button-chevron {
+          @apply h-4 w-4 transition-transform duration-150;
+        }
+
+        .combo-button-chevron-open {
+          transform: rotate(180deg);
+        }
+
+        .combo-button-menu {
+          @apply absolute right-0 top-[calc(100%+0.35rem)] z-20 min-w-[10rem] rounded-lg border border-gray-200 bg-white p-1 shadow-lg;
+        }
+
+        .combo-button-menu-item {
+          @apply flex w-full items-center rounded-md px-3 py-2 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 disabled:cursor-not-allowed disabled:text-gray-400;
+        }
+
+        .inline-source-editor {
+          @apply flex min-w-[16rem] flex-col gap-2;
+        }
+
+        .inline-source-input {
+          @apply h-9 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-800 shadow-sm outline-none transition focus:border-blue-300 focus:ring-2 focus:ring-blue-100;
+        }
+
+        .inline-source-actions {
+          @apply flex items-center gap-2;
+        }
+
+        .inline-source-save {
+          @apply inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300;
+        }
+
+        .inline-source-cancel {
+          @apply inline-flex items-center rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
+        .pdf-page-link {
+          @apply inline-flex text-xs font-medium text-gray-600 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-900;
+        }
+
+        .bucket-card {
+          @apply rounded-xl border border-gray-200 bg-white p-3;
+        }
+
+        .bucket-header {
+          @apply flex items-center justify-between gap-4;
+        }
+
+        .bucket-title {
+          @apply text-sm font-semibold text-gray-900;
+        }
+
+        .bucket-copy {
+          @apply mt-3 text-sm text-gray-500;
+        }
+
+        .bucket-action {
+          @apply mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
+        .focus-stack {
+          @apply space-y-4;
+        }
+
+        .focus-card {
+          @apply rounded-xl border border-gray-200 bg-gray-50 p-3;
+        }
+
+        .focus-label {
+          @apply text-xs uppercase tracking-[0.2em] text-gray-400;
+        }
+
+        .focus-value {
+          @apply mt-2 text-sm font-semibold text-gray-900;
+        }
+
+        .focus-copy {
+          @apply mt-2 text-sm text-gray-500;
+        }
+
+        .result-shell {
+          @apply rounded-xl border border-gray-200 bg-gray-50 p-4;
+        }
+
+        .result-header {
+          @apply flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between;
+        }
+
+        .result-title {
+          @apply mt-1 text-lg font-semibold text-gray-900;
+        }
+
+        .result-copy {
+          @apply mt-1 text-sm text-gray-500;
+        }
+
+        .result-grid {
+          @apply mt-5 grid gap-4 md:grid-cols-4;
+        }
+
+        .step-card {
+          @apply rounded-xl border border-gray-200 bg-white p-4;
+        }
+
+        .step-index {
+          @apply text-xs uppercase tracking-[0.2em] text-gray-400;
+        }
+
+        .step-title {
+          @apply mt-2 text-sm font-semibold text-gray-900;
+        }
+
+        .step-copy {
+          @apply mt-2 text-sm text-gray-500;
+        }
+
+        .step-list {
+          @apply mt-4 space-y-3;
+        }
+
+        .step-item-label {
+          @apply block text-xs uppercase tracking-[0.18em] text-gray-400;
+        }
+
+        .step-item-value {
+          @apply mt-1 text-sm text-gray-700;
+        }
+
+        .pipeline-stage {
+          @apply grid grid-cols-[2.5rem_minmax(0,1fr)] gap-4;
+        }
+
+        .pipeline-stage-rail {
+          @apply flex flex-col items-center;
+        }
+
+        .pipeline-stage-node {
+          @apply flex h-10 w-10 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-sm font-semibold text-blue-700;
+        }
+
+        .pipeline-stage-line {
+          @apply mt-3 w-px flex-1 bg-gray-200;
+        }
+
+        .pipeline-stage-body {
+          @apply rounded-xl border border-gray-200 bg-white p-4;
+        }
+
+        .pipeline-stage-header {
+          @apply flex flex-col gap-3 md:flex-row md:items-start md:justify-between;
+        }
+
+        .pipeline-stage-kicker {
+          @apply text-xs uppercase tracking-[0.2em] text-gray-400;
+        }
+
+        .pipeline-stage-grid {
+          @apply mt-4 grid gap-3 md:grid-cols-3;
+        }
+
+        .pipeline-stage-actions {
+          @apply mt-4 flex flex-wrap gap-2;
+        }
+
+        .results-summary {
+          @apply grid gap-4 md:grid-cols-3;
+        }
+
+        .pdf-results-grid {
+          @apply grid gap-4 xl:grid-cols-2;
+        }
+
+        .pdf-result-card {
+          @apply rounded-xl border border-gray-200 bg-white p-4;
+        }
+
+        .pdf-result-button {
+          @apply flex w-full items-start justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:bg-gray-100;
+        }
+
+        .pdf-result-icon {
+          @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-xs font-semibold uppercase tracking-[0.2em] text-rose-600;
+        }
+
+        .pdf-result-title {
+          @apply text-sm font-semibold text-gray-900;
+        }
+
+        .pdf-result-copy {
+          @apply mt-2 text-sm text-gray-500;
+        }
+
+        .pdf-result-meta {
+          @apply mt-4 flex flex-wrap gap-2;
+        }
+
+        .pdf-result-actions {
+          @apply mt-5 flex flex-wrap gap-3;
+        }
+
+        .link-button {
+          @apply inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
+        }
+
+        .editor-shell {
+          @apply space-y-6;
+        }
+
+        .editor-header {
+          @apply flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between;
+        }
+
+        .editor-grid {
+          @apply grid gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)];
+        }
+
+        .question-list {
+          @apply space-y-3;
+        }
+
+        .question-card {
+          @apply w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:bg-gray-100;
+        }
+
+        .question-card-active {
+          background: #ecf3ff;
+          border-color: #c7d7fe;
+        }
+
+        .question-title {
+          @apply text-sm font-semibold text-gray-900;
+        }
+
+        .question-copy {
+          @apply mt-2 text-sm text-gray-500;
+        }
+
+        .page-stack {
+          @apply space-y-6;
+        }
+
+        .pdf-page-card {
+          @apply rounded-xl border border-gray-200 bg-white p-3;
+        }
+
+        .pdf-page-header {
+          @apply mb-4 flex items-center justify-between gap-4;
+        }
+
+        .pdf-stage {
+          @apply relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50;
+        }
+
+        .pdf-canvas {
+          @apply block h-auto w-full;
+        }
+
+        .pdf-overlay {
+          @apply pointer-events-none absolute inset-0 h-full w-full;
+        }
+
+        .overlay-empty-note {
+          @apply pointer-events-none absolute right-4 bottom-4 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-500 shadow-sm;
+        }
+
+        .overlay-rect {
+          fill: rgba(240, 68, 56, 0.12);
+          stroke: #d92d20;
+          stroke-width: 2;
+        }
+
+        .overlay-rect-active {
+          fill: rgba(70, 95, 255, 0.15);
+          stroke: #465fff;
+          stroke-width: 3;
+        }
+
+        .overlay-label {
+          @apply fill-gray-800 text-[11px] font-semibold;
+        }
+
+        .history-list {
+          @apply space-y-3;
+        }
+
+        .history-card {
+          @apply rounded-xl border border-gray-200 bg-white p-4 shadow-sm;
+        }
+
+        .history-header {
+          @apply flex items-start justify-between gap-3;
+        }
+
+        .history-header-copy {
+          @apply min-w-0;
+        }
+
+        .history-header-actions {
+          @apply flex shrink-0 items-center gap-2;
+        }
+
+        .history-title {
+          @apply text-base font-semibold text-gray-900;
+        }
+
+        .history-copy {
+          @apply mt-1 text-sm text-gray-500;
+        }
+
+        .history-metrics {
+          @apply mt-4 grid gap-3 md:grid-cols-4;
+        }
+
+        .history-deltas {
+          @apply mt-4 flex flex-wrap gap-2;
+        }
+
+        .history-expand-button {
+          @apply inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition hover:border-gray-300 hover:text-gray-700;
+        }
+
+        .history-chevron {
+          @apply h-4 w-4 transition-transform duration-200 ease-out;
+        }
+
+        .history-chevron-expanded {
+          @apply rotate-180;
+        }
+
+        .history-expanded {
+          @apply mt-4 border-t border-gray-200 pt-4;
+        }
+
+        .history-detail-panels {
+          @apply grid gap-3 xl:grid-cols-3;
+        }
+
+        .history-detail-panel {
+          @apply rounded-xl border border-gray-200 bg-gray-50 p-3;
+        }
+
+        .history-detail-title {
+          @apply text-xs font-semibold uppercase tracking-[0.22em] text-gray-400;
+        }
+
+        .history-detail-grid {
+          @apply mt-3 grid gap-3 sm:grid-cols-2;
+        }
+
+        .history-detail-item {
+          @apply rounded-lg border border-gray-200 bg-white p-3;
+        }
+
+        .history-detail-pair {
+          @apply mt-2 flex items-center gap-2 text-sm font-medium text-gray-900;
+        }
+
+        .history-detail-copy {
+          @apply mt-2 text-sm text-gray-500;
+        }
+
+        .history-detail-list {
+          @apply mt-3 space-y-2;
+        }
+
+        .history-detail-list-item {
+          @apply rounded-lg border border-gray-200 bg-white p-3;
+        }
+
+        .history-detail-list-title {
+          @apply text-sm font-medium text-gray-900 break-all;
+        }
+
+        .delta-pill {
+          @apply inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium;
+        }
+
+        .delta-pill-improved {
+          @apply bg-emerald-100 text-emerald-700;
+        }
+
+        .delta-pill-regressed {
+          @apply bg-amber-100 text-amber-700;
+        }
+
+        .delta-pill-neutral {
+          @apply bg-gray-100 text-gray-600;
+        }
+
+        .inspector-shell {
+          @apply rounded-xl border border-gray-200 bg-slate-50 p-4;
+        }
+
+        .inspector-header {
+          @apply flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
+        }
+
+        .inspector-grid {
+          @apply mt-4 grid gap-3 md:grid-cols-3;
+        }
+
+        .inspector-list {
+          @apply mt-4 space-y-3;
+        }
+
+        .inspector-item {
+          @apply rounded-xl border border-gray-200 bg-white p-4;
+        }
+
+        .inspector-item-header {
+          @apply flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between;
+        }
+
+        .inspector-item-title {
+          @apply text-sm font-semibold text-gray-900 break-all;
+        }
+
+        .inspector-item-copy {
+          @apply mt-1 text-sm text-gray-500 break-all;
+        }
+
+        .inspector-meta {
+          @apply mt-3 flex flex-wrap gap-2;
+        }
+
+        .inspector-actions {
+          @apply mt-4 flex flex-wrap gap-2;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app-shell" class="app-shell">
+      <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+      <aside id="app-sidebar" class="app-sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo-badge">
+            RW
+          </div>
+          <div class="sidebar-brand-copy">
+            <p class="text-xs uppercase tracking-[0.24em] text-gray-400">Records Workflow</p>
+            <h1 class="mt-1 text-lg font-semibold text-gray-900">Operator Dashboard</h1>
+          </div>
+        </div>
+
+        <div class="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
+          <nav class="sidebar-nav space-y-7">
+            <div>
+              <h3 class="sidebar-section-title mb-4 text-xs uppercase leading-[20px] text-gray-400">Menu</h3>
+              <ul class="mb-6 flex flex-col gap-2">
+                <li>
+                  <button id="home-nav" type="button" class="menu-item menu-item-active">
+                    <svg class="menu-item-icon menu-item-icon-active" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M4 5.75A1.75 1.75 0 0 1 5.75 4h4.5A1.75 1.75 0 0 1 12 5.75v4.5A1.75 1.75 0 0 1 10.25 12h-4.5A1.75 1.75 0 0 1 4 10.25zm8 0A1.75 1.75 0 0 1 13.75 4h4.5A1.75 1.75 0 0 1 20 5.75v4.5A1.75 1.75 0 0 1 18.25 12h-4.5A1.75 1.75 0 0 1 12 10.25zm-8 8A1.75 1.75 0 0 1 5.75 12h4.5A1.75 1.75 0 0 1 12 13.75v4.5A1.75 1.75 0 0 1 10.25 20h-4.5A1.75 1.75 0 0 1 4 18.25zm8 0A1.75 1.75 0 0 1 13.75 12h4.5A1.75 1.75 0 0 1 20 13.75v4.5A1.75 1.75 0 0 1 18.25 20h-4.5A1.75 1.75 0 0 1 12 18.25z" stroke="currentColor" stroke-width="1.5" />
+                    </svg>
+                    <span>Dashboard</span>
+                  </button>
+                </li>
+                <li>
+                  <button id="state-nav" type="button" class="menu-item menu-item-inactive">
+                    <svg class="menu-item-icon menu-item-icon-inactive" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M5 7.75A2.75 2.75 0 0 1 7.75 5h8.5A2.75 2.75 0 0 1 19 7.75v8.5A2.75 2.75 0 0 1 16.25 19h-8.5A2.75 2.75 0 0 1 5 16.25z" stroke="currentColor" stroke-width="1.5" />
+                      <path d="M8.5 9h7m-7 3h7m-7 3H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                    <span>State View</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="sidebar-section-title mb-4 text-xs uppercase leading-[20px] text-gray-400">Workspace</h3>
+              <ul class="mb-6 flex flex-col gap-2">
+                <li>
+                  <button id="sidebar-systems-nav" type="button" class="menu-item menu-item-inactive">
+                    <svg class="menu-item-icon menu-item-icon-inactive" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M4 7.25A2.25 2.25 0 0 1 6.25 5h11.5A2.25 2.25 0 0 1 20 7.25v2.5A2.25 2.25 0 0 1 17.75 12H6.25A2.25 2.25 0 0 1 4 9.75zM4 15.25A2.25 2.25 0 0 1 6.25 13h11.5A2.25 2.25 0 0 1 20 15.25v1.5A2.25 2.25 0 0 1 17.75 19H6.25A2.25 2.25 0 0 1 4 16.75z" stroke="currentColor" stroke-width="1.5" />
+                    </svg>
+                    <span>Systems</span>
+                  </button>
+                </li>
+                <li>
+                  <button id="sidebar-pipeline-nav" type="button" class="menu-item menu-item-inactive">
+                    <svg class="menu-item-icon menu-item-icon-inactive" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M6 6h4v4H6zm8 0h4v4h-4zM6 14h4v4H6zm10-5v2.5a2.5 2.5 0 0 1-2.5 2.5H10m0-6h3.5A2.5 2.5 0 0 1 16 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span>Pipeline</span>
+                  </button>
+                </li>
+                <li>
+                  <button id="sidebar-results-nav" type="button" class="menu-item menu-item-inactive">
+                    <svg class="menu-item-icon menu-item-icon-inactive" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M5 6.75A1.75 1.75 0 0 1 6.75 5h10.5A1.75 1.75 0 0 1 19 6.75v10.5A1.75 1.75 0 0 1 17.25 19H6.75A1.75 1.75 0 0 1 5 17.25z" stroke="currentColor" stroke-width="1.5" />
+                      <path d="M8 9h8m-8 3h8m-8 3h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                    <span>Results</span>
+                  </button>
+                </li>
+                <li>
+                  <button id="sidebar-history-nav" type="button" class="menu-item menu-item-inactive">
+                    <svg class="menu-item-icon menu-item-icon-inactive" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M12 7.75v4.5l2.75 1.75M20 12a8 8 0 1 1-2.343-5.657L20 4m0 0v4h-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span>Run History</span>
+                  </button>
+                </li>
+                <li>
+                  <button id="sidebar-editor-nav" type="button" class="menu-item menu-item-inactive hidden">
+                    <svg class="menu-item-icon menu-item-icon-inactive" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M7.75 4h6.086c.464 0 .91.184 1.238.512l3.414 3.414c.328.328.512.774.512 1.238v9.086A1.75 1.75 0 0 1 17.25 20H7.75A1.75 1.75 0 0 1 6 18.25V5.75A1.75 1.75 0 0 1 7.75 4Z" stroke="currentColor" stroke-width="1.5" />
+                      <path d="M14 4.75V8a1 1 0 0 0 1 1h3.25M8.5 14.5l2-2 1.5 1.5 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span>PDF Editor</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 class="sidebar-section-title mb-4 text-xs uppercase leading-[20px] text-gray-400">Current State</h3>
+              <div id="sidebar-state-summary" class="sidebar-summary-card"></div>
+            </div>
+          </nav>
+        </div>
+      </aside>
+
+      <div id="app-scroll-root" class="relative flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
+        <header class="sticky top-0 z-30 flex w-full border-b border-gray-200 bg-white">
+          <div class="flex grow flex-col justify-between lg:flex-row lg:px-6">
+            <div class="flex w-full items-center justify-between gap-3 border-b border-gray-200 px-4 py-3 lg:border-b-0 lg:px-0 lg:py-4">
+              <div class="flex min-w-0 items-center gap-3">
+                <button
+                  id="sidebar-toggle"
+                  type="button"
+                  class="sidebar-toggle-button"
+                  aria-label="Open sidebar"
+                  aria-controls="app-sidebar"
+                  aria-expanded="false"
+                >
+                  <svg
+                    id="sidebar-toggle-desktop-icon"
+                    class="hidden fill-current xl:block"
+                    width="16"
+                    height="12"
+                    viewBox="0 0 16 12"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      clip-rule="evenodd"
+                      d="M0.583252 1C0.583252 0.585788 0.919038 0.25 1.33325 0.25H14.6666C15.0808 0.25 15.4166 0.585786 15.4166 1C15.4166 1.41421 15.0808 1.75 14.6666 1.75L1.33325 1.75C0.919038 1.75 0.583252 1.41422 0.583252 1ZM0.583252 11C0.583252 10.5858 0.919038 10.25 1.33325 10.25L14.6666 10.25C15.0808 10.25 15.4166 10.5858 15.4166 11C15.4166 11.4142 15.0808 11.75 14.6666 11.75L1.33325 11.75C0.919038 11.75 0.583252 11.4142 0.583252 11ZM1.33325 5.25C0.919038 5.25 0.583252 5.58579 0.583252 6C0.583252 6.41421 0.919038 6.75 1.33325 6.75L7.99992 6.75C8.41413 6.75 8.74992 6.41421 8.74992 6C8.74992 5.58579 8.41413 5.25 7.99992 5.25L1.33325 5.25Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <svg
+                    id="sidebar-toggle-mobile-icon"
+                    class="block fill-current xl:hidden"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      clip-rule="evenodd"
+                      d="M3.25 6C3.25 5.58579 3.58579 5.25 4 5.25L20 5.25C20.4142 5.25 20.75 5.58579 20.75 6C20.75 6.41421 20.4142 6.75 20 6.75L4 6.75C3.58579 6.75 3.25 6.41422 3.25 6ZM3.25 18C3.25 17.5858 3.58579 17.25 4 17.25L20 17.25C20.4142 17.25 20.75 17.5858 20.75 18C20.75 18.4142 20.4142 18.75 20 18.75L4 18.75C3.58579 18.75 3.25 18.4142 3.25 18ZM4 11.25C3.58579 11.25 3.25 11.5858 3.25 12C3.25 12.4142 3.58579 12.75 4 12.75L12 12.75C12.4142 12.75 12.75 12.4142 12.75 12C12.75 11.5858 12.4142 11.25 12 11.25L4 11.25Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  <svg
+                    id="sidebar-toggle-close-icon"
+                    class="hidden fill-current xl:hidden"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      clip-rule="evenodd"
+                      d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </button>
+
+                <div class="flex min-w-0 flex-1 items-center gap-3 overflow-hidden">
+                  <h2 id="state-title" class="truncate text-2xl font-semibold leading-none text-gray-900">Records Workflow</h2>
+                  <p id="state-breadcrumb" class="truncate text-sm text-gray-500">Home &gt; National Map</p>
+                  <p id="page-copy" class="hidden text-sm text-gray-500"></p>
+                </div>
+              </div>
+            </div>
+            <div class="flex w-full flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-end lg:w-auto lg:px-0 lg:py-4">
+              <button id="back-home" type="button" class="ghost-button hidden">Back To Map</button>
+              <select id="state-select" class="input-shell sm:w-72"></select>
+              <button id="refresh-map" type="button" class="ghost-button">Refresh Map</button>
+              <button id="refresh-state" type="button" class="ghost-button hidden">Refresh State</button>
+            </div>
+          </div>
+        </header>
+
+        <main>
+          <div class="mx-auto max-w-[1600px] p-3 md:p-4">
+            <section id="home-view" class="space-y-6">
+              <div id="home-overview-cards" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"></div>
+
+              <div class="grid grid-cols-12 gap-3 md:gap-4">
+                <section class="col-span-12 xl:col-span-8">
+                  <div class="app-card">
+                    <div>
+                      <p class="section-kicker">Coverage</p>
+                      <h3 class="section-title">United States</h3>
+                    </div>
+                    <div class="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div id="home-map" class="map-shell h-[440px] w-full overflow-hidden"></div>
+                    </div>
+                  </div>
+                </section>
+
+                <aside class="col-span-12 space-y-6 xl:col-span-4">
+                  <section class="app-card">
+                    <p class="section-kicker">Selected</p>
+                    <div id="home-state-preview" class="mt-4"></div>
+                  </section>
+
+                  <section class="app-card">
+                    <p class="section-kicker">Attention Queue</p>
+                    <div id="home-attention-list" class="mt-4 space-y-3"></div>
+                  </section>
+                </aside>
+              </div>
+            </section>
+
+            <section id="state-view" class="hidden space-y-6">
+              <div id="state-tab-switcher" class="inline-flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1">
+                <button id="systems-tab" type="button" class="nav-pill nav-pill-active">Systems</button>
+                <button id="pipeline-tab" type="button" class="nav-pill">Pipeline</button>
+                <button id="history-tab" type="button" class="nav-pill">Run History</button>
+              </div>
+
+              <div id="state-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"></div>
+              <div id="state-action-banner" aria-live="polite"></div>
+              <input id="manual-pdf-upload-input" type="file" accept="application/pdf,.pdf" class="hidden" />
+
+              <section id="systems-panel" class="space-y-6">
+                <section class="app-card">
+                  <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p class="section-kicker">Systems</p>
+                      <h3 class="section-title">Hospital Systems</h3>
+                    </div>
+                    <input id="system-filter" type="search" class="input-shell sm:w-80" placeholder="Filter systems" />
+                  </div>
+                  <div id="systems-table" class="w-full overflow-x-hidden"></div>
+                </section>
+
+                <section class="app-card">
+                  <p class="section-kicker">Priority Queue</p>
+                  <div id="priority-buckets" class="mt-4 grid gap-3 xl:grid-cols-3"></div>
+                </section>
+              </section>
+
+              <section id="pipeline-panel" class="hidden space-y-6">
+                <section class="app-card">
+                  <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div>
+                      <p class="section-kicker">Pipeline</p>
+                      <h3 class="section-title">Workflow</h3>
+                      <p class="section-copy">This view mirrors the real crawl checkpoints. The cards below show where the crawl can fail and where a human can intervene.</p>
+                    </div>
+                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                      <select id="pipeline-system-select" class="input-shell sm:w-80"></select>
+                    </div>
+                  </div>
+                  <div id="pipeline-run-result" class="mt-6"></div>
+                </section>
+
+                <section class="app-card">
+                  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p class="section-kicker">Workspace</p>
+                      <h3 class="section-title">Flow and Results</h3>
+                    </div>
+                    <div class="subnav-shell">
+                      <button id="pipeline-flow-tab" type="button" class="subnav-pill subnav-pill-active">Flow</button>
+                      <button id="pipeline-results-tab" type="button" class="subnav-pill">Results</button>
+                    </div>
+                  </div>
+
+                  <div id="pipeline-flow-panel" class="mt-6 space-y-6">
+                    <div id="pipeline-insights" class="grid gap-3 lg:grid-cols-4"></div>
+                    <div id="pipeline-visual" class="space-y-4"></div>
+                    <div id="pipeline-stage-inspector" class="inspector-shell"></div>
+                    <div id="state-data-stage-inspector" class="inspector-shell"></div>
+                  </div>
+
+                  <div id="pipeline-results-panel" class="hidden mt-6 space-y-6">
+                    <div id="pipeline-results-summary" class="results-summary"></div>
+                    <div id="pipeline-results-list" class="pdf-results-grid"></div>
+                  </div>
+                </section>
+              </section>
+
+              <section id="run-history-panel" class="hidden space-y-6">
+                <div class="grid grid-cols-12 gap-3 md:gap-4">
+                  <section class="col-span-12 space-y-6 xl:col-span-8">
+                    <div class="app-card">
+                      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div>
+                          <p class="section-kicker">Run History</p>
+                          <h3 class="section-title">Pipeline Runs</h3>
+                        </div>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <select id="run-history-system-select" class="input-shell sm:w-80"></select>
+                          <button id="refresh-run-history" type="button" class="ghost-button">Refresh History</button>
+                        </div>
+                      </div>
+                      <div id="run-history-summary" class="mt-5 grid grid-cols-1 gap-3 md:grid-cols-4"></div>
+                    </div>
+
+                    <div id="run-history-list" class="history-list"></div>
+                  </section>
+
+                  <aside class="col-span-12 xl:col-span-4">
+                    <section class="app-card">
+                      <p class="section-kicker">History Context</p>
+                      <div id="run-history-insights" class="mt-4 focus-stack"></div>
+                    </section>
+                  </aside>
+                </div>
+              </section>
+
+              <section id="pdf-editor-panel" class="hidden editor-shell">
+                <div class="app-card">
+                  <div class="editor-header">
+                    <div>
+                      <button id="back-to-results" type="button" class="ghost-button">Back To Results</button>
+                      <p class="section-kicker mt-4">PDF Editor</p>
+                      <h3 id="pdf-editor-title" class="section-title">PDF Editor</h3>
+                      <p id="pdf-editor-copy" class="section-copy">Question mappings over the rendered PDF.</p>
+                      <p id="pdf-editor-save-status" class="section-copy hidden"></p>
+                    </div>
+                    <div class="flex flex-col gap-3 sm:flex-row">
+                      <button id="start-manual-mapping" type="button" class="ghost-button">Start Manual Mapping</button>
+                      <button id="save-pdf-draft" type="button" class="ghost-button">Save Draft</button>
+                      <button id="publish-pdf-draft" type="button" class="primary-button">Publish</button>
+                      <a id="open-cached-pdf" href="#" target="_blank" rel="noreferrer" class="link-button">Open Cached PDF</a>
+                    </div>
+                  </div>
+
+                  <div id="pdf-editor-metrics" class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"></div>
+                </div>
+
+                <div class="editor-grid">
+                  <section class="app-card">
+                    <p class="section-kicker">Questions</p>
+                    <div id="pdf-editor-authoring" class="mt-4 hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <div class="flex flex-col gap-3">
+                        <div class="flex flex-col gap-3 sm:flex-row">
+                          <input
+                            id="manual-question-label"
+                            type="text"
+                            class="input-shell flex-1"
+                            placeholder="New text question label"
+                          />
+                          <button id="add-manual-question" type="button" class="ghost-button">Add Text Question</button>
+                          <button id="map-selected-question" type="button" class="ghost-button">Map Selected Question</button>
+                        </div>
+                        <p class="system-subtext">
+                          Create a text question, select it, then drag one rectangle on the PDF to place its mapping.
+                        </p>
+                      </div>
+                    </div>
+                    <div id="pdf-editor-questions" class="question-list mt-4"></div>
+                  </section>
+
+                  <section class="app-card">
+                    <p class="section-kicker">PDF</p>
+                    <div id="pdf-editor-pages" class="page-stack mt-4"></div>
+                  </section>
+                </div>
+              </section>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+    <script src="/internal/console/assets/console.js"></script>
+  </body>
+</html>

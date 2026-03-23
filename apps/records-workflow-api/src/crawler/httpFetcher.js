@@ -1,6 +1,7 @@
 import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { resolvePythonExecutable } from '../utils/pythonRuntime.js';
 
 const execFile = promisify(execFileCallback);
 const SCRAPLING_FETCHER_PATH = fileURLToPath(new URL('./scrapling_fetch.py', import.meta.url));
@@ -35,6 +36,7 @@ async function fetchWithNode({ url, timeoutMs }) {
     });
 
     return {
+      backend: 'node',
       status: response.status,
       finalUrl: response.url,
       headers: normalizeHeaders(response.headers),
@@ -46,12 +48,14 @@ async function fetchWithNode({ url, timeoutMs }) {
 }
 
 async function fetchWithScrapling({ url }) {
-  const { stdout } = await execFile('python3', [SCRAPLING_FETCHER_PATH, url], {
+  const pythonBin = resolvePythonExecutable({ overrideEnvVar: 'RECORDS_FETCH_PYTHON_BIN' });
+  const { stdout } = await execFile(pythonBin, [SCRAPLING_FETCHER_PATH, url], {
     maxBuffer: MAX_FETCH_BUFFER_BYTES
   });
   const payload = JSON.parse(stdout || '{}');
 
   return {
+    backend: 'scrapling',
     status: Number(payload.status || 0),
     finalUrl: payload.finalUrl || url,
     headers: normalizeHeaders(payload.headers || {}),

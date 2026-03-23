@@ -1,4 +1,8 @@
-import { hostFromUrl, isLikelyWorkflowLink } from '../utils/urls.js';
+import {
+  hostFromUrl,
+  isLikelyDirectRecordsPageLink,
+  isLikelyWorkflowLink,
+} from '../utils/urls.js';
 
 const APPROVED_EXTERNAL_DOMAINS = [
   'healthmark-group.com',
@@ -11,12 +15,15 @@ const APPROVED_EXTERNAL_DOMAINS = [
   'swellbox.com'
 ];
 
-export function expandCandidateLinks({ document, allowedDomain }) {
+export function expandCandidateLinks({ document, allowedDomain, mode = 'general' }) {
   if (!document || !Array.isArray(document.links)) return [];
+
+  const linkMatcher =
+    mode === 'records_page' ? isLikelyDirectRecordsPageLink : isLikelyWorkflowLink;
 
   return document.links
     .filter((link) =>
-      isLikelyWorkflowLink({
+      linkMatcher({
         href: link.href,
         text: link.text,
         contextText: link.contextText || '',
