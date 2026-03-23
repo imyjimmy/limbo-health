@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { View, Pressable, StyleSheet, Modal, Text } from 'react-native';
 import {
   IconBook2,
-  IconBook,
-  IconBookFilled,
   IconHome,
   IconHomeFilled,
   IconPlus,
@@ -12,6 +10,7 @@ import {
   IconMicrophone,
   IconCamera,
   IconLogs,
+  IconReportMedical,
 } from '@tabler/icons-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ProfileAvatar } from './ProfileAvatar';
@@ -56,7 +55,6 @@ interface CustomTabBarProps extends BottomTabBarProps {
     label: string;
     icon?: ContextualCreateIconKey;
   } | null;
-  onDocumentPress?: () => void;
 }
 
 export function CustomTabBar({
@@ -67,12 +65,11 @@ export function CustomTabBar({
   hasNotification = false,
   onCreateAction,
   contextualCreateAction = null,
-  onDocumentPress,
 }: CustomTabBarProps) {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const [menuVisible, setMenuVisible] = useState(false);
-  const orderedTabKinds: TabKind[] = ['home', 'binders', 'create', 'page', 'profile'];
+  const orderedTabKinds: TabKind[] = ['home', 'page', 'create', 'binders', 'profile'];
   const visibleRoutes = orderedTabKinds
     .map((kind) => state.routes.find((route) => getTabKind(route.name) === kind))
     .filter((route): route is (typeof state.routes)[number] => Boolean(route));
@@ -95,11 +92,6 @@ export function CustomTabBar({
             const onPress = () => {
               if (tabKind === 'create') {
                 setMenuVisible(true);
-                return;
-              }
-
-              if (tabKind === 'page') {
-                onDocumentPress?.();
                 return;
               }
 
@@ -231,11 +223,7 @@ function renderTabIcon(
       return <IconBook2 size={ICON_SIZE} color={color} strokeWidth={2} />;
 
     case 'page':
-      return isActive ? (
-        <IconBookFilled size={ICON_SIZE} color={color} />
-      ) : (
-        <IconBook size={ICON_SIZE} color={color} strokeWidth={2} />
-      );
+      return <IconReportMedical size={ICON_SIZE} color={color} strokeWidth={2} />;
 
     case 'create':
       return (

@@ -181,7 +181,7 @@ export default function WelcomeScreen() {
                 request packets for supported hospital systems.
               </Text>
               <Text style={styles.supportNote}>
-                Coverage varies by hospital system and keeps expanding as workflows are verified.
+                Coverage will expand to all 50 States.
               </Text>
             </View>
 

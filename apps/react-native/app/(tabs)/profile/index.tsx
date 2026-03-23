@@ -9,7 +9,7 @@ import { getProfileChrome } from './profileChrome';
 
 type MenuItemKey =
   | 'account'
-  | 'personal-info'
+  | 'medical-info'
   | 'settings'
   | 'encryption-keys'
   | 'notifications'
@@ -52,7 +52,7 @@ export default function ProfileScreen() {
   const menuSections: MenuSection[] = [
     {
       key: 'records-setup',
-      items: [{ key: 'personal-info', label: 'My Personal Info', destructive: false }],
+      items: [{ key: 'medical-info', label: 'My Medical Info', destructive: false }],
     },
     {
       key: 'account-logistics',
@@ -75,7 +75,7 @@ export default function ProfileScreen() {
     }
     if (key === 'account') router.push('/(tabs)/profile/account');
     if (key === 'settings') router.push('/(tabs)/profile/settings');
-    if (key === 'personal-info') router.push('/(tabs)/profile/personal-info');
+    if (key === 'medical-info') router.push('/(tabs)/profile/medical-info');
     if (key === 'encryption-keys') router.push('/(tabs)/profile/encryption-keys');
   };
 

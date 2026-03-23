@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
-  type LayoutChangeEvent,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import RNFS from 'react-native-fs';
@@ -124,8 +123,6 @@ export default function BinderListScreen() {
   const [editingName, setEditingName] = useState('');
   const [renamingRepoId, setRenamingRepoId] = useState<string | null>(null);
   const [isDigitalInfoVisible, setIsDigitalInfoVisible] = useState(false);
-  const [listViewportHeight, setListViewportHeight] = useState(0);
-  const [pendingSectionBottom, setPendingSectionBottom] = useState(0);
 
   const binderRef = useRef<BinderService | null>(null);
   const digitalInfoReveal = useRef(new Animated.Value(0)).current;
@@ -696,21 +693,6 @@ export default function BinderListScreen() {
     [capture, openBinder],
   );
 
-  const handleListViewportLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextHeight = event.nativeEvent.layout.height;
-    setListViewportHeight((prev) => (Math.abs(prev - nextHeight) < 1 ? prev : nextHeight));
-  }, []);
-
-  const handlePendingSectionLayout = useCallback((event: LayoutChangeEvent) => {
-    const { y, height } = event.nativeEvent.layout;
-    const nextBottom = y + height;
-    setPendingSectionBottom((prev) => (Math.abs(prev - nextBottom) < 1 ? prev : nextBottom));
-  }, []);
-
-  const digitalBindersMarginTop =
-    listViewportHeight > 0 && pendingSectionBottom > 0
-      ? Math.max(16, Math.round(listViewportHeight / 2 - pendingSectionBottom))
-      : 16;
   const digitalInfoSlotHeight = digitalInfoReveal.interpolate({
     inputRange: [0, 1],
     outputRange: [0, DIGITAL_INFO_REVEAL_HEIGHT],
@@ -779,29 +761,8 @@ export default function BinderListScreen() {
 
     case 'repos-loaded':
       return (
-        <ScrollView
-          style={styles.container}
-          onLayout={handleListViewportLayout}
-          contentContainerStyle={[styles.scrollContent, styles.scrollContentExpanded]}
-        >
-          <View style={styles.pendingSection} onLayout={handlePendingSectionLayout}>
-            <View style={styles.headerRow}>
-              <Text style={styles.screenTitle}>Pending Requests</Text>
-            </View>
-            <View style={styles.pendingInfoCard}>
-              <View style={styles.pendingInfoBadge}>
-                <Text style={styles.pendingInfoBadgeText}>i</Text>
-              </View>
-              <View style={styles.pendingInfoBody}>
-                <Text style={styles.pendingInfoTitle}>No pending requests yet</Text>
-                <Text style={styles.pendingInfoText}>
-                  Pending medical records requests will appear here once they are created.
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={[styles.digitalBindersSection, { marginTop: digitalBindersMarginTop }]}>
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.digitalBindersSection}>
             <View style={styles.digitalBindersHeaderRow}>
               <View style={styles.digitalBindersTitleRow}>
                 <Text style={styles.screenTitle}>Digital Binders</Text>
@@ -1177,6 +1138,7 @@ addPhotoButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 40,
     paddingBottom: 12,
     paddingHorizontal: 0,
   },

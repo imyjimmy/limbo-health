@@ -31,10 +31,10 @@ export default function ProfileLayout() {
         }}
       />
       <Stack.Screen
-        name="personal-info"
+        name="medical-info"
         options={{
           headerShown: true,
-          title: 'My Personal Info',
+          title: 'My Medical Info',
           headerBackButtonDisplayMode: 'default',
           headerStyle: { backgroundColor: chrome.headerBackground },
           headerTintColor: chrome.primaryText,

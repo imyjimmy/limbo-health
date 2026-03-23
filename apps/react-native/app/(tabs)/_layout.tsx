@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { Redirect, Tabs, useRouter, usePathname } from 'expo-router';
 import { CustomTabBar } from '../../components/navigation/CustomTabBar';
-import { getLastViewed, setPendingRestore } from '../../core/binder/LastViewedStore';
 import { ToastProvider, useToast } from '../../components/Toast';
 
 import { useAuthContext } from '../../providers/AuthProvider';
@@ -96,34 +95,6 @@ function TabLayoutInner() {
 
     return null;
   }, [binderContext?.dirPath]);
-
-  const handleDocumentPress = () => {
-    const last = getLastViewed();
-    if (!last) {
-      showToast('Open a binder');
-      return;
-    }
-    const { binderId, dirPath } = last;
-
-    // Already viewing the target directory? Do nothing.
-    const targetPath = dirPath
-      ? `/binder/${binderId}/browse/${dirPath}`
-      : `/binder/${binderId}`;
-    if (pathname === targetPath) {
-      showToast('Already on current view');
-      return;
-    }
-
-    if (dirPath) {
-      setPendingRestore(dirPath);
-    }
-    // Pop the (binders) stack to root first (clears any stale binder),
-    // then push a fresh binder instance
-    router.navigate('/(tabs)/(binders)');
-    setTimeout(() => {
-      router.push(`/binder/${binderId}`);
-    }, 0);
-  };
 
   const handleCreateAction = async (action: 'note' | 'audio' | 'photo' | 'medication') => {
     if (!binderContext) {
@@ -250,7 +221,6 @@ function TabLayoutInner() {
             hasNotification={false}
             onCreateAction={handleCreateAction}
             contextualCreateAction={contextualCreateAction}
-            onDocumentPress={handleDocumentPress}
           />
         )}
         screenOptions={{
@@ -258,9 +228,9 @@ function TabLayoutInner() {
         }}
       >
         <Tabs.Screen name="home" options={{ title: 'Home' }} />
-        <Tabs.Screen name="(binders)" options={{ title: 'Binder List' }} />
+        <Tabs.Screen name="page" options={{ title: 'Requests' }} />
         <Tabs.Screen name="create" options={{ title: 'Create' }} />
-        <Tabs.Screen name="page" options={{ title: 'Current View' }} />
+        <Tabs.Screen name="(binders)" options={{ title: 'Digital Binders' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
       </Tabs>
 

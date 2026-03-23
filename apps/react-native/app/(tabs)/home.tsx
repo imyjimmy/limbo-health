@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  IconMedicalCross,
   IconCirclePlus,
+  IconCheck,
   IconChevronRight,
 } from '@tabler/icons-react-native';
 import { SvgUri } from 'react-native-svg';
@@ -25,6 +25,8 @@ import {
 const LOGO_TILE_WIDTH = 112;
 const LOGO_TILE_HEIGHT = 58;
 const LOGO_TILE_GAP = 10;
+const INFO_PILLS = ['Find hospital systems', 'Re-Use Your Bio', 'Send Official Forms'];
+const APP_ICON = require('../../assets/icon.png');
 
 const MONOGRAM_STOP_WORDS = new Set([
   'and',
@@ -185,76 +187,65 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.headerRow}>
-          <Text style={styles.screenTitle}>Home</Text>
+          <Text style={styles.screenTitle}>Request Your Records</Text>
         </View>
 
         <View style={styles.contentArea}>
-          <View style={styles.infoCard}>
-            <View style={styles.infoHeader}>
-              <View style={styles.infoIconWrap}>
-                <IconMedicalCross size={20} color={theme.colors.danger} strokeWidth={2} />
+          <View style={styles.topSection}>
+            <View style={styles.infoCard}>
+              <View style={styles.infoIconShell}>
+                <Image source={APP_ICON} style={styles.infoIcon} resizeMode="cover" />
               </View>
-              <View style={styles.infoHeadingWrap}>
-                <Text style={styles.infoTitle}>Request Your Records</Text>
-                <Text style={styles.infoSubtitle}>Guided request packets</Text>
+              <View style={styles.infoPillRow}>
+                {INFO_PILLS.map((pill) => (
+                  <View key={pill} style={styles.infoPill}>
+                    <IconCheck size={14} color={theme.colors.secondary} strokeWidth={2.4} />
+                    <Text style={styles.infoPillText}>{pill}</Text>
+                  </View>
+                ))}
               </View>
             </View>
 
-            <Text style={styles.infoBody}>
-              Search supported hospital systems, reuse your saved request details, and generate a
-              ready-to-send PDF without starting from scratch.
-            </Text>
+            <View style={styles.hospitalLogoPanel}>
+              <LogoMarqueeRow
+                logos={logoRows[0]}
+                direction="left"
+                durationMs={84000}
+                renderHospitalLogo={renderHospitalLogo}
+                startOffsetPx={24}
+                style={styles.marqueeRowTop}
+              />
+              <LogoMarqueeRow
+                logos={logoRows[1]}
+                direction="right"
+                durationMs={92000}
+                renderHospitalLogo={renderHospitalLogo}
+                startOffsetPx={LOGO_TILE_WIDTH * 0.65}
+              />
+            </View>
 
-            <View style={styles.infoPillRow}>
-              <View style={styles.infoPill}>
-                <Text style={styles.infoPillText}>Supported systems</Text>
-              </View>
-              <View style={styles.infoPill}>
-                <Text style={styles.infoPillText}>Official form links</Text>
-              </View>
-              <View style={styles.infoPill}>
-                <Text style={styles.infoPillText}>Reusable profile</Text>
+            <View style={styles.pendingSection}>
+              <Text style={styles.pendingSectionTitle}>Pending Requests</Text>
+              <View style={styles.pendingEmptyState}>
+                <Text style={styles.pendingEmptyText}>No Pending Requests</Text>
               </View>
             </View>
           </View>
 
-          <View style={styles.hospitalLogoPanel}>
-            <View style={styles.logoPanelHeader}>
-              <Text style={styles.logoPanelTitle}>Featured systems</Text>
-              <Text style={styles.logoPanelCaption}>
-                Examples from current verified request coverage.
-              </Text>
-            </View>
-            <LogoMarqueeRow
-              logos={logoRows[0]}
-              direction="left"
-              durationMs={84000}
-              renderHospitalLogo={renderHospitalLogo}
-              startOffsetPx={24}
-              style={styles.marqueeRowTop}
-            />
-            <LogoMarqueeRow
-              logos={logoRows[1]}
-              direction="right"
-              durationMs={92000}
-              renderHospitalLogo={renderHospitalLogo}
-              startOffsetPx={LOGO_TILE_WIDTH * 0.65}
-            />
+          <View style={styles.bottomSection}>
+            <Pressable
+              onPress={() => router.push('/records-request')}
+              style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaButtonPressed]}
+            >
+              <IconCirclePlus size={22} color={theme.colors.primaryForeground} strokeWidth={2} />
+              <Text style={styles.ctaText}>Start Records Request</Text>
+              <IconChevronRight size={20} color={theme.colors.primaryForeground} strokeWidth={2} />
+            </Pressable>
+
+            {/* <Text style={styles.supportNote}>
+              Coverage will expand to all 50 States.
+            </Text> */}
           </View>
-
-          <Pressable
-            onPress={() => router.push('/records-request')}
-            style={({ pressed }) => [styles.ctaButton, pressed && styles.ctaButtonPressed]}
-          >
-            <IconCirclePlus size={22} color={theme.colors.primaryForeground} strokeWidth={2} />
-            <Text style={styles.ctaText}>Start Records Request</Text>
-            <IconChevronRight size={20} color={theme.colors.primaryForeground} strokeWidth={2} />
-          </Pressable>
-
-          <Text style={styles.supportNote}>
-            Coverage expands as more hospital workflows are verified. Binder tools stay available
-            once records arrive.
-          </Text>
         </View>
       </View>
     </View>
@@ -270,7 +261,7 @@ const createStyles = createThemedStyles((theme) => ({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 40,
-    paddingBottom: 48,
+    paddingBottom: 20,
   },
   headerRow: {
     flexDirection: 'row',
@@ -287,38 +278,30 @@ const createStyles = createThemedStyles((theme) => ({
   contentArea: {
     flex: 1,
   },
-  hospitalLogoPanel: {
+  topSection: {
     flex: 1,
+    gap: 0,
+  },
+  bottomSection: {
+    marginTop: 'auto',
+    paddingTop: 20,
+  },
+  hospitalLogoPanel: {
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.logoPanelBorder,
     backgroundColor: theme.colors.logoPanelBackground,
-    paddingVertical: 14,
+    paddingVertical: 8,
     marginBottom: 16,
     justifyContent: 'center',
   },
-  logoPanelHeader: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 4,
-  },
-  logoPanelTitle: {
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  logoPanelCaption: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
-  },
   marqueeRow: {
-    height: LOGO_TILE_HEIGHT + 14,
+    height: LOGO_TILE_HEIGHT + 8,
     overflow: 'hidden',
     justifyContent: 'center',
   },
   marqueeRowTop: {
-    marginBottom: 10,
+    marginBottom: 6,
   },
   marqueeTrack: {
     flexDirection: 'row',
@@ -361,60 +344,46 @@ const createStyles = createThemedStyles((theme) => ({
     fontWeight: '700',
   },
   infoCard: {
+    alignItems: 'center',
     backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.dangerSoft,
+    flexDirection: 'row',
+    gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 12,
     marginBottom: 16,
   },
-  infoHeader: {
+  infoIconShell: {
     alignItems: 'center',
-    flexDirection: 'row',
-    marginBottom: 8,
-  },
-  infoIconWrap: {
-    alignItems: 'center',
-    backgroundColor: theme.colors.dangerSoft,
-    borderRadius: 10,
-    height: 34,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    height: 74,
     justifyContent: 'center',
-    marginRight: 12,
-    width: 34,
+    overflow: 'hidden',
+    width: 74,
   },
-  infoHeadingWrap: {
-    flex: 1,
-  },
-  infoTitle: {
-    color: theme.colors.text,
-    fontSize: 22,
-    fontWeight: '700',
-    lineHeight: 28,
-  },
-  infoSubtitle: {
-    color: theme.colors.textSecondary,
-    fontSize: 17,
-    fontWeight: '500',
-    lineHeight: 22,
-  },
-  infoBody: {
-    color: theme.colors.textSecondary,
-    fontSize: 16,
-    lineHeight: 24,
-    paddingRight: 6,
+  infoIcon: {
+    height: 74,
+    width: 74,
   },
   infoPillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 14,
+    flex: 1,
+    gap: 6,
+    paddingLeft: 4,
   },
   infoPill: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     backgroundColor: theme.colors.surface,
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
+    flexDirection: 'row',
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -422,6 +391,28 @@ const createStyles = createThemedStyles((theme) => ({
     color: theme.colors.secondary,
     fontSize: 12,
     fontWeight: '700',
+  },
+  pendingSection: {
+    flex: 1,
+    marginTop: 2,
+  },
+  pendingEmptyState: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  pendingSectionTitle: {
+    color: theme.colors.text,
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  pendingEmptyText: {
+    color: theme.colors.textMuted,
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 20,
+    opacity: 0.9,
+    textAlign: 'center',
   },
   ctaButton: {
     alignItems: 'center',
