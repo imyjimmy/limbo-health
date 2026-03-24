@@ -78,7 +78,9 @@ export function resolveSourceDocumentPath(
   } = {},
 ) {
   if (!filePath) return filePath;
-  if (path.isAbsolute(filePath)) return filePath;
+  if (path.isAbsolute(filePath) && fs.existsSync(filePath)) {
+    return filePath;
+  }
 
   const relativePath = toSourceDocumentRelativePath(filePath, {
     sourceDocumentStorageDir,

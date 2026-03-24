@@ -93,7 +93,14 @@ publicRouter.get('/source-documents/:id/content', async (req, res) => {
 
     return res.sendFile(resolvedStoragePath);
   } catch (error) {
-    console.error('Failed to fetch source document content:', error);
+    if (error?.code === 'ENOENT') {
+      return res.status(404).json({ error: 'Source document content not found on disk.' });
+    }
+
+    console.error('Failed to fetch source document content:', {
+      sourceDocumentId: req.params.id,
+      error,
+    });
     return res.status(500).json({ error: 'Failed to fetch source document content.' });
   }
 });
