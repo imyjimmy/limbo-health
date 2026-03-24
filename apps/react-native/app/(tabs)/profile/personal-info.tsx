@@ -82,7 +82,7 @@ export default function PersonalInfoScreen() {
         <View style={styles.card}>
           <Text style={styles.helperText}>
             Used to prefill medical-records request packets, including contact fields when a form
-            asks for them. Stored only on this device.
+            asks for them.
           </Text>
         </View>
 

@@ -9,6 +9,7 @@ import { useLocalSearchParams, useNavigation } from 'expo-router';
 import { CommonActions } from '@react-navigation/native';
 import { BinderDirectory } from '../../../../../components/binder/BinderDirectory';
 import { consumePendingRestore } from '../../../../../core/binder/LastViewedStore';
+import { resolveBinderDisplayName } from '../../../../../core/binder/binderDisplayName';
 
 export default function BinderRootScreen() {
   const { binderId, binderName } = useLocalSearchParams<{
@@ -18,7 +19,10 @@ export default function BinderRootScreen() {
   const navigation = useNavigation();
   const [ready, setReady] = useState(false);
   const resolvedBinderName = Array.isArray(binderName) ? binderName[0] : binderName;
-  const title = resolvedBinderName?.trim() ? resolvedBinderName : 'Binder';
+  const title = resolveBinderDisplayName({
+    repoId: binderId ?? 'binder',
+    remoteName: resolvedBinderName,
+  });
 
   useEffect(() => {
     const dirPath = consumePendingRestore();

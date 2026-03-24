@@ -114,19 +114,25 @@ export default function WelcomeScreen() {
     {
       // eyebrow: 'Self Sovereign Tech',
       title: 'Find & Keep Your Medical Records',
-      body: 'Fill out your medical info one time, use it everywhere.',
+      body: 'Access to your own Medical Records has always been Fragmented and Painful. Not anymore.',
+      accent: theme.colors.primary,
+    },
+    {
+      title: 'Manage Your Own Healthcare',
+      body: 'When you have your own records, you enable an entirely new way to manage your own health:',
       accent: theme.colors.primary,
       pills: ['Enable Private AI', 'Unlock Medical Tourism', 'Get Second Opinions'],
     },
-    {
-      // eyebrow: 'Workflow over chaos',
-      title: 'Conquer Hospital Bureaucracy.',
-      body:
-        'Let us guide you through hospital paperwork. Interact with legacy systems without headaches.',
-      accent: theme.colors.secondary,
-      pills: ['Conquer Legacy Systems', 'Access Your Records', 'Manage Your Health'],
-    },
+    // {
+    //   // eyebrow: 'Workflow over chaos',
+    //   title: 'Conquer Hospital Bureaucracy.',
+    //   body:
+    //     'Let us guide you through hospital paperwork. Interact with legacy systems without headaches.',
+    //   accent: theme.colors.secondary,
+    //   pills: ['Conquer Legacy Systems', 'Access Your Records', 'Manage Your Health'],
+    // },
   ];
+  const totalSlides = slides.length + 1;
 
   useEffect(() => {
     if (response?.type === 'success' && response.authentication?.accessToken) {
@@ -155,8 +161,9 @@ export default function WelcomeScreen() {
   };
 
   const goToSlide = (index: number) => {
-    setCurrentSlide(index);
-    scrollRef.current?.scrollTo({ x: width * index, animated: true });
+    const nextSlide = Math.max(0, Math.min(index, totalSlides - 1));
+    setCurrentSlide(nextSlide);
+    scrollRef.current?.scrollTo({ x: width * nextSlide, animated: true });
   };
 
   const renderNostrEntryPoint = () => {
@@ -213,6 +220,8 @@ export default function WelcomeScreen() {
         ref={scrollRef}
         horizontal
         pagingEnabled
+        bounces={false}
+        directionalLockEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         onMomentumScrollEnd={(event) => {
@@ -249,15 +258,10 @@ export default function WelcomeScreen() {
         <View style={[styles.slide, { width }]}>
           <View style={styles.slideInner}>
             <View style={styles.finalHero}>
-              <Text style={styles.slideEyebrow}>Ready when you are</Text>
-              <Text style={styles.slideTitle}>Fill Out Once. Ready Everywhere.</Text>
+              {/* <Text style={styles.slideEyebrow}>Ready when you are</Text> */}
+              <Text style={styles.slideTitle}>Conquer Hospital Bureaucracy.</Text>
               <Text style={styles.slideBody}>
-                Fill out your medical info{' '}
-                <Text style={styles.slideBodyEmphasis}>one time</Text>, use it{' '}
-                <Text style={styles.slideBodyEmphasis}>everywhere</Text>.
-              </Text>
-              <Text style={styles.supportNote}>
-                Coverage will expand to all 50 States.
+                Let us guide you through hospital paperwork. Interact with legacy systems without headaches.
               </Text>
             </View>
 
@@ -289,7 +293,7 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.paginationRow}>
-          {[0, 1, 2].map((index) => (
+          {Array.from({ length: totalSlides }, (_, index) => index).map((index) => (
             <Pressable
               key={index}
               onPress={() => goToSlide(index)}
@@ -310,7 +314,8 @@ export default function WelcomeScreen() {
               <Text style={styles.nextButtonText}>Next</Text>
             </Pressable>
           ) : (
-            <Text style={styles.footerNote}>Bio setup comes right after sign-in.</Text>
+            // <Text style={styles.footerNote}>Bio setup comes right after sign-in.</Text>
+            <></>
           )}
         </View>
       </View>

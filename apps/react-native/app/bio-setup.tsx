@@ -85,12 +85,14 @@ export default function BioSetupScreen() {
   const [saving, setSaving] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [armedField, setArmedField] = useState<BioFieldKey | null>(null);
   const pagerRef = useRef<ScrollView>(null);
   const pageScrollRefs = useRef<Record<BioStepIndex, ScrollView | null>>({
     0: null,
     1: null,
     2: null,
   });
+  const fieldRefs = useRef<Partial<Record<BioFieldKey, TextInput | null>>>({});
   const fieldLayoutsRef = useRef<Record<BioStepIndex, Partial<Record<BioFieldKey, number>>>>({
     0: {},
     1: {},
@@ -107,9 +109,8 @@ export default function BioSetupScreen() {
     () => [
       {
         eyebrow: 'Personal Info',
-        title: hasProfile ? 'Keep your request details current.' : 'Set up your request identity.',
-        body:
-          'We keep this profile on your device and use it to prefill medical-records request packets so you do not have to keep retyping it.',
+        title: 'Your request identity.',
+        body: 'Fill out your info once, use it everywhere.',
       },
       {
         eyebrow: 'Step 2 of 3',
@@ -123,7 +124,7 @@ export default function BioSetupScreen() {
         body: 'Add the address that should appear on outgoing request forms and response mail.',
       },
     ],
-    [hasProfile],
+    [],
   );
 
   useEffect(() => {
@@ -171,6 +172,13 @@ export default function BioSetupScreen() {
     [],
   );
 
+  const setFieldRef = useCallback(
+    (field: BioFieldKey) => (node: TextInput | null) => {
+      fieldRefs.current[field] = node;
+    },
+    [],
+  );
+
   const focusField = useCallback((field: BioFieldKey) => {
     focusedFieldRef.current = field;
     const stepIndex = BIO_FIELD_STEP_MAP[field];
@@ -192,11 +200,23 @@ export default function BioSetupScreen() {
     if (focusedFieldRef.current === field) {
       focusedFieldRef.current = null;
     }
+    setArmedField((current) => (current === field ? null : current));
   }, []);
 
   const dismissKeyboard = useCallback(() => {
     focusedFieldRef.current = null;
+    setArmedField(null);
+    for (const input of Object.values(fieldRefs.current)) {
+      input?.blur();
+    }
     Keyboard.dismiss();
+  }, []);
+
+  const activateField = useCallback((field: BioFieldKey) => {
+    setArmedField(field);
+    requestAnimationFrame(() => {
+      fieldRefs.current[field]?.focus();
+    });
   }, []);
 
   const setPageScrollRef = useCallback(
@@ -246,6 +266,7 @@ export default function BioSetupScreen() {
 
   const handlePrevious = () => {
     if (currentStep > 0) {
+      dismissKeyboard();
       const nextStep = currentStep - 1;
       setCurrentStep(nextStep);
       scrollPagerToStep(nextStep, true);
@@ -261,6 +282,7 @@ export default function BioSetupScreen() {
         Alert.alert('Incomplete Personal Info', validationError);
         return;
       }
+      dismissKeyboard();
       const nextStep = currentStep + 1;
       setCurrentStep(nextStep);
       scrollPagerToStep(nextStep, true);
@@ -273,6 +295,7 @@ export default function BioSetupScreen() {
   const handleStepSelect = (targetStep: number) => {
     if (targetStep === currentStep) return;
     if (targetStep < currentStep) {
+      dismissKeyboard();
       setCurrentStep(targetStep);
       scrollPagerToStep(targetStep, true);
       return;
@@ -284,6 +307,7 @@ export default function BioSetupScreen() {
       Alert.alert('Incomplete Personal Info', validationError);
       return;
     }
+    dismissKeyboard();
     setCurrentStep(targetStep);
     scrollPagerToStep(targetStep, true);
   };
@@ -294,6 +318,7 @@ export default function BioSetupScreen() {
       if (targetStep === currentStep) return;
 
       if (targetStep < currentStep) {
+        dismissKeyboard();
         setCurrentStep(targetStep);
         return;
       }
@@ -310,9 +335,10 @@ export default function BioSetupScreen() {
         return;
       }
 
+      dismissKeyboard();
       setCurrentStep(targetStep);
     },
-    [currentStep, form, scrollPagerToStep, width],
+    [currentStep, dismissKeyboard, form, scrollPagerToStep, width],
   );
 
   useEffect(() => {
@@ -367,6 +393,7 @@ export default function BioSetupScreen() {
         directionalLockEnabled
         scrollEnabled={!keyboardVisible}
         showsHorizontalScrollIndicator={false}
+        onScrollBeginDrag={dismissKeyboard}
         onMomentumScrollEnd={handlePagerMomentumEnd}
         style={styles.pager}
       >
@@ -391,7 +418,14 @@ export default function BioSetupScreen() {
             >
               <Text style={styles.eyebrow}>{step.eyebrow}</Text>
               <Text style={styles.title}>{step.title}</Text>
-              <Text style={styles.subtitle}>{step.body}</Text>
+              {index === 0 ? (
+                <Text style={styles.subtitle}>
+                  Fill out your info <Text style={styles.subtitleEmphasis}>once</Text>, use it{' '}
+                  <Text style={styles.subtitleEmphasis}>everywhere</Text>.
+                </Text>
+              ) : (
+                <Text style={styles.subtitle}>{step.body}</Text>
+              )}
             </Pressable>
 
             {index === 0 ? (
@@ -402,7 +436,6 @@ export default function BioSetupScreen() {
                 <Text style={styles.introCardBody}>Phone number (optional)</Text>
                 <Text style={styles.introCardBody}>Email (optional)</Text>
                 <Text style={styles.introCardBody}>Mailing address</Text>
-                <Text style={styles.introCardFootnote}>Stored only on this device.</Text>
               </View>
             ) : null}
 
@@ -410,75 +443,123 @@ export default function BioSetupScreen() {
               <View style={styles.card}>
                 <View onLayout={registerFieldLayout('fullName')}>
                   <Text style={styles.fieldLabel}>Full name</Text>
-                  <TextInput
-                    value={form.fullName}
-                    onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
-                    onFocus={() => focusField('fullName')}
-                    onBlur={() => blurField('fullName')}
-                    placeholder="Jane Doe"
-                    placeholderTextColor={theme.colors.inputPlaceholder}
-                    style={styles.input}
-                    autoCapitalize="words"
-                    textContentType="name"
-                    returnKeyType="next"
-                  />
+                  <View style={styles.inputShell}>
+                    <TextInput
+                      ref={setFieldRef('fullName')}
+                      value={form.fullName}
+                      onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
+                      onFocus={() => focusField('fullName')}
+                      onBlur={() => blurField('fullName')}
+                      placeholder="Jane Doe"
+                      placeholderTextColor={theme.colors.inputPlaceholder}
+                      style={styles.input}
+                      autoCapitalize="words"
+                      textContentType="name"
+                      returnKeyType="next"
+                      showSoftInputOnFocus={armedField === 'fullName'}
+                    />
+                    {armedField !== 'fullName' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit full name"
+                        onPress={() => activateField('fullName')}
+                        style={styles.inputActivationOverlay}
+                      />
+                    ) : null}
+                  </View>
                 </View>
 
                 <View onLayout={registerFieldLayout('dateOfBirth')}>
                   <Text style={styles.fieldLabel}>Date of birth</Text>
-                  <TextInput
-                    value={form.dateOfBirth}
-                    onChangeText={(value) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        dateOfBirth: formatDateOfBirthInput(value),
-                      }))
-                    }
-                    onFocus={() => focusField('dateOfBirth')}
-                    onBlur={() => blurField('dateOfBirth')}
-                    onSubmitEditing={dismissKeyboard}
-                    placeholder="MM/DD/YYYY"
-                    placeholderTextColor={theme.colors.inputPlaceholder}
-                    style={styles.input}
-                    keyboardType="number-pad"
-                    inputAccessoryViewButtonLabel={
-                      Platform.OS === 'ios' && showsDateOfBirthDoneButton ? 'Done' : undefined
-                    }
-                  />
+                  <View style={styles.inputShell}>
+                    <TextInput
+                      ref={setFieldRef('dateOfBirth')}
+                      value={form.dateOfBirth}
+                      onChangeText={(value) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          dateOfBirth: formatDateOfBirthInput(value),
+                        }))
+                      }
+                      onFocus={() => focusField('dateOfBirth')}
+                      onBlur={() => blurField('dateOfBirth')}
+                      onSubmitEditing={dismissKeyboard}
+                      placeholder="MM/DD/YYYY"
+                      placeholderTextColor={theme.colors.inputPlaceholder}
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      inputAccessoryViewButtonLabel={
+                        Platform.OS === 'ios' && showsDateOfBirthDoneButton ? 'Done' : undefined
+                      }
+                      showSoftInputOnFocus={armedField === 'dateOfBirth'}
+                    />
+                    {armedField !== 'dateOfBirth' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit date of birth"
+                        onPress={() => activateField('dateOfBirth')}
+                        style={styles.inputActivationOverlay}
+                      />
+                    ) : null}
+                  </View>
                 </View>
 
                 <View onLayout={registerFieldLayout('phoneNumber')}>
                   <Text style={styles.fieldLabel}>Phone number</Text>
-                  <TextInput
-                    value={form.phoneNumber}
-                    onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
-                    onFocus={() => focusField('phoneNumber')}
-                    onBlur={() => blurField('phoneNumber')}
-                    placeholder="512 555 0123"
-                    placeholderTextColor={theme.colors.inputPlaceholder}
-                    style={styles.input}
-                    keyboardType="phone-pad"
-                    textContentType="telephoneNumber"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <View style={styles.inputShell}>
+                    <TextInput
+                      ref={setFieldRef('phoneNumber')}
+                      value={form.phoneNumber}
+                      onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
+                      onFocus={() => focusField('phoneNumber')}
+                      onBlur={() => blurField('phoneNumber')}
+                      placeholder="512 555 0123"
+                      placeholderTextColor={theme.colors.inputPlaceholder}
+                      style={styles.input}
+                      keyboardType="phone-pad"
+                      textContentType="telephoneNumber"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      showSoftInputOnFocus={armedField === 'phoneNumber'}
+                    />
+                    {armedField !== 'phoneNumber' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit phone number"
+                        onPress={() => activateField('phoneNumber')}
+                        style={styles.inputActivationOverlay}
+                      />
+                    ) : null}
+                  </View>
                 </View>
 
                 <View onLayout={registerFieldLayout('email')}>
                   <Text style={styles.fieldLabel}>Email</Text>
-                  <TextInput
-                    value={form.email}
-                    onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
-                    onFocus={() => focusField('email')}
-                    onBlur={() => blurField('email')}
-                    placeholder="name@example.com"
-                    placeholderTextColor={theme.colors.inputPlaceholder}
-                    style={styles.input}
-                    keyboardType="email-address"
-                    textContentType="emailAddress"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+                  <View style={styles.inputShell}>
+                    <TextInput
+                      ref={setFieldRef('email')}
+                      value={form.email}
+                      onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
+                      onFocus={() => focusField('email')}
+                      onBlur={() => blurField('email')}
+                      placeholder="name@example.com"
+                      placeholderTextColor={theme.colors.inputPlaceholder}
+                      style={styles.input}
+                      keyboardType="email-address"
+                      textContentType="emailAddress"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      showSoftInputOnFocus={armedField === 'email'}
+                    />
+                    {armedField !== 'email' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit email"
+                        onPress={() => activateField('email')}
+                        style={styles.inputActivationOverlay}
+                      />
+                    ) : null}
+                  </View>
                 </View>
               </View>
             ) : null}
@@ -487,89 +568,153 @@ export default function BioSetupScreen() {
               <View style={styles.card}>
                 <View onLayout={registerFieldLayout('addressLine1')}>
                   <Text style={styles.fieldLabel}>Address line 1</Text>
-                  <TextInput
-                    value={form.addressLine1}
-                    onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
-                    onFocus={() => focusField('addressLine1')}
-                    onBlur={() => blurField('addressLine1')}
-                    placeholder="123 Main St"
-                    placeholderTextColor={theme.colors.inputPlaceholder}
-                    style={styles.input}
-                    autoCapitalize="words"
-                    textContentType="streetAddressLine1"
-                  />
+                  <View style={styles.inputShell}>
+                    <TextInput
+                      ref={setFieldRef('addressLine1')}
+                      value={form.addressLine1}
+                      onChangeText={(value) =>
+                        setForm((prev) => ({ ...prev, addressLine1: value }))
+                      }
+                      onFocus={() => focusField('addressLine1')}
+                      onBlur={() => blurField('addressLine1')}
+                      placeholder="123 Main St"
+                      placeholderTextColor={theme.colors.inputPlaceholder}
+                      style={styles.input}
+                      autoCapitalize="words"
+                      textContentType="streetAddressLine1"
+                      showSoftInputOnFocus={armedField === 'addressLine1'}
+                    />
+                    {armedField !== 'addressLine1' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit address line 1"
+                        onPress={() => activateField('addressLine1')}
+                        style={styles.inputActivationOverlay}
+                      />
+                    ) : null}
+                  </View>
                 </View>
 
                 <View onLayout={registerFieldLayout('addressLine2')}>
                   <Text style={styles.fieldLabel}>Address line 2</Text>
-                  <TextInput
-                    value={form.addressLine2}
-                    onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
-                    onFocus={() => focusField('addressLine2')}
-                    onBlur={() => blurField('addressLine2')}
-                    placeholder="Apt 4B"
-                    placeholderTextColor={theme.colors.inputPlaceholder}
-                    style={styles.input}
-                    autoCapitalize="words"
-                    textContentType="streetAddressLine2"
-                  />
+                  <View style={styles.inputShell}>
+                    <TextInput
+                      ref={setFieldRef('addressLine2')}
+                      value={form.addressLine2}
+                      onChangeText={(value) =>
+                        setForm((prev) => ({ ...prev, addressLine2: value }))
+                      }
+                      onFocus={() => focusField('addressLine2')}
+                      onBlur={() => blurField('addressLine2')}
+                      placeholder="Apt 4B"
+                      placeholderTextColor={theme.colors.inputPlaceholder}
+                      style={styles.input}
+                      autoCapitalize="words"
+                      textContentType="streetAddressLine2"
+                      showSoftInputOnFocus={armedField === 'addressLine2'}
+                    />
+                    {armedField !== 'addressLine2' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit address line 2"
+                        onPress={() => activateField('addressLine2')}
+                        style={styles.inputActivationOverlay}
+                      />
+                    ) : null}
+                  </View>
                 </View>
 
                 <View style={styles.inlineRow}>
                   <View style={styles.inlineFieldWide} onLayout={registerFieldLayout('city')}>
                     <Text style={styles.fieldLabel}>City</Text>
-                    <TextInput
-                      value={form.city}
-                      onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
-                      onFocus={() => focusField('city')}
-                      onBlur={() => blurField('city')}
-                      placeholder="Austin"
-                      placeholderTextColor={theme.colors.inputPlaceholder}
-                      style={styles.input}
-                      autoCapitalize="words"
-                      textContentType="addressCity"
-                    />
+                    <View style={styles.inputShell}>
+                      <TextInput
+                        ref={setFieldRef('city')}
+                        value={form.city}
+                        onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
+                        onFocus={() => focusField('city')}
+                        onBlur={() => blurField('city')}
+                        placeholder="Austin"
+                        placeholderTextColor={theme.colors.inputPlaceholder}
+                        style={styles.input}
+                        autoCapitalize="words"
+                        textContentType="addressCity"
+                        showSoftInputOnFocus={armedField === 'city'}
+                      />
+                      {armedField !== 'city' ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Edit city"
+                          onPress={() => activateField('city')}
+                          style={styles.inputActivationOverlay}
+                        />
+                      ) : null}
+                    </View>
                   </View>
 
                   <View style={styles.inlineFieldNarrow} onLayout={registerFieldLayout('state')}>
                     <Text style={styles.fieldLabel}>State</Text>
-                    <TextInput
-                      value={form.state}
-                      onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
-                      onFocus={() => focusField('state')}
-                      onBlur={() => blurField('state')}
-                      placeholder="TX"
-                      placeholderTextColor={theme.colors.inputPlaceholder}
-                      style={styles.input}
-                      autoCapitalize="characters"
-                      textContentType="addressState"
-                      maxLength={24}
-                    />
+                    <View style={styles.inputShell}>
+                      <TextInput
+                        ref={setFieldRef('state')}
+                        value={form.state}
+                        onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
+                        onFocus={() => focusField('state')}
+                        onBlur={() => blurField('state')}
+                        placeholder="TX"
+                        placeholderTextColor={theme.colors.inputPlaceholder}
+                        style={styles.input}
+                        autoCapitalize="characters"
+                        textContentType="addressState"
+                        maxLength={24}
+                        showSoftInputOnFocus={armedField === 'state'}
+                      />
+                      {armedField !== 'state' ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Edit state"
+                          onPress={() => activateField('state')}
+                          style={styles.inputActivationOverlay}
+                        />
+                      ) : null}
+                    </View>
                   </View>
                 </View>
 
                 <View onLayout={registerFieldLayout('postalCode')}>
                   <Text style={styles.fieldLabel}>Postal code</Text>
-                  <TextInput
-                    value={form.postalCode}
-                    onChangeText={(value) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        postalCode: value.replace(/[^\d-]/g, '').slice(0, 10),
-                      }))
-                    }
-                    onFocus={() => focusField('postalCode')}
-                    onBlur={() => blurField('postalCode')}
-                    onSubmitEditing={dismissKeyboard}
-                    placeholder="78701"
-                    placeholderTextColor={theme.colors.inputPlaceholder}
-                    style={styles.input}
-                    keyboardType="number-pad"
-                    textContentType="postalCode"
-                    inputAccessoryViewButtonLabel={
-                      Platform.OS === 'ios' && showsPostalCodeDoneButton ? 'Done' : undefined
-                    }
-                  />
+                  <View style={styles.inputShell}>
+                    <TextInput
+                      ref={setFieldRef('postalCode')}
+                      value={form.postalCode}
+                      onChangeText={(value) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          postalCode: value.replace(/[^\d-]/g, '').slice(0, 10),
+                        }))
+                      }
+                      onFocus={() => focusField('postalCode')}
+                      onBlur={() => blurField('postalCode')}
+                      onSubmitEditing={dismissKeyboard}
+                      placeholder="78701"
+                      placeholderTextColor={theme.colors.inputPlaceholder}
+                      style={styles.input}
+                      keyboardType="number-pad"
+                      textContentType="postalCode"
+                      inputAccessoryViewButtonLabel={
+                        Platform.OS === 'ios' && showsPostalCodeDoneButton ? 'Done' : undefined
+                      }
+                      showSoftInputOnFocus={armedField === 'postalCode'}
+                    />
+                    {armedField !== 'postalCode' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Edit postal code"
+                        onPress={() => activateField('postalCode')}
+                        style={styles.inputActivationOverlay}
+                      />
+                    ) : null}
+                  </View>
                 </View>
               </View>
             ) : null}
@@ -698,6 +843,10 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 16,
     lineHeight: 23,
   },
+  subtitleEmphasis: {
+    color: theme.colors.text,
+    fontWeight: '800',
+  },
   introCard: {
     backgroundColor: theme.colors.surface,
     borderRadius: 28,
@@ -746,6 +895,13 @@ const createStyles = createThemedStyles((theme) => ({
     paddingVertical: 13,
     color: theme.colors.text,
     fontSize: 16,
+  },
+  inputShell: {
+    position: 'relative',
+  },
+  inputActivationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
   },
   dismissArea: {
     flexGrow: 1,

@@ -21,6 +21,12 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuthContext } from '../../../providers/AuthProvider';
 import { useCryptoContext } from '../../../providers/CryptoProvider';
 import { BinderService } from '../../../core/binder/BinderService';
+import {
+  forgetBinderName,
+  readBinderNames,
+  rememberBinderName,
+  rememberBinderNames,
+} from '../../../core/binder/BinderNameStore';
 import { API_BASE_URL } from '../../../constants/api';
 import { useCamera } from '../../../hooks/useCamera';
 import type { MedicalDocument } from '../../../types/document';
@@ -36,6 +42,7 @@ import {
   type BinderTextureId,
 } from '../../../components/binder/BinderTextureBackground';
 import { BinderSpine } from '../../../components/binder/BinderSpine';
+import { resolveBinderDisplayName } from '../../../core/binder/binderDisplayName';
 
 // --- Types ---
 
@@ -75,6 +82,15 @@ const DIGITAL_INFO_REVEAL_HEIGHT = 104;
 
 function repoDir(repoId: string): string {
   return `binders/${repoId}`;
+}
+
+function pickFirstNonEmptyString(...values: Array<string | null | undefined>): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
 }
 
 async function isAlreadyCloned(repoId: string): Promise<boolean> {
@@ -118,6 +134,7 @@ export default function BinderListScreen() {
     phase: 'loading-repos',
   });
   const [binderTextures, setBinderTextures] = useState<Record<string, BinderTextureId>>({});
+  const [binderNames, setBinderNames] = useState<Record<string, string>>({});
   const [expandedTextureCards, setExpandedTextureCards] = useState<Record<string, boolean>>({});
   const [editingRepoId, setEditingRepoId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -192,6 +209,9 @@ export default function BinderListScreen() {
     setScreenState({ phase: 'loading-repos' });
 
     try {
+      const storedBinderNames = await readBinderNames();
+      setBinderNames(storedBinderNames);
+
       const res = await fetch(`${API_BASE_URL}/api/mgit/user/repositories`, {
         headers: { Authorization: `Bearer ${jwt}` },
       });
@@ -201,15 +221,38 @@ export default function BinderListScreen() {
       const data = await res.json();
 
       // Normalize response — may be an array or { repositories: [...] }
-      const rawList: RepoSummary[] = (Array.isArray(data)
-        ? data.map((r: any) => ({ id: r.id ?? r.repoId ?? r.name, name: r.name ?? r.id }))
-        : (data.repositories ?? []).map((r: any) => ({
-            id: r.id ?? r.repoId ?? r.name,
-            name: r.name ?? r.id,
-          }))
-      ).filter((r: RepoSummary) => !r.id.startsWith('scan-'));
+      const rawRepos = Array.isArray(data) ? data : (data.repositories ?? []);
+      const rawList: RepoSummary[] = rawRepos
+        .map((repo: any) => {
+          const repoId = pickFirstNonEmptyString(repo?.id, repo?.repoId, repo?.name);
+          if (!repoId) {
+            return null;
+          }
+
+          const remoteName = pickFirstNonEmptyString(
+            repo?.displayName,
+            repo?.display_name,
+            repo?.binderName,
+            repo?.binder_name,
+            repo?.repoName,
+            repo?.repo_name,
+            repo?.name,
+          );
+
+          return {
+            id: repoId,
+            name: resolveBinderDisplayName({
+              repoId,
+              remoteName,
+              cachedName: storedBinderNames[repoId],
+            }),
+          };
+        })
+        .filter((repo: RepoSummary | null): repo is RepoSummary => Boolean(repo))
+        .filter((repo: RepoSummary) => !repo.id.startsWith('scan-'));
 
       // Enrich binder cards with local metadata from git + patient-info.
+      const learnedBinderNames: Record<string, string> = {};
       const enriched = await Promise.all(
         rawList.map(async (repo) => {
           const cloned = await isAlreadyCloned(repo.id);
@@ -276,10 +319,20 @@ export default function BinderListScreen() {
             const doc = await io.readDocument('/patient-info.json');
             const firstLine = doc.value?.split('\n')[0] ?? '';
             const name = firstLine.startsWith('# ') ? firstLine.slice(2).trim() : '';
+            const resolvedName = resolveBinderDisplayName({
+              repoId: repo.id,
+              remoteName: result.name,
+              cachedName: storedBinderNames[repo.id],
+              localName: name,
+            });
+
+            if (name) {
+              learnedBinderNames[repo.id] = name;
+            }
 
             return {
               ...result,
-              name: name || result.name,
+              name: resolvedName,
               patientCreatedAt: extractPatientCreatedAt(doc.value),
             };
           } catch {
@@ -287,6 +340,11 @@ export default function BinderListScreen() {
           }
         }),
       );
+
+      if (Object.keys(learnedBinderNames).length > 0) {
+        const nextBinderNames = await rememberBinderNames(learnedBinderNames);
+        setBinderNames(nextBinderNames);
+      }
 
       setScreenState({ phase: 'repos-loaded', repos: enriched });
     } catch (err) {
@@ -443,6 +501,8 @@ export default function BinderListScreen() {
             ),
           };
         });
+        const nextBinderNames = await rememberBinderName(repo.id, nextName);
+        setBinderNames(nextBinderNames);
 
         return true;
       } catch (err) {
@@ -604,6 +664,8 @@ export default function BinderListScreen() {
                 },
               );
 
+              const nextBinderNames = await rememberBinderName(binderId, binderName);
+              setBinderNames(nextBinderNames);
               await fetchRepos();
             } catch (err) {
               const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -641,6 +703,8 @@ export default function BinderListScreen() {
         persistTextureMap(next);
         return next;
       });
+      const nextBinderNames = await forgetBinderName(repo.id);
+      setBinderNames(nextBinderNames);
 
       // Delete from server
       if (jwt) {
@@ -684,13 +748,19 @@ export default function BinderListScreen() {
         await service.addPhoto('photos', result.binaryData, result.sizeBytes);
 
         // Refresh entry list
-        await openBinder({ id: repoId, name: repoId });
+        await openBinder({
+          id: repoId,
+          name: resolveBinderDisplayName({
+            repoId,
+            cachedName: binderNames[repoId],
+          }),
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         Alert.alert('Photo Failed', msg);
       }
     },
-    [capture, openBinder],
+    [binderNames, capture, openBinder],
   );
 
   const digitalInfoSlotHeight = digitalInfoReveal.interpolate({
