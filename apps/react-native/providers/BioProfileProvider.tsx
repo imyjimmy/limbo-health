@@ -9,6 +9,10 @@ import React, {
 import * as SecureStore from 'expo-secure-store';
 import { useAuthContext } from './AuthProvider';
 import { emptyBioProfile, isBioProfileComplete, type BioProfile } from '../types/bio';
+import {
+  resolveBioProfileOwnerKeys,
+  storageKeyForBioProfileOwner,
+} from '../core/bio/storage';
 
 type BioProfileStatus = 'loading' | 'ready';
 
@@ -21,29 +25,7 @@ interface BioProfileContextValue {
   clearProfile: () => Promise<void>;
 }
 
-const STORAGE_KEY_PREFIX = 'limbo_bio_profile_v1';
-
 const BioProfileContext = createContext<BioProfileContextValue | null>(null);
-
-function ownerKeyForAuthState(
-  status: string,
-  pubkey: string | null,
-  loginMethod: string | null,
-  googleId?: string | null,
-  googleEmail?: string | null,
-): string | null {
-  if (status !== 'authenticated' && status !== 'expired') return null;
-
-  if (pubkey) return `nostr:${pubkey}`;
-  if (loginMethod === 'google' && googleId) return `google-id:${googleId}`;
-  if (loginMethod === 'google' && googleEmail) return `google-email:${googleEmail}`;
-  return null;
-}
-
-function storageKeyForOwner(ownerKey: string): string {
-  const encodedOwner = encodeURIComponent(ownerKey).replace(/%/g, '_');
-  return `${STORAGE_KEY_PREFIX}.${encodedOwner}`;
-}
 
 export function BioProfileProvider({ children }: { children: React.ReactNode }) {
   const { state } = useAuthContext();
@@ -81,23 +63,17 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
     [defaultProfile, profile],
   );
 
-  const ownerKey = useMemo(
+  const ownerKeys = useMemo(
     () =>
-      ownerKeyForAuthState(
-        state.status,
-        state.pubkey,
-        state.loginMethod,
-        state.googleProfile?.googleId ?? null,
-        state.googleProfile?.email ?? null,
-      ),
-    [
-      state.status,
-      state.pubkey,
-      state.loginMethod,
-      state.googleProfile?.googleId,
-      state.googleProfile?.email,
-    ],
+      resolveBioProfileOwnerKeys({
+        status: state.status,
+        pubkey: state.pubkey,
+        googleProfile: state.googleProfile,
+        connections: state.connections,
+      }),
+    [state.status, state.pubkey, state.googleProfile, state.connections],
   );
+  const ownerKey = ownerKeys[0] ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +88,16 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
       setStatus('loading');
 
       try {
-        const raw = await SecureStore.getItemAsync(storageKeyForOwner(ownerKey));
+        let raw: string | null = null;
+        let loadedFromOwnerKey: string | null = null;
+
+        for (const candidateOwnerKey of ownerKeys) {
+          raw = await SecureStore.getItemAsync(storageKeyForBioProfileOwner(candidateOwnerKey));
+          if (raw) {
+            loadedFromOwnerKey = candidateOwnerKey;
+            break;
+          }
+        }
         if (cancelled) return;
 
         if (!raw) {
@@ -127,6 +112,17 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
           ...parsed,
         };
         setProfile(isBioProfileComplete(normalizedProfile) ? normalizedProfile : normalizedProfile);
+
+        if (loadedFromOwnerKey && loadedFromOwnerKey !== ownerKey) {
+          try {
+            await SecureStore.setItemAsync(storageKeyForBioProfileOwner(ownerKey), raw);
+          } catch (error) {
+            console.warn(
+              '[BioProfileProvider] Failed to migrate bio profile to linked owner key',
+              error,
+            );
+          }
+        }
       } catch (error) {
         console.warn('[BioProfileProvider] Failed to load bio profile', error);
         if (!cancelled) {
@@ -144,7 +140,7 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
     return () => {
       cancelled = true;
     };
-  }, [defaultProfile, ownerKey]);
+  }, [defaultProfile, ownerKey, ownerKeys]);
 
   const saveProfile = useCallback(
     async (nextProfile: BioProfile) => {
@@ -153,7 +149,7 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
       }
 
       await SecureStore.setItemAsync(
-        storageKeyForOwner(ownerKey),
+        storageKeyForBioProfileOwner(ownerKey),
         JSON.stringify({
           ...nextProfile,
           fullName: nextProfile.fullName.trim(),
@@ -185,10 +181,14 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
   );
 
   const clearProfile = useCallback(async () => {
-    if (!ownerKey) return;
-    await SecureStore.deleteItemAsync(storageKeyForOwner(ownerKey));
+    if (ownerKeys.length === 0) return;
+    await Promise.all(
+      ownerKeys.map((candidateOwnerKey) =>
+        SecureStore.deleteItemAsync(storageKeyForBioProfileOwner(candidateOwnerKey)),
+      ),
+    );
     setProfile(null);
-  }, [ownerKey]);
+  }, [ownerKeys]);
 
   const value = useMemo<BioProfileContextValue>(
     () => ({
