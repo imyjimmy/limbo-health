@@ -14,7 +14,7 @@ beforeEach(() => {
 
 describe('dirCache', () => {
   const items: DirItem[] = [
-    { kind: 'folder', name: 'conditions', relativePath: 'conditions' },
+    { kind: 'folder', name: 'conditions', relativePath: 'conditions', childCount: 0 },
   ];
 
   test('dirSet/dirGet stores and retrieves items by reference', () => {

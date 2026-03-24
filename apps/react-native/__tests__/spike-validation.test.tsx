@@ -12,7 +12,7 @@ import { hkdf } from '@noble/hashes/hkdf.js';
 import * as git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
 // import * as FileSystem from 'expo-file-system';
-import { createFSAdapter } from './fsAdapter';
+import { createFSAdapter } from '../core/git/fsAdapter';
 import './polyfills';
 
 const testPullAndDecrypt = async (

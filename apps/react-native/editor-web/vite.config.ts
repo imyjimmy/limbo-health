@@ -12,7 +12,7 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: '@10play/tentap-editor',
+        find: /^@10play\/tentap-editor$/,
         replacement: '@10play/tentap-editor/web',
       },
       {
