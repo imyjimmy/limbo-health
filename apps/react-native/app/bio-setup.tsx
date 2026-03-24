@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 import { useBioProfile } from '../providers/BioProfileProvider';
@@ -231,6 +232,29 @@ export default function BioSetupScreen() {
     setCurrentStep(targetStep);
   };
 
+  const stepSwipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(!keyboardVisible)
+        .activeOffsetX([-24, 24])
+        .failOffsetY([-16, 16])
+        .runOnJS(true)
+        .onEnd((event) => {
+          if ((event.translationX > 72 || event.velocityX > 650) && currentStep > 0) {
+            handlePrevious();
+            return;
+          }
+
+          if (
+            (event.translationX < -72 || event.velocityX < -650) &&
+            currentStep < STEP_COUNT - 1
+          ) {
+            void handleNext();
+          }
+        }),
+    [currentStep, handleNext, handlePrevious, keyboardVisible],
+  );
+
   if (status === 'loading' && !didHydrate) {
     return (
       <View style={styles.loadingScreen}>
@@ -263,211 +287,213 @@ export default function BioSetupScreen() {
         </View>
       </View>
 
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        onScrollBeginDrag={dismissKeyboard}
-        showsVerticalScrollIndicator={false}
-      >
-        <Pressable
-          onPress={dismissKeyboard}
-          disabled={!keyboardVisible}
-          style={[styles.hero, currentStep === 0 && styles.heroIntro]}
+      <GestureDetector gesture={stepSwipeGesture}>
+        <ScrollView
+          ref={scrollRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={dismissKeyboard}
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.eyebrow}>{activeStep.eyebrow}</Text>
-          <Text style={styles.title}>{activeStep.title}</Text>
-          <Text style={styles.subtitle}>{activeStep.body}</Text>
-        </Pressable>
+          <Pressable
+            onPress={dismissKeyboard}
+            disabled={!keyboardVisible}
+            style={[styles.hero, currentStep === 0 && styles.heroIntro]}
+          >
+            <Text style={styles.eyebrow}>{activeStep.eyebrow}</Text>
+            <Text style={styles.title}>{activeStep.title}</Text>
+            <Text style={styles.subtitle}>{activeStep.body}</Text>
+          </Pressable>
 
-        {currentStep === 0 ? (
-          <View style={styles.introCard}>
-            <Text style={styles.introCardTitle}>What we will ask for</Text>
-            <Text style={styles.introCardBody}>Full name</Text>
-            <Text style={styles.introCardBody}>Date of birth</Text>
-            <Text style={styles.introCardBody}>Phone number (optional)</Text>
-            <Text style={styles.introCardBody}>Email (optional)</Text>
-            <Text style={styles.introCardBody}>Mailing address</Text>
-            <Text style={styles.introCardFootnote}>Stored only on this device.</Text>
-          </View>
-        ) : null}
-
-        {currentStep === 1 ? (
-          <View style={styles.card}>
-            <View onLayout={registerFieldLayout('fullName')}>
-              <Text style={styles.fieldLabel}>Full name</Text>
-              <TextInput
-                value={form.fullName}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
-                onFocus={() => focusField('fullName')}
-                onBlur={() => blurField('fullName')}
-                placeholder="Jane Doe"
-                placeholderTextColor={theme.colors.inputPlaceholder}
-                style={styles.input}
-                autoCapitalize="words"
-                textContentType="name"
-                returnKeyType="next"
-              />
+          {currentStep === 0 ? (
+            <View style={styles.introCard}>
+              <Text style={styles.introCardTitle}>What we will ask for</Text>
+              <Text style={styles.introCardBody}>Full name</Text>
+              <Text style={styles.introCardBody}>Date of birth</Text>
+              <Text style={styles.introCardBody}>Phone number (optional)</Text>
+              <Text style={styles.introCardBody}>Email (optional)</Text>
+              <Text style={styles.introCardBody}>Mailing address</Text>
+              <Text style={styles.introCardFootnote}>Stored only on this device.</Text>
             </View>
+          ) : null}
 
-            <View onLayout={registerFieldLayout('dateOfBirth')}>
-              <Text style={styles.fieldLabel}>Date of birth</Text>
-              <TextInput
-                value={form.dateOfBirth}
-                onChangeText={(value) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    dateOfBirth: formatDateOfBirthInput(value),
-                  }))
-                }
-                onFocus={() => focusField('dateOfBirth')}
-                onBlur={() => blurField('dateOfBirth')}
-                onSubmitEditing={dismissKeyboard}
-                placeholder="MM/DD/YYYY"
-                placeholderTextColor={theme.colors.inputPlaceholder}
-                style={styles.input}
-                keyboardType="number-pad"
-                inputAccessoryViewButtonLabel={
-                  Platform.OS === 'ios' && showsDateOfBirthDoneButton ? 'Done' : undefined
-                }
-              />
-            </View>
-
-            <View onLayout={registerFieldLayout('phoneNumber')}>
-              <Text style={styles.fieldLabel}>Phone number</Text>
-              <TextInput
-                value={form.phoneNumber}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
-                onFocus={() => focusField('phoneNumber')}
-                onBlur={() => blurField('phoneNumber')}
-                placeholder="512 555 0123"
-                placeholderTextColor={theme.colors.inputPlaceholder}
-                style={styles.input}
-                keyboardType="phone-pad"
-                textContentType="telephoneNumber"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-
-            <View onLayout={registerFieldLayout('email')}>
-              <Text style={styles.fieldLabel}>Email</Text>
-              <TextInput
-                value={form.email}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
-                onFocus={() => focusField('email')}
-                onBlur={() => blurField('email')}
-                placeholder="name@example.com"
-                placeholderTextColor={theme.colors.inputPlaceholder}
-                style={styles.input}
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-          </View>
-        ) : null}
-
-        {currentStep === 2 ? (
-          <View style={styles.card}>
-            <View onLayout={registerFieldLayout('addressLine1')}>
-              <Text style={styles.fieldLabel}>Address line 1</Text>
-              <TextInput
-                value={form.addressLine1}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
-                onFocus={() => focusField('addressLine1')}
-                onBlur={() => blurField('addressLine1')}
-                placeholder="123 Main St"
-                placeholderTextColor={theme.colors.inputPlaceholder}
-                style={styles.input}
-                autoCapitalize="words"
-                textContentType="streetAddressLine1"
-              />
-            </View>
-
-            <View onLayout={registerFieldLayout('addressLine2')}>
-              <Text style={styles.fieldLabel}>Address line 2</Text>
-              <TextInput
-                value={form.addressLine2}
-                onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
-                onFocus={() => focusField('addressLine2')}
-                onBlur={() => blurField('addressLine2')}
-                placeholder="Apt 4B"
-                placeholderTextColor={theme.colors.inputPlaceholder}
-                style={styles.input}
-                autoCapitalize="words"
-                textContentType="streetAddressLine2"
-              />
-            </View>
-
-            <View style={styles.inlineRow}>
-              <View style={styles.inlineFieldWide} onLayout={registerFieldLayout('city')}>
-                <Text style={styles.fieldLabel}>City</Text>
+          {currentStep === 1 ? (
+            <View style={styles.card}>
+              <View onLayout={registerFieldLayout('fullName')}>
+                <Text style={styles.fieldLabel}>Full name</Text>
                 <TextInput
-                  value={form.city}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
-                  onFocus={() => focusField('city')}
-                  onBlur={() => blurField('city')}
-                  placeholder="Austin"
+                  value={form.fullName}
+                  onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
+                  onFocus={() => focusField('fullName')}
+                  onBlur={() => blurField('fullName')}
+                  placeholder="Jane Doe"
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   autoCapitalize="words"
-                  textContentType="addressCity"
+                  textContentType="name"
+                  returnKeyType="next"
                 />
               </View>
 
-              <View style={styles.inlineFieldNarrow} onLayout={registerFieldLayout('state')}>
-                <Text style={styles.fieldLabel}>State</Text>
+              <View onLayout={registerFieldLayout('dateOfBirth')}>
+                <Text style={styles.fieldLabel}>Date of birth</Text>
                 <TextInput
-                  value={form.state}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
-                  onFocus={() => focusField('state')}
-                  onBlur={() => blurField('state')}
-                  placeholder="TX"
+                  value={form.dateOfBirth}
+                  onChangeText={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      dateOfBirth: formatDateOfBirthInput(value),
+                    }))
+                  }
+                  onFocus={() => focusField('dateOfBirth')}
+                  onBlur={() => blurField('dateOfBirth')}
+                  onSubmitEditing={dismissKeyboard}
+                  placeholder="MM/DD/YYYY"
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
-                  autoCapitalize="characters"
-                  textContentType="addressState"
-                  maxLength={24}
+                  keyboardType="number-pad"
+                  inputAccessoryViewButtonLabel={
+                    Platform.OS === 'ios' && showsDateOfBirthDoneButton ? 'Done' : undefined
+                  }
+                />
+              </View>
+
+              <View onLayout={registerFieldLayout('phoneNumber')}>
+                <Text style={styles.fieldLabel}>Phone number</Text>
+                <TextInput
+                  value={form.phoneNumber}
+                  onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
+                  onFocus={() => focusField('phoneNumber')}
+                  onBlur={() => blurField('phoneNumber')}
+                  placeholder="512 555 0123"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
+                  style={styles.input}
+                  keyboardType="phone-pad"
+                  textContentType="telephoneNumber"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+
+              <View onLayout={registerFieldLayout('email')}>
+                <Text style={styles.fieldLabel}>Email</Text>
+                <TextInput
+                  value={form.email}
+                  onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
+                  onFocus={() => focusField('email')}
+                  onBlur={() => blurField('email')}
+                  placeholder="name@example.com"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
+                  style={styles.input}
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  autoCapitalize="none"
+                  autoCorrect={false}
                 />
               </View>
             </View>
+          ) : null}
 
-            <View onLayout={registerFieldLayout('postalCode')}>
-              <Text style={styles.fieldLabel}>Postal code</Text>
-              <TextInput
-                value={form.postalCode}
-                onChangeText={(value) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    postalCode: value.replace(/[^\d-]/g, '').slice(0, 10),
-                  }))
-                }
-                onFocus={() => focusField('postalCode')}
-                onBlur={() => blurField('postalCode')}
-                onSubmitEditing={dismissKeyboard}
-                placeholder="78701"
-                placeholderTextColor={theme.colors.inputPlaceholder}
-                style={styles.input}
-                keyboardType="number-pad"
-                textContentType="postalCode"
-                inputAccessoryViewButtonLabel={
-                  Platform.OS === 'ios' && showsPostalCodeDoneButton ? 'Done' : undefined
-                }
-              />
+          {currentStep === 2 ? (
+            <View style={styles.card}>
+              <View onLayout={registerFieldLayout('addressLine1')}>
+                <Text style={styles.fieldLabel}>Address line 1</Text>
+                <TextInput
+                  value={form.addressLine1}
+                  onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
+                  onFocus={() => focusField('addressLine1')}
+                  onBlur={() => blurField('addressLine1')}
+                  placeholder="123 Main St"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
+                  style={styles.input}
+                  autoCapitalize="words"
+                  textContentType="streetAddressLine1"
+                />
+              </View>
+
+              <View onLayout={registerFieldLayout('addressLine2')}>
+                <Text style={styles.fieldLabel}>Address line 2</Text>
+                <TextInput
+                  value={form.addressLine2}
+                  onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
+                  onFocus={() => focusField('addressLine2')}
+                  onBlur={() => blurField('addressLine2')}
+                  placeholder="Apt 4B"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
+                  style={styles.input}
+                  autoCapitalize="words"
+                  textContentType="streetAddressLine2"
+                />
+              </View>
+
+              <View style={styles.inlineRow}>
+                <View style={styles.inlineFieldWide} onLayout={registerFieldLayout('city')}>
+                  <Text style={styles.fieldLabel}>City</Text>
+                  <TextInput
+                    value={form.city}
+                    onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
+                    onFocus={() => focusField('city')}
+                    onBlur={() => blurField('city')}
+                    placeholder="Austin"
+                    placeholderTextColor={theme.colors.inputPlaceholder}
+                    style={styles.input}
+                    autoCapitalize="words"
+                    textContentType="addressCity"
+                  />
+                </View>
+
+                <View style={styles.inlineFieldNarrow} onLayout={registerFieldLayout('state')}>
+                  <Text style={styles.fieldLabel}>State</Text>
+                  <TextInput
+                    value={form.state}
+                    onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
+                    onFocus={() => focusField('state')}
+                    onBlur={() => blurField('state')}
+                    placeholder="TX"
+                    placeholderTextColor={theme.colors.inputPlaceholder}
+                    style={styles.input}
+                    autoCapitalize="characters"
+                    textContentType="addressState"
+                    maxLength={24}
+                  />
+                </View>
+              </View>
+
+              <View onLayout={registerFieldLayout('postalCode')}>
+                <Text style={styles.fieldLabel}>Postal code</Text>
+                <TextInput
+                  value={form.postalCode}
+                  onChangeText={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      postalCode: value.replace(/[^\d-]/g, '').slice(0, 10),
+                    }))
+                  }
+                  onFocus={() => focusField('postalCode')}
+                  onBlur={() => blurField('postalCode')}
+                  onSubmitEditing={dismissKeyboard}
+                  placeholder="78701"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
+                  style={styles.input}
+                  keyboardType="number-pad"
+                  textContentType="postalCode"
+                  inputAccessoryViewButtonLabel={
+                    Platform.OS === 'ios' && showsPostalCodeDoneButton ? 'Done' : undefined
+                  }
+                />
+              </View>
             </View>
-          </View>
-        ) : null}
+          ) : null}
 
-        <Pressable
-          onPress={dismissKeyboard}
-          disabled={!keyboardVisible}
-          style={styles.dismissArea}
-        />
-      </ScrollView>
+          <Pressable
+            onPress={dismissKeyboard}
+            disabled={!keyboardVisible}
+            style={styles.dismissArea}
+          />
+        </ScrollView>
+      </GestureDetector>
 
       {!keyboardVisible ? (
         <View
@@ -490,6 +516,8 @@ export default function BioSetupScreen() {
               />
             ))}
           </View>
+
+          <Text style={styles.paginationHint}>Swipe between steps or tap the dots.</Text>
 
           <Pressable
             onPress={handleNext}
@@ -670,6 +698,12 @@ const createStyles = createThemedStyles((theme) => ({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
+  },
+  paginationHint: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   paginationDot: {
     width: 10,

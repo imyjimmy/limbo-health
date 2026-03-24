@@ -380,8 +380,10 @@ export default function WelcomeScreen() {
               <Text style={styles.slideEyebrow}>Ready when you are</Text>
               <Text style={styles.slideTitle}>Fill Out Once. Ready Everywhere.</Text>
               <Text style={styles.slideBody}>
-                Fill out your medical info <b>one time</b>, use it <b>everywhere</b>.
-                At an appointment and have to fill out annoying forms? Take a picture and we'll fill it out for you. 
+                Fill out your medical info{' '}
+                <Text style={styles.slideBodyEmphasis}>one time</Text>, use it{' '}
+                <Text style={styles.slideBodyEmphasis}>everywhere</Text>. At an appointment and
+                have to fill out annoying forms? Take a picture and we'll fill it out for you.
               </Text>
               <Text style={styles.supportNote}>
                 Coverage will expand to all 50 States.
@@ -728,6 +730,10 @@ const createStyles = createThemedStyles((theme) => ({
     color: theme.colors.textSecondary,
     fontSize: 16,
     lineHeight: 24,
+  },
+  slideBodyEmphasis: {
+    color: theme.colors.text,
+    fontWeight: '800',
   },
   pillRow: {
     flexDirection: 'row',
