@@ -174,7 +174,9 @@ const state = {
   pdfEditorActiveQuestionId: null,
   pdfEditorRenderedPages: [],
   pdfEditorDrawMode: false,
+  pdfEditorInteractionMode: null,
   pdfEditorPendingDraw: null,
+  pdfEditorPendingRectEdit: null,
   pdfEditorDraftDirty: false,
   pdfEditorSaveStatus: null,
   pdfDocumentProxy: null,
@@ -259,9 +261,14 @@ const elements = {
   publishPdfDraft: document.querySelector('#publish-pdf-draft'),
   openCachedPdf: document.querySelector('#open-cached-pdf'),
   pdfEditorAuthoring: document.querySelector('#pdf-editor-authoring'),
-  manualQuestionLabel: document.querySelector('#manual-question-label'),
-  addManualQuestion: document.querySelector('#add-manual-question'),
+  captureQuestionFromPdf: document.querySelector('#capture-question-from-pdf'),
   mapSelectedQuestion: document.querySelector('#map-selected-question'),
+  moveSelectedRect: document.querySelector('#move-selected-rect'),
+  resizeSelectedRect: document.querySelector('#resize-selected-rect'),
+  moveSelectedQuestionUp: document.querySelector('#move-selected-question-up'),
+  moveSelectedQuestionDown: document.querySelector('#move-selected-question-down'),
+  deleteSelectedQuestion: document.querySelector('#delete-selected-question'),
+  pdfEditorSelectionCopy: document.querySelector('#pdf-editor-selection-copy'),
   pdfEditorQuestions: document.querySelector('#pdf-editor-questions'),
   pdfEditorPages: document.querySelector('#pdf-editor-pages'),
 };
@@ -1050,6 +1057,18 @@ function currentPdfEditorQuestion() {
   );
 }
 
+function currentPdfDraftQuestion() {
+  const payload = currentPdfDraftPayload();
+  if (!payload || !Array.isArray(payload.questions)) return null;
+  return payload.questions.find((question) => question.id === state.pdfEditorActiveQuestionId) || null;
+}
+
+function syncActivePdfEditorQuestion() {
+  if (!state.pdfEditorQuestions.find((question) => question.id === state.pdfEditorActiveQuestionId)) {
+    state.pdfEditorActiveQuestionId = state.pdfEditorQuestions[0]?.id || null;
+  }
+}
+
 function setPipelineActionState(actionKey = null) {
   state.pipelineActionInFlight = actionKey;
   const hasSystem = Boolean(state.selectedSystemId);
@@ -1088,10 +1107,60 @@ function currentPdfDraftPayload() {
   return state.pdfEditorDraftPayload || null;
 }
 
+function clearPdfEditorInteraction({ preserveStatus = false } = {}) {
+  state.pdfEditorInteractionMode = null;
+  state.pdfEditorDrawMode = false;
+  state.pdfEditorPendingDraw = null;
+  state.pdfEditorPendingRectEdit = null;
+  if (!preserveStatus) {
+    state.pdfEditorSaveStatus = null;
+  }
+}
+
+function setPdfEditorInteractionMode(mode = null) {
+  state.pdfEditorInteractionMode = mode;
+  state.pdfEditorDrawMode = mode === 'draw' || mode === 'capture';
+  state.pdfEditorPendingDraw = null;
+  state.pdfEditorPendingRectEdit = null;
+  state.pdfEditorSaveStatus = null;
+}
+
+function selectedQuestionSupportsRectEditing() {
+  const question = currentPdfEditorQuestion();
+  const draftQuestion = currentPdfDraftQuestion();
+  return Boolean(
+    hasManualOverlayDraft() &&
+      question &&
+      draftQuestion &&
+      question.kind === 'short_text' &&
+      question.rects.length === 1 &&
+      Array.isArray(draftQuestion.bindings) &&
+      draftQuestion.bindings[0]?.type === 'overlay_text',
+  );
+}
+
+function currentPdfEditorInteractionLabel() {
+  switch (state.pdfEditorInteractionMode) {
+    case 'capture':
+      return 'Draw over the field box for the missed question. The label will be sourced from nearby PDF text.';
+    case 'draw':
+      return 'Draw a new rectangle for the selected short-text question. The old box will be replaced.';
+    case 'move':
+      return 'Drag the selected box to its correct position on the PDF.';
+    case 'resize':
+      return 'Drag the blue handle on the selected box to resize it.';
+    default:
+      return null;
+  }
+}
+
 function canStartManualMapping() {
   const payload = currentPdfDraftPayload();
   if (!payload) return false;
   if (payload.supported && payload.mode === 'overlay') return true;
+  if (payload.supported && payload.mode === 'acroform') {
+    return Array.isArray(state.pdfEditorReview?.pdf_geometry?.pages) && state.pdfEditorReview.pdf_geometry.pages.length > 0;
+  }
   return !payload.supported || !Array.isArray(payload.questions) || payload.questions.length === 0;
 }
 
@@ -1106,8 +1175,10 @@ function resetPdfEditorState() {
   state.pdfEditorQuestions = [];
   state.pdfEditorActiveQuestionId = null;
   state.pdfEditorRenderedPages = [];
+  state.pdfEditorInteractionMode = null;
   state.pdfEditorDrawMode = false;
   state.pdfEditorPendingDraw = null;
+  state.pdfEditorPendingRectEdit = null;
   state.pdfEditorDraftDirty = false;
   state.pdfEditorSaveStatus = null;
   state.pdfDocumentProxy = null;
@@ -2785,7 +2856,11 @@ function buildQuestionMappings(review, payloadOverride = null) {
   }
 
   return (Array.isArray(payload.questions) ? payload.questions : []).map((question) => {
-    const baseRects = (Array.isArray(question.bindings) ? question.bindings : []).flatMap((binding) =>
+    const baseBindings = Array.isArray(question.bindings) ? question.bindings : [];
+    const optionBindings = (Array.isArray(question.options) ? question.options : []).flatMap((option) =>
+      Array.isArray(option.bindings) ? option.bindings : [],
+    );
+    const baseRects = baseBindings.flatMap((binding) =>
       rectsForBinding(binding, question.label),
     );
     const optionRects = (Array.isArray(question.options) ? question.options : []).flatMap((option) =>
@@ -2795,17 +2870,137 @@ function buildQuestionMappings(review, payloadOverride = null) {
     );
     const rects = [...baseRects, ...optionRects];
     const pages = Array.from(new Set(rects.map((rect) => rect.page_index))).sort((left, right) => left - right);
+    const bindingCount = baseBindings.length + optionBindings.length;
 
     return {
       id: question.id,
       label: question.label,
       kind: question.kind,
       help_text: question.help_text || null,
+      binding_count: bindingCount,
       rects,
       page_indexes: pages,
       option_count: Array.isArray(question.options) ? question.options.length : 0,
     };
   });
+}
+
+function buildPdfWidgetsByField(review) {
+  const pdfPages = Array.isArray(review?.pdf_geometry?.pages) ? review.pdf_geometry.pages : [];
+  const widgetsByField = new Map();
+
+  for (const page of pdfPages) {
+    for (const widget of Array.isArray(page.widgets) ? page.widgets : []) {
+      const key = String(widget.field_name || '').trim();
+      if (!key) continue;
+      if (!widgetsByField.has(key)) {
+        widgetsByField.set(key, []);
+      }
+      widgetsByField.get(key).push({
+        page_index: page.page_index,
+        x: Number(widget.x || 0),
+        y: Number(widget.y || 0),
+        width: Math.max(Number(widget.width || 0), 12),
+        height: Math.max(Number(widget.height || 0), 12),
+      });
+    }
+  }
+
+  return widgetsByField;
+}
+
+function convertBindingToOverlayBindings(binding, widgetsByField) {
+  if (!binding || typeof binding !== 'object') return [];
+
+  if (binding.type === 'overlay_text' || binding.type === 'overlay_mark') {
+    return [cloneJson(binding)];
+  }
+
+  const fieldName = String(binding.field_name || '').trim();
+  const widgets = fieldName ? widgetsByField.get(fieldName) || [] : [];
+  if (!widgets.length) {
+    return [];
+  }
+
+  if (binding.type === 'field_text') {
+    return widgets.map((widget) => ({
+      type: 'overlay_text',
+      page_index: widget.page_index,
+      x: Number(widget.x.toFixed(2)),
+      y: Number(widget.y.toFixed(2)),
+      max_width: Number(widget.width.toFixed(2)),
+      font_size: Number(Math.max(widget.height / 1.8, 12).toFixed(2)),
+    }));
+  }
+
+  if (binding.type === 'field_checkbox' || binding.type === 'field_radio') {
+    return widgets.map((widget) => ({
+      type: 'overlay_mark',
+      page_index: widget.page_index,
+      x: Number((widget.x + widget.width / 2).toFixed(2)),
+      y: Number((widget.y + widget.height / 2).toFixed(2)),
+      mark: 'x',
+      size: Number(Math.max(Math.max(widget.width, widget.height), 12).toFixed(2)),
+    }));
+  }
+
+  return [];
+}
+
+function convertQuestionToEditableOverlay(question, widgetsByField) {
+  const nextQuestion = {
+    id: question.id,
+    label: question.label,
+    kind: question.kind,
+    required: Boolean(question.required),
+    help_text: question.help_text || null,
+    confidence: typeof question.confidence === 'number' ? question.confidence : 1,
+    bindings: [],
+    options: [],
+  };
+
+  if (question.kind === 'short_text') {
+    nextQuestion.bindings = (Array.isArray(question.bindings) ? question.bindings : []).flatMap((binding) =>
+      convertBindingToOverlayBindings(binding, widgetsByField),
+    );
+    return nextQuestion.bindings.length > 0 ? nextQuestion : null;
+  }
+
+  nextQuestion.options = (Array.isArray(question.options) ? question.options : [])
+    .map((option) => {
+      const bindings = (Array.isArray(option.bindings) ? option.bindings : []).flatMap((binding) =>
+        convertBindingToOverlayBindings(binding, widgetsByField),
+      );
+      if (!bindings.length) return null;
+      return {
+        id: option.id,
+        label: option.label,
+        confidence: typeof option.confidence === 'number' ? option.confidence : 1,
+        bindings,
+      };
+    })
+    .filter(Boolean);
+
+  return nextQuestion.options.length > 0 ? nextQuestion : null;
+}
+
+function buildEditableOverlayPayload() {
+  const currentPayload = currentPdfDraftPayload();
+  const basePayload = buildManualOverlayPayload();
+
+  if (!currentPayload?.supported || !Array.isArray(currentPayload.questions) || currentPayload.questions.length === 0) {
+    return basePayload;
+  }
+
+  const widgetsByField = buildPdfWidgetsByField(state.pdfEditorReview);
+  const questions = currentPayload.questions
+    .map((question) => convertQuestionToEditableOverlay(question, widgetsByField))
+    .filter(Boolean);
+
+  return {
+    ...basePayload,
+    questions,
+  };
 }
 
 function buildManualOverlayPayload() {
@@ -2830,20 +3025,12 @@ function buildManualOverlayPayload() {
 
 function refreshPdfEditorQuestionsFromDraft() {
   state.pdfEditorQuestions = buildQuestionMappings(state.pdfEditorReview, state.pdfEditorDraftPayload);
-  if (!state.pdfEditorQuestions.find((question) => question.id === state.pdfEditorActiveQuestionId)) {
-    state.pdfEditorActiveQuestionId = state.pdfEditorQuestions[0]?.id || null;
-  }
+  syncActivePdfEditorQuestion();
 }
 
 function beginManualMapping() {
-  const payload = currentPdfDraftPayload();
-  if (payload?.supported && payload?.mode === 'acroform' && Array.isArray(payload.questions) && payload.questions.length) {
-    throw new Error('This PDF already has an acroform draft. Manual rectangle mapping only supports overlay drafts.');
-  }
-
-  state.pdfEditorDraftPayload = buildManualOverlayPayload();
-  state.pdfEditorDrawMode = false;
-  state.pdfEditorPendingDraw = null;
+  state.pdfEditorDraftPayload = buildEditableOverlayPayload();
+  clearPdfEditorInteraction();
   state.pdfEditorDraftDirty = true;
   state.pdfEditorSaveStatus = null;
   refreshPdfEditorQuestionsFromDraft();
@@ -2851,38 +3038,46 @@ function beginManualMapping() {
   updatePdfEditorOverlays();
 }
 
-function addManualTextQuestion(label) {
-  const normalizedLabel = String(label || '').trim();
-  if (!normalizedLabel) {
-    throw new Error('Enter a question label before adding a manual question.');
-  }
-
-  if (!hasManualOverlayDraft()) {
-    beginManualMapping();
-  }
-
+function moveActivePdfEditorQuestion(delta) {
   const payload = currentPdfDraftPayload();
-  const existingIds = new Set((payload.questions || []).map((question) => question.id));
-  let baseId = slugifyId(normalizedLabel);
-  let nextId = baseId;
-  let suffix = 2;
-  while (existingIds.has(nextId)) {
-    nextId = `${baseId}-${suffix}`;
-    suffix += 1;
+  if (!payload || !Array.isArray(payload.questions)) {
+    throw new Error('Open an editable draft before reordering questions.');
   }
 
-  payload.questions = Array.isArray(payload.questions) ? payload.questions : [];
-  payload.questions.push({
-    id: nextId,
-    label: normalizedLabel,
-    kind: 'short_text',
-    required: false,
-    help_text: null,
-    confidence: 1,
-    bindings: [],
-    options: [],
-  });
-  state.pdfEditorActiveQuestionId = nextId;
+  const currentIndex = payload.questions.findIndex((question) => question.id === state.pdfEditorActiveQuestionId);
+  if (currentIndex < 0) {
+    throw new Error('Select a question before reordering.');
+  }
+
+  const nextIndex = Math.max(0, Math.min(payload.questions.length - 1, currentIndex + delta));
+  if (nextIndex === currentIndex) {
+    return;
+  }
+
+  const [question] = payload.questions.splice(currentIndex, 1);
+  payload.questions.splice(nextIndex, 0, question);
+  clearPdfEditorInteraction();
+  state.pdfEditorDraftDirty = true;
+  state.pdfEditorSaveStatus = null;
+  refreshPdfEditorQuestionsFromDraft();
+  renderPdfEditor();
+  updatePdfEditorOverlays();
+}
+
+function deleteActivePdfEditorQuestion() {
+  const payload = currentPdfDraftPayload();
+  if (!payload || !Array.isArray(payload.questions)) {
+    throw new Error('Open an editable draft before deleting a question.');
+  }
+
+  const currentIndex = payload.questions.findIndex((question) => question.id === state.pdfEditorActiveQuestionId);
+  if (currentIndex < 0) {
+    throw new Error('Select a question before deleting.');
+  }
+
+  payload.questions.splice(currentIndex, 1);
+  state.pdfEditorActiveQuestionId = payload.questions[Math.max(0, currentIndex - 1)]?.id || payload.questions[0]?.id || null;
+  clearPdfEditorInteraction();
   state.pdfEditorDraftDirty = true;
   state.pdfEditorSaveStatus = null;
   refreshPdfEditorQuestionsFromDraft();
@@ -2893,16 +3088,16 @@ function addManualTextQuestion(label) {
 function upsertManualBindingForActiveQuestion(renderedPage, rect) {
   const payload = currentPdfDraftPayload();
   if (!payload || !Array.isArray(payload.questions)) {
-    throw new Error('Start manual mapping before drawing a rectangle.');
+    throw new Error('Create an editable draft before drawing a rectangle.');
   }
 
   const question = payload.questions.find((entry) => entry.id === state.pdfEditorActiveQuestionId);
   if (!question) {
-    throw new Error('Select a manual question before drawing a rectangle.');
+    throw new Error('Select a question before drawing a rectangle.');
   }
 
   if (question.kind !== 'short_text') {
-    throw new Error('Manual rectangle mapping currently supports text questions only.');
+    throw new Error('Rectangle repair currently supports short-text questions only.');
   }
 
   const scaleX = renderedPage.viewport.width / Math.max(renderedPage.page_width || 1, 1);
@@ -2927,12 +3122,212 @@ function upsertManualBindingForActiveQuestion(renderedPage, rect) {
   payload.supported = true;
   payload.mode = 'overlay';
   payload.confidence = 1;
-  state.pdfEditorDrawMode = false;
-  state.pdfEditorPendingDraw = null;
+  clearPdfEditorInteraction();
   state.pdfEditorDraftDirty = true;
   state.pdfEditorSaveStatus = null;
   refreshPdfEditorQuestionsFromDraft();
   renderPdfEditorQuestions();
+  updatePdfEditorOverlays();
+}
+
+function buildUniqueQuestionId(payload, label) {
+  const existingIds = new Set((payload?.questions || []).map((question) => question.id));
+  const baseId = slugifyId(label);
+  let nextId = baseId;
+  let suffix = 2;
+
+  while (existingIds.has(nextId)) {
+    nextId = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+
+  return nextId;
+}
+
+function screenRectToPdfRect(renderedPage, rect) {
+  const scaleX = renderedPage.viewport.width / Math.max(renderedPage.page_width || 1, 1);
+  const scaleY = renderedPage.viewport.height / Math.max(renderedPage.page_height || 1, 1);
+  const pdfX = rect.left / scaleX;
+  const pdfWidth = rect.width / scaleX;
+  const pdfHeight = rect.height / scaleY;
+  const pdfY = renderedPage.page_height - rect.top / scaleY - pdfHeight;
+
+  return {
+    page_index: renderedPage.page_index,
+    x: Number(pdfX.toFixed(2)),
+    y: Number(pdfY.toFixed(2)),
+    width: Number(Math.max(pdfWidth, 24).toFixed(2)),
+    height: Number(Math.max(pdfHeight, 18).toFixed(2)),
+  };
+}
+
+function activePdfEditorShortTextRect() {
+  const question = currentPdfEditorQuestion();
+  if (!question || question.kind !== 'short_text' || question.rects.length !== 1) {
+    return null;
+  }
+
+  return question.rects[0];
+}
+
+function updateActiveQuestionRectFromPdfRect(pdfRect) {
+  const question = currentPdfDraftQuestion();
+  if (!question || question.kind !== 'short_text') {
+    throw new Error('Select a short-text question before editing its box.');
+  }
+
+  const fontSize = Number(Math.max(pdfRect.height / 1.8, 12).toFixed(2));
+  question.bindings = [
+    {
+      type: 'overlay_text',
+      page_index: pdfRect.page_index,
+      x: Number(pdfRect.x.toFixed(2)),
+      y: Number(pdfRect.y.toFixed(2)),
+      max_width: Number(Math.max(pdfRect.width, 24).toFixed(2)),
+      font_size: fontSize,
+    },
+  ];
+  question.confidence = 1;
+  state.pdfEditorDraftDirty = true;
+  state.pdfEditorSaveStatus = null;
+  refreshPdfEditorQuestionsFromDraft();
+}
+
+function groupPdfWordsIntoLines(words) {
+  const sortedWords = [...(Array.isArray(words) ? words : [])].sort((left, right) => {
+    const leftCenter = left.y + left.height / 2;
+    const rightCenter = right.y + right.height / 2;
+    if (Math.abs(rightCenter - leftCenter) > 8) {
+      return rightCenter - leftCenter;
+    }
+    return left.x - right.x;
+  });
+
+  const lines = [];
+  for (const word of sortedWords) {
+    const centerY = word.y + word.height / 2;
+    const existingLine = lines.find((line) => Math.abs(line.centerY - centerY) <= 8);
+    if (existingLine) {
+      existingLine.words.push(word);
+      existingLine.centerY = (existingLine.centerY + centerY) / 2;
+      continue;
+    }
+
+    lines.push({
+      centerY,
+      words: [word],
+    });
+  }
+
+  return lines
+    .map((line) => {
+      const orderedWords = [...line.words].sort((left, right) => left.x - right.x);
+      const xMin = Math.min(...orderedWords.map((word) => word.x));
+      const xMax = Math.max(...orderedWords.map((word) => word.x + word.width));
+      const bottomY = Math.min(...orderedWords.map((word) => word.y));
+      const topY = Math.max(...orderedWords.map((word) => word.y + word.height));
+
+      return {
+        text: orderedWords.map((word) => word.text).join(' ').replace(/\s+/g, ' ').trim(),
+        xMin,
+        xMax,
+        bottomY,
+        topY,
+        centerY: (bottomY + topY) / 2,
+      };
+    })
+    .filter((line) => line.text);
+}
+
+function deriveQuestionLabelFromPageWords(pageWords, pdfRect) {
+  const rectLeft = pdfRect.x;
+  const rectRight = pdfRect.x + pdfRect.width;
+  const rectBottom = pdfRect.y;
+  const rectTop = pdfRect.y + pdfRect.height;
+  const rectCenterY = rectBottom + pdfRect.height / 2;
+  const lines = groupPdfWordsIntoLines(pageWords);
+
+  const candidates = lines
+    .map((line) => {
+      const horizontalGap = rectLeft - line.xMax;
+      const verticalDistance = Math.abs(line.centerY - rectCenterY);
+      const aboveGap = line.bottomY - rectTop;
+      let score = Number.POSITIVE_INFINITY;
+
+      if (horizontalGap >= -8 && horizontalGap <= 320 && verticalDistance <= 92) {
+        score = Math.min(score, horizontalGap + verticalDistance * 1.8);
+      }
+
+      const horizontalOverlap =
+        Math.min(rectRight, line.xMax) - Math.max(rectLeft - 140, line.xMin);
+      if (aboveGap >= -8 && aboveGap <= 108 && horizontalOverlap >= -40) {
+        score = Math.min(score, aboveGap * 2 + Math.abs(line.centerY - rectTop));
+      }
+
+      return {
+        line,
+        score,
+      };
+    })
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((left, right) => left.score - right.score);
+
+  const best = candidates[0]?.line || null;
+  if (!best?.text) {
+    return null;
+  }
+
+  return best.text.replace(/\s+/g, ' ').trim();
+}
+
+function createQuestionFromPageSelection(renderedPage, rect) {
+  if (!hasManualOverlayDraft()) {
+    beginManualMapping();
+  }
+
+  const payload = currentPdfDraftPayload();
+  if (!payload || !Array.isArray(payload.questions)) {
+    throw new Error('Create an editable draft before capturing a question.');
+  }
+
+  const pageGeometry = state.pdfEditorReview?.pdf_geometry?.pages?.find(
+    (page) => page.page_index === renderedPage.page_index,
+  );
+  const pdfRect = screenRectToPdfRect(renderedPage, rect);
+  const label = deriveQuestionLabelFromPageWords(pageGeometry?.words || [], pdfRect);
+  if (!label) {
+    throw new Error(
+      'Could not source a question label from nearby PDF text. Draw around a field whose prompt is visible on the page.',
+    );
+  }
+
+  const questionId = buildUniqueQuestionId(payload, label);
+  payload.questions.push({
+    id: questionId,
+    label,
+    kind: 'short_text',
+    required: false,
+    help_text: null,
+    confidence: 1,
+    bindings: [
+      {
+        type: 'overlay_text',
+        page_index: pdfRect.page_index,
+        x: Number(pdfRect.x.toFixed(2)),
+        y: Number(pdfRect.y.toFixed(2)),
+        max_width: Number(Math.max(pdfRect.width, 24).toFixed(2)),
+        font_size: Number(Math.max(pdfRect.height / 1.8, 12).toFixed(2)),
+      },
+    ],
+    options: [],
+  });
+
+  state.pdfEditorActiveQuestionId = questionId;
+  clearPdfEditorInteraction();
+  state.pdfEditorDraftDirty = true;
+  state.pdfEditorSaveStatus = null;
+  refreshPdfEditorQuestionsFromDraft();
+  renderPdfEditor();
   updatePdfEditorOverlays();
 }
 
@@ -2962,7 +3357,7 @@ function renderPdfEditorQuestions() {
   }
 
   elements.pdfEditorQuestions.innerHTML = state.pdfEditorQuestions
-    .map((question) => {
+    .map((question, index) => {
       const activeClass =
         question.id === state.pdfEditorActiveQuestionId
           ? 'question-card question-card-active'
@@ -2970,10 +3365,15 @@ function renderPdfEditorQuestions() {
 
       return `
         <button type="button" class="${activeClass}" data-action="select-editor-question" data-question-id="${escapeHtml(question.id)}">
-          <div class="question-title">${escapeHtml(question.label)}</div>
+          <div class="question-title">${formatNumber(index + 1)}. ${escapeHtml(question.label)}</div>
           <div class="question-copy">
-            ${escapeHtml(question.kind)} • ${formatNumber(question.rects.length)} mapped rectangles •
-            ${formatNumber(question.page_indexes.length)} pages
+            ${
+              question.rects.length > 0
+                ? `${escapeHtml(question.kind)} • ${formatNumber(question.rects.length)} mapped rectangles • ${formatNumber(question.page_indexes.length)} pages`
+                : question.binding_count > 0
+                  ? `${escapeHtml(question.kind)} • ${formatNumber(question.binding_count)} saved bindings • overlay unavailable`
+                  : `${escapeHtml(question.kind)} • no saved bindings`
+            }
           </div>
           ${
             question.help_text
@@ -3069,12 +3469,30 @@ async function renderPdfEditorPages() {
 function updatePdfEditorOverlays() {
   const activeQuestion = currentPdfEditorQuestion();
   const questionsToShow = activeQuestion ? [activeQuestion] : state.pdfEditorQuestions;
+  const activeRect = activePdfEditorShortTextRect();
+  const previewRect = state.pdfEditorPendingRectEdit?.previewRect || null;
 
   for (const renderedPage of state.pdfEditorRenderedPages) {
     const rects = questionsToShow.flatMap((question) =>
       question.rects
         .filter((rect) => rect.page_index === renderedPage.page_index)
-        .map((rect) => ({ ...rect, active: question.id === activeQuestion?.id, question_label: question.label })),
+        .map((rect) => {
+          const isActiveRect =
+            question.id === activeQuestion?.id &&
+            activeRect &&
+            rect.page_index === activeRect.page_index &&
+            rect.x === activeRect.x &&
+            rect.y === activeRect.y &&
+            rect.width === activeRect.width &&
+            rect.height === activeRect.height;
+
+          return {
+            ...(isActiveRect && previewRect ? { ...rect, ...previewRect } : rect),
+            active: question.id === activeQuestion?.id,
+            isActiveRect,
+            question_label: question.label,
+          };
+        }),
     );
 
     renderedPage.overlay.innerHTML = rects
@@ -3087,10 +3505,27 @@ function updatePdfEditorOverlays() {
         const top = (renderedPage.page_height - rect.y - rect.height) * scaleY;
         const labelY = Math.max(top - 6, 12);
         const safeLabel = escapeHtml(rect.context_label || rect.question_label || rect.binding_type || 'Question');
+        const handleSize = rect.isActiveRect ? 12 : 0;
+        const handleX = left + width - handleSize / 2;
+        const handleY = top + height - handleSize / 2;
 
         return `
-          <rect class="${rect.active ? 'overlay-rect overlay-rect-active' : 'overlay-rect'}" x="${left}" y="${top}" width="${width}" height="${height}" rx="6" ry="6"></rect>
+          <rect
+            class="${rect.active ? 'overlay-rect overlay-rect-active' : 'overlay-rect'}"
+            x="${left}"
+            y="${top}"
+            width="${width}"
+            height="${height}"
+            rx="6"
+            ry="6"
+            ${rect.isActiveRect ? 'data-active-overlay-rect="true"' : ''}
+          ></rect>
           ${rect.active ? `<text class="overlay-label" x="${left + 4}" y="${labelY}">${safeLabel}</text>` : ''}
+          ${
+            rect.isActiveRect && selectedQuestionSupportsRectEditing()
+              ? `<rect class="overlay-handle" x="${handleX}" y="${handleY}" width="${handleSize}" height="${handleSize}" rx="4" ry="4" data-active-overlay-handle="resize"></rect>`
+              : ''
+          }
         `;
       })
       .join('');
@@ -3107,7 +3542,8 @@ function updatePdfEditorOverlays() {
       `;
     }
 
-    renderedPage.overlay.style.pointerEvents = state.pdfEditorDrawMode ? 'auto' : 'none';
+    renderedPage.overlay.style.pointerEvents =
+      hasManualOverlayDraft() && state.pdfEditorInteractionMode ? 'auto' : 'none';
     renderedPage.emptyNote?.classList.toggle('hidden', rects.length > 0);
   }
 }
@@ -3126,7 +3562,7 @@ function overlayPoint(event, overlayElement) {
 
 async function savePdfEditorDraft({ publish = false } = {}) {
   if (!hasManualOverlayDraft()) {
-    throw new Error('Start manual mapping before saving a draft.');
+    throw new Error('Create an editable draft before saving a draft.');
   }
 
   if (!state.pdfEditorReview?.source_document?.id) {
@@ -3149,10 +3585,11 @@ async function savePdfEditorDraft({ publish = false } = {}) {
   state.pdfEditorDraftPayload = cloneJson(
     response?.draft?.payload || response?.published_version?.payload || state.pdfEditorDraftPayload,
   );
+  clearPdfEditorInteraction({ preserveStatus: true });
   state.pdfEditorDraftDirty = false;
   state.pdfEditorSaveStatus = {
     tone: 'success',
-    message: publish ? 'Published manual question mappings.' : 'Saved manual question-mapping draft.',
+    message: publish ? 'Published the repaired question template.' : 'Saved the repaired question-mapping draft.',
   };
   refreshPdfEditorQuestionsFromDraft();
   renderPdfEditor();
@@ -3175,8 +3612,10 @@ async function openPdfEditor(sourceDocumentId) {
   );
   state.pdfEditorQuestions = buildQuestionMappings(state.pdfEditorReview, state.pdfEditorDraftPayload);
   state.pdfEditorActiveQuestionId = state.pdfEditorQuestions[0]?.id || null;
+  state.pdfEditorInteractionMode = null;
   state.pdfEditorDrawMode = false;
   state.pdfEditorPendingDraw = null;
+  state.pdfEditorPendingRectEdit = null;
   state.pdfEditorDraftDirty = false;
   state.pdfEditorSaveStatus = null;
   state.currentStateTab = 'pipeline';
@@ -3198,27 +3637,83 @@ function renderPdfEditor() {
   }
 
   const totalRects = state.pdfEditorQuestions.reduce((count, question) => count + question.rects.length, 0);
+  const totalBindings = state.pdfEditorQuestions.reduce(
+    (count, question) => count + Number(question.binding_count || 0),
+    0,
+  );
   const pageCount =
     Number(review.pdf_geometry?.page_count || 0) ||
     (Array.isArray(review.pdf_geometry?.pages) ? review.pdf_geometry.pages.length : 0);
   const parseStatus =
-    review.source_document.pdf_parse_status || review.pdf_geometry?.parse_status || 'unknown';
+    review.pdf_geometry?.parse_status || review.source_document.pdf_parse_status || 'unknown';
+  const mappingMetricLabel =
+    totalRects > 0 || totalBindings === 0 ? 'Mapped Rectangles' : 'Saved Bindings';
+  const mappingMetricValue =
+    totalRects > 0 || totalBindings === 0 ? formatNumber(totalRects) : formatNumber(totalBindings);
+  const interactionLabel = currentPdfEditorInteractionLabel();
+  const selectedQuestion = currentPdfEditorQuestion();
+  const canEditRect = selectedQuestionSupportsRectEditing();
+  const createDraftLabel =
+    currentPdfDraftPayload()?.supported && currentPdfDraftPayload()?.mode === 'acroform'
+      ? 'Create Editable Overlay Draft'
+      : hasManualOverlayDraft()
+        ? 'Editable Draft Ready'
+        : 'Create Editable Draft';
 
   elements.pdfEditorTitle.textContent = review.source_document.title || 'PDF Editor';
   elements.pdfEditorCopy.textContent =
     totalRects > 0
       ? 'SVG rectangles show where the current question mappings land on the rendered PDF.'
-      : 'PDF geometry loaded. No extracted question mappings are available for this PDF yet.';
+      : pageCount > 0
+        ? 'PDF geometry loaded. No extracted question mappings are available for this PDF yet.'
+        : 'Saved question data exists, but persisted PDF geometry is unavailable for overlay rendering.';
   elements.openCachedPdf.href = review.source_document.content_url;
   const manualAvailable = canStartManualMapping();
-  const activeQuestion = currentPdfEditorQuestion();
   elements.startManualMapping.disabled = !manualAvailable;
-  elements.startManualMapping.textContent = hasManualOverlayDraft() ? 'Overlay Draft Ready' : 'Start Manual Mapping';
+  elements.startManualMapping.textContent = createDraftLabel;
   elements.savePdfDraft.disabled = !hasManualOverlayDraft() || totalRects === 0;
   elements.publishPdfDraft.disabled = !hasManualOverlayDraft() || totalRects === 0;
-  elements.mapSelectedQuestion.disabled = !hasManualOverlayDraft() || !activeQuestion;
-  elements.mapSelectedQuestion.textContent = state.pdfEditorDrawMode ? 'Draw On PDF...' : 'Map Selected Question';
+  elements.captureQuestionFromPdf.disabled = !hasManualOverlayDraft();
+  elements.captureQuestionFromPdf.textContent =
+    state.pdfEditorInteractionMode === 'capture' ? 'Draw On PDF...' : 'Capture Question From PDF';
+  elements.captureQuestionFromPdf.classList.toggle(
+    'ghost-button-active',
+    state.pdfEditorInteractionMode === 'capture',
+  );
+  elements.mapSelectedQuestion.disabled = !canEditRect;
+  elements.mapSelectedQuestion.textContent =
+    state.pdfEditorInteractionMode === 'draw' ? 'Draw On PDF...' : 'Rebind Selected Box';
+  elements.mapSelectedQuestion.classList.toggle(
+    'ghost-button-active',
+    state.pdfEditorInteractionMode === 'draw',
+  );
+  elements.moveSelectedRect.disabled = !canEditRect;
+  elements.moveSelectedRect.classList.toggle(
+    'ghost-button-active',
+    state.pdfEditorInteractionMode === 'move',
+  );
+  elements.resizeSelectedRect.disabled = !canEditRect;
+  elements.resizeSelectedRect.classList.toggle(
+    'ghost-button-active',
+    state.pdfEditorInteractionMode === 'resize',
+  );
+  const selectedIndex = selectedQuestion
+    ? state.pdfEditorQuestions.findIndex((question) => question.id === selectedQuestion.id)
+    : -1;
+  elements.moveSelectedQuestionUp.disabled = !hasManualOverlayDraft() || selectedIndex <= 0;
+  elements.moveSelectedQuestionDown.disabled =
+    !hasManualOverlayDraft() || selectedIndex < 0 || selectedIndex >= state.pdfEditorQuestions.length - 1;
+  elements.deleteSelectedQuestion.disabled = !hasManualOverlayDraft() || !selectedQuestion;
   elements.pdfEditorAuthoring.classList.toggle('hidden', !hasManualOverlayDraft());
+  if (elements.pdfEditorSelectionCopy) {
+    elements.pdfEditorSelectionCopy.textContent =
+      interactionLabel ||
+      (selectedQuestion
+        ? canEditRect
+          ? `Selected: ${selectedQuestion.label}. You can rebind, move, resize, reorder, or delete this question.`
+          : `Selected: ${selectedQuestion.label}. Reorder and delete are available. Box editing is limited to single-box short-text questions.`
+        : 'Select a question to repair its order or mapping.');
+  }
   elements.pdfEditorSaveStatus.classList.toggle('hidden', !state.pdfEditorSaveStatus);
   elements.pdfEditorSaveStatus.textContent = state.pdfEditorSaveStatus?.message || '';
   elements.pdfEditorSaveStatus.className = `section-copy${state.pdfEditorSaveStatus ? '' : ' hidden'} ${
@@ -3234,8 +3729,8 @@ function renderPdfEditor() {
       <div class="metric-value">${formatNumber(state.pdfEditorQuestions.length)}</div>
     </article>
     <article class="metric-card">
-      <div class="metric-label">Mapped Rectangles</div>
-      <div class="metric-value">${formatNumber(totalRects)}</div>
+      <div class="metric-label">${mappingMetricLabel}</div>
+      <div class="metric-value">${mappingMetricValue}</div>
     </article>
     <article class="metric-card">
       <div class="metric-label">Parse Status</div>
@@ -3781,7 +4276,7 @@ function renderPipelineVisual() {
       humanMove:
         pdfDocuments.length === 0
           ? 'Fix the fetch/triage/accept side first so real PDFs exist.'
-          : 'Run Question Stage after Parse Stage, then inspect Results for anything still needing manual mapping.',
+          : 'Run Question Stage after Parse Stage, then inspect Results for anything still needing human repair.',
       tone:
         questionRun
           ? stageRunTone(questionRun, lowConfidenceDrafts > 0 ? 'yellow' : Number(system.stats?.approved_templates || 0) > 0 ? 'green' : 'yellow')
@@ -5459,26 +5954,64 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
-    if (button === elements.addManualQuestion) {
-      addManualTextQuestion(elements.manualQuestionLabel.value);
-      elements.manualQuestionLabel.value = '';
+    if (button === elements.captureQuestionFromPdf) {
+      if (!hasManualOverlayDraft()) {
+        throw new Error('Create an editable draft before capturing a question.');
+      }
+
+      setPdfEditorInteractionMode(
+        state.pdfEditorInteractionMode === 'capture' ? null : 'capture',
+      );
+      renderPdfEditor();
+      updatePdfEditorOverlays();
       return;
     }
 
     if (button === elements.mapSelectedQuestion) {
-      if (!hasManualOverlayDraft()) {
-        throw new Error('Start manual mapping first.');
+      if (!selectedQuestionSupportsRectEditing()) {
+        throw new Error('Select a single-box short-text question before rebinding its box.');
       }
 
-      if (!currentPdfEditorQuestion()) {
-        throw new Error('Select a question before drawing on the PDF.');
-      }
-
-      state.pdfEditorDrawMode = !state.pdfEditorDrawMode;
-      state.pdfEditorPendingDraw = null;
-      state.pdfEditorSaveStatus = null;
+      setPdfEditorInteractionMode(state.pdfEditorInteractionMode === 'draw' ? null : 'draw');
       renderPdfEditor();
       updatePdfEditorOverlays();
+      return;
+    }
+
+    if (button === elements.moveSelectedRect) {
+      if (!selectedQuestionSupportsRectEditing()) {
+        throw new Error('Select a single-box short-text question before moving its box.');
+      }
+
+      setPdfEditorInteractionMode(state.pdfEditorInteractionMode === 'move' ? null : 'move');
+      renderPdfEditor();
+      updatePdfEditorOverlays();
+      return;
+    }
+
+    if (button === elements.resizeSelectedRect) {
+      if (!selectedQuestionSupportsRectEditing()) {
+        throw new Error('Select a single-box short-text question before resizing its box.');
+      }
+
+      setPdfEditorInteractionMode(state.pdfEditorInteractionMode === 'resize' ? null : 'resize');
+      renderPdfEditor();
+      updatePdfEditorOverlays();
+      return;
+    }
+
+    if (button === elements.moveSelectedQuestionUp) {
+      moveActivePdfEditorQuestion(-1);
+      return;
+    }
+
+    if (button === elements.moveSelectedQuestionDown) {
+      moveActivePdfEditorQuestion(1);
+      return;
+    }
+
+    if (button === elements.deleteSelectedQuestion) {
+      deleteActivePdfEditorQuestion();
       return;
     }
 
@@ -5755,6 +6288,8 @@ document.addEventListener('click', async (event) => {
 
     if (button.dataset.action === 'select-editor-question' && button.dataset.questionId) {
       state.pdfEditorActiveQuestionId = button.dataset.questionId;
+      clearPdfEditorInteraction({ preserveStatus: true });
+      renderPdfEditor();
       renderPdfEditorQuestions();
       updatePdfEditorOverlays();
       const activeQuestion = currentPdfEditorQuestion();
@@ -5873,53 +6408,158 @@ elements.runHistorySystemSelect.addEventListener('change', () => {
     });
 });
 
-elements.manualQuestionLabel.addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter') return;
-  event.preventDefault();
-  Promise.resolve()
-    .then(() => addManualTextQuestion(elements.manualQuestionLabel.value))
-    .then(() => {
-      elements.manualQuestionLabel.value = '';
-    })
-    .catch((error) => {
-      notify(error.message || 'Failed to add a manual question.', true);
-    });
-});
-
 elements.pdfEditorPages.addEventListener('pointerdown', (event) => {
-  if (!state.pdfEditorDrawMode) return;
   const overlay = event.target.closest('.pdf-overlay');
   if (!overlay) return;
   const renderedPage = renderedPageForOverlay(overlay);
   if (!renderedPage) return;
   const point = overlayPoint(event, overlay);
-  state.pdfEditorPendingDraw = {
-    page_index: renderedPage.page_index,
-    start_x: point.x,
-    start_y: point.y,
-    current_x: point.x,
-    current_y: point.y,
-  };
-  overlay.setPointerCapture?.(event.pointerId);
-  updatePdfEditorOverlays();
+
+  if (state.pdfEditorInteractionMode === 'draw' || state.pdfEditorInteractionMode === 'capture') {
+    state.pdfEditorPendingDraw = {
+      mode: state.pdfEditorInteractionMode,
+      page_index: renderedPage.page_index,
+      start_x: point.x,
+      start_y: point.y,
+      current_x: point.x,
+      current_y: point.y,
+    };
+    overlay.setPointerCapture?.(event.pointerId);
+    updatePdfEditorOverlays();
+    return;
+  }
+
+  if (state.pdfEditorInteractionMode === 'move') {
+    const activeRect = activePdfEditorShortTextRect();
+    if (!activeRect) return;
+    const scaleX = renderedPage.viewport.width / Math.max(renderedPage.page_width || 1, 1);
+    const scaleY = renderedPage.viewport.height / Math.max(renderedPage.page_height || 1, 1);
+    const left = activeRect.x * scaleX;
+    const top = (renderedPage.page_height - activeRect.y - activeRect.height) * scaleY;
+    const width = Math.max(activeRect.width * scaleX, 10);
+    const height = Math.max(activeRect.height * scaleY, 10);
+    const insideRect =
+      point.x >= left &&
+      point.x <= left + width &&
+      point.y >= top &&
+      point.y <= top + height;
+    if (!insideRect) return;
+
+    state.pdfEditorPendingRectEdit = {
+      mode: 'move',
+      page_index: renderedPage.page_index,
+      start_point: point,
+      originalRect: {
+        page_index: activeRect.page_index,
+        x: activeRect.x,
+        y: activeRect.y,
+        width: activeRect.width,
+        height: activeRect.height,
+      },
+      previewRect: {
+        page_index: activeRect.page_index,
+        x: activeRect.x,
+        y: activeRect.y,
+        width: activeRect.width,
+        height: activeRect.height,
+      },
+      renderedPage,
+    };
+    overlay.setPointerCapture?.(event.pointerId);
+    updatePdfEditorOverlays();
+    return;
+  }
+
+  if (state.pdfEditorInteractionMode === 'resize') {
+    const handle = event.target.closest('[data-active-overlay-handle="resize"]');
+    if (!handle) return;
+    const activeRect = activePdfEditorShortTextRect();
+    if (!activeRect) return;
+    state.pdfEditorPendingRectEdit = {
+      mode: 'resize',
+      page_index: renderedPage.page_index,
+      start_point: point,
+      originalRect: {
+        page_index: activeRect.page_index,
+        x: activeRect.x,
+        y: activeRect.y,
+        width: activeRect.width,
+        height: activeRect.height,
+      },
+      previewRect: {
+        page_index: activeRect.page_index,
+        x: activeRect.x,
+        y: activeRect.y,
+        width: activeRect.width,
+        height: activeRect.height,
+      },
+      renderedPage,
+    };
+    overlay.setPointerCapture?.(event.pointerId);
+    updatePdfEditorOverlays();
+  }
 });
 
 elements.pdfEditorPages.addEventListener('pointermove', (event) => {
-  if (!state.pdfEditorDrawMode || !state.pdfEditorPendingDraw) return;
   const overlay = event.target.closest('.pdf-overlay');
   if (!overlay) return;
   const point = overlayPoint(event, overlay);
-  state.pdfEditorPendingDraw.current_x = point.x;
-  state.pdfEditorPendingDraw.current_y = point.y;
+
+  if (state.pdfEditorPendingDraw) {
+    state.pdfEditorPendingDraw.current_x = point.x;
+    state.pdfEditorPendingDraw.current_y = point.y;
+    updatePdfEditorOverlays();
+    return;
+  }
+
+  if (!state.pdfEditorPendingRectEdit) return;
+  const session = state.pdfEditorPendingRectEdit;
+  const renderedPage = session.renderedPage;
+  const scaleX = renderedPage.viewport.width / Math.max(renderedPage.page_width || 1, 1);
+  const scaleY = renderedPage.viewport.height / Math.max(renderedPage.page_height || 1, 1);
+  const deltaX = (point.x - session.start_point.x) / scaleX;
+  const deltaY = (point.y - session.start_point.y) / scaleY;
+
+  if (session.mode === 'move') {
+    session.previewRect = {
+      page_index: session.originalRect.page_index,
+      x: Number(Math.max(0, session.originalRect.x + deltaX).toFixed(2)),
+      y: Number(Math.max(0, session.originalRect.y - deltaY).toFixed(2)),
+      width: session.originalRect.width,
+      height: session.originalRect.height,
+    };
+  } else if (session.mode === 'resize') {
+    session.previewRect = {
+      page_index: session.originalRect.page_index,
+      x: session.originalRect.x,
+      y: session.originalRect.y,
+      width: Number(Math.max(24, session.originalRect.width + deltaX).toFixed(2)),
+      height: Number(Math.max(18, session.originalRect.height - deltaY).toFixed(2)),
+    };
+  }
+
   updatePdfEditorOverlays();
 });
 
 elements.pdfEditorPages.addEventListener('pointerup', (event) => {
-  if (!state.pdfEditorDrawMode || !state.pdfEditorPendingDraw) return;
   const overlay = event.target.closest('.pdf-overlay');
   if (!overlay) return;
   const renderedPage = renderedPageForOverlay(overlay);
   if (!renderedPage) return;
+
+  if (state.pdfEditorPendingRectEdit) {
+    try {
+      updateActiveQuestionRectFromPdfRect(state.pdfEditorPendingRectEdit.previewRect);
+      clearPdfEditorInteraction();
+      renderPdfEditor();
+      updatePdfEditorOverlays();
+    } catch (error) {
+      notify(error.message || 'Failed to edit the selected box.', true);
+    }
+    return;
+  }
+
+  if (!state.pdfEditorPendingDraw) return;
 
   const point = overlayPoint(event, overlay);
   state.pdfEditorPendingDraw.current_x = point.x;
@@ -5931,20 +6571,28 @@ elements.pdfEditorPages.addEventListener('pointerup', (event) => {
   const height = Math.abs(state.pdfEditorPendingDraw.current_y - state.pdfEditorPendingDraw.start_y);
 
   if (width < 8 || height < 8) {
-    state.pdfEditorPendingDraw = null;
-    state.pdfEditorDrawMode = false;
+    clearPdfEditorInteraction();
     renderPdfEditor();
     updatePdfEditorOverlays();
     return;
   }
 
   try {
-    upsertManualBindingForActiveQuestion(renderedPage, {
-      left,
-      top,
-      width,
-      height,
-    });
+    if (state.pdfEditorPendingDraw.mode === 'capture') {
+      createQuestionFromPageSelection(renderedPage, {
+        left,
+        top,
+        width,
+        height,
+      });
+    } else {
+      upsertManualBindingForActiveQuestion(renderedPage, {
+        left,
+        top,
+        width,
+        height,
+      });
+    }
     renderPdfEditor();
   } catch (error) {
     notify(error.message || 'Failed to map the selected question.', true);

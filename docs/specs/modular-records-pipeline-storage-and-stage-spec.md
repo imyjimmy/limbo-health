@@ -277,6 +277,93 @@ Those sub-stages should remain inspectable, but they should not be the primary t
 | `question_mapping` | parsed PDF artifact or accepted PDF source doc | `storage/question-mappings/`, `extraction_runs`, `pdf_question_templates` | yes |
 | `publish_template` | question draft + PDF geometry | `storage/published-templates/`, `pdf_question_template_versions` | yes |
 
+### 5.4 Required Operator Capabilities
+
+The operator dashboard must plug into this artifact model directly.
+
+This spec is not satisfied if the dashboard can only inspect artifacts or rerun automation while leaving artifact repair weak.
+
+For each human-facing artifact, the minimum required operator capabilities are:
+
+#### 5.4.1 Targeted Pages
+
+A human must be able to:
+
+- inspect the currently selected targeted page or pages for a hospital system
+- see the source URL, crawl provenance, and last-updated time
+- manually edit the targeted page URL when the crawler picked the wrong page
+- add a new targeted page URL
+- choose which targeted page should be treated as the active source page
+- retire or reject targeted pages that are wrong, stale, or irrelevant
+- trigger a targeted refresh from the chosen page without forcing a full recrawl
+
+#### 5.4.2 Captured Forms
+
+A human must be able to:
+
+- inspect every captured PDF or form candidate associated with a hospital system
+- open the form and see where it came from
+- manually upload a replacement form when the crawler missed the right one
+- compare captured forms and choose which one is the real records-request form
+- reject, archive, or remove captured forms that do not match request-records intent
+- promote a captured form into the accepted-form corpus
+- demote or replace an accepted form when a better form is found
+
+#### 5.4.3 Accepted Forms
+
+A human must be able to:
+
+- see which accepted form is canonical for the hospital system or facility
+- open the accepted form directly from the dashboard
+- see the provenance trail from targeted page to captured form to accepted form
+- trigger reparse and downstream regeneration from the accepted form only
+- replace the canonical accepted form without losing provenance on the previous one
+
+#### 5.4.4 Hospital Submission Requirements
+
+A human must be able to:
+
+- inspect the currently derived hospital-submission-requirements artifact
+- see whether each requirement came from the page, the form, or both
+- edit the key submission facts directly when extraction is wrong or incomplete
+- repair channels and constraints such as portal, fax, mail, email, phone, in-person, fees, ID requirements, signatures, witnesses, delivery options, and notes
+- save a repaired draft of the requirements artifact
+- publish a reviewed version of the requirements artifact
+
+#### 5.4.5 Question Mapping
+
+A human must be able to:
+
+- open a question-review session from persisted artifacts
+- inspect the extracted questions and their saved bindings
+- add a new missed question
+- delete a duplicate or bad question
+- reorder questions so related follow-up questions stay near the parent question
+- rebind a question to a different PDF field
+- move a mapped rectangle and persist the updated coordinates
+- resize a mapped rectangle and persist the updated dimensions
+- define, move, and resize signature questions just like other mapped questions
+- save a repaired draft
+- publish a reviewed template
+
+#### 5.4.6 General Dashboard Expectations
+
+For every artifact-repair surface above, the dashboard must also provide:
+
+- a clear draft vs published state
+- explicit save and publish actions
+- undo-friendly editing semantics where possible
+- visible provenance for what artifact version is being edited
+- a way to compare machine output against human-reviewed truth
+- a way to see what downstream stages will be affected by publishing the repair
+
+The intent is simple:
+
+- the dashboard should not just explain pipeline failures
+- the dashboard should let a human fix the right artifact at the right stage
+- each repair should update persisted source-of-truth artifacts directly
+- downstream stages should rerun from those repaired artifacts rather than recomputing hidden intermediate state
+
 ---
 
 ## 6. Proposed Database Schema

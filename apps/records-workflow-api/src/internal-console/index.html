@@ -196,6 +196,12 @@
           @apply inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
         }
 
+        .ghost-button-active {
+          background: #ecf3ff;
+          border-color: #c7d7fe;
+          color: #274bdb;
+        }
+
         .primary-button {
           @apply inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm transition disabled:cursor-not-allowed disabled:bg-gray-300;
           background: #465fff;
@@ -630,6 +636,18 @@
           @apply grid gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)];
         }
 
+        .editor-toolbar {
+          @apply flex flex-wrap gap-2;
+        }
+
+        .danger-button {
+          @apply inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400;
+        }
+
+        .editor-status-copy {
+          @apply mt-3 text-sm text-gray-500;
+        }
+
         .question-list {
           @apply space-y-3;
         }
@@ -693,6 +711,12 @@
 
         .overlay-label {
           @apply fill-gray-800 text-[11px] font-semibold;
+        }
+
+        .overlay-handle {
+          fill: #465fff;
+          stroke: white;
+          stroke-width: 2;
         }
 
         .history-list {
@@ -1177,19 +1201,16 @@
                     <p class="section-kicker">Questions</p>
                     <div id="pdf-editor-authoring" class="mt-4 hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
                       <div class="flex flex-col gap-3">
-                        <div class="flex flex-col gap-3 sm:flex-row">
-                          <input
-                            id="manual-question-label"
-                            type="text"
-                            class="input-shell flex-1"
-                            placeholder="New text question label"
-                          />
-                          <button id="add-manual-question" type="button" class="ghost-button">Add Text Question</button>
-                          <button id="map-selected-question" type="button" class="ghost-button">Map Selected Question</button>
+                        <div class="editor-toolbar">
+                          <button id="capture-question-from-pdf" type="button" class="ghost-button">Capture Question From PDF</button>
+                          <button id="map-selected-question" type="button" class="ghost-button">Rebind Selected Box</button>
+                          <button id="move-selected-rect" type="button" class="ghost-button">Move Box</button>
+                          <button id="resize-selected-rect" type="button" class="ghost-button">Resize Box</button>
+                          <button id="move-selected-question-up" type="button" class="ghost-button">Move Up</button>
+                          <button id="move-selected-question-down" type="button" class="ghost-button">Move Down</button>
+                          <button id="delete-selected-question" type="button" class="danger-button">Delete Question</button>
                         </div>
-                        <p class="system-subtext">
-                          Create a text question, select it, then drag one rectangle on the PDF to place its mapping.
-                        </p>
+                        <p id="pdf-editor-selection-copy" class="editor-status-copy"></p>
                       </div>
                     </div>
                     <div id="pdf-editor-questions" class="question-list mt-4"></div>

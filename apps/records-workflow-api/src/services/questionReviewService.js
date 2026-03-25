@@ -4,6 +4,7 @@ import { parsePdfDocument } from '../parsers/pdfParser.js';
 import { query, withTransaction } from '../db.js';
 import { extractPdfFormUnderstanding } from '../extractors/pdfFormUnderstandingExtractor.js';
 import { insertExtractionRun } from '../repositories/workflowRepository.js';
+import { resolveParsedArtifactPath } from '../utils/pipelineArtifactStorage.js';
 import { resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
 import {
   buildUnsupportedAutofillPayload,
@@ -74,18 +75,77 @@ function buildConfidenceSummary(payload) {
   };
 }
 
-async function loadPdfGeometry(sourceDocument) {
+async function loadLatestParsedArtifact(sourceDocument, client = null) {
+  if (!sourceDocument?.id) return null;
+
+  const q = client || { query };
+  const result = await q.query(
+    `select
+       pa.id,
+       pa.parse_status,
+       pa.storage_path,
+       pa.created_at
+     from parsed_artifacts pa
+     where pa.source_document_id = $1
+     order by
+       case
+         when pa.id = $2 then 0
+         else 1
+       end asc,
+       pa.created_at desc
+     limit 1`,
+    [sourceDocument.id, sourceDocument.parsed_artifact_id || null],
+  );
+
+  return result.rows[0] || null;
+}
+
+async function loadPdfGeometry(sourceDocument, client = null) {
   if (!sourceDocument?.storage_path || sourceDocument?.source_type !== 'pdf') {
     return null;
   }
 
-  const resolvedPath = resolveSourceDocumentPath(sourceDocument.storage_path);
-  const parsed = await parsePdfDocument({ filePath: resolvedPath });
+  const parsedArtifact = await loadLatestParsedArtifact(sourceDocument, client);
+  if (!parsedArtifact?.storage_path) {
+    return null;
+  }
+
+  let parsed = null;
+  try {
+    const artifactPayload = JSON.parse(
+      await fs.readFile(resolveParsedArtifactPath(parsedArtifact.storage_path), 'utf8'),
+    );
+    parsed = artifactPayload?.parsed_document || null;
+  } catch (error) {
+    console.warn('Failed to load persisted parsed artifact for question review:', {
+      sourceDocumentId: sourceDocument.id,
+      parsedArtifactId: parsedArtifact.id,
+      storagePath: parsedArtifact.storage_path,
+      error,
+    });
+    return {
+      parse_status: 'artifact_missing',
+      page_count: 0,
+      pages: [],
+    };
+  }
+
   const pages = Array.isArray(parsed?.pages)
     ? parsed.pages.map((page) => ({
         page_index: page.pageIndex,
         width: Number(page.width || 0),
         height: Number(page.height || 0),
+        words: Array.isArray(page.words)
+          ? page.words
+              .map((word) => ({
+                text: normalizeString(word.text || ''),
+                x: Number(word.x || 0),
+                y: Number(word.y || 0),
+                width: Number(word.width || 0),
+                height: Number(word.height || 0),
+              }))
+              .filter((word) => word.text)
+          : [],
         widgets: Array.isArray(page.widgets)
           ? page.widgets.map((widget) => ({
               field_name: widget.fieldName || null,
@@ -102,7 +162,7 @@ async function loadPdfGeometry(sourceDocument) {
     : [];
 
   return {
-    parse_status: parsed?.parseStatus || null,
+    parse_status: parsed?.parseStatus || parsedArtifact.parse_status || null,
     page_count: pages.length,
     pages,
   };
@@ -146,6 +206,7 @@ async function loadSourceDocument(sourceDocumentId, client = null) {
        sd.http_status,
        sd.content_hash,
        sd.storage_path,
+       sd.parsed_artifact_id,
        sd.extracted_text,
        sd.import_mode,
        sd.import_notes,
@@ -378,7 +439,7 @@ async function buildQuestionReview(sourceDocumentId, client = null) {
   const [latestRun, publishedVersions, pdfGeometry] = await Promise.all([
     loadLatestFormExtractionRun(sourceDocumentId, q),
     loadPublishedVersions(template.id, q),
-    loadPdfGeometry(sourceDocument),
+    loadPdfGeometry(sourceDocument, q),
   ]);
 
   return buildQuestionReviewResponse({
