@@ -285,28 +285,51 @@ async function computeNationalStateOverview() {
 async function loadStateSystemStats(state) {
   const [systemStats, templateStats, dbSeedUrls, qualityStats, pdfLinks] = await Promise.all([
     query(
-      `select
+      `with facility_counts as (
+         select
+           hospital_system_id,
+           count(*)::int as db_facilities
+         from facilities
+         where active = true
+         group by hospital_system_id
+       ),
+       source_document_counts as (
+         select
+           hospital_system_id,
+           count(*)::int as source_documents,
+           count(*) filter (where source_type = 'html')::int as html_source_documents,
+           count(*) filter (where source_type = 'pdf')::int as pdf_source_documents,
+           max(fetched_at) as last_crawl_at
+         from source_documents
+         group by hospital_system_id
+       ),
+       workflow_counts as (
+         select
+           hospital_system_id,
+           count(*)::int as workflows
+         from records_workflows
+         group by hospital_system_id
+       )
+       select
          hs.id,
          hs.system_name,
          hs.canonical_domain,
          hs.state,
-         count(distinct f.id)::int as db_facilities,
-         count(distinct sd.id)::int as source_documents,
-         count(distinct case when sd.source_type = 'html' then sd.id end)::int as html_source_documents,
-         count(distinct case when sd.source_type = 'pdf' then sd.id end)::int as pdf_source_documents,
-         count(distinct rw.id)::int as workflows,
-         max(sd.fetched_at) as last_crawl_at
+         coalesce(fc.db_facilities, 0)::int as db_facilities,
+         coalesce(sdc.source_documents, 0)::int as source_documents,
+         coalesce(sdc.html_source_documents, 0)::int as html_source_documents,
+         coalesce(sdc.pdf_source_documents, 0)::int as pdf_source_documents,
+         coalesce(wc.workflows, 0)::int as workflows,
+         sdc.last_crawl_at
        from hospital_systems hs
-       left join facilities f
-         on f.hospital_system_id = hs.id
-        and f.active = true
-       left join source_documents sd
-         on sd.hospital_system_id = hs.id
-       left join records_workflows rw
-         on rw.hospital_system_id = hs.id
+       left join facility_counts fc
+         on fc.hospital_system_id = hs.id
+       left join source_document_counts sdc
+         on sdc.hospital_system_id = hs.id
+       left join workflow_counts wc
+         on wc.hospital_system_id = hs.id
        where hs.state = $1
          and hs.active = true
-       group by hs.id, hs.system_name, hs.canonical_domain, hs.state
        order by hs.system_name`,
       [state],
     ),
