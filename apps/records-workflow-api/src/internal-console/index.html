@@ -625,18 +625,30 @@
         }
 
         .editor-shell {
-          @apply space-y-6;
+          @apply space-y-4;
+        }
+
+        .editor-shell-tight {
+          margin-top: -10px;
+        }
+
+        .editor-card {
+          @apply p-3 md:p-4;
         }
 
         .editor-header {
-          @apply flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between;
+          @apply flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between;
         }
 
         .editor-grid {
-          @apply grid gap-6 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)];
+          @apply grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)];
         }
 
         .editor-toolbar {
+          @apply flex flex-wrap gap-2;
+        }
+
+        .editor-toolbar-secondary {
           @apply flex flex-wrap gap-2;
         }
 
@@ -644,16 +656,78 @@
           @apply inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700 shadow-sm transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400;
         }
 
+        .tool-exit-button {
+          @apply inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 shadow-sm transition hover:bg-amber-100;
+        }
+
+        .editor-mode-pill {
+          @apply inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-800;
+        }
+
         .editor-status-copy {
-          @apply mt-3 text-sm text-gray-500;
+          @apply text-sm text-gray-500;
+          line-height: 1.35;
         }
 
         .question-list {
-          @apply space-y-3;
+          @apply space-y-2;
+        }
+
+        .question-card-shell {
+          @apply relative;
+        }
+
+        .question-card-shell-draggable {
+          @apply flex items-start gap-2;
+        }
+
+        .question-card-shell-draggable > .question-card {
+          flex: 1 1 auto;
+          min-width: 0;
+        }
+
+        .question-card-shell-dragging {
+          opacity: 0.55;
+        }
+
+        .question-card-shell-drop-before::before,
+        .question-card-shell-drop-after::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 3px;
+          border-radius: 999px;
+          background: #465fff;
+          box-shadow: 0 0 0 3px rgba(70, 95, 255, 0.14);
+        }
+
+        .question-card-shell-drop-before::before {
+          top: -8px;
+        }
+
+        .question-card-shell-drop-after::after {
+          bottom: -8px;
+        }
+
+        .question-drag-handle {
+          @apply mt-1 inline-grid shrink-0 cursor-grab grid-cols-2 gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-gray-400 shadow-sm;
+        }
+
+        .question-card-shell-dragging .question-drag-handle {
+          cursor: grabbing;
+        }
+
+        .question-drag-dot {
+          width: 4px;
+          height: 4px;
+          border-radius: 999px;
+          background: currentColor;
+          opacity: 0.7;
         }
 
         .question-card {
-          @apply w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:bg-gray-100;
+          @apply w-full rounded-xl border border-gray-200 bg-gray-50 p-2.5 text-left transition hover:bg-gray-100;
         }
 
         .question-card-active {
@@ -1175,12 +1249,12 @@
                 </div>
               </section>
 
-              <section id="pdf-editor-panel" class="hidden editor-shell">
-                <div class="app-card">
+              <section id="pdf-editor-panel" class="hidden editor-shell editor-shell-tight">
+                <div class="app-card editor-card">
                   <div class="editor-header">
                     <div>
                       <button id="back-to-results" type="button" class="ghost-button">Back To Results</button>
-                      <p class="section-kicker mt-4">PDF Editor</p>
+                      <p class="section-kicker mt-2">PDF Editor</p>
                       <h3 id="pdf-editor-title" class="section-title">PDF Editor</h3>
                       <p id="pdf-editor-copy" class="section-copy">Question mappings over the rendered PDF.</p>
                       <p id="pdf-editor-save-status" class="section-copy hidden"></p>
@@ -1193,27 +1267,29 @@
                     </div>
                   </div>
 
-                  <div id="pdf-editor-metrics" class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"></div>
+                  <div id="pdf-editor-authoring" class="mt-3 hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <div class="flex flex-col gap-2">
+                      <div class="editor-toolbar">
+                        <button id="capture-question-from-pdf" type="button" class="ghost-button">Capture Question From PDF</button>
+                        <button id="map-selected-question" type="button" class="ghost-button">Rebind Selected Box</button>
+                        <button id="move-selected-rect" type="button" class="ghost-button">Move Box</button>
+                        <button id="resize-selected-rect" type="button" class="ghost-button">Resize Box</button>
+                        <button id="move-selected-question-up" type="button" class="ghost-button">Move Up</button>
+                        <button id="move-selected-question-down" type="button" class="ghost-button">Move Down</button>
+                        <button id="cancel-pdf-editor-mode" type="button" class="tool-exit-button hidden">Exit Tool</button>
+                        <button id="delete-selected-question" type="button" class="danger-button">Delete Question</button>
+                      </div>
+                      <p id="pdf-editor-selection-copy" class="editor-status-copy"></p>
+                    </div>
+                  </div>
+
+                  <div id="pdf-editor-metrics" class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"></div>
                 </div>
 
                 <div class="editor-grid">
                   <section class="app-card">
                     <p class="section-kicker">Questions</p>
-                    <div id="pdf-editor-authoring" class="mt-4 hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
-                      <div class="flex flex-col gap-3">
-                        <div class="editor-toolbar">
-                          <button id="capture-question-from-pdf" type="button" class="ghost-button">Capture Question From PDF</button>
-                          <button id="map-selected-question" type="button" class="ghost-button">Rebind Selected Box</button>
-                          <button id="move-selected-rect" type="button" class="ghost-button">Move Box</button>
-                          <button id="resize-selected-rect" type="button" class="ghost-button">Resize Box</button>
-                          <button id="move-selected-question-up" type="button" class="ghost-button">Move Up</button>
-                          <button id="move-selected-question-down" type="button" class="ghost-button">Move Down</button>
-                          <button id="delete-selected-question" type="button" class="danger-button">Delete Question</button>
-                        </div>
-                        <p id="pdf-editor-selection-copy" class="editor-status-copy"></p>
-                      </div>
-                    </div>
-                    <div id="pdf-editor-questions" class="question-list mt-4"></div>
+                    <div id="pdf-editor-questions" class="question-list mt-3"></div>
                   </section>
 
                   <section class="app-card">

@@ -173,10 +173,14 @@ const state = {
   pdfEditorQuestions: [],
   pdfEditorActiveQuestionId: null,
   pdfEditorRenderedPages: [],
+  pdfEditorAuthoringOpen: false,
   pdfEditorDrawMode: false,
   pdfEditorInteractionMode: null,
   pdfEditorPendingDraw: null,
   pdfEditorPendingRectEdit: null,
+  pdfEditorDragQuestionId: null,
+  pdfEditorDropTargetQuestionId: null,
+  pdfEditorDropPosition: null,
   pdfEditorDraftDirty: false,
   pdfEditorSaveStatus: null,
   pdfDocumentProxy: null,
@@ -267,6 +271,7 @@ const elements = {
   resizeSelectedRect: document.querySelector('#resize-selected-rect'),
   moveSelectedQuestionUp: document.querySelector('#move-selected-question-up'),
   moveSelectedQuestionDown: document.querySelector('#move-selected-question-down'),
+  cancelPdfEditorMode: document.querySelector('#cancel-pdf-editor-mode'),
   deleteSelectedQuestion: document.querySelector('#delete-selected-question'),
   pdfEditorSelectionCopy: document.querySelector('#pdf-editor-selection-copy'),
   pdfEditorQuestions: document.querySelector('#pdf-editor-questions'),
@@ -1160,6 +1165,21 @@ function currentPdfEditorInteractionLabel() {
   }
 }
 
+function currentPdfEditorInteractionModeLabel() {
+  switch (state.pdfEditorInteractionMode) {
+    case 'capture':
+      return 'Capture Question';
+    case 'draw':
+      return 'Rebind Box';
+    case 'move':
+      return 'Move Box';
+    case 'resize':
+      return 'Resize Box';
+    default:
+      return null;
+  }
+}
+
 function canStartManualMapping() {
   const payload = currentPdfDraftPayload();
   if (!payload) return false;
@@ -1181,10 +1201,14 @@ function resetPdfEditorState() {
   state.pdfEditorQuestions = [];
   state.pdfEditorActiveQuestionId = null;
   state.pdfEditorRenderedPages = [];
+  state.pdfEditorAuthoringOpen = false;
   state.pdfEditorInteractionMode = null;
   state.pdfEditorDrawMode = false;
   state.pdfEditorPendingDraw = null;
   state.pdfEditorPendingRectEdit = null;
+  state.pdfEditorDragQuestionId = null;
+  state.pdfEditorDropTargetQuestionId = null;
+  state.pdfEditorDropPosition = null;
   state.pdfEditorDraftDirty = false;
   state.pdfEditorSaveStatus = null;
   state.pdfDocumentProxy = null;
@@ -3314,10 +3338,23 @@ function refreshPdfEditorQuestionsFromDraft() {
 
 function beginManualMapping() {
   state.pdfEditorDraftPayload = buildEditableOverlayPayload();
+  state.pdfEditorAuthoringOpen = true;
   clearPdfEditorInteraction();
   state.pdfEditorDraftDirty = true;
   state.pdfEditorSaveStatus = null;
   refreshPdfEditorQuestionsFromDraft();
+  renderPdfEditor();
+  updatePdfEditorOverlays();
+}
+
+function togglePdfEditorAuthoring() {
+  if (!hasManualOverlayDraft()) {
+    beginManualMapping();
+    return;
+  }
+
+  state.pdfEditorAuthoringOpen = !state.pdfEditorAuthoringOpen;
+  clearPdfEditorInteraction({ preserveStatus: true });
   renderPdfEditor();
   updatePdfEditorOverlays();
 }
@@ -3340,6 +3377,49 @@ function moveActivePdfEditorQuestion(delta) {
 
   const [question] = payload.questions.splice(currentIndex, 1);
   payload.questions.splice(nextIndex, 0, question);
+  clearPdfEditorInteraction();
+  state.pdfEditorDraftDirty = true;
+  state.pdfEditorSaveStatus = null;
+  refreshPdfEditorQuestionsFromDraft();
+  renderPdfEditor();
+  updatePdfEditorOverlays();
+}
+
+function reorderPdfEditorQuestion({
+  questionId,
+  targetQuestionId,
+  position = 'before',
+} = {}) {
+  const payload = currentPdfDraftPayload();
+  if (!payload || !Array.isArray(payload.questions)) {
+    throw new Error('Open an editable draft before reordering questions.');
+  }
+
+  if (!questionId || !targetQuestionId || questionId === targetQuestionId) {
+    return;
+  }
+
+  const sourceIndex = payload.questions.findIndex((question) => question.id === questionId);
+  const targetIndex = payload.questions.findIndex((question) => question.id === targetQuestionId);
+  if (sourceIndex < 0 || targetIndex < 0) {
+    throw new Error('Could not find the question to reorder.');
+  }
+
+  const [question] = payload.questions.splice(sourceIndex, 1);
+  let insertionIndex = targetIndex;
+  if (position === 'after') {
+    insertionIndex += 1;
+  }
+  if (sourceIndex < targetIndex) {
+    insertionIndex -= 1;
+  }
+  insertionIndex = Math.max(0, Math.min(payload.questions.length, insertionIndex));
+  payload.questions.splice(insertionIndex, 0, question);
+
+  state.pdfEditorActiveQuestionId = question.id;
+  state.pdfEditorDragQuestionId = null;
+  state.pdfEditorDropTargetQuestionId = null;
+  state.pdfEditorDropPosition = null;
   clearPdfEditorInteraction();
   state.pdfEditorDraftDirty = true;
   state.pdfEditorSaveStatus = null;
@@ -3640,34 +3720,78 @@ function renderPdfEditorQuestions() {
     return;
   }
 
+  const canDragQuestions = hasManualOverlayDraft() && state.pdfEditorAuthoringOpen;
   elements.pdfEditorQuestions.innerHTML = state.pdfEditorQuestions
     .map((question, index) => {
       const activeClass =
         question.id === state.pdfEditorActiveQuestionId
           ? 'question-card question-card-active'
           : 'question-card';
+      const shellClasses = ['question-card-shell'];
+      if (canDragQuestions) {
+        shellClasses.push('question-card-shell-draggable');
+      }
+      if (question.id === state.pdfEditorDragQuestionId) {
+        shellClasses.push('question-card-shell-dragging');
+      }
+      if (question.id === state.pdfEditorDropTargetQuestionId) {
+        shellClasses.push(
+          state.pdfEditorDropPosition === 'after'
+            ? 'question-card-shell-drop-after'
+            : 'question-card-shell-drop-before',
+        );
+      }
 
       return `
-        <button type="button" class="${activeClass}" data-action="select-editor-question" data-question-id="${escapeHtml(question.id)}">
-          <div class="question-title">${formatNumber(index + 1)}. ${escapeHtml(question.label)}</div>
-          <div class="question-copy">
-            ${
-              question.rects.length > 0
-                ? `${escapeHtml(question.kind)} • ${formatNumber(question.rects.length)} mapped rectangles • ${formatNumber(question.page_indexes.length)} pages`
-                : question.binding_count > 0
-                  ? `${escapeHtml(question.kind)} • ${formatNumber(question.binding_count)} saved bindings • overlay unavailable`
-                  : `${escapeHtml(question.kind)} • no saved bindings`
-            }
-          </div>
+        <div
+          class="${shellClasses.join(' ')}"
+          data-question-id="${escapeHtml(question.id)}"
+          ${canDragQuestions ? 'draggable="true"' : ''}
+        >
           ${
-            question.help_text
-              ? `<div class="question-copy">${escapeHtml(question.help_text)}</div>`
+            canDragQuestions
+              ? `
+                <div class="question-drag-handle" title="Drag to reorder" aria-hidden="true">
+                  <span class="question-drag-dot"></span>
+                  <span class="question-drag-dot"></span>
+                  <span class="question-drag-dot"></span>
+                  <span class="question-drag-dot"></span>
+                  <span class="question-drag-dot"></span>
+                  <span class="question-drag-dot"></span>
+                </div>
+              `
               : ''
           }
-        </button>
+          <button type="button" class="${activeClass}" data-action="select-editor-question" data-question-id="${escapeHtml(question.id)}">
+            <div class="question-title">${formatNumber(index + 1)}. ${escapeHtml(question.label)}</div>
+            <div class="question-copy">
+              ${
+                question.rects.length > 0
+                  ? `${escapeHtml(question.kind)} • ${formatNumber(question.rects.length)} mapped rectangles • ${formatNumber(question.page_indexes.length)} pages`
+                  : question.binding_count > 0
+                    ? `${escapeHtml(question.kind)} • ${formatNumber(question.binding_count)} saved bindings • overlay unavailable`
+                    : `${escapeHtml(question.kind)} • no saved bindings`
+              }
+            </div>
+            ${
+              question.help_text
+                ? `<div class="question-copy">${escapeHtml(question.help_text)}</div>`
+                : ''
+            }
+          </button>
+        </div>
       `;
     })
     .join('');
+}
+
+function exitPdfEditorInteractionMode() {
+  if (!state.pdfEditorInteractionMode) {
+    return;
+  }
+  clearPdfEditorInteraction({ preserveStatus: true });
+  renderPdfEditor();
+  updatePdfEditorOverlays();
 }
 
 async function renderPdfEditorPages() {
@@ -3827,7 +3951,7 @@ function updatePdfEditorOverlays() {
     }
 
     renderedPage.overlay.style.pointerEvents =
-      hasManualOverlayDraft() && state.pdfEditorInteractionMode ? 'auto' : 'none';
+      hasManualOverlayDraft() && state.pdfEditorAuthoringOpen && state.pdfEditorInteractionMode ? 'auto' : 'none';
     renderedPage.emptyNote?.classList.toggle('hidden', rects.length > 0);
   }
 }
@@ -3869,6 +3993,7 @@ async function savePdfEditorDraft({ publish = false } = {}) {
   state.pdfEditorDraftPayload = cloneJson(
     response?.draft?.payload || response?.published_version?.payload || state.pdfEditorDraftPayload,
   );
+  state.pdfEditorAuthoringOpen = true;
   clearPdfEditorInteraction({ preserveStatus: true });
   state.pdfEditorDraftDirty = false;
   state.pdfEditorSaveStatus = {
@@ -3896,6 +4021,7 @@ async function openPdfEditor(sourceDocumentId) {
   );
   state.pdfEditorQuestions = buildQuestionMappings(state.pdfEditorReview, state.pdfEditorDraftPayload);
   state.pdfEditorActiveQuestionId = state.pdfEditorQuestions[0]?.id || null;
+  state.pdfEditorAuthoringOpen = false;
   state.pdfEditorInteractionMode = null;
   state.pdfEditorDrawMode = false;
   state.pdfEditorPendingDraw = null;
@@ -3937,20 +4063,28 @@ function renderPdfEditor() {
   const interactionLabel = currentPdfEditorInteractionLabel();
   const selectedQuestion = currentPdfEditorQuestion();
   const canEditRect = selectedQuestionSupportsRectEditing();
+  const authoringOpen = hasManualOverlayDraft() && state.pdfEditorAuthoringOpen;
   const createDraftLabel =
     currentPdfDraftPayload()?.supported && currentPdfDraftPayload()?.mode === 'acroform'
       ? 'Create Editable Overlay Draft'
       : hasManualOverlayDraft()
-        ? 'Editable Draft Ready'
+        ? authoringOpen
+          ? 'Hide Editing Tools'
+          : 'Edit Draft'
         : 'Create Editable Draft';
 
   elements.pdfEditorTitle.textContent = review.source_document.title || 'PDF Editor';
   elements.pdfEditorCopy.textContent =
-    totalRects > 0
-      ? 'SVG rectangles show where the current question mappings land on the rendered PDF.'
-      : pageCount > 0
-        ? 'PDF geometry loaded. No extracted question mappings are available for this PDF yet.'
-        : 'Saved question data exists, but persisted PDF geometry is unavailable for overlay rendering.';
+    authoringOpen
+      ? interactionLabel ||
+        (selectedQuestion
+          ? `Editing draft for ${selectedQuestion.label}. Drag the six-dot handle to reorder questions.`
+          : 'Editing draft. Drag the six-dot handle beside a question to reorder it.')
+      : totalRects > 0
+        ? 'SVG rectangles show where the current question mappings land on the rendered PDF.'
+        : pageCount > 0
+          ? 'PDF geometry loaded. No extracted question mappings are available for this PDF yet.'
+          : 'Saved question data exists, but persisted PDF geometry is unavailable for overlay rendering.';
   elements.openCachedPdf.href = review.source_document.content_url;
   const manualAvailable = canStartManualMapping();
   elements.startManualMapping.disabled = !manualAvailable;
@@ -3981,6 +4115,11 @@ function renderPdfEditor() {
     'ghost-button-active',
     state.pdfEditorInteractionMode === 'resize',
   );
+  elements.cancelPdfEditorMode?.classList.toggle('hidden', !state.pdfEditorInteractionMode);
+  if (elements.cancelPdfEditorMode) {
+    const modeLabel = currentPdfEditorInteractionModeLabel();
+    elements.cancelPdfEditorMode.textContent = modeLabel ? `Exit ${modeLabel}` : 'Exit Tool';
+  }
   const selectedIndex = selectedQuestion
     ? state.pdfEditorQuestions.findIndex((question) => question.id === selectedQuestion.id)
     : -1;
@@ -3988,15 +4127,20 @@ function renderPdfEditor() {
   elements.moveSelectedQuestionDown.disabled =
     !hasManualOverlayDraft() || selectedIndex < 0 || selectedIndex >= state.pdfEditorQuestions.length - 1;
   elements.deleteSelectedQuestion.disabled = !hasManualOverlayDraft() || !selectedQuestion;
-  elements.pdfEditorAuthoring.classList.toggle('hidden', !hasManualOverlayDraft());
+  elements.pdfEditorAuthoring.classList.toggle('hidden', !authoringOpen);
+  elements.pdfEditorMetrics.classList.toggle('hidden', authoringOpen);
   if (elements.pdfEditorSelectionCopy) {
     elements.pdfEditorSelectionCopy.textContent =
       interactionLabel ||
       (selectedQuestion
         ? canEditRect
-          ? `Selected: ${selectedQuestion.label}. You can rebind, move, resize, reorder, or delete this question.`
-          : `Selected: ${selectedQuestion.label}. Reorder and delete are available. Box editing is limited to single-box short-text questions.`
-        : 'Select a question to repair its order or mapping.');
+          ? `Selected: ${selectedQuestion.label}. Drag the six-dot handle beside a question to reorder it. Press Esc or Exit Tool to leave box-editing modes.`
+          : `Selected: ${selectedQuestion.label}. Drag the six-dot handle beside a question to reorder it. Box editing is limited to single-box short-text questions.`
+        : authoringOpen
+          ? 'Drag the six-dot handle beside a question to reorder it. Press Esc or Exit Tool to leave any active PDF tool.'
+          : hasManualOverlayDraft()
+            ? 'This PDF already has an editable draft. Click Edit Draft when you want repair controls.'
+          : 'Select a question to inspect its order or mapping.');
   }
   elements.pdfEditorSaveStatus.classList.toggle('hidden', !state.pdfEditorSaveStatus);
   elements.pdfEditorSaveStatus.textContent = state.pdfEditorSaveStatus?.message || '';
@@ -6461,7 +6605,7 @@ document.addEventListener('click', async (event) => {
     }
 
     if (button === elements.startManualMapping) {
-      beginManualMapping();
+      togglePdfEditorAuthoring();
       return;
     }
 
@@ -6523,6 +6667,11 @@ document.addEventListener('click', async (event) => {
 
     if (button === elements.deleteSelectedQuestion) {
       deleteActivePdfEditorQuestion();
+      return;
+    }
+
+    if (button === elements.cancelPdfEditorMode) {
+      exitPdfEditorInteractionMode();
       return;
     }
 
@@ -6903,6 +7052,105 @@ document.addEventListener('click', async (event) => {
   } catch (error) {
     notify(error.message || 'Request failed.', true);
   }
+});
+
+function pdfEditorQuestionCardFromEventTarget(target) {
+  return target instanceof Element ? target.closest('.question-card-shell[data-question-id]') : null;
+}
+
+function clearPdfEditorQuestionDropState({ preserveDragQuestion = false } = {}) {
+  const draggingQuestionId = state.pdfEditorDragQuestionId;
+  if (!preserveDragQuestion) {
+    state.pdfEditorDragQuestionId = null;
+  }
+  state.pdfEditorDropTargetQuestionId = null;
+  state.pdfEditorDropPosition = null;
+  elements.pdfEditorQuestions
+    ?.querySelectorAll('.question-card-shell-dragging, .question-card-shell-drop-before, .question-card-shell-drop-after')
+    .forEach((element) => {
+      element.classList.remove(
+        'question-card-shell-dragging',
+        'question-card-shell-drop-before',
+        'question-card-shell-drop-after',
+      );
+    });
+  if (preserveDragQuestion && draggingQuestionId) {
+    elements.pdfEditorQuestions
+      ?.querySelector(`.question-card-shell[data-question-id="${CSS.escape(draggingQuestionId)}"]`)
+      ?.classList.add('question-card-shell-dragging');
+  }
+}
+
+elements.pdfEditorQuestions?.addEventListener('dragstart', (event) => {
+  if (!hasManualOverlayDraft() || !state.pdfEditorAuthoringOpen) return;
+  const card = pdfEditorQuestionCardFromEventTarget(event.target);
+  const questionId = card?.dataset.questionId;
+  if (!card || !questionId || !event.dataTransfer) return;
+
+  state.pdfEditorDragQuestionId = questionId;
+  state.pdfEditorDropTargetQuestionId = null;
+  state.pdfEditorDropPosition = null;
+  state.pdfEditorActiveQuestionId = questionId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', questionId);
+  card.classList.add('question-card-shell-dragging');
+});
+
+elements.pdfEditorQuestions?.addEventListener('dragover', (event) => {
+  if (!hasManualOverlayDraft() || !state.pdfEditorAuthoringOpen || !state.pdfEditorDragQuestionId) return;
+  const card = pdfEditorQuestionCardFromEventTarget(event.target);
+  if (!card?.dataset.questionId || card.dataset.questionId === state.pdfEditorDragQuestionId) {
+    return;
+  }
+
+  event.preventDefault();
+  const bounds = card.getBoundingClientRect();
+  const position = event.clientY - bounds.top < bounds.height / 2 ? 'before' : 'after';
+  if (
+    state.pdfEditorDropTargetQuestionId === card.dataset.questionId &&
+    state.pdfEditorDropPosition === position
+  ) {
+    return;
+  }
+
+  clearPdfEditorQuestionDropState({ preserveDragQuestion: true });
+  state.pdfEditorDragQuestionId = event.dataTransfer?.getData('text/plain') || state.pdfEditorDragQuestionId;
+  state.pdfEditorDropTargetQuestionId = card.dataset.questionId;
+  state.pdfEditorDropPosition = position;
+  card.classList.add(position === 'after' ? 'question-card-shell-drop-after' : 'question-card-shell-drop-before');
+});
+
+elements.pdfEditorQuestions?.addEventListener('drop', (event) => {
+  if (!hasManualOverlayDraft() || !state.pdfEditorAuthoringOpen || !state.pdfEditorDragQuestionId) return;
+  const card = pdfEditorQuestionCardFromEventTarget(event.target);
+  const targetQuestionId = card?.dataset.questionId || null;
+  const draggedQuestionId = state.pdfEditorDragQuestionId || event.dataTransfer?.getData('text/plain');
+  const position = state.pdfEditorDropPosition || 'before';
+  clearPdfEditorQuestionDropState();
+  event.preventDefault();
+
+  if (!targetQuestionId || !draggedQuestionId || targetQuestionId === draggedQuestionId) {
+    renderPdfEditor();
+    updatePdfEditorOverlays();
+    return;
+  }
+
+  reorderPdfEditorQuestion({
+    questionId: draggedQuestionId,
+    targetQuestionId,
+    position,
+  });
+});
+
+elements.pdfEditorQuestions?.addEventListener('dragend', () => {
+  clearPdfEditorQuestionDropState();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  if (!state.pdfEditorReview || !state.pdfEditorInteractionMode) return;
+  event.preventDefault();
+  exitPdfEditorInteractionMode();
 });
 
 elements.sidebarBackdrop?.addEventListener('click', () => {
