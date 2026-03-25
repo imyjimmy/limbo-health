@@ -3978,6 +3978,7 @@ async function savePdfEditorDraft({ publish = false } = {}) {
   }
 
   const endpoint = publish ? 'publish' : 'draft';
+  const authoringWasOpen = state.pdfEditorAuthoringOpen;
   const response = await fetchJson(
     `/internal/source-documents/${encodeURIComponent(state.pdfEditorReview.source_document.id)}/question-review/${endpoint}`,
     {
@@ -3993,7 +3994,7 @@ async function savePdfEditorDraft({ publish = false } = {}) {
   state.pdfEditorDraftPayload = cloneJson(
     response?.draft?.payload || response?.published_version?.payload || state.pdfEditorDraftPayload,
   );
-  state.pdfEditorAuthoringOpen = true;
+  state.pdfEditorAuthoringOpen = authoringWasOpen;
   clearPdfEditorInteraction({ preserveStatus: true });
   state.pdfEditorDraftDirty = false;
   state.pdfEditorSaveStatus = {

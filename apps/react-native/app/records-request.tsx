@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
   Alert,
@@ -133,37 +134,6 @@ function getWorkflowStepDescription(
   }
 }
 
-function formatLastVerifiedAt(value: string | null): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function getRecommendedPathSummary(packet: RecordsRequestPacket): string {
-  const availablePaths = packet.recommendedPaths
-    .filter((path) => path.available)
-    .map((path) => path.label);
-
-  if (availablePaths.length > 0) {
-    return availablePaths.slice(0, 2).join(' • ');
-  }
-
-  if (packet.forms.length > 0) {
-    return 'Official forms found for manual review';
-  }
-
-  if (packet.portal.url) {
-    return 'Portal details found';
-  }
-
-  return 'Coverage still being verified';
-}
-
 export default function RecordsRequestScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -198,6 +168,7 @@ export default function RecordsRequestScreen() {
   const [signaturePadActive, setSignaturePadActive] = useState(false);
   const packetLoadRequestIdRef = useRef(0);
   const scrollViewRef = useRef<ScrollView | null>(null);
+  const autofillAnswersRef = useRef<RecordsWorkflowAutofillAnswers>({});
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -308,6 +279,10 @@ export default function RecordsRequestScreen() {
   }, [selectedFormKey]);
 
   useEffect(() => {
+    autofillAnswersRef.current = autofillAnswers;
+  }, [autofillAnswers]);
+
+  useEffect(() => {
     if (currentStepId !== 'signature') {
       setSignaturePadActive(false);
     }
@@ -324,9 +299,10 @@ export default function RecordsRequestScreen() {
         preferredFormKey: selectedFormKey,
       })
     : null;
+  const activeAutofillForm = selectedPdfForm || primaryDisplayForm;
   const allDynamicQuestions =
-    selectedPdfForm?.autofill.supported && selectedPdfForm.autofill.questions.length > 0
-      ? selectedPdfForm.autofill.questions
+    activeAutofillForm?.autofill.supported && activeAutofillForm.autofill.questions.length > 0
+      ? activeAutofillForm.autofill.questions
       : [];
   const dynamicQuestions = getVisibleAutofillQuestions(allDynamicQuestions, autofillAnswers);
   const hasSignatureStep = signatureFieldCount > 0;
@@ -355,17 +331,28 @@ export default function RecordsRequestScreen() {
   const canGeneratePdf = hasPdfForm && templatePrefetchState !== 'loading';
   const formFillButtonLabel =
     dynamicQuestions.length > 0 || hasSignatureStep ? 'Fill Out Form' : 'Apply Bio To PDF';
-  const currentStepTitle = getWorkflowStepTitle(currentWorkflowStep);
-  const currentStepDescription = getWorkflowStepDescription(currentWorkflowStep);
+  const currentStepTitle =
+    currentWorkflowStep.kind === 'hospital' && selectedSystem
+      ? selectedSystem.name
+      : getWorkflowStepTitle(currentWorkflowStep);
+  const currentStepDescription =
+    currentWorkflowStep.kind === 'hospital' && selectedSystem
+      ? ''
+      : getWorkflowStepDescription(currentWorkflowStep);
   const currentQuestionIsDate = currentQuestion ? isDateAutofillQuestion(currentQuestion) : false;
   const nextWorkflowStep = workflowSteps[currentStepIndex + 1] || null;
-  const availablePathSummary = packet ? getRecommendedPathSummary(packet) : null;
-  const lastVerifiedLabel = packet
-    ? formatLastVerifiedAt(
-        packet.sources.find((source) => Boolean(source.lastVerifiedAt))?.lastVerifiedAt || null,
-      )
+  const compactHospitalSummary = packet
+    ? dynamicQuestions.length > 0
+      ? `${dynamicQuestions.length} question${dynamicQuestions.length === 1 ? '' : 's'}`
+      : hasPdfForm
+        ? 'No extra questions'
+        : 'No fillable PDF yet'
     : null;
-  const previewInstructions = packet?.instructions.slice(0, 2) || [];
+  const compactHospitalDetail = signatureFieldCount > 0 ? 'Signature later' : null;
+  const compactHospitalStatus = [compactHospitalSummary, compactHospitalDetail]
+    .filter(Boolean)
+    .join(' • ');
+  const useCompactProgressCard = currentWorkflowStep.kind === 'hospital' && Boolean(selectedSystem);
 
   useEffect(() => {
     if (rawCurrentStepIndex !== -1) return;
@@ -587,6 +574,24 @@ export default function RecordsRequestScreen() {
     goToStepByIndex(currentStepIndex + 1);
   };
 
+  const getNextWorkflowStepIdForAnswers = (
+    currentQuestionId: string,
+    answers: RecordsWorkflowAutofillAnswers,
+  ) => {
+    const nextVisibleQuestions = getVisibleAutofillQuestions(allDynamicQuestions, answers);
+    const nextSteps = buildRecordsRequestWorkflowSteps(nextVisibleQuestions, {
+      includeSignatureStep: hasSignatureStep,
+    });
+    const currentQuestionStepId = getRecordsRequestQuestionStepId(currentQuestionId);
+    const nextIndex = nextSteps.findIndex((step) => step.id === currentQuestionStepId);
+
+    if (nextIndex === -1) {
+      return nextSteps[0]?.id || 'bio';
+    }
+
+    return nextSteps[nextIndex + 1]?.id || 'submit';
+  };
+
   const handleContinueFromHospital = () => {
     if (!packetReadyForContinue) return;
     goToStep(firstQuestionStepId || 'id');
@@ -595,13 +600,14 @@ export default function RecordsRequestScreen() {
   const handleContinueFromQuestion = () => {
     if (!currentQuestion) return;
 
-    const validationMessage = validateAutofillAnswers([currentQuestion], autofillAnswers);
+    const latestAnswers = autofillAnswersRef.current;
+    const validationMessage = validateAutofillAnswers([currentQuestion], latestAnswers);
     if (validationMessage) {
       Alert.alert('Answer Required', validationMessage);
       return;
     }
 
-    goToNextStep();
+    goToStep(getNextWorkflowStepIdForAnswers(currentQuestion.id, latestAnswers));
   };
 
   const handleContinueFromSignature = () => {
@@ -614,17 +620,25 @@ export default function RecordsRequestScreen() {
   };
 
   const updateShortTextAnswer = (questionId: string, value: string) => {
-    setAutofillAnswers((currentAnswers) => ({
-      ...currentAnswers,
-      [questionId]: value,
-    }));
+    setAutofillAnswers((currentAnswers) => {
+      const nextAnswers = {
+        ...currentAnswers,
+        [questionId]: value,
+      };
+      autofillAnswersRef.current = nextAnswers;
+      return nextAnswers;
+    });
   };
 
   const updateSingleSelectAnswer = (questionId: string, optionId: string) => {
-    setAutofillAnswers((currentAnswers) => ({
-      ...currentAnswers,
-      [questionId]: optionId,
-    }));
+    setAutofillAnswers((currentAnswers) => {
+      const nextAnswers = {
+        ...currentAnswers,
+        [questionId]: optionId,
+      };
+      autofillAnswersRef.current = nextAnswers;
+      return nextAnswers;
+    });
   };
 
   const toggleMultiSelectAnswer = (questionId: string, optionId: string) => {
@@ -634,10 +648,12 @@ export default function RecordsRequestScreen() {
         ? existing.filter((value) => value !== optionId)
         : [...existing, optionId];
 
-      return {
+      const nextAnswers = {
         ...currentAnswers,
         [questionId]: nextValue,
       };
+      autofillAnswersRef.current = nextAnswers;
+      return nextAnswers;
     });
   };
 
@@ -673,11 +689,15 @@ export default function RecordsRequestScreen() {
             <Text style={styles.heroSubtitle}>{currentStepDescription}</Text>
           </View>
         ) : (
-          <View style={styles.progressCard}>
+          <View style={[styles.progressCard, useCompactProgressCard && styles.progressCardCompact]}>
             <Text style={styles.progressEyebrow}>
               Step {currentStepIndex + 1} of {workflowSteps.length}
             </Text>
-            <Text style={styles.progressTitle}>{currentStepTitle}</Text>
+            <Text
+              style={[styles.progressTitle, useCompactProgressCard && styles.progressTitleCompact]}
+            >
+              {currentStepTitle}
+            </Text>
             {currentStepDescription ? (
               <Text style={styles.progressSubtitle}>{currentStepDescription}</Text>
             ) : null}
@@ -792,7 +812,6 @@ export default function RecordsRequestScreen() {
 
             {selectedSystem && (
               <View style={styles.selectionSummary}>
-                <Text style={styles.selectionSummaryTitle}>Selected system</Text>
                 <View style={styles.selectionSystemPreview}>
                   <HospitalSystemLogo systemName={selectedSystem.name} width={92} height={44} />
                   <View style={styles.systemTextWrap}>
@@ -812,7 +831,7 @@ export default function RecordsRequestScreen() {
                   ]}
                 >
                   <Text style={styles.changeSelectionButtonText}>
-                    Choose a different hospital system
+                    Change system
                   </Text>
                 </Pressable>
                 {packetLoading && (
@@ -824,107 +843,43 @@ export default function RecordsRequestScreen() {
                 {packetError && <Text style={styles.errorInlineText}>{packetError}</Text>}
                 {packet && (
                   <>
-                    <View style={styles.badgeRow}>
-                      {(packet.medicalWorkflow?.availableMethods || []).map((method) => (
-                        <View key={method} style={styles.methodBadge}>
-                          <Text style={styles.methodBadgeText}>{formatMethodLabel(method)}</Text>
-                        </View>
-                      ))}
-                    </View>
-                    <View style={styles.supportSnapshotCard}>
-                      <Text style={styles.supportSnapshotTitle}>Support snapshot</Text>
-                      <View style={styles.supportSnapshotRow}>
-                        <Text style={styles.supportSnapshotLabel}>Best path</Text>
-                        <Text style={styles.supportSnapshotValue}>{availablePathSummary}</Text>
-                      </View>
-                      <View style={styles.supportSnapshotRow}>
-                        <Text style={styles.supportSnapshotLabel}>Portal</Text>
-                        <Text style={styles.supportSnapshotValue}>
-                          {packet.portal.url
-                            ? packet.portal.name || 'Portal available'
-                            : 'Portal not surfaced yet'}
-                        </Text>
-                      </View>
-                      <View style={styles.supportSnapshotRow}>
-                        <Text style={styles.supportSnapshotLabel}>Photo ID</Text>
-                        <Text style={styles.supportSnapshotValue}>
-                          {packet.requiresPhotoId ? 'Required by this workflow' : 'Optional'}
-                        </Text>
-                      </View>
-                      <View style={styles.supportSnapshotRow}>
-                        <Text style={styles.supportSnapshotLabel}>Last verified</Text>
-                        <Text style={styles.supportSnapshotValue}>
-                          {lastVerifiedLabel || 'Verification date unavailable'}
-                        </Text>
-                      </View>
-                      {packet.specialCases[0] && (
-                        <Text style={styles.supportFootnote}>
-                          Special case: {packet.specialCases[0].label}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={styles.selectionSummaryMeta}>
-                      {primaryDisplayForm
-                        ? `Ready to fill: ${primaryDisplayForm.name}`
-                        : packet.forms.length > 0
-                          ? 'Official form links were found, but no preferred PDF was selected yet.'
-                          : 'No official form links were attached yet.'}
-                    </Text>
                     {templatePrefetchState === 'loading' && (
                       <Text style={styles.selectionSummaryMeta}>
-                        Preparing the selected form...
+                        Preparing form...
                       </Text>
                     )}
-                    {templatePrefetchState === 'ready' && prefetchedFormName && (
-                      <>
-                        <Text style={styles.selectionSummaryMeta}>
-                          {prefetchedFormName} is ready.
-                        </Text>
-                        <Text style={styles.selectionSummaryMeta}>
-                          {dynamicQuestions.length > 0
-                            ? `This form adds ${dynamicQuestions.length} question${dynamicQuestions.length === 1 ? '' : 's'}.`
-                            : 'No extra form questions are needed for this form.'}
-                        </Text>
-                        {signatureFieldCount > 0 && (
-                          <Text style={styles.selectionSummaryMeta}>
-                            We&apos;ll ask for your signature before review.
-                          </Text>
-                        )}
-                      </>
+                    {templatePrefetchState === 'ready' && (
+                      <Text style={styles.selectionFormTitle}>
+                        {primaryDisplayForm ? 'Form ready' : 'Workflow ready'}
+                      </Text>
+                    )}
+                    {templatePrefetchState === 'ready' && compactHospitalStatus && (
+                      <Text style={styles.selectionSummaryMeta}>
+                        {compactHospitalStatus}
+                      </Text>
+                    )}
+                    {templatePrefetchState === 'idle' && !packetLoading && (
+                      <Text style={styles.selectionSummaryMeta}>
+                        {primaryDisplayForm ? 'Form ready' : 'Workflow ready'}
+                      </Text>
                     )}
                     {templatePrefetchState === 'error' && templatePrefetchError && (
                       <Text style={styles.errorInlineText}>{templatePrefetchError}</Text>
-                    )}
-                    {previewInstructions.length > 0 && (
-                      <View style={styles.selectionInstructionCard}>
-                        <Text style={styles.supportSnapshotTitle}>Before you send</Text>
-                        {previewInstructions.map((instruction) => (
-                          <View
-                            key={`${instruction.sequenceNo}:${instruction.details}`}
-                            style={styles.instructionRow}
-                          >
-                            <Text style={styles.instructionBullet}>
-                              {instruction.sequenceNo || '•'}
-                            </Text>
-                            <Text style={styles.instructionText}>{instruction.details}</Text>
-                          </View>
-                        ))}
-                      </View>
                     )}
                   </>
                 )}
               </View>
             )}
 
-            <View style={styles.actionRow}>
+            <View style={styles.hospitalActionRow}>
               <Pressable
                 onPress={goToPreviousStep}
                 style={({ pressed }) => [
-                  styles.secondaryButton,
+                  styles.secondaryIconButton,
                   pressed && styles.secondaryButtonPressed,
                 ]}
               >
-                <Text style={styles.secondaryButtonText}>Back</Text>
+                <Ionicons name="chevron-back" size={22} color={theme.colors.secondary} />
               </Pressable>
 
               <Pressable
@@ -932,12 +887,18 @@ export default function RecordsRequestScreen() {
                 disabled={!packetReadyForContinue}
                 style={({ pressed }) => [
                   styles.primaryButton,
+                  styles.hospitalPrimaryButton,
                   (!packetReadyForContinue || pressed) && styles.primaryButtonPressed,
                   !packetReadyForContinue && styles.disabledButton,
                 ]}
               >
-                <Text style={styles.primaryButtonText}>
-                  {dynamicQuestions.length > 0 ? 'Continue to Questions' : 'Continue to ID'}
+                <Text
+                  style={styles.primaryButtonText}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.92}
+                >
+                  {dynamicQuestions.length > 0 ? 'Continue to questions' : 'Continue to ID'}
                 </Text>
               </Pressable>
             </View>
@@ -1427,6 +1388,10 @@ const createStyles = createThemedStyles((theme) => ({
     borderColor: theme.colors.border,
     gap: 8,
   },
+  progressCardCompact: {
+    paddingVertical: 16,
+    gap: 6,
+  },
   eyebrow: {
     color: theme.colors.primary,
     fontSize: 12,
@@ -1459,6 +1424,10 @@ const createStyles = createThemedStyles((theme) => ({
     fontWeight: '800',
     lineHeight: 30,
     letterSpacing: -0.5,
+  },
+  progressTitleCompact: {
+    fontSize: 20,
+    lineHeight: 25,
   },
   progressSubtitle: {
     color: theme.colors.textSecondary,
@@ -1510,6 +1479,11 @@ const createStyles = createThemedStyles((theme) => ({
     flexDirection: 'row',
     gap: 12,
   },
+  hospitalActionRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 12,
+  },
   actionColumn: {
     gap: 12,
   },
@@ -1521,6 +1495,9 @@ const createStyles = createThemedStyles((theme) => ({
     borderRadius: 18,
     paddingHorizontal: 18,
     paddingVertical: 16,
+  },
+  hospitalPrimaryButton: {
+    minWidth: 0,
   },
   primaryButtonPressed: {
     opacity: 0.86,
@@ -1635,15 +1612,8 @@ const createStyles = createThemedStyles((theme) => ({
   selectionSummary: {
     backgroundColor: theme.colors.surfaceSubtle,
     borderRadius: 20,
-    padding: 16,
-    gap: 8,
-  },
-  selectionSummaryTitle: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    padding: 14,
+    gap: 10,
   },
   selectionSummaryName: {
     color: theme.colors.text,
@@ -1658,52 +1628,17 @@ const createStyles = createThemedStyles((theme) => ({
   selectionSummaryMeta: {
     color: theme.colors.textSecondary,
     fontSize: 14,
+    lineHeight: 19,
   },
-  supportSnapshotCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: 10,
-  },
-  supportSnapshotTitle: {
+  selectionFormTitle: {
     color: theme.colors.text,
     fontSize: 15,
     fontWeight: '700',
-  },
-  supportSnapshotRow: {
-    gap: 4,
-  },
-  supportSnapshotLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  supportSnapshotValue: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: '600',
     lineHeight: 20,
-  },
-  supportFootnote: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  selectionInstructionCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: 10,
   },
   changeSelectionButton: {
     alignSelf: 'flex-start',
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   changeSelectionButtonPressed: {
     opacity: 0.72,
@@ -1713,25 +1648,20 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 14,
     fontWeight: '700',
   },
-  badgeRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  methodBadge: {
-    backgroundColor: theme.colors.secondarySoft,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  methodBadgeText: {
-    color: theme.colors.secondary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
   errorInlineText: {
     color: theme.colors.danger,
     fontSize: 14,
+  },
+  secondaryIconButton: {
+    width: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.secondarySoft,
+    borderRadius: 18,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.secondary,
+    flexShrink: 0,
   },
   requirementCard: {
     backgroundColor: theme.colors.warningSoft,

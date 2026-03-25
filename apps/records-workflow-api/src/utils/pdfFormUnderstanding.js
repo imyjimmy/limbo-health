@@ -31,6 +31,24 @@ function slugify(value) {
   return normalized || 'question';
 }
 
+function buildUniqueSlug(candidates = [], seenIds = new Set(), fallbackBase = 'option') {
+  for (const candidate of candidates) {
+    const nextId = slugify(candidate);
+    if (nextId && !seenIds.has(nextId)) {
+      return nextId;
+    }
+  }
+
+  const baseId = slugify(candidates.find((candidate) => normalizeString(candidate)) || fallbackBase);
+  let nextId = baseId;
+  let suffix = 2;
+  while (seenIds.has(nextId)) {
+    nextId = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  return nextId;
+}
+
 function normalizeMode(value) {
   if (value === 'acroform' || value === 'overlay') return value;
   return null;
@@ -177,6 +195,11 @@ function normalizeOption(rawOption, questionId, minimumConfidence) {
 
   if (bindings.length === 0) return null;
 
+  const bindingFieldNames = bindings
+    .filter((binding) => binding?.type === 'field_text' || binding?.type === 'field_checkbox')
+    .map((binding) => normalizeString(binding.field_name))
+    .filter(Boolean);
+
   return {
     option: {
       id: slugify(normalizeString(rawOption.id) || `${questionId}-${label}`),
@@ -184,6 +207,7 @@ function normalizeOption(rawOption, questionId, minimumConfidence) {
       confidence,
       bindings,
     },
+    bindingFieldNames,
     families,
   };
 }
@@ -225,10 +249,24 @@ function normalizeQuestion(rawQuestion, minimumConfidence) {
     return { question: normalizedQuestion, families };
   }
 
+  const seenOptionIds = new Set();
   for (const rawOption of Array.isArray(rawQuestion.options) ? rawQuestion.options : []) {
     const normalized = normalizeOption(rawOption, id, minimumConfidence);
     if (!normalized) continue;
-    normalizedQuestion.options.push(normalized.option);
+    const uniqueOptionId = buildUniqueSlug(
+      [
+        normalized.option.id,
+        ...normalized.bindingFieldNames,
+        `${id}-${normalized.option.label}`,
+      ],
+      seenOptionIds,
+      `${id}-option`,
+    );
+    seenOptionIds.add(uniqueOptionId);
+    normalizedQuestion.options.push({
+      ...normalized.option,
+      id: uniqueOptionId,
+    });
     for (const family of normalized.families) {
       families.add(family);
     }

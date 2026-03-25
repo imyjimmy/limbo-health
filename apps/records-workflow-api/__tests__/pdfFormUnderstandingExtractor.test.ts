@@ -354,6 +354,12 @@ describe('pdfFormUnderstandingExtractor', () => {
     ).toEqual(
       expect.arrayContaining(['Clinic visits', 'Hospital visits', 'specify provider']),
     );
+    expect(facilitiesQuestion?.options?.map((option) => option.label)).toEqual(
+      expect.arrayContaining(['Clinic Visits', 'Hospital Visits', 'Specify Provider']),
+    );
+    expect(facilitiesQuestion?.options?.map((option) => option.id)).toEqual(
+      expect.arrayContaining(['clinic-visits', 'hospital-visits', 'specify-provider']),
+    );
 
     const detailedRecordsQuestion = questions.find((question) =>
       question.options?.some(
@@ -381,6 +387,66 @@ describe('pdfFormUnderstandingExtractor', () => {
         'immunization',
         'progress notes',
         'Release info - other',
+      ]),
+    );
+  });
+
+  it('keeps distinct labels and ids for adjacent checkbox options that share a suffix', async () => {
+    vi.mocked(extractPdfFormUnderstandingWithOpenAI).mockResolvedValue({
+      responseId: 'resp_suffix_cluster',
+      usage: { total_tokens: 222 },
+      output: {
+        mode: 'acroform',
+        template_id: null,
+        confidence: 0.97,
+        questions: [],
+      },
+    });
+
+    const result = await extractPdfFormUnderstanding({
+      parsedPdf: {
+        title: 'Authorization for Release of Medical Information',
+        text: '',
+        headerText: 'Authorization',
+        pages: [
+          {
+            pageIndex: 0,
+            width: 612,
+            height: 792,
+            words: [
+              { text: 'Clinic', x: 309.74, y: 351.32, width: 22.74, height: 10 },
+              { text: 'visits', x: 334.94, y: 351.32, width: 20.63, height: 10 },
+              { text: 'Hospital', x: 371.28, y: 351.32, width: 33.65, height: 10 },
+              { text: 'visits', x: 407.38, y: 351.32, width: 20.63, height: 10 },
+              { text: '(Specify', x: 462.61, y: 342.23, width: 30.56, height: 10 },
+              { text: 'Provider', x: 495.24, y: 342.23, width: 31.9, height: 10 },
+            ],
+            widgets: [
+              { fieldName: 'Clinic visits', fieldType: 'CheckBox', x: 299.04, y: 352.15, width: 10, height: 10 },
+              { fieldName: 'Hospital visits', fieldType: 'CheckBox', x: 360.57, y: 352.15, width: 10, height: 10 },
+              { fieldName: 'specify provider', fieldType: 'CheckBox', x: 433.01, y: 352.15, width: 10, height: 10 },
+            ],
+            lineCandidates: [],
+            checkboxCandidates: [],
+          },
+        ],
+      },
+      hospitalSystemName: 'Generic Health',
+      facilityName: null,
+      formName: 'Authorization for Release of Medical Information',
+      sourceUrl: 'https://example.org/form.pdf',
+      promptProfile: 'expanded',
+      maxInputTokens: 20000,
+    });
+
+    const question = result.structuredOutput.form_understanding.questions.find((entry) =>
+      entry.options?.some((option) => option.bindings?.some((binding) => binding.field_name === 'Clinic visits')),
+    );
+
+    expect(question?.options?.map((option) => ({ id: option.id, label: option.label }))).toEqual(
+      expect.arrayContaining([
+        { id: 'clinic-visits', label: 'Clinic visits' },
+        { id: 'hospital-visits', label: 'Hospital visits' },
       ]),
     );
   });

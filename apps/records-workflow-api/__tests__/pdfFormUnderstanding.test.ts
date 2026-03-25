@@ -149,4 +149,52 @@ describe('normalizePdfFormUnderstanding', () => {
       questions: [],
     });
   });
+
+  it('guarantees unique option ids within a question even when extraction duplicates them', () => {
+    const result = normalizePdfFormUnderstanding({
+      mode: 'acroform',
+      confidence: 0.95,
+      questions: [
+        {
+          id: 'facilities',
+          label: 'Information to be released from these facilities',
+          kind: 'multi_select',
+          required: false,
+          confidence: 0.95,
+          options: [
+            {
+              id: 'visits',
+              label: 'visits',
+              confidence: 0.95,
+              bindings: [
+                {
+                  type: 'field_checkbox',
+                  field_name: 'Clinic visits',
+                  checked: true,
+                },
+              ],
+            },
+            {
+              id: 'visits',
+              label: 'visits',
+              confidence: 0.95,
+              bindings: [
+                {
+                  type: 'field_checkbox',
+                  field_name: 'Hospital visits',
+                  checked: true,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.supported).toBe(true);
+    expect(result.questions[0]?.options?.map((option) => option.id)).toEqual([
+      'visits',
+      'hospital-visits',
+    ]);
+  });
 });

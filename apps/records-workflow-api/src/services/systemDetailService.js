@@ -3,6 +3,146 @@ import { query } from '../db.js';
 import { resolveFetchArtifactPath } from '../utils/fetchArtifactStorage.js';
 import { resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
 
+function normalizeComparableString(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getCapturedFormDedupKey(form) {
+  const contentHash = normalizeComparableString(form?.content_hash);
+  if (contentHash) {
+    return `hash:${contentHash}`;
+  }
+
+  const finalUrl = normalizeComparableString(form?.final_url);
+  if (finalUrl) {
+    return `url:${finalUrl}`;
+  }
+
+  const requestedUrl = normalizeComparableString(form?.requested_url);
+  if (requestedUrl) {
+    return `url:${requestedUrl}`;
+  }
+
+  return `id:${normalizeComparableString(form?.id)}`;
+}
+
+function toTimestamp(value) {
+  const timestamp = new Date(value || 0).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareCapturedFormsByRecency(left, right) {
+  return (
+    toTimestamp(right?.fetched_at || right?.created_at) -
+    toTimestamp(left?.fetched_at || left?.created_at)
+  );
+}
+
+function pickPreferredValue(...values) {
+  for (const value of values) {
+    if (value !== null && value !== undefined && value !== '') {
+      return value;
+    }
+  }
+
+  return values[values.length - 1] ?? null;
+}
+
+export function dedupeCapturedFormsForDisplay(forms = []) {
+  const groups = new Map();
+
+  for (const form of forms) {
+    const key = getCapturedFormDedupKey(form);
+    const existing = groups.get(key) || [];
+    existing.push(form);
+    groups.set(key, existing);
+  }
+
+  return Array.from(groups.values()).map((group) => {
+    const byRecency = [...group].sort(compareCapturedFormsByRecency);
+    const latest = byRecency[0];
+    const latestAccepted = byRecency.find((form) => form?.accepted_source_document_id) || null;
+    const latestReviewed =
+      byRecency.find(
+        (form) =>
+          form?.effective_decision &&
+          form.effective_decision !== 'captured' &&
+          form?.triage_decision_id,
+      ) || null;
+    const statusSource = latestAccepted || latestReviewed || latest;
+
+    return {
+      ...latest,
+      title: pickPreferredValue(
+        latest.title,
+        latestAccepted?.title,
+        latestReviewed?.title,
+        byRecency.find((form) => form?.title)?.title,
+      ),
+      content_available: group.some((form) => Boolean(form?.content_available)),
+      effective_decision: pickPreferredValue(
+        latestAccepted ? 'accepted' : null,
+        statusSource?.effective_decision,
+        latest.effective_decision,
+        'captured',
+      ),
+      triage_decision_id: pickPreferredValue(
+        statusSource?.triage_decision_id,
+        latest.triage_decision_id,
+      ),
+      triage_decision: pickPreferredValue(
+        statusSource?.triage_decision,
+        latest.triage_decision,
+      ),
+      triage_basis: pickPreferredValue(statusSource?.triage_basis, latest.triage_basis),
+      triage_reason_code: pickPreferredValue(
+        statusSource?.triage_reason_code,
+        latest.triage_reason_code,
+      ),
+      triage_reason_detail: pickPreferredValue(
+        statusSource?.triage_reason_detail,
+        latest.triage_reason_detail,
+      ),
+      triage_created_at: pickPreferredValue(
+        statusSource?.triage_created_at,
+        latest.triage_created_at,
+      ),
+      triage_override_id: pickPreferredValue(
+        statusSource?.triage_override_id,
+        latest.triage_override_id,
+      ),
+      triage_override_decision: pickPreferredValue(
+        statusSource?.triage_override_decision,
+        latest.triage_override_decision,
+      ),
+      triage_override_notes: pickPreferredValue(
+        statusSource?.triage_override_notes,
+        latest.triage_override_notes,
+      ),
+      triage_override_created_at: pickPreferredValue(
+        statusSource?.triage_override_created_at,
+        latest.triage_override_created_at,
+      ),
+      accepted_source_document_id: pickPreferredValue(
+        latestAccepted?.accepted_source_document_id,
+        latest.accepted_source_document_id,
+      ),
+      accepted_source_url: pickPreferredValue(
+        latestAccepted?.accepted_source_url,
+        latest.accepted_source_url,
+      ),
+      accepted_title: pickPreferredValue(
+        latestAccepted?.accepted_title,
+        latest.accepted_title,
+      ),
+      accepted_storage_path: pickPreferredValue(
+        latestAccepted?.accepted_storage_path,
+        latest.accepted_storage_path,
+      ),
+    };
+  });
+}
+
 function toContentUrl(sourceDocumentId) {
   return `/api/records-workflow/source-documents/${sourceDocumentId}/content`;
 }
@@ -249,7 +389,7 @@ export async function getHospitalSystemDetail(systemId) {
     return null;
   }
 
-  const capturedForms = await Promise.all(
+  const capturedForms = dedupeCapturedFormsForDisplay(await Promise.all(
     capturedFormsResult.rows.map(async (row) => {
       let contentAvailable = false;
 
@@ -277,7 +417,7 @@ export async function getHospitalSystemDetail(systemId) {
         content_url: toFetchArtifactContentUrl(row.id),
       };
     }),
-  );
+  ));
 
   capturedForms.sort((left, right) => {
     const availabilityDiff = Number(Boolean(right.content_available)) - Number(Boolean(left.content_available));

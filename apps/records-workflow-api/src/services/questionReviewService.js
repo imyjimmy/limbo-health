@@ -24,6 +24,183 @@ function slugify(value) {
     .replace(/^-+|-+$/g, '');
 }
 
+function buildUniqueSlug(candidates = [], seenIds = new Set(), fallbackBase = 'option') {
+  for (const candidate of candidates) {
+    const nextId = slugify(candidate);
+    if (nextId && !seenIds.has(nextId)) {
+      return nextId;
+    }
+  }
+
+  const baseId = slugify(candidates.find((candidate) => normalizeString(candidate)) || fallbackBase);
+  let nextId = baseId;
+  let suffix = 2;
+  while (seenIds.has(nextId)) {
+    nextId = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  return nextId;
+}
+
+function humanizeFieldName(value) {
+  const trimmed = normalizeString(value);
+  if (!trimmed) return '';
+
+  const collapsed = trimmed.replace(/[_-]+/g, ' ');
+  if (/^[A-Z0-9\s/&().:-]+$/.test(collapsed)) {
+    return collapsed;
+  }
+
+  return collapsed.replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function normalizeCheckboxOptionLabel(label, fieldName) {
+  const normalizedLabel = normalizeString(label)
+    .replace(/^\(+|\)+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (/^other:?$/i.test(normalizedLabel)) {
+    return 'Other (please specify)';
+  }
+
+  return normalizedLabel || humanizeFieldName(fieldName);
+}
+
+function tokenizeCheckboxLabel(value) {
+  return normalizeString(value)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/g)
+    .filter(Boolean);
+}
+
+function shouldPreferFallbackCheckboxLabel(label, fallbackLabel) {
+  const normalizedLabel = normalizeString(label);
+  const normalizedFallback = normalizeString(fallbackLabel);
+  if (!normalizedFallback) return false;
+  if (!normalizedLabel) return true;
+  if (normalizedLabel.toLowerCase() === normalizedFallback.toLowerCase()) return false;
+
+  const labelTokens = tokenizeCheckboxLabel(normalizedLabel);
+  const fallbackTokens = tokenizeCheckboxLabel(normalizedFallback);
+  if (labelTokens.length === 0) return true;
+  if (fallbackTokens.length <= labelTokens.length) return false;
+
+  const fallbackTokenSet = new Set(fallbackTokens);
+  return labelTokens.every((token) => fallbackTokenSet.has(token));
+}
+
+function countNormalizedValues(values = []) {
+  const counts = new Map();
+  for (const value of values) {
+    const normalizedValue = normalizeComparableLabel(value);
+    if (!normalizedValue) continue;
+    counts.set(normalizedValue, (counts.get(normalizedValue) || 0) + 1);
+  }
+  return counts;
+}
+
+function buildPdfGeometryPageMap(pdfGeometry) {
+  return new Map(
+    (pdfGeometry?.pages || []).map((page) => [Number(page.page_index), page]),
+  );
+}
+
+function findClosestCheckboxWidget(binding, page) {
+  if (!page || binding?.type !== 'overlay_mark') return null;
+
+  const candidates = (page.widgets || [])
+    .filter((widget) => /checkbox/i.test(normalizeString(widget.field_type)))
+    .map((widget) => ({
+      widget,
+      distance: Math.hypot(
+        Number(widget.x || 0) - Number(binding.x || 0),
+        Number(widget.y || 0) - Number(binding.y || 0),
+      ),
+    }))
+    .sort((left, right) => left.distance - right.distance);
+
+  if (!candidates[0] || candidates[0].distance > 18) {
+    return null;
+  }
+
+  return candidates[0].widget;
+}
+
+function repairQuestionOptionMetadata(payload, pdfGeometry) {
+  if (!Array.isArray(payload?.questions) || payload.questions.length === 0) {
+    return payload;
+  }
+
+  const pagesByIndex = buildPdfGeometryPageMap(pdfGeometry);
+  const repairedQuestions = payload.questions.map((question) => {
+    if (!Array.isArray(question?.options) || question.options.length === 0) {
+      return question;
+    }
+
+    const optionIdCounts = countNormalizedValues(question.options.map((option) => option?.id));
+    const optionLabelCounts = countNormalizedValues(question.options.map((option) => option?.label));
+    const seenOptionIds = new Set();
+
+    const repairedOptions = question.options.map((option) => {
+      const firstOverlayMark = (Array.isArray(option?.bindings) ? option.bindings : []).find(
+        (binding) => binding?.type === 'overlay_mark' && Number.isInteger(binding?.page_index),
+      );
+      const matchedWidget = firstOverlayMark
+        ? findClosestCheckboxWidget(firstOverlayMark, pagesByIndex.get(Number(firstOverlayMark.page_index)))
+        : null;
+      const fallbackLabel = matchedWidget
+        ? normalizeCheckboxOptionLabel(
+            normalizeString(matchedWidget.field_label) || humanizeFieldName(matchedWidget.field_name),
+            matchedWidget.field_name,
+          )
+        : '';
+      const hasDuplicateId =
+        (optionIdCounts.get(normalizeComparableLabel(option?.id || '')) || 0) > 1;
+      const hasDuplicateLabel =
+        (optionLabelCounts.get(normalizeComparableLabel(option?.label || '')) || 0) > 1;
+      const prefersFallbackLabel =
+        fallbackLabel && shouldPreferFallbackCheckboxLabel(option?.label, fallbackLabel);
+      const canonicalWidgetOptionId = matchedWidget?.field_name ? slugify(matchedWidget.field_name) : '';
+      const currentOptionId = slugify(option?.id);
+      const nextLabel =
+        fallbackLabel &&
+        (hasDuplicateId || hasDuplicateLabel || prefersFallbackLabel)
+          ? fallbackLabel
+          : normalizeString(option?.label);
+      const shouldRebuildOptionIdentity =
+        hasDuplicateId ||
+        hasDuplicateLabel ||
+        prefersFallbackLabel ||
+        Boolean(canonicalWidgetOptionId && currentOptionId !== canonicalWidgetOptionId);
+      const nextId = buildUniqueSlug(
+        shouldRebuildOptionIdentity
+          ? [matchedWidget?.field_name, nextLabel, option?.id]
+          : [option?.id, matchedWidget?.field_name, nextLabel],
+        seenOptionIds,
+        `${question?.id || 'question'}-option`,
+      );
+      seenOptionIds.add(nextId);
+
+      return {
+        ...option,
+        id: nextId,
+        label: nextLabel || normalizeString(option?.label),
+      };
+    });
+
+    return {
+      ...question,
+      options: repairedOptions,
+    };
+  });
+
+  return {
+    ...payload,
+    questions: repairedQuestions,
+  };
+}
+
 function normalizeComparableUrl(value) {
   if (!value) return '';
 
@@ -212,6 +389,22 @@ function normalizeDraftPayload(payload, templateIdFallback) {
   }
 
   return normalized;
+}
+
+async function prepareDraftPayloadForPersistence(
+  payload,
+  templateIdFallback,
+  sourceDocument,
+  client = null,
+) {
+  const normalizedPayload = normalizeDraftPayload(payload, templateIdFallback);
+
+  if (normalizedPayload?.mode !== 'overlay') {
+    return normalizedPayload;
+  }
+
+  const pdfGeometry = await loadPdfGeometry(sourceDocument, client);
+  return repairQuestionOptionMetadata(normalizedPayload, pdfGeometry);
 }
 
 async function loadSourceDocument(sourceDocumentId, client = null) {
@@ -539,7 +732,12 @@ export async function saveQuestionReviewDraft(
 ) {
   return withTransaction(async (client) => {
     const { sourceDocument, template } = await ensureQuestionTemplate(sourceDocumentId, client);
-    const nextPayload = normalizeDraftPayload(payload, buildTemplateIdFallback(sourceDocument));
+    const nextPayload = await prepareDraftPayloadForPersistence(
+      payload,
+      buildTemplateIdFallback(sourceDocument),
+      sourceDocument,
+      client,
+    );
     const nextStatus = !nextPayload.supported && markUnsupported ? 'unsupported' : 'draft';
 
     await client.query(
@@ -682,8 +880,18 @@ export async function publishQuestionReview(
   return withTransaction(async (client) => {
     const { sourceDocument, template } = await ensureQuestionTemplate(sourceDocumentId, client);
     const nextPayload = payload
-      ? normalizeDraftPayload(payload, buildTemplateIdFallback(sourceDocument))
-      : normalizeDraftPayload(template.payload, buildTemplateIdFallback(sourceDocument));
+      ? await prepareDraftPayloadForPersistence(
+          payload,
+          buildTemplateIdFallback(sourceDocument),
+          sourceDocument,
+          client,
+        )
+      : await prepareDraftPayloadForPersistence(
+          template.payload,
+          buildTemplateIdFallback(sourceDocument),
+          sourceDocument,
+          client,
+        );
     const versionStatus = nextPayload.supported ? 'approved' : 'unsupported';
 
     const versionResult = await client.query(

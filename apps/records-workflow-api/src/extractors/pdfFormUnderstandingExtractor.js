@@ -365,23 +365,63 @@ function cleanCheckboxPromptLabel(label) {
     .trim();
 }
 
+function tokenizeCheckboxLabel(value) {
+  return normalizeFieldName(value)
+    .split(/[^a-z0-9]+/g)
+    .filter(Boolean);
+}
+
+function buildCheckboxOptionFallbackLabel(widget) {
+  return normalizeCheckboxOptionLabel(
+    normalizeString(widget?.fieldLabel) || humanizeFieldName(widget?.fieldName),
+    widget?.fieldName,
+  );
+}
+
+function shouldPreferFallbackCheckboxLabel(derivedLabel, fallbackLabel) {
+  const normalizedDerived = normalizeString(derivedLabel);
+  const normalizedFallback = normalizeString(fallbackLabel);
+  if (!normalizedFallback) return false;
+  if (!normalizedDerived) return true;
+  if (normalizeFieldName(normalizedDerived) === normalizeFieldName(normalizedFallback)) {
+    return false;
+  }
+
+  const derivedTokens = tokenizeCheckboxLabel(normalizedDerived);
+  const fallbackTokens = tokenizeCheckboxLabel(normalizedFallback);
+  if (derivedTokens.length === 0) return true;
+  if (fallbackTokens.length <= derivedTokens.length) return false;
+
+  const fallbackTokenSet = new Set(fallbackTokens);
+  return derivedTokens.every((token) => fallbackTokenSet.has(token));
+}
+
+function resolveCheckboxOptionLabel(derivedLabel, widget) {
+  const fallbackLabel = buildCheckboxOptionFallbackLabel(widget);
+  if (shouldPreferFallbackCheckboxLabel(derivedLabel, fallbackLabel)) {
+    return fallbackLabel;
+  }
+
+  return normalizeCheckboxOptionLabel(derivedLabel, widget?.fieldName) || fallbackLabel;
+}
+
 function buildClusterOption(widget, rowWidgets, page) {
   const sortedRowWidgets = [...rowWidgets].sort((left, right) => left.x - right.x);
   const widgetIndex = sortedRowWidgets.findIndex((candidate) => candidate === widget);
   const nextWidget = widgetIndex >= 0 ? sortedRowWidgets[widgetIndex + 1] || null : null;
   const labelWords = (page?.words || [])
     .filter((word) => Math.abs(Number(word.y || 0) - Number(widget.y || 0)) <= CHECKBOX_LABEL_WORD_TOLERANCE)
-    .filter((word) => Number(word.x || 0) >= Number(widget.x || 0) + Number(widget.width || 0) + 2)
+    .filter((word) => Number(word.x || 0) >= Number(widget.x || 0) + Math.max(Number(widget.width || 0) - 3, 4))
     .filter((word) => !nextWidget || Number(word.x || 0) < Number(nextWidget.x || 0) - 4)
     .sort((left, right) => left.x - right.x);
 
   const derivedLabel = labelWords.map((word) => normalizeRenderableWord(word.text || '')).filter(Boolean).join(' ');
-  const label = normalizeCheckboxOptionLabel(derivedLabel || widget?.fieldLabel || '', widget?.fieldName);
+  const label = resolveCheckboxOptionLabel(derivedLabel, widget);
 
   if (!label) return null;
 
   return {
-    id: slugifyQuestionId(label || widget.fieldName) || slugifyQuestionId(widget.fieldName),
+    id: slugifyQuestionId(widget?.fieldName) || slugifyQuestionId(label),
     label,
     fieldName: widget.fieldName,
   };
