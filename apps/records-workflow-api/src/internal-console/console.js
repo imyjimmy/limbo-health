@@ -961,6 +961,12 @@ function currentSeedUrls() {
   return Array.isArray(state.selectedSystemDetail?.seed_urls) ? state.selectedSystemDetail.seed_urls : [];
 }
 
+function currentCapturedForms() {
+  return Array.isArray(state.selectedSystemDetail?.captured_forms)
+    ? state.selectedSystemDetail.captured_forms
+    : [];
+}
+
 function currentSourceDocuments() {
   return Array.isArray(state.selectedSystemDetail?.source_documents)
     ? state.selectedSystemDetail.source_documents
@@ -1276,6 +1282,15 @@ function currentSystemSourcePageEditor(system) {
   return state.systemSourcePageEditor?.key === key ? state.systemSourcePageEditor : null;
 }
 
+function currentTargetedPageEditor(seedUrlId = null) {
+  const editor = state.systemSourcePageEditor;
+  if (!editor) return null;
+  if (!seedUrlId) {
+    return editor.seedUrlId ? null : editor;
+  }
+  return editor.seedUrlId === seedUrlId ? editor : null;
+}
+
 function currentSystemActionMenuKey(system) {
   return systemIdentityKey(system);
 }
@@ -1302,15 +1317,54 @@ function toggleSystemActionMenu(system) {
 
 function focusSystemSourcePageEditor() {
   const key = state.systemSourcePageEditor?.key;
-  if (!key || !elements.systemsTable) return;
+  if (!key) return;
 
-  const input = elements.systemsTable.querySelector(
-    `[data-source-page-editor-input="${CSS.escape(key)}"]`,
+  const inputs = Array.from(
+    document.querySelectorAll(`[data-source-page-editor-input="${CSS.escape(key)}"]`),
   );
+  const input = inputs.find((candidate) => candidate.offsetParent !== null) || inputs[0] || null;
   if (!input) return;
 
   input.focus();
   input.select();
+}
+
+function renderInlineSourcePageEditor(editor, saveLabel = 'Save') {
+  if (!editor) return '';
+
+  return `
+    <div class="inline-source-editor">
+      <input
+        type="url"
+        class="inline-source-input"
+        data-source-page-editor-input="${escapeHtml(editor.key)}"
+        value="${escapeHtml(editor.value || '')}"
+        placeholder="https://records-page.example"
+        aria-label="Medical-records source page URL for ${escapeHtml(editor.systemName || 'system')}"
+        ${editor.saving ? 'disabled' : ''}
+      />
+      <div class="inline-source-actions">
+        <button
+          type="button"
+          class="inline-source-save"
+          data-action="save-system-source-page"
+          data-system-key="${escapeHtml(editor.key)}"
+          ${editor.saving ? 'disabled' : ''}
+        >
+          ${escapeHtml(saveLabel)}
+        </button>
+        <button
+          type="button"
+          class="inline-source-cancel"
+          data-action="cancel-system-source-page"
+          data-system-key="${escapeHtml(editor.key)}"
+          ${editor.saving ? 'disabled' : ''}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  `;
 }
 
 function uniqueSystemPdfSourcePages(system) {
@@ -1450,39 +1504,7 @@ function renderSystemPdfPageLinks(system) {
   const actionAttributes = sourcePageActionDataAttributes(system);
 
   if (editor) {
-    return `
-      <div class="inline-source-editor">
-        <input
-          type="url"
-          class="inline-source-input"
-          data-source-page-editor-input="${escapeHtml(editor.key)}"
-          value="${escapeHtml(editor.value || '')}"
-          placeholder="https://records-page.example"
-          aria-label="Medical-records source page URL for ${escapeHtml(system.system_name || 'system')}"
-          ${editor.saving ? 'disabled' : ''}
-        />
-        <div class="inline-source-actions">
-          <button
-            type="button"
-            class="inline-source-save"
-            data-action="save-system-source-page"
-            data-system-key="${escapeHtml(editor.key)}"
-            ${editor.saving ? 'disabled' : ''}
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            class="inline-source-cancel"
-            data-action="cancel-system-source-page"
-            data-system-key="${escapeHtml(editor.key)}"
-            ${editor.saving ? 'disabled' : ''}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    `;
+    return renderInlineSourcePageEditor(editor);
   }
 
   if (!pages.length) {
@@ -2669,11 +2691,319 @@ function renderPipelineInsights() {
   `;
 }
 
+function fetchArtifactDisplayName(artifact) {
+  return (
+    String(artifact?.title || '').trim() ||
+    fileNameFromPath(artifact?.storage_path) ||
+    fileNameFromUrl(artifact?.final_url || artifact?.requested_url) ||
+    'Captured PDF'
+  );
+}
+
+function targetedPageTone(seed) {
+  return seed?.active ? 'green' : 'yellow';
+}
+
+function capturedFormTone(form) {
+  const decision = String(form?.effective_decision || '').trim().toLowerCase();
+  if (decision === 'accepted') return 'green';
+  if (decision === 'needs_review') return 'red';
+  return 'yellow';
+}
+
+function renderTargetedPagesSection(system) {
+  const seedUrls = currentSeedUrls();
+  const addEditor = currentTargetedPageEditor(null);
+  const emptyState = `
+    <div class="empty-state">
+      No targeted pages are active for ${escapeHtml(system.system_name)} yet. Add the page that should drive request discovery for this system.
+    </div>
+  `;
+
+  return `
+    <section class="space-y-4">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="section-kicker">Targeted Pages</p>
+          <h4 class="text-lg font-semibold text-gray-900">Choose the page the crawler should trust</h4>
+          <p class="section-copy">These are the operator-controlled pages that seed request discovery for the selected hospital system.</p>
+        </div>
+        ${
+          addEditor
+            ? ''
+            : `<button
+                type="button"
+                class="ghost-button"
+                data-action="add-targeted-page"
+                data-system-id="${escapeHtml(system.hospital_system_id || '')}"
+                data-system-name="${escapeHtml(system.system_name || '')}"
+                data-system-state="${escapeHtml(system.state || state.currentState || '')}"
+                data-system-domain="${escapeHtml(system.domain || system.canonical_domain || '')}"
+              >
+                Add Targeted Page
+              </button>`
+        }
+      </div>
+      ${addEditor ? `<article class="pdf-result-card">${renderInlineSourcePageEditor(addEditor, 'Save Page')}</article>` : ''}
+      ${
+        seedUrls.length === 0
+          ? emptyState
+          : `<div class="pdf-results-grid">
+              ${seedUrls
+                .map((seed) => {
+                  const editor = currentTargetedPageEditor(seed.id);
+                  const tone = targetedPageTone(seed);
+                  const activeLabel = seed.active ? 'active' : 'retired';
+                  const seedTypeLabel = formatStageStatusLabel(seed.seed_type || 'targeted_page');
+                  const facilityLabel = seed.facility_name ? `Facility: ${seed.facility_name}` : 'System-level page';
+
+                  return `
+                    <article class="pdf-result-card">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h4 class="pdf-result-title">${escapeHtml(formatInspectorUrl(seed.url))}</h4>
+                          <p class="pdf-result-copy">${escapeHtml(facilityLabel)}. Added ${escapeHtml(formatDateTime(seed.created_at))}.</p>
+                        </div>
+                        <div class="pdf-result-meta mt-0">
+                          <span class="${statusPillClass(tone)}">${escapeHtml(activeLabel)}</span>
+                          <span class="${statusPillClass(seed.approved_by_human ? 'green' : 'yellow')}">${escapeHtml(seed.approved_by_human ? 'human approved' : 'crawler discovered')}</span>
+                          <span class="status-pill status-yellow">${escapeHtml(seedTypeLabel)}</span>
+                        </div>
+                      </div>
+                      ${seed.evidence_note ? `<p class="pdf-result-copy">${escapeHtml(seed.evidence_note)}</p>` : ''}
+                      ${editor ? renderInlineSourcePageEditor(editor, 'Save Page') : ''}
+                      <div class="pdf-result-actions">
+                        ${renderIconLink(seed.url, `Open targeted page ${seed.url}`)}
+                        <button
+                          type="button"
+                          class="ghost-button"
+                          data-action="edit-targeted-page"
+                          data-system-id="${escapeHtml(system.hospital_system_id || '')}"
+                          data-system-name="${escapeHtml(system.system_name || '')}"
+                          data-system-state="${escapeHtml(system.state || state.currentState || '')}"
+                          data-system-domain="${escapeHtml(system.domain || system.canonical_domain || '')}"
+                          data-seed-url-id="${escapeHtml(seed.id || '')}"
+                          data-seed-url="${escapeHtml(seed.url || '')}"
+                        >
+                          Edit Page
+                        </button>
+                        <button
+                          type="button"
+                          class="ghost-button"
+                          data-action="refresh-targeted-page"
+                          data-seed-url="${escapeHtml(seed.url || '')}"
+                        >
+                          Refresh This Page
+                        </button>
+                        ${
+                          seed.active
+                            ? `<button
+                                type="button"
+                                class="ghost-button"
+                                data-action="retire-targeted-page"
+                                data-seed-url-id="${escapeHtml(seed.id || '')}"
+                              >
+                                Retire
+                              </button>`
+                            : `<button
+                                type="button"
+                                class="ghost-button"
+                                data-action="activate-targeted-page"
+                                data-seed-url-id="${escapeHtml(seed.id || '')}"
+                              >
+                                Use This Page
+                              </button>`
+                        }
+                      </div>
+                    </article>
+                  `;
+                })
+                .join('')}
+            </div>`
+      }
+    </section>
+  `;
+}
+
+function renderCapturedFormsSection(system) {
+  const capturedForms = currentCapturedForms();
+
+  return `
+    <section class="space-y-4">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="section-kicker">Captured Forms</p>
+          <h4 class="text-lg font-semibold text-gray-900">Review candidate PDFs before promotion</h4>
+          <p class="section-copy">These are fetched PDF artifacts for the selected system. Promote the right one, flag weak captures, or skip junk.</p>
+        </div>
+        <button
+          type="button"
+          class="ghost-button"
+          data-action="upload-system-pdf"
+          data-system-id="${escapeHtml(system.hospital_system_id || '')}"
+          data-system-name="${escapeHtml(system.system_name || '')}"
+          data-system-state="${escapeHtml(system.state || state.currentState || '')}"
+          data-source-view="results"
+        >
+          Upload Captured PDF
+        </button>
+      </div>
+      ${
+        capturedForms.length === 0
+          ? `<div class="empty-state">No captured PDF forms are available for ${escapeHtml(system.system_name)} yet. Refresh a targeted page or upload the right form manually.</div>`
+          : `<div class="pdf-results-grid">
+              ${capturedForms
+                .map((form) => {
+                  const tone = capturedFormTone(form);
+                  const effectiveDecision = formatStageStatusLabel(form.effective_decision || 'captured');
+                  const acceptedCopy = form.accepted_source_document_id
+                    ? `Promoted to accepted forms as ${form.accepted_title || 'a canonical form'}.`
+                    : form.triage_decision_id
+                      ? `Latest triage: ${effectiveDecision}.`
+                      : 'Waiting for triage.';
+
+                  return `
+                    <article class="pdf-result-card">
+                      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h4 class="pdf-result-title">${escapeHtml(fetchArtifactDisplayName(form))}</h4>
+                          <p class="pdf-result-copy">${escapeHtml(acceptedCopy)}</p>
+                        </div>
+                        <div class="pdf-result-meta mt-0">
+                          <span class="${statusPillClass(tone)}">${escapeHtml(effectiveDecision)}</span>
+                          <span class="status-pill status-yellow">${escapeHtml(formatDateTime(form.fetched_at))}</span>
+                        </div>
+                      </div>
+                      <div class="icon-link-row mt-3">
+                        ${renderIconLink(form.source_page_url, `Open source page for ${fetchArtifactDisplayName(form)}`)}
+                        ${renderIconLink(form.final_url || form.requested_url, `Open captured URL for ${fetchArtifactDisplayName(form)}`)}
+                      </div>
+                      <div class="pdf-result-meta">
+                        <span class="status-pill status-yellow">${escapeHtml(form.facility_name || 'system capture')}</span>
+                        <span class="status-pill status-yellow">${escapeHtml(form.http_status ?? 'n/a')}</span>
+                        <span class="status-pill status-yellow">${escapeHtml(form.fetch_backend || 'fetch')}</span>
+                        <span class="${statusPillClass(form.content_available ? 'green' : 'red')}">${escapeHtml(form.content_available ? 'content available' : 'content missing')}</span>
+                      </div>
+                      <p class="pdf-result-copy">
+                        ${escapeHtml(form.triage_reason_detail || form.triage_reason_code || form.triage_basis || 'No triage note recorded.')}
+                      </p>
+                      <div class="pdf-result-actions">
+                        ${
+                          form.content_available
+                            ? `<a class="link-button" href="${escapeHtml(form.content_url)}" target="_blank" rel="noreferrer">Open Captured PDF</a>`
+                            : `<span class="system-subtext">Captured file missing on disk</span>`
+                        }
+                        ${
+                          form.triage_decision_id && form.effective_decision !== 'accepted'
+                            ? `<button type="button" class="ghost-button" data-action="accept-captured-form" data-triage-id="${escapeHtml(form.triage_decision_id)}">Promote To Accepted Forms</button>`
+                            : ''
+                        }
+                        ${
+                          form.triage_decision_id && form.effective_decision !== 'needs_review'
+                            ? `<button type="button" class="ghost-button" data-action="override-captured-form" data-triage-id="${escapeHtml(form.triage_decision_id)}" data-decision="needs_review">Mark Needs Review</button>`
+                            : ''
+                        }
+                        ${
+                          form.triage_decision_id && form.effective_decision !== 'skipped'
+                            ? `<button type="button" class="ghost-button" data-action="override-captured-form" data-triage-id="${escapeHtml(form.triage_decision_id)}" data-decision="skipped">Mark Skipped</button>`
+                            : ''
+                        }
+                      </div>
+                    </article>
+                  `;
+                })
+                .join('')}
+            </div>`
+      }
+    </section>
+  `;
+}
+
+function renderAcceptedFormsSection(pdfDocuments, system) {
+  return `
+    <section class="space-y-4">
+      <div>
+        <p class="section-kicker">Accepted Forms</p>
+        <h4 class="text-lg font-semibold text-gray-900">Canonical forms the app and editor depend on</h4>
+        <p class="section-copy">These accepted forms are the ones downstream parse, question mapping, and publish flows should trust.</p>
+      </div>
+      ${
+        pdfDocuments.length === 0
+          ? `<div class="empty-state">No accepted PDF forms are attached to ${escapeHtml(system.system_name)} yet. Promote a captured form or upload a replacement.</div>`
+          : `<div class="pdf-results-grid">
+              ${pdfDocuments
+                .map((document) => {
+                  const displayName = sourceDocumentDisplayName(document);
+
+                  return `
+                    <article class="pdf-result-card">
+                      <button
+                        type="button"
+                        class="pdf-result-button"
+                        data-action="open-pdf-editor"
+                        data-source-document-id="${escapeHtml(document.id)}"
+                      >
+                        <div class="flex items-start gap-4">
+                          <div class="pdf-result-icon">PDF</div>
+                          <div>
+                            <h4 class="pdf-result-title">${escapeHtml(displayName)}</h4>
+                            <p class="pdf-result-copy">Open question mapping editor</p>
+                          </div>
+                        </div>
+                        <span class="status-pill status-yellow">Inspect</span>
+                      </button>
+                      <div class="icon-link-row mt-3">
+                        ${renderIconLink(document.source_page_url, `Open source page for ${displayName}`)}
+                        ${document.source_page_url ? '<span class="system-subtext">Open source page</span>' : ''}
+                      </div>
+                      <div class="pdf-result-meta">
+                        <span class="${statusPillClass(document.pdf_parse_status === 'empty_text' || document.latest_question_extraction_status === 'failed' ? 'red' : 'green')}">
+                          ${escapeHtml(document.pdf_parse_status || 'parsed')}
+                        </span>
+                        <span class="status-pill status-yellow">${escapeHtml(document.import_mode || 'crawl')}</span>
+                        <span class="status-pill status-yellow">${escapeHtml(formatDateTime(document.fetched_at))}</span>
+                      </div>
+                      <p class="pdf-result-copy">
+                        Question template status: ${escapeHtml(document.question_template_status || 'not reviewed')}. Published versions: ${formatNumber(document.published_versions || 0)}.
+                      </p>
+                      <div class="pdf-result-actions">
+                        <a class="link-button" href="${escapeHtml(document.content_url)}" target="_blank" rel="noreferrer">Open Accepted PDF</a>
+                        <button type="button" class="ghost-button" data-action="open-pdf-editor" data-source-document-id="${escapeHtml(document.id)}">
+                          Open Mapping Editor
+                        </button>
+                        <button type="button" class="ghost-button" data-action="reparse-results-source-document" data-source-document-id="${escapeHtml(document.id)}">
+                          Reparse
+                        </button>
+                        <button type="button" class="ghost-button" data-action="reextract-workflow-results-source-document" data-source-document-id="${escapeHtml(document.id)}">
+                          Reextract Requirements
+                        </button>
+                        <button
+                          type="button"
+                          class="ghost-button"
+                          data-action="upload-system-pdf"
+                          data-system-id="${escapeHtml(system.hospital_system_id || '')}"
+                          data-system-name="${escapeHtml(system.system_name || '')}"
+                          data-system-state="${escapeHtml(system.state || state.currentState || '')}"
+                          data-source-view="results"
+                        >
+                          Replace Accepted Form
+                        </button>
+                      </div>
+                    </article>
+                  `;
+                })
+                .join('')}
+            </div>`
+      }
+    </section>
+  `;
+}
+
 function renderPipelineResults() {
   const system = currentSystem();
-  const pdfDocuments = Array.isArray(state.selectedSystemDetail?.source_documents)
-    ? state.selectedSystemDetail.source_documents.filter((document) => document.source_type === 'pdf')
-    : [];
+  const seedUrls = currentSeedUrls();
+  const capturedForms = currentCapturedForms();
+  const pdfDocuments = currentPdfDocuments();
   const latestTrackedRun = latestRunForSelectedSystem();
   const latestActivityAt =
     state.pipelineRunResult?.ranAt || latestTrackedRun?.created_at || system?.stats?.last_crawl_at || null;
@@ -2706,9 +3036,19 @@ function renderPipelineResults() {
       <p class="metric-note">Results are scoped to this hospital system inside the current state.</p>
     </article>
     <article class="metric-card">
-      <div class="metric-label">PDF Results</div>
+      <div class="metric-label">Targeted Pages</div>
+      <div class="metric-value">${formatNumber(seedUrls.filter((seed) => seed.active).length)} / ${formatNumber(seedUrls.length)}</div>
+      <p class="metric-note">Active targeted pages vs total known pages for this system.</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-label">Captured Forms</div>
+      <div class="metric-value">${formatNumber(capturedForms.length)}</div>
+      <p class="metric-note">Fetched PDF candidates waiting for review or already promoted.</p>
+    </article>
+    <article class="metric-card">
+      <div class="metric-label">Accepted Forms</div>
       <div class="metric-value">${formatNumber(pdfDocuments.length)}</div>
-      <p class="metric-note">Cached PDF source documents currently attached to this system.</p>
+      <p class="metric-note">Canonical PDF source documents currently attached to this system.</p>
     </article>
     <article class="metric-card">
       <div class="metric-label">${escapeHtml(latestActivityLabel)}</div>
@@ -2717,69 +3057,13 @@ function renderPipelineResults() {
     </article>
   `;
 
-  if (pdfDocuments.length === 0) {
-    elements.pipelineResultsList.innerHTML = `
-      <div class="empty-state">
-        No PDF results are attached to ${escapeHtml(system.system_name)} yet. Run the pipeline for this
-        hospital system, or use a system that already has PDF output to inspect the resulting documents.
-      </div>
-    `;
-    return;
-  }
-
-  elements.pipelineResultsList.innerHTML = pdfDocuments
-    .map(
-      (document) => {
-        const displayName = sourceDocumentDisplayName(document);
-
-        return `
-        <article class="pdf-result-card">
-          <button
-            type="button"
-            class="pdf-result-button"
-            data-action="open-pdf-editor"
-            data-source-document-id="${escapeHtml(document.id)}"
-          >
-            <div class="flex items-start gap-4">
-              <div class="pdf-result-icon">PDF</div>
-              <div>
-                <h4 class="pdf-result-title">${escapeHtml(displayName)}</h4>
-                <p class="pdf-result-copy">Open mapping editor</p>
-              </div>
-            </div>
-            <span class="status-pill status-yellow">Inspect</span>
-          </button>
-          <div class="icon-link-row mt-3">
-            ${renderIconLink(document.source_page_url, `Open source page for ${displayName}`)}
-            ${document.source_page_url ? '<span class="system-subtext">Open source page</span>' : ''}
-          </div>
-          <div class="pdf-result-meta">
-            <span class="${statusPillClass(document.pdf_parse_status === 'empty_text' || document.latest_question_extraction_status === 'failed' ? 'red' : 'green')}">
-              ${escapeHtml(document.pdf_parse_status || 'parsed')}
-            </span>
-            <span class="status-pill status-yellow">${escapeHtml(document.import_mode || 'crawl')}</span>
-            <span class="status-pill status-yellow">${formatDateTime(document.fetched_at)}</span>
-          </div>
-          <p class="pdf-result-copy">
-            Question template status: ${escapeHtml(document.question_template_status || 'not reviewed')}.
-            Published versions: ${formatNumber(document.published_versions || 0)}.
-          </p>
-          <div class="pdf-result-actions">
-            <a class="link-button" href="${escapeHtml(document.content_url)}" target="_blank" rel="noreferrer">Open Cached PDF</a>
-            <button type="button" class="ghost-button" data-action="open-pdf-editor" data-source-document-id="${escapeHtml(document.id)}">
-              Open Mapping Editor
-            </button>
-            ${
-              document.storage_path
-                ? `<span class="system-subtext">${escapeHtml(document.storage_path)}</span>`
-                : ''
-            }
-          </div>
-        </article>
-      `;
-      },
-    )
-    .join('');
+  elements.pipelineResultsList.innerHTML = `
+    <div class="space-y-8 xl:col-span-2">
+      ${renderTargetedPagesSection(system)}
+      ${renderCapturedFormsSection(system)}
+      ${renderAcceptedFormsSection(pdfDocuments, system)}
+    </div>
+  `;
 }
 
 function buildQuestionMappings(review, payloadOverride = null) {
@@ -5453,13 +5737,20 @@ async function openStageInspector(runId, { force = false } = {}) {
   }
 }
 
-async function acceptTriageDecisionFromInspector(triageDecisionId) {
+async function acceptTriageDecisionFromInspector(
+  triageDecisionId,
+  {
+    notes = 'Accepted from pipeline inspector',
+    pipelineTab = 'flow',
+    openInspector = true,
+  } = {},
+) {
   const result = await fetchJson(`/internal/triage-decisions/${encodeURIComponent(triageDecisionId)}/accept`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       created_by: 'operator-console',
-      notes: 'Accepted from pipeline inspector',
+      notes,
     }),
   });
 
@@ -5468,19 +5759,29 @@ async function acceptTriageDecisionFromInspector(triageDecisionId) {
     preserveSelectedSystem: true,
     keepPipelineResult: true,
     stateTab: 'pipeline',
-    pipelineTab: 'flow',
+    pipelineTab,
   });
-  await openStageInspector(result.stage_run_id || state.stageInspectorRunId, { force: true });
+  if (openInspector) {
+    await openStageInspector(result.stage_run_id || state.stageInspectorRunId, { force: true });
+  }
 }
 
-async function overrideTriageDecisionFromInspector(triageDecisionId, overrideDecision) {
+async function overrideTriageDecisionFromInspector(
+  triageDecisionId,
+  overrideDecision,
+  {
+    notes = `Override set to ${overrideDecision} from pipeline inspector`,
+    pipelineTab = 'flow',
+    openInspector = true,
+  } = {},
+) {
   const result = await fetchJson(`/internal/triage-decisions/${encodeURIComponent(triageDecisionId)}/override`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       override_decision: overrideDecision,
       created_by: 'operator-console',
-      notes: `Override set to ${overrideDecision} from pipeline inspector`,
+      notes,
     }),
   });
 
@@ -5490,15 +5791,21 @@ async function overrideTriageDecisionFromInspector(triageDecisionId, overrideDec
     preserveSelectedSystem: true,
     keepPipelineResult: true,
     stateTab: 'pipeline',
-    pipelineTab: 'flow',
+    pipelineTab,
   });
   const triageRunId = result.override?.triage_stage_run_id || state.stageInspectorRunId;
-  if (triageRunId) {
+  if (openInspector && triageRunId) {
     await openStageInspector(triageRunId, { force: true });
   }
 }
 
-async function rerunParseFromInspector(sourceDocumentId) {
+async function rerunParseFromInspector(
+  sourceDocumentId,
+  {
+    pipelineTab = 'flow',
+    openInspector = true,
+  } = {},
+) {
   const result = await fetchJson(`/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reparse`, {
     method: 'POST',
   });
@@ -5508,14 +5815,20 @@ async function rerunParseFromInspector(sourceDocumentId) {
     preserveSelectedSystem: true,
     keepPipelineResult: true,
     stateTab: 'pipeline',
-    pipelineTab: 'flow',
+    pipelineTab,
   });
-  if (result.stage_run_id) {
+  if (openInspector && result.stage_run_id) {
     await openStageInspector(result.stage_run_id, { force: true });
   }
 }
 
-async function rerunWorkflowFromInspector(sourceDocumentId) {
+async function rerunWorkflowFromInspector(
+  sourceDocumentId,
+  {
+    pipelineTab = 'flow',
+    openInspector = true,
+  } = {},
+) {
   const result = await fetchJson(`/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reextract-workflow`, {
     method: 'POST',
   });
@@ -5525,9 +5838,9 @@ async function rerunWorkflowFromInspector(sourceDocumentId) {
     preserveSelectedSystem: true,
     keepPipelineResult: true,
     stateTab: 'pipeline',
-    pipelineTab: 'flow',
+    pipelineTab,
   });
-  if (result.stage_run_id) {
+  if (openInspector && result.stage_run_id) {
     await openStageInspector(result.stage_run_id, { force: true });
   }
 }
@@ -5540,7 +5853,16 @@ async function runPipelineForSelectedSystem() {
   });
 }
 
-function openSourcePageEditorForSystem({ systemId = null, systemName = null, systemState = null, systemDomain = null } = {}) {
+function openSourcePageEditorForSystem({
+  systemId = null,
+  systemName = null,
+  systemState = null,
+  systemDomain = null,
+  sourceView = 'systems',
+  seedUrlId = null,
+  initialValue = '',
+  originalUrl = null,
+} = {}) {
   const system =
     state.systems.find(
       (entry) =>
@@ -5560,10 +5882,14 @@ function openSourcePageEditorForSystem({ systemId = null, systemName = null, sys
     systemName: system.system_name || systemName || null,
     systemState: system.state || systemState || state.currentState || null,
     systemDomain: system.domain || systemDomain || null,
-    value: '',
+    sourceView,
+    seedUrlId,
+    originalUrl: originalUrl || initialValue || null,
+    value: initialValue || '',
     saving: false,
   };
   renderSystemsTable();
+  renderPipelineResults();
 }
 
 function cancelSourcePageEditor(expectedKey = null) {
@@ -5575,6 +5901,7 @@ function cancelSourcePageEditor(expectedKey = null) {
   }
   state.systemSourcePageEditor = null;
   renderSystemsTable();
+  renderPipelineResults();
 }
 
 async function saveSourcePageEditor(expectedKey = null) {
@@ -5594,6 +5921,7 @@ async function saveSourcePageEditor(expectedKey = null) {
     saving: true,
   };
   renderSystemsTable();
+  renderPipelineResults();
 
   try {
     await fetchJson('/internal/manual-url', {
@@ -5611,12 +5939,23 @@ async function saveSourcePageEditor(expectedKey = null) {
       }),
     });
 
+    if (
+      editor.seedUrlId &&
+      editor.originalUrl &&
+      normalizeConsoleString(editor.originalUrl) !== normalizeConsoleString(nextUrl)
+    ) {
+      await fetchJson(`/internal/targeted-pages/${encodeURIComponent(editor.seedUrlId)}/retire`, {
+        method: 'POST',
+      });
+    }
+
     notify(`Saved ${nextUrl} as the focused source page for ${editor.systemName}.`);
     state.systemSourcePageEditor = null;
     await loadStateView(state.currentState, {
       preserveSelectedSystem: true,
       keepPipelineResult: true,
-      stateTab: 'systems',
+      stateTab: editor.sourceView === 'results' ? 'pipeline' : 'systems',
+      pipelineTab: editor.sourceView === 'results' ? 'results' : state.currentPipelineTab,
     });
   } catch (error) {
     state.systemSourcePageEditor = {
@@ -5625,6 +5964,7 @@ async function saveSourcePageEditor(expectedKey = null) {
       saving: false,
     };
     renderSystemsTable();
+    renderPipelineResults();
     throw error;
   }
 }
@@ -5633,10 +5973,181 @@ async function addSourcePageForSystem(options = {}) {
   openSourcePageEditorForSystem(options);
 }
 
+async function activateTargetedPageForSelectedSystem(seedUrlId) {
+  const system = currentSystem();
+  if (!system?.hospital_system_id || !seedUrlId) {
+    throw new Error('Choose a targeted page before activating it.');
+  }
+
+  setPipelineActionState('seed_scope_stage');
+  setActionBanner({
+    tone: 'info',
+    title: 'Targeted page update started',
+    message: `Marking a targeted page as active for ${system.system_name}.`,
+    badge: 'Updating',
+  });
+  await waitForNextPaint();
+
+  try {
+    await fetchJson(`/internal/targeted-pages/${encodeURIComponent(seedUrlId)}/activate`, {
+      method: 'POST',
+    });
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'pipeline',
+      pipelineTab: 'results',
+    });
+    setActionBanner(
+      {
+        tone: 'success',
+        title: 'Targeted page active',
+        message: `The selected page is now active for ${system.system_name}.`,
+        badge: 'Saved',
+      },
+      { autoClearMs: 8000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: 'Targeted page update failed',
+        message: error?.message || 'The dashboard could not activate the targeted page.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
+async function retireTargetedPageForSelectedSystem(seedUrlId) {
+  const system = currentSystem();
+  if (!system?.hospital_system_id || !seedUrlId) {
+    throw new Error('Choose a targeted page before retiring it.');
+  }
+
+  setPipelineActionState('seed_scope_stage');
+  setActionBanner({
+    tone: 'info',
+    title: 'Targeted page retirement started',
+    message: `Retiring the selected targeted page for ${system.system_name}.`,
+    badge: 'Updating',
+  });
+  await waitForNextPaint();
+
+  try {
+    await fetchJson(`/internal/targeted-pages/${encodeURIComponent(seedUrlId)}/retire`, {
+      method: 'POST',
+    });
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'pipeline',
+      pipelineTab: 'results',
+    });
+    setActionBanner(
+      {
+        tone: 'success',
+        title: 'Targeted page retired',
+        message: `The selected page is no longer active for ${system.system_name}.`,
+        badge: 'Saved',
+      },
+      { autoClearMs: 8000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: 'Targeted page retirement failed',
+        message: error?.message || 'The dashboard could not retire the targeted page.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
+async function refreshTargetedPageForSelectedSystem(seedUrl) {
+  const system = currentSystem();
+  const normalizedSeedUrl = String(seedUrl || '').trim();
+  if (!system?.hospital_system_id || !normalizedSeedUrl) {
+    throw new Error('Choose a targeted page before refreshing it.');
+  }
+
+  const actionLabel = pipelineActionLabel('fetch_stage');
+  setPipelineActionState('fetch_stage');
+  setActionBanner({
+    tone: 'info',
+    title: `${actionLabel} started`,
+    message: `Refreshing ${formatInspectorUrl(normalizedSeedUrl)} for ${system.system_name}.`,
+    badge: 'Running',
+  });
+  await waitForNextPaint();
+
+  try {
+    const result = await fetchJson('/internal/pipeline/system/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        state: state.currentState,
+        system_id: system.hospital_system_id,
+        seed_url: normalizedSeedUrl,
+      }),
+    });
+
+    state.pipelineRunResult = {
+      ...result,
+      systemName: system.system_name,
+      ranAt: new Date().toISOString(),
+    };
+
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'pipeline',
+      pipelineTab: 'results',
+    });
+
+    if (result.stage_run_id) {
+      await openStageInspector(result.stage_run_id, { force: true });
+    }
+
+    setActionBanner(
+      {
+        tone: actionBannerToneForStatus(result.stage_status || result.status),
+        title: `${actionLabel} finished`,
+        message: `Fetched fresh artifacts from ${formatInspectorUrl(normalizedSeedUrl)} for ${system.system_name}.`,
+        badge: formatStageStatusLabel(result.stage_status || result.status),
+      },
+      { autoClearMs: 9000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: `${actionLabel} failed`,
+        message: error?.message || 'The dashboard could not refresh the targeted page.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
 function renderPdfUploadSurfaces() {
   renderSystemsTable();
   if (state.currentStateTab === 'pipeline') {
     renderPipelineVisual();
+    renderPipelineResults();
   }
 }
 
@@ -6123,6 +6634,32 @@ document.addEventListener('click', async (event) => {
         systemName: button.dataset.systemName || null,
         systemState: button.dataset.systemState || null,
         systemDomain: button.dataset.systemDomain || null,
+        sourceView: button.dataset.sourceView || 'systems',
+      });
+      return;
+    }
+
+    if (button.dataset.action === 'add-targeted-page') {
+      await addSourcePageForSystem({
+        systemId: button.dataset.systemId || null,
+        systemName: button.dataset.systemName || null,
+        systemState: button.dataset.systemState || null,
+        systemDomain: button.dataset.systemDomain || null,
+        sourceView: 'results',
+      });
+      return;
+    }
+
+    if (button.dataset.action === 'edit-targeted-page') {
+      openSourcePageEditorForSystem({
+        systemId: button.dataset.systemId || null,
+        systemName: button.dataset.systemName || null,
+        systemState: button.dataset.systemState || null,
+        systemDomain: button.dataset.systemDomain || null,
+        sourceView: 'results',
+        seedUrlId: button.dataset.seedUrlId || null,
+        initialValue: button.dataset.seedUrl || '',
+        originalUrl: button.dataset.seedUrl || null,
       });
       return;
     }
@@ -6144,6 +6681,21 @@ document.addEventListener('click', async (event) => {
 
     if (button.dataset.action === 'cancel-system-source-page') {
       cancelSourcePageEditor(button.dataset.systemKey || null);
+      return;
+    }
+
+    if (button.dataset.action === 'activate-targeted-page' && button.dataset.seedUrlId) {
+      await activateTargetedPageForSelectedSystem(button.dataset.seedUrlId);
+      return;
+    }
+
+    if (button.dataset.action === 'retire-targeted-page' && button.dataset.seedUrlId) {
+      await retireTargetedPageForSelectedSystem(button.dataset.seedUrlId);
+      return;
+    }
+
+    if (button.dataset.action === 'refresh-targeted-page' && button.dataset.seedUrl) {
+      await refreshTargetedPageForSelectedSystem(button.dataset.seedUrl);
       return;
     }
 
@@ -6261,6 +6813,15 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (button.dataset.action === 'accept-captured-form' && button.dataset.triageId) {
+      await acceptTriageDecisionFromInspector(button.dataset.triageId, {
+        notes: 'Accepted from captured forms workspace',
+        pipelineTab: 'results',
+        openInspector: false,
+      });
+      return;
+    }
+
     if (
       button.dataset.action === 'override-triage-decision' &&
       button.dataset.triageId &&
@@ -6273,8 +6834,36 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (
+      button.dataset.action === 'override-captured-form' &&
+      button.dataset.triageId &&
+      button.dataset.decision
+    ) {
+      await overrideTriageDecisionFromInspector(
+        button.dataset.triageId,
+        button.dataset.decision,
+        {
+          notes: `Override set to ${button.dataset.decision} from captured forms workspace`,
+          pipelineTab: 'results',
+          openInspector: false,
+        },
+      );
+      return;
+    }
+
     if (button.dataset.action === 'reparse-source-document' && button.dataset.sourceDocumentId) {
       await rerunParseFromInspector(button.dataset.sourceDocumentId);
+      return;
+    }
+
+    if (
+      button.dataset.action === 'reparse-results-source-document' &&
+      button.dataset.sourceDocumentId
+    ) {
+      await rerunParseFromInspector(button.dataset.sourceDocumentId, {
+        pipelineTab: 'results',
+        openInspector: false,
+      });
       return;
     }
 
@@ -6283,6 +6872,17 @@ document.addEventListener('click', async (event) => {
       button.dataset.sourceDocumentId
     ) {
       await rerunWorkflowFromInspector(button.dataset.sourceDocumentId);
+      return;
+    }
+
+    if (
+      button.dataset.action === 'reextract-workflow-results-source-document' &&
+      button.dataset.sourceDocumentId
+    ) {
+      await rerunWorkflowFromInspector(button.dataset.sourceDocumentId, {
+        pipelineTab: 'results',
+        openInspector: false,
+      });
       return;
     }
 
@@ -6322,7 +6922,7 @@ elements.systemFilter.addEventListener('input', () => {
   renderSystemsTable();
 });
 
-elements.systemsTable?.addEventListener('input', (event) => {
+function handleSourcePageEditorInput(event) {
   const input = event.target.closest('[data-source-page-editor-input]');
   if (!input || !state.systemSourcePageEditor) return;
   if (input.dataset.sourcePageEditorInput !== state.systemSourcePageEditor.key) return;
@@ -6330,9 +6930,12 @@ elements.systemsTable?.addEventListener('input', (event) => {
     ...state.systemSourcePageEditor,
     value: input.value || '',
   };
-});
+}
 
-elements.systemsTable?.addEventListener('keydown', (event) => {
+elements.systemsTable?.addEventListener('input', handleSourcePageEditorInput);
+elements.pipelineResultsList?.addEventListener('input', handleSourcePageEditorInput);
+
+function handleSourcePageEditorKeydown(event) {
   const input = event.target.closest('[data-source-page-editor-input]');
   if (!input) return;
 
@@ -6350,7 +6953,10 @@ elements.systemsTable?.addEventListener('keydown', (event) => {
     event.preventDefault();
     cancelSourcePageEditor(input.dataset.sourcePageEditorInput || null);
   }
-});
+}
+
+elements.systemsTable?.addEventListener('keydown', handleSourcePageEditorKeydown);
+elements.pipelineResultsList?.addEventListener('keydown', handleSourcePageEditorKeydown);
 
 elements.manualPdfUploadInput?.addEventListener('change', (event) => {
   const input = event.target;

@@ -819,6 +819,18 @@ export async function getFetchArtifactById(id, client = null) {
        from triage_decisions td
        where td.fetch_artifact_id = $1
        order by td.fetch_artifact_id, td.created_at desc
+     ),
+     accepted_source_document as (
+       select distinct on (coalesce(sd.fetch_artifact_id::text, sd.triage_decision_id::text))
+         sd.id,
+         sd.fetch_artifact_id,
+         sd.triage_decision_id,
+         sd.source_type,
+         sd.source_url
+       from source_documents sd
+       where sd.fetch_artifact_id = $1
+          or sd.triage_decision_id in (select id from latest_triage)
+       order by coalesce(sd.fetch_artifact_id::text, sd.triage_decision_id::text), sd.created_at desc
      )
      select
        fa.*,
@@ -841,7 +853,9 @@ export async function getFetchArtifactById(id, client = null) {
      left join hospital_systems hs on hs.id = fa.hospital_system_id
      left join facilities f on f.id = fa.facility_id
      left join latest_triage lt on lt.fetch_artifact_id = fa.id
-     left join source_documents sd on sd.fetch_artifact_id = fa.id
+     left join accepted_source_document sd
+       on sd.fetch_artifact_id = fa.id
+       or (sd.fetch_artifact_id is null and sd.triage_decision_id = lt.id)
      where fa.id = $1
      limit 1`,
     [id],

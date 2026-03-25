@@ -249,3 +249,58 @@ export async function upsertHumanApprovedSeedInFile({
     systems,
   });
 }
+
+export async function replaceSystemSeedUrlsInFile({
+  state,
+  systemName,
+  domain = null,
+  seedUrls = [],
+}) {
+  const snapshot = await readStateSeedFile(state);
+  const normalizedSystemName = normalizeString(systemName);
+  const normalizedSeedUrls = normalizeSeedUrls(seedUrls);
+
+  if (!normalizedSystemName) {
+    throw new Error('systemName is required to replace system seed URLs in the seed file.');
+  }
+
+  const systems = [...snapshot.systems];
+  const matchIndex = systems.findIndex(
+    (system) =>
+      system.system_name.toLowerCase() === normalizedSystemName.toLowerCase() ||
+      (domain && system.domain && system.domain.toLowerCase() === String(domain).toLowerCase()),
+  );
+
+  if (matchIndex === -1) {
+    if (normalizedSeedUrls.length === 0) {
+      return snapshot;
+    }
+
+    systems.push(
+      normalizeSeedSystem(
+        {
+          system_name: normalizedSystemName,
+          state: snapshot.state,
+          domain,
+          seed_urls: normalizedSeedUrls,
+          facilities: [],
+        },
+        snapshot.state,
+      ),
+    );
+  } else {
+    systems[matchIndex] = normalizeSeedSystem(
+      {
+        ...systems[matchIndex],
+        domain: normalizeOptionalString(domain) || systems[matchIndex].domain,
+        seed_urls: normalizedSeedUrls,
+      },
+      snapshot.state,
+    );
+  }
+
+  return saveStateSeedFile({
+    state: snapshot.state,
+    systems,
+  });
+}

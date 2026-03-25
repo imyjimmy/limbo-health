@@ -1,5 +1,6 @@
+import fs from 'node:fs/promises';
 import { Router } from 'express';
-import { getExtractionRunById } from '../repositories/workflowRepository.js';
+import { getExtractionRunById, getSourceDocumentById } from '../repositories/workflowRepository.js';
 import { runCrawl } from '../services/crawlService.js';
 import {
   addManualApprovedUrl,
@@ -44,11 +45,17 @@ import { reseedFromFile } from '../services/seedService.js';
 import { promoteGeneratedSeedsFromStateDataStage } from '../services/stateDataSeedPromotionService.js';
 import { getHospitalSystemDetail } from '../services/systemDetailService.js';
 import {
+  activateTargetedPage,
+  retireTargetedPage,
+} from '../services/targetedPageService.js';
+import {
   getNationalStateOverview,
   getStateSummary,
   listStateSystems,
 } from '../services/stateSummaryService.js';
 import { runStateDataMaterializationStage } from '../services/stateDataMaterializationService.js';
+import { resolveFetchArtifactPath } from '../utils/fetchArtifactStorage.js';
+import { resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
 
 export const internalRouter = Router();
 
@@ -237,6 +244,56 @@ internalRouter.get('/fetch-artifacts/:id', async (req, res) => {
   }
 });
 
+internalRouter.get('/fetch-artifacts/:id/content', async (req, res) => {
+  try {
+    const artifact = await getFetchArtifactDetail(req.params.id);
+    if (!artifact?.storage_path) {
+      if (!artifact?.accepted_source_document?.id) {
+        return res.status(404).json({ error: 'Fetch artifact content not found.' });
+      }
+    }
+
+    try {
+      const resolvedStoragePath = resolveFetchArtifactPath(artifact.storage_path);
+      await fs.access(resolvedStoragePath);
+
+      if (artifact.source_type === 'pdf') {
+        res.type('application/pdf');
+      } else if (artifact.content_type) {
+        res.type(artifact.content_type);
+      }
+
+      return res.sendFile(resolvedStoragePath);
+    } catch (error) {
+      if (error?.code !== 'ENOENT' || !artifact.accepted_source_document?.id) {
+        throw error;
+      }
+    }
+
+    const sourceDocument = await getSourceDocumentById(artifact.accepted_source_document.id);
+    if (!sourceDocument?.storage_path) {
+      return res.status(404).json({ error: 'Fetch artifact content not found on disk.' });
+    }
+
+    const acceptedStoragePath = resolveSourceDocumentPath(sourceDocument.storage_path);
+    await fs.access(acceptedStoragePath);
+    if (sourceDocument.source_type === 'pdf') {
+      res.type('application/pdf');
+    }
+    return res.sendFile(acceptedStoragePath);
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      return res.status(404).json({ error: 'Fetch artifact content not found on disk.' });
+    }
+
+    console.error('Failed to fetch artifact content:', {
+      fetchArtifactId: req.params.id,
+      error,
+    });
+    return res.status(500).json({ error: 'Failed to fetch artifact content.' });
+  }
+});
+
 internalRouter.get('/triage-decisions/:id', async (req, res) => {
   try {
     const decision = await getTriageDecisionDetail(req.params.id);
@@ -332,6 +389,28 @@ internalRouter.post('/manual-url', async (req, res) => {
   } catch (error) {
     console.error('Failed to add manual URL:', error);
     const response = toErrorPayload(error, 'Failed to add manual URL.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/targeted-pages/:id/activate', async (req, res) => {
+  try {
+    const result = await activateTargetedPage(req.params.id);
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to activate targeted page:', error);
+    const response = toErrorPayload(error, 'Failed to activate targeted page.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.post('/targeted-pages/:id/retire', async (req, res) => {
+  try {
+    const result = await retireTargetedPage(req.params.id);
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to retire targeted page:', error);
+    const response = toErrorPayload(error, 'Failed to retire targeted page.');
     return res.status(response.status).json(response.body);
   }
 });
