@@ -30,39 +30,23 @@ Postgres-backed crawler + extraction service that ingests public hospital record
 
 ```text
 data/[state-prefixed files]
-=> src/services/stateDataMaterializationService.js
-   (Stage 1 "Data Intake": scans data/ for state-prefixed files, can use OpenAI to normalize non-homologous source files into hospital identities, writes run artifacts to storage/data-intake/<state>, merges the result into the canonical state seed file, and can reseed the DB)
 => seeds/[state-name]-systems.json
-   (canonical seed registry; each JSON entry has:
-    - system_name
-    - state
-    - domain
-    - seed_urls[]
-    - optional facilities[] with:
-      - facility_name
-      - city
-      - state
-      - facility_type
-      - facility_page_url
-      - external_facility_id)
-=> src/services/seedService.js via src/seed.js
-   (reads the canonical seed file and upserts hospital_systems, facilities, and seed_urls into Postgres)
-=> src/services/crawlService.js via src/crawl.js
-   (loads active DB seeds by hospital system and runs the crawl queue)
-=> src/crawler/fetcher.js
-   (fetches each URL and decides whether it is HTML or PDF; fetch artifacts are written under storage/fetch/<state>/...)
-=> src/parsers/htmlParser.js or src/parsers/pdfParser.js
-   (HTML: extracts title, body text, links, and nearby link context; PDF: extracts text, header lines, and metadata; parsed artifacts are written under storage/parsed/<state>/...)
-=> src/crawler/linkExpander.js + src/utils/urls.js
-   (scores pages and links to decide which ones look like medical-records workflow pages or medical-records PDFs and should be followed)
-=> src/extractors/workflowExtractor.js
-   (turns parsed pages/docs into structured workflow data such as portal info, request methods, forms, contacts, and instructions; downstream artifacts are written under storage/triage, storage/workflows, storage/questions, and storage/published)
-=> src/utils/pdfStorage.js + src/utils/pdfNaming.js + src/utils/pdfHeader.js + src/utils/sourceDocumentStorage.js
-   (for accepted PDFs: builds the final readable filename from the facility/system name, descriptive phrase, and language code, then writes it into the canonical source-document state folder)
-=> storage/source-documents/[state]/[facility-or-system]-[descriptive-phrase]-[language][-N].pdf
+=> storage/targeted-pages/<state>/
+=> storage/captured-forms/<state>/
+=> storage/accepted-forms/<state>/
+=> storage/parsed/<state>/
+=> storage/question-mappings/<state>/<source-document-id>/
+=> storage/published-templates/<state>/<source-document-id>/
 ```
 
-Short version: `data -> canonical seeds -> DB reseed -> crawl/fetch/parse -> link expansion -> workflow extraction -> accepted PDFs in storage/source-documents/<state>/`.
+Short version: `data -> seeds -> targeted pages -> captured forms -> accepted forms -> parsed pdf -> question mapping -> published template`.
+
+`hospital-submission-requirements` is a derived artifact, not a strictly linear stage. It can be inferred from targeted pages, accepted forms, or both, and is stored under `storage/hospital-submission-requirements/<state>/<source-document-id>/`.
+
+Current implementation note:
+- internal machine bookkeeping still exists under `storage/internal/*`
+- the crawler/fetch layer is still more coupled than the human-facing pipeline above
+- `storage/captured-forms/` is the intended review boundary even though some candidate PDFs still arrive through the targeted-page fetch flow before promotion
 
 ## Setup
 
@@ -92,7 +76,7 @@ Short version: `data -> canonical seeds -> DB reseed -> crawl/fetch/parse -> lin
    - `npm run start`
 11. Build the official CMS national hospital roster and compare processed states against it:
    - Build roster: `npm run build:national-roster`
-   - Audit states currently represented under the legacy raw-state footprint in `storage/raw/*`: `npm run report:national-roster-coverage`
+   - Audit states currently represented under the accepted-form corpus footprint in `storage/accepted-forms/*`: `npm run report:national-roster-coverage`
 12. Generate import-compatible seed candidates from the CMS roster:
    - Single state: `npm run generate:seed-candidates -- --state CT`
    - Remaining states: `npm run generate:seed-candidates -- --all-remaining`
@@ -139,37 +123,38 @@ If you want a different interpreter or port, pass the env var explicitly, for ex
 ### Canonical vs artifact
 
 - Canonical seed definitions: `seeds/<state-name>-systems.json`
-- Canonical accepted PDF blobs: `storage/source-documents/<state>/`
-- Legacy/fallback PDF/blob location: `storage/raw/<state>/`
-- Stage artifacts and caches: most other `storage/*` subdirectories
+- Canonical accepted PDF/form blobs: `storage/accepted-forms/<state>/`
+- Backward-compatible legacy locations: `storage/source-documents/<state>/` and `storage/raw/<state>/`
+- Human-facing stage artifacts: `storage/targeted-pages`, `storage/captured-forms`, `storage/parsed`, `storage/hospital-submission-requirements`, `storage/question-mappings`, `storage/published-templates`
+- Internal machine bookkeeping: `storage/internal/*`
 
 ### Directory meanings
 
 - `storage/data-intake/<state>`: Stage 1 data-intake run artifacts. These document how `data/*` was interpreted and whether canonical seeds were updated.
 - `storage/generated-seeds/`: generated seed candidates from the roster/search pipeline. These are not canonical until explicitly promoted into `seeds/<state-name>-systems.json`.
-- `storage/seed-scopes/<state>`: seed-scope stage artifacts and run metadata.
-- `storage/fetch/<state>/<run-id>`: fetched HTML/PDF artifacts and crawl-stage metadata for a run.
-- `storage/parsed/<state>`: parsed page/document artifacts derived from fetched content.
-- `storage/triage/<state>`: triage/acceptance artifacts derived from parsed content.
-- `storage/source-documents/<state>`: canonical home for accepted, live, DB-backed source documents, especially PDFs.
-- `storage/raw/<state>`: legacy/raw storage. Keep for backward compatibility and old artifacts, but do not treat it as the intended finished corpus for accepted PDFs.
-- `storage/workflows/<state>/<source-document-id>`: extracted workflow artifacts.
-- `storage/questions/<state>/<source-document-id>`: question-extraction artifacts and drafts.
-- `storage/published/<state>/<source-document-id>`: published downstream artifacts.
+- `storage/targeted-pages/<state>/<artifact-id>`: fetched request-page snapshots and related crawl artifacts a human may inspect when fixing the PDF-link source.
+- `storage/captured-forms/<state>`: review queue for plausible request forms before human approval into the canonical corpus.
+- `storage/accepted-forms/<state>`: canonical home for approved, live, DB-backed request forms.
+- `storage/parsed/<state>`: parsed page/document artifacts derived from accepted content.
+- `storage/hospital-submission-requirements/<state>/<source-document-id>`: derived submission requirements inferred from targeted pages and/or accepted forms.
+- `storage/question-mappings/<state>/<source-document-id>`: question-extraction artifacts and drafts.
+- `storage/published-templates/<state>/<source-document-id>`: published downstream artifacts the app should trust.
+- `storage/internal/seed-scopes/<state>`: machine-only seed-scope stage artifacts and run metadata.
+- `storage/internal/triage-decisions/<state>`: machine-only triage and acceptance bookkeeping.
 
 ### What can be deleted or regenerated
 
-- Usually safe to regenerate from upstream state: `storage/data-intake`, `storage/generated-seeds`, `storage/seed-scopes`, `storage/fetch`, `storage/parsed`, `storage/triage`, `storage/workflows`, `storage/questions`
-- Not safe to treat as disposable: `seeds/` and `storage/source-documents/`
-- Conditionally safe to clean: `storage/raw/`
-  Only after confirming active DB-backed `source_documents.storage_path` rows no longer depend on it and canonical copies exist under `storage/source-documents/`
-- Conditionally safe to clean: `storage/published/`
+- Usually safe to regenerate from upstream state: `storage/data-intake`, `storage/generated-seeds`, `storage/targeted-pages`, `storage/captured-forms`, `storage/parsed`, `storage/hospital-submission-requirements`, `storage/question-mappings`, `storage/internal`
+- Not safe to treat as disposable: `seeds/` and `storage/accepted-forms/`
+- Conditionally safe to clean: legacy `storage/source-documents/` and `storage/raw/`
+  Only after confirming active DB-backed `source_documents.storage_path` rows no longer depend on those legacy roots and canonical copies exist under `storage/accepted-forms/`
+- Conditionally safe to clean: `storage/published-templates/`
   Only if you are deliberately republishing or rebuilding those outputs
 
 ## Notes
 
-- Accepted source-document PDFs now live canonically under `storage/source-documents/<state>/`.
-- `storage/raw/<state>/` remains a legacy/fallback location for older artifacts and backward-compatible reads. Do not assume the newest accepted PDFs will land there.
+- Accepted request forms now live canonically under `storage/accepted-forms/<state>/`.
+- `storage/source-documents/<state>/` and `storage/raw/<state>/` remain legacy/fallback locations for older artifacts and backward-compatible reads. Do not assume the newest accepted forms will land there.
 - `CRAWL_STATE` scopes default crawl runs when no explicit CLI/API state is provided. Deployed Texas scheduled crawls should set `CRAWL_STATE=TX`.
 - No-arg seeding remains Texas-oriented for backward compatibility. Use `--state` or `--seed-file` for non-Texas imports.
 - Accepted medical-records request PDFs use descriptive filenames derived from the facility/system name, a sensible form phrase, and a language code.

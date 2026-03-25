@@ -14,33 +14,73 @@ export function resolveFromServiceRoot(value, fallback) {
   return path.resolve(serviceRoot, candidate);
 }
 
+const targetedPageStorageDir = resolveFromServiceRoot(
+  process.env.TARGETED_PAGES_STORAGE_DIR || process.env.FETCH_STORAGE_DIR,
+  'storage/targeted-pages',
+);
+const capturedFormStorageDir = resolveFromServiceRoot(
+  process.env.CAPTURED_FORMS_STORAGE_DIR,
+  'storage/captured-forms',
+);
+const acceptedFormStorageDir = resolveFromServiceRoot(
+  process.env.ACCEPTED_FORMS_STORAGE_DIR ||
+    process.env.SOURCE_DOCUMENT_STORAGE_DIR ||
+    process.env.RAW_STORAGE_DIR,
+  'storage/accepted-forms',
+);
+const hospitalSubmissionRequirementsStorageDir = resolveFromServiceRoot(
+  process.env.HOSPITAL_SUBMISSION_REQUIREMENTS_STORAGE_DIR || process.env.WORKFLOW_STORAGE_DIR,
+  'storage/hospital-submission-requirements',
+);
+const questionMappingStorageDir = resolveFromServiceRoot(
+  process.env.QUESTION_MAPPING_STORAGE_DIR || process.env.QUESTION_STORAGE_DIR,
+  'storage/question-mappings',
+);
+const publishedTemplateStorageDir = resolveFromServiceRoot(
+  process.env.PUBLISHED_TEMPLATE_STORAGE_DIR || process.env.PUBLISHED_STORAGE_DIR,
+  'storage/published-templates',
+);
+const internalSeedScopeStorageDir = resolveFromServiceRoot(
+  process.env.SEED_SCOPE_STORAGE_DIR,
+  'storage/internal/seed-scopes',
+);
+const internalTriageStorageDir = resolveFromServiceRoot(
+  process.env.TRIAGE_STORAGE_DIR,
+  'storage/internal/triage-decisions',
+);
+
 export const config = {
   port: Number.parseInt(process.env.PORT || '3020', 10),
   databaseUrl:
     process.env.DATABASE_URL ||
     'postgres://postgres:postgres@localhost:5432/records_workflow',
+  targetedPageStorageDir,
+  capturedFormStorageDir,
+  acceptedFormStorageDir,
+  hospitalSubmissionRequirementsStorageDir,
+  questionMappingStorageDir,
+  publishedTemplateStorageDir,
+  legacySourceDocumentStorageDir: resolveFromServiceRoot(
+    process.env.LEGACY_SOURCE_DOCUMENT_STORAGE_DIR || process.env.SOURCE_DOCUMENT_STORAGE_DIR,
+    'storage/source-documents',
+  ),
+  legacyRawStorageDir: resolveFromServiceRoot(
+    process.env.LEGACY_RAW_STORAGE_DIR || process.env.RAW_STORAGE_DIR,
+    'storage/raw',
+  ),
   dataIntakeStorageDir: resolveFromServiceRoot(
     process.env.DATA_INTAKE_STORAGE_DIR,
     'storage/data-intake',
   ),
-  rawStorageDir: resolveFromServiceRoot(process.env.RAW_STORAGE_DIR, 'storage/raw'),
-  sourceDocumentStorageDir: resolveFromServiceRoot(
-    process.env.SOURCE_DOCUMENT_STORAGE_DIR,
-    'storage/source-documents',
-  ),
-  seedScopeStorageDir: resolveFromServiceRoot(
-    process.env.SEED_SCOPE_STORAGE_DIR,
-    'storage/seed-scopes',
-  ),
-  fetchStorageDir: resolveFromServiceRoot(process.env.FETCH_STORAGE_DIR, 'storage/fetch'),
+  rawStorageDir: acceptedFormStorageDir,
+  sourceDocumentStorageDir: acceptedFormStorageDir,
+  seedScopeStorageDir: internalSeedScopeStorageDir,
+  fetchStorageDir: targetedPageStorageDir,
   parsedStorageDir: resolveFromServiceRoot(process.env.PARSED_STORAGE_DIR, 'storage/parsed'),
-  workflowStorageDir: resolveFromServiceRoot(process.env.WORKFLOW_STORAGE_DIR, 'storage/workflows'),
-  questionStorageDir: resolveFromServiceRoot(process.env.QUESTION_STORAGE_DIR, 'storage/questions'),
-  triageStorageDir: resolveFromServiceRoot(process.env.TRIAGE_STORAGE_DIR, 'storage/triage'),
-  publishedStorageDir: resolveFromServiceRoot(
-    process.env.PUBLISHED_STORAGE_DIR,
-    'storage/published',
-  ),
+  workflowStorageDir: hospitalSubmissionRequirementsStorageDir,
+  questionStorageDir: questionMappingStorageDir,
+  triageStorageDir: internalTriageStorageDir,
+  publishedStorageDir: publishedTemplateStorageDir,
   seedFile: resolveFromServiceRoot(process.env.SEED_FILE, 'seeds/texas-systems.json'),
   crawlState: normalizeStateCode(process.env.CRAWL_STATE),
   crawl: {

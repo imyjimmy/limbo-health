@@ -3,7 +3,10 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { normalizeStateCode } from './states.js';
 
+const ACCEPTED_FORMS_MARKER = '/storage/accepted-forms/';
+const SOURCE_DOCUMENTS_MARKER = '/storage/source-documents/';
 const RAW_STORAGE_MARKER = '/storage/raw/';
+const STORAGE_MARKERS = [ACCEPTED_FORMS_MARKER, SOURCE_DOCUMENTS_MARKER, RAW_STORAGE_MARKER];
 
 function normalizePathString(value) {
   return String(value || '').replace(/\\/g, '/');
@@ -12,7 +15,7 @@ function normalizePathString(value) {
 export function rawStorageStateSegment(state) {
   const normalizedState = normalizeStateCode(state);
   if (!normalizedState) {
-    throw new Error('A valid state code is required for raw storage paths.');
+    throw new Error('A valid state code is required for accepted-form storage paths.');
   }
 
   return normalizedState.toLowerCase();
@@ -42,13 +45,15 @@ export function toRawStorageRelativePath(filePath, rawStorageDir = config.rawSto
   }
 
   const normalizedPath = normalizePathString(filePath);
-  const markerIndex = normalizedPath.lastIndexOf(RAW_STORAGE_MARKER);
-  if (markerIndex === -1) {
-    return null;
+  for (const marker of STORAGE_MARKERS) {
+    const markerIndex = normalizedPath.lastIndexOf(marker);
+    if (markerIndex !== -1) {
+      const extracted = normalizedPath.slice(markerIndex + marker.length);
+      return extracted || null;
+    }
   }
 
-  const extracted = normalizedPath.slice(markerIndex + RAW_STORAGE_MARKER.length);
-  return extracted || null;
+  return null;
 }
 
 export function resolveRawStoragePath(filePath, rawStorageDir = config.rawStorageDir) {
@@ -71,10 +76,12 @@ export function replaceRawStorageRelativePath(storedPath, nextRelativePath, rawS
   }
 
   const normalizedStoredPath = normalizePathString(storedPath);
-  const markerIndex = normalizedStoredPath.lastIndexOf(RAW_STORAGE_MARKER);
-  if (markerIndex === -1) {
-    return path.join(rawStorageDir, normalizedNextRelativePath);
+  for (const marker of STORAGE_MARKERS) {
+    const markerIndex = normalizedStoredPath.lastIndexOf(marker);
+    if (markerIndex !== -1) {
+      return `${normalizedStoredPath.slice(0, markerIndex + marker.length)}${normalizedNextRelativePath}`;
+    }
   }
 
-  return `${normalizedStoredPath.slice(0, markerIndex + RAW_STORAGE_MARKER.length)}${normalizedNextRelativePath}`;
+  return path.join(rawStorageDir, normalizedNextRelativePath);
 }

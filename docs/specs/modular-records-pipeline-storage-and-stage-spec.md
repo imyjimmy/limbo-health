@@ -25,7 +25,7 @@ Today `runCrawl` still performs all of this in one loop:
 5. parse HTML or PDF
 6. extract workflow rows
 7. save accepted source documents
-8. run initial PDF question extraction
+8. run initial PDF question mapping
 9. expand more candidate links from HTML
 
 The important design flaw is not just "the code is large." The flaw is that most stage boundaries are still in memory only.
@@ -34,56 +34,92 @@ As a result:
 
 - rejected PDFs are skipped and deleted instead of being reviewable artifacts
 - crawled HTML is parsed, but the raw HTML snapshot is not durably stored as a stage artifact
-- workflow extraction cannot be rerun cleanly from a persisted parsed-document stage
+- hospital-submission-requirements cannot be rerun cleanly from a persisted parsed-document stage
 - link discovery cannot be replayed cleanly from stored HTML
-- the dashboard cannot offer honest stage buttons beyond crawl, question extraction, and full pipeline
+- the dashboard cannot offer honest stage buttons beyond crawl, question mapping, and full pipeline
 
 ---
 
 ## 2. Core Design Goal
 
-Refactor the records pipeline so every distinct stage has:
+Refactor the records pipeline so the operator can understand it through durable human-facing artifacts, while the backend still keeps enough provenance to rerun machine sub-stages safely.
+
+Every distinct stage should have:
 
 - a durable artifact boundary on disk
 - a corresponding DB record
 - a stage run record with status and counts
 - enough provenance to rerun that stage without redoing earlier stages
 
-The target outcome is:
+The human-facing target outcome is:
 
 ```text
-seed scope
-=> fetch
-=> triage
-=> accepted source document storage
-=> parse
-=> workflow extraction
-=> question extraction
-=> review / publish
+data
+=> seeds
+=> targeted pages
+=> captured forms
+=> accepted forms
+=> parsed pdf
+=> question mapping
+=> published template
 ```
 
-Each stage should be inspectable, repeatable, and attributable.
+`hospital-submission-requirements` is a derived artifact that can come from:
+
+- the targeted page
+- the accepted form
+- or both together
+
+So it should be persisted, but it should not be forced into a fake single linear step if the evidence is coming from multiple artifacts.
+
+Each artifact boundary should be inspectable, repeatable, and attributable.
 
 ---
 
-## 3. Key Naming Correction
+## 3. Human Model Vs Machine Model
 
-`storage/raw` is misnamed.
+The current repo leaks machine-stage vocabulary into the operator experience.
 
-It is not truly "raw fetch output." It currently behaves more like:
+That is why the system feels harder to understand than it should.
 
-- accepted PDF source-document storage
-- human-readable canonical filenames
-- a reviewable corpus used by downstream parsing and question extraction
+There are really two layers here:
 
-That means the honest rename is:
+### 3.1 Human-Facing Artifact Model
 
 ```text
-storage/raw
-=> storage/source-documents
+data
+=> seeds
+=> targeted pages
+=> captured forms
+=> accepted forms
+=> parsed pdf
+=> question mapping
+=> published template
 ```
 
-Then add new stage-specific directories for artifacts that are actually raw or intermediate.
+Plus a side artifact:
+
+```text
+targeted pages and/or accepted forms
+=> hospital-submission-requirements
+```
+
+### 3.2 Internal Machine Sub-Stages
+
+The backend may still need sub-stages such as:
+
+- `seed_scope`
+- `fetch`
+- `triage`
+- `acceptance`
+- `parse`
+- `hospital_submission_requirements`
+- `question_mapping`
+- `publish_template`
+
+Those machine labels are implementation details.
+
+The operator dashboard and `storage/` layout should primarily reflect the human artifact model, not the machine bookkeeping.
 
 ---
 
@@ -93,36 +129,36 @@ Root:
 
 ```text
 apps/records-workflow-api/storage/
-  seed-scopes/
-  fetch/
-  triage/
-  source-documents/
+  targeted-pages/
+  captured-forms/
+  accepted-forms/
   parsed/
-  workflows/
-  questions/
-  published/
+  hospital-submission-requirements/
+  question-mappings/
+  published-templates/
+  internal/
+    seed-scopes/
+    triage-decisions/
 ```
 
 Detailed tree:
 
 ```text
 apps/records-workflow-api/storage/
-  seed-scopes/
+  targeted-pages/
     tx/
-      <pipeline-stage-run-id>.json
-
-  fetch/
-    tx/
-      <fetch-artifact-id>/
+      <targeted-page-artifact-id>/
         response.html
         response.pdf
         metadata.json
 
-  triage/
+  captured-forms/
     tx/
-      <triage-decision-id>.json
+      <captured-form-id>/
+        source.pdf
+        metadata.json
 
-  source-documents/
+  accepted-forms/
     tx/
       <system-or-facility>-<descriptive-phrase>-<language>[-N].html
       <system-or-facility>-<descriptive-phrase>-<language>[-N].pdf
@@ -131,109 +167,115 @@ apps/records-workflow-api/storage/
     tx/
       <parsed-artifact-id>.json
 
-  workflows/
+  hospital-submission-requirements/
     tx/
       <source-document-id>/
         <extraction-run-id>.json
 
-  questions/
+  question-mappings/
     tx/
       <source-document-id>/
         <extraction-run-id>.json
 
-  published/
+  published-templates/
     tx/
       <source-document-id>/
         v1.json
         v2.json
+
+  internal/
+    seed-scopes/
+      tx/
+        <pipeline-stage-run-id>.json
+
+    triage-decisions/
+      tx/
+        <triage-decision-id>.json
 ```
 
 ### 4.1 Stage Semantics
 
-- `seed-scopes/`
-  - exact inputs for one targeted run
-  - selected system, facility, seed URLs, options
+- `targeted-pages/`
+  - the page snapshots and fetch artifacts a human can inspect when fixing where the crawler should look
+  - this is the discovery layer
 
-- `fetch/`
-  - immutable fetched body plus fetch metadata
-  - this is the true raw stage
+- `captured-forms/`
+  - plausible request forms before they are promoted into the trusted corpus
+  - this is the review queue humans should be able to inspect
 
-- `triage/`
-  - one classification decision per fetched artifact
-  - accepted, skipped, or needs review
-
-- `source-documents/`
-  - accepted canonical document corpus
-  - this replaces current `storage/raw`
+- `accepted-forms/`
+  - canonical approved document corpus
+  - this replaces both `storage/raw` and `storage/source-documents` as the honest primary name
 
 - `parsed/`
   - normalized HTML/PDF payloads used for reruns
   - links, contacts, headings, PDF geometry, parse status
 
-- `workflows/`
-  - workflow extraction output snapshots
+- `hospital-submission-requirements/`
+  - submission requirements derived from targeted pages and/or accepted forms
+  - this is the human-facing replacement for backend-speak like `workflow-extraction`
 
-- `questions/`
-  - PDF question extraction output snapshots
+- `question-mappings/`
+  - PDF question-mapping output snapshots
+  - saved questions, bindings, and repairable mapping drafts
 
-- `published/`
+- `published-templates/`
   - app-consumable approved template versions
+
+- `internal/`
+  - machine bookkeeping only
+  - this is where seed-scope and triage metadata should live so they do not dominate the top-level artifact story
 
 ### 4.2 File Naming Rules
 
-- `fetch/` should be keyed by artifact IDs, not pretty filenames
+- `targeted-pages/` should be keyed by artifact IDs, not pretty filenames
   - it is a provenance layer, not an operator-facing corpus
-- `source-documents/` should keep the current human-readable naming style
+- `captured-forms/` can be keyed by IDs during review
+- `accepted-forms/` should keep the current human-readable naming style
   - this is the operator-facing accepted corpus
-- `parsed/`, `workflows/`, and `questions/` should be keyed by IDs
+- `parsed/`, `hospital-submission-requirements/`, and `question-mappings/` should be keyed by IDs
   - they are machine-managed stage outputs
 
 ---
 
 ## 5. Stage Model
 
-### 5.1 Stage List
+### 5.1 Human-Facing Artifact Stages
 
-The pipeline should be split into these explicit stages:
+The operator should experience the pipeline as:
 
-1. `seed_scope`
-2. `fetch`
-3. `triage`
-4. `source_document_acceptance`
-5. `parse`
-6. `workflow_extraction`
-7. `question_extraction`
-8. `review_publish`
+1. `data`
+2. `seeds`
+3. `targeted_pages`
+4. `captured_forms`
+5. `accepted_forms`
+6. `parsed_pdf`
+7. `hospital_submission_requirements`
+8. `question_mapping`
+9. `published_template`
 
-### 5.2 Why There Is An Acceptance Stage
+### 5.2 Why There Are Still Internal Sub-Stages
 
-The dashboard currently combines "PDF Parse and Storage" into one visible operator checkpoint.
+The backend still needs machine checkpoints such as fetch, triage, and acceptance because the system must distinguish:
 
-Under the hood, we still need one explicit acceptance boundary:
+- what it looked at
+- what it thinks is relevant
+- what a human has accepted into the trusted corpus
 
-- `fetch` artifact is the raw response
-- `triage` decides whether it is allowed downstream
-- `source_document_acceptance` copies the accepted artifact into canonical `source-documents/`
-- `parse` creates the normalized machine-readable payload from the accepted source document
+Those sub-stages should remain inspectable, but they should not be the primary top-level explanation of the system.
 
-That distinction matters because:
+### 5.3 Internal Stage Contracts
 
-- skipped documents must still be reviewable
-- accepted documents need stable canonical paths
-- parse reruns should operate on accepted source documents, not transient fetch blobs
-
-### 5.3 Stage Contracts
-
-| Stage | Reads | Writes | Can Rerun Without Refetch? |
+| Internal Stage | Reads | Writes | Can Rerun Without Refetch? |
 | --- | --- | --- | --- |
-| `seed_scope` | `seed_urls`, manual approvals | `seed-scopes/`, stage run row | yes |
-| `fetch` | seed scope artifact | `fetch/`, fetch tables | no |
-| `triage` | fetch artifact, context | `triage/`, triage table | yes |
-| `source_document_acceptance` | accepted triage decision, fetch artifact | `source-documents/`, `source_documents` row | yes |
-| `parse` | accepted source document | `parsed/`, parsed table | yes |
-| `workflow_extraction` | parsed artifact | `workflows/`, existing workflow tables, `extraction_runs` | yes |
-| `question_extraction` | parsed PDF artifact or accepted PDF source doc | `questions/`, `extraction_runs`, `pdf_question_templates` | yes |
-| `review_publish` | question draft + PDF geometry | `published/`, `pdf_question_template_versions` | yes |
+| `seed_scope` | `seed_urls`, manual approvals | `storage/internal/seed-scopes/`, stage run row | yes |
+| `fetch` | seed scope artifact | `storage/targeted-pages/`, fetch tables | no |
+| `triage` | targeted-page artifact, context | `storage/internal/triage-decisions/`, triage table | yes |
+| `acceptance` | accepted triage decision, targeted-page artifact | `storage/captured-forms/` and/or `storage/accepted-forms/`, `source_documents` row | yes |
+| `parse` | accepted form | `storage/parsed/`, parsed table | yes |
+| `hospital_submission_requirements` | parsed artifact, targeted pages, accepted forms | `storage/hospital-submission-requirements/`, existing workflow tables, `extraction_runs` | yes |
+| `question_mapping` | parsed PDF artifact or accepted PDF source doc | `storage/question-mappings/`, `extraction_runs`, `pdf_question_templates` | yes |
+| `publish_template` | question draft + PDF geometry | `storage/published-templates/`, `pdf_question_template_versions` | yes |
 
 ---
 
@@ -266,11 +308,11 @@ create table if not exists pipeline_stage_runs (
       'seed_scope',
       'fetch',
       'triage',
-      'source_document_acceptance',
+      'acceptance',
       'parse',
-      'workflow_extraction',
-      'question_extraction',
-      'review_publish'
+      'hospital_submission_requirements',
+      'question_mapping',
+      'publish_template'
     )
   ),
   state char(2),
@@ -431,7 +473,7 @@ Purpose:
 
 - make parse a first-class rerunnable stage
 - store normalized HTML/PDF payloads durably
-- let workflow extraction and question extraction replay from parsed artifacts
+- let hospital-submission-requirements and question-mapping replay from parsed artifacts
 
 ## 6.6 `source_documents` Additive Columns
 
@@ -522,28 +564,30 @@ src/services/pipeline/
 
 - `runSeedScopeStage({ state, systemId, facilityId, seedUrl })`
   - reads `seed_urls`
-  - writes `pipeline_stage_runs` + `seed-scopes/`
+  - writes `pipeline_stage_runs` + `storage/internal/seed-scopes/`
 
 - `runFetchStage({ seedScopeStageRunId, maxDepth })`
   - writes `crawl_frontier_items` + `fetch_artifacts`
+  - persists targeted-page artifacts under `storage/targeted-pages/`
 
 - `runTriageStage({ fetchStageRunId })`
   - writes `triage_decisions`
+  - persists machine-only triage summaries under `storage/internal/triage-decisions/`
 
-- `runSourceDocumentAcceptanceStage({ triageStageRunId })`
-  - copies accepted artifacts into `storage/source-documents/`
+- `runAcceptanceStage({ triageStageRunId })`
+  - copies accepted artifacts into `storage/accepted-forms/`
   - creates or updates `source_documents`
 
 - `runParseStage({ sourceDocumentIds | acceptanceStageRunId })`
   - writes `parsed_artifacts`
 
-- `runWorkflowExtractionStage({ sourceDocumentIds | parseStageRunId })`
+- `runHospitalSubmissionRequirementsStage({ sourceDocumentIds | parseStageRunId })`
   - consumes `parsed_artifacts`
-  - writes `extraction_runs`, `records_workflows`, related workflow tables, and `workflows/`
+  - writes `extraction_runs`, `records_workflows`, related workflow tables, and `storage/hospital-submission-requirements/`
 
-- `runQuestionExtractionStage({ sourceDocumentIds | parseStageRunId })`
+- `runQuestionMappingStage({ sourceDocumentIds | parseStageRunId })`
   - consumes parsed PDF artifacts
-  - writes `extraction_runs`, `pdf_question_templates`, and `questions/`
+  - writes `extraction_runs`, `pdf_question_templates`, and `storage/question-mappings/`
 
 - `runFullPipelineForSystem(...)`
   - orchestrates the stages above
@@ -558,10 +602,10 @@ It should become:
 runSeedScopeStage
 => runFetchStage
 => runTriageStage
-=> runSourceDocumentAcceptanceStage
+=> runAcceptanceStage
 => runParseStage
-=> runWorkflowExtractionStage
-=> optionally runQuestionExtractionStage for accepted PDFs
+=> runHospitalSubmissionRequirementsStage
+=> optionally runQuestionMappingStage for accepted PDFs
 ```
 
 The service can still expose one convenience entrypoint named `runCrawl`, but it should only orchestrate stage services.
@@ -570,14 +614,14 @@ The service can still expose one convenience entrypoint named `runCrawl`, but it
 
 ## 8. Dashboard / API Implications
 
-Once the schema above exists, the Pipeline UI can expose honest stage actions:
+Once the schema above exists, the Pipeline UI can expose honest artifact actions:
 
-- `Run Seed Stage`
-- `Run Fetch Stage`
-- `Run Triage Stage`
-- `Run Parse Stage`
-- `Run Workflow Stage`
-- `Run Question Stage`
+- `Run Targeted Pages`
+- `Review Captured Forms`
+- `Promote Accepted Forms`
+- `Run Parse`
+- `Refresh Hospital Submission Requirements`
+- `Refresh Question Mapping`
 
 And each stage card can show:
 
@@ -608,7 +652,7 @@ GET  /internal/parsed-artifacts/:id
 The current `Run Crawl Stage` button can later become a convenience action that runs:
 
 ```text
-fetch + triage + acceptance + parse + workflow extraction
+targeted pages + captured forms + accepted forms + parse + hospital-submission-requirements
 ```
 
 But the UI would no longer be forced to pretend that is the only available control.
@@ -626,28 +670,39 @@ But the UI would no longer be forced to pretend that is the only available contr
 - add `triage_decisions`
 - add `parsed_artifacts`
 - add provenance columns to `source_documents`
-- keep current behavior intact
+- keep current behavior intact while moving machine bookkeeping under `storage/internal/`
 
-### Phase 2: Stop Treating `storage/raw` As Raw
+### Phase 2: Rename The Corpus Honestly
 
-- create `storage/source-documents/`
+- create `storage/accepted-forms/`
 - update helpers so accepted canonical PDFs/HTML write there
-- keep a compatibility reader for legacy `storage/raw/`
+- keep compatibility readers for legacy `storage/source-documents/` and `storage/raw/`
 - migrate path resolution helpers to accept both roots during transition
 
-### Phase 3: Split `runCrawl`
+### Phase 3: Promote Human-Facing Artifact Names
+
+- rename top-level artifact directories to:
+  - `targeted-pages/`
+  - `captured-forms/`
+  - `accepted-forms/`
+  - `hospital-submission-requirements/`
+  - `question-mappings/`
+  - `published-templates/`
+- keep machine-only state under `storage/internal/`
+
+### Phase 4: Split `runCrawl`
 
 - factor stage services out of `crawlService.js`
 - keep `runCrawl` as orchestration only
 - persist stage outputs as they are produced
 
-### Phase 4: Split Dashboard Actions
+### Phase 5: Split Dashboard Actions
 
 - add stage endpoints
 - make Pipeline buttons stage-specific
 - show stage-run history and artifact inspection
 
-### Phase 5: Human Rescue Paths
+### Phase 6: Human Rescue Paths
 
 - add triage override UI
 - add "accept skipped PDF" workflow
@@ -659,21 +714,21 @@ But the UI would no longer be forced to pretend that is the only available contr
 
 If full schema rollout is too much at once, the smallest change set that still unlocks honest stage reruns is:
 
-1. rename `storage/raw` semantics to `storage/source-documents`
-2. persist crawled HTML snapshots to disk, not just manual HTML imports
+1. rename the accepted corpus to `storage/accepted-forms`
+2. persist targeted-page snapshots to disk, not just manual HTML imports
 3. add `source_page_url` to `source_documents`
 4. add `parsed_artifacts`
 5. split out:
    - `runParseStage`
-   - `runWorkflowExtractionStage`
-   - `runQuestionExtractionStage`
+   - `runHospitalSubmissionRequirementsStage`
+   - `runQuestionMappingStage`
 6. stop deleting skipped PDFs and store their triage decisions
 
 This would be enough to make:
 
 - parse reruns
-- workflow reruns
-- question reruns
+- hospital-submission-requirements reruns
+- question-mapping reruns
 - source-page tracing
 
 work correctly, even before a full fetch-frontier refactor lands.
@@ -685,7 +740,7 @@ work correctly, even before a full fetch-frontier refactor lands.
 This spec is satisfied when all of the following are true:
 
 - every pipeline stage writes a durable artifact or summary row
-- the operator can rerun parse, workflow extraction, and question extraction without refetching
+- the operator can rerun parse, hospital-submission-requirements, and question-mapping without refetching
 - the operator can see which page a PDF came from via `source_page_url`
 - skipped PDFs are reviewable instead of disappearing
 - crawled HTML is durably stored and replayable
@@ -699,11 +754,11 @@ This spec is satisfied when all of the following are true:
 Build in this order:
 
 1. `source_page_url` provenance on `source_documents`
-2. crawled HTML snapshot persistence
+2. targeted-page snapshot persistence
 3. `parsed_artifacts` table and storage
 4. `runParseStage`
-5. `runWorkflowExtractionStage`
-6. `runQuestionExtractionStage` using parsed artifacts
+5. `runHospitalSubmissionRequirementsStage`
+6. `runQuestionMappingStage` using parsed artifacts
 7. skipped-document persistence via `triage_decisions`
 8. fetch-frontier persistence
 

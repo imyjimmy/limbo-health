@@ -4,6 +4,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { normalizeStateCode } from './states.js';
 
+const ACCEPTED_FORM_MARKER = '/storage/accepted-forms/';
 const SOURCE_DOCUMENT_MARKER = '/storage/source-documents/';
 const LEGACY_RAW_STORAGE_MARKER = '/storage/raw/';
 
@@ -40,7 +41,8 @@ export function toSourceDocumentRelativePath(
   filePath,
   {
     sourceDocumentStorageDir = config.sourceDocumentStorageDir,
-    legacyRawStorageDir = config.rawStorageDir,
+    legacySourceDocumentStorageDir = config.legacySourceDocumentStorageDir,
+    legacyRawStorageDir = config.legacyRawStorageDir,
   } = {},
 ) {
   if (!filePath) return null;
@@ -50,7 +52,11 @@ export function toSourceDocumentRelativePath(
     return normalizedRelative || null;
   }
 
-  const candidateRoots = [sourceDocumentStorageDir, legacyRawStorageDir].filter(Boolean);
+  const candidateRoots = [
+    sourceDocumentStorageDir,
+    legacySourceDocumentStorageDir,
+    legacyRawStorageDir,
+  ].filter(Boolean);
   for (const root of candidateRoots) {
     const relativePath = path.relative(root, filePath);
     if (relativePath && relativePath !== '' && !relativePath.startsWith('..')) {
@@ -59,7 +65,7 @@ export function toSourceDocumentRelativePath(
   }
 
   const normalizedPath = normalizePathString(filePath);
-  for (const marker of [SOURCE_DOCUMENT_MARKER, LEGACY_RAW_STORAGE_MARKER]) {
+  for (const marker of [ACCEPTED_FORM_MARKER, SOURCE_DOCUMENT_MARKER, LEGACY_RAW_STORAGE_MARKER]) {
     const markerIndex = normalizedPath.lastIndexOf(marker);
     if (markerIndex !== -1) {
       const extracted = normalizedPath.slice(markerIndex + marker.length);
@@ -74,7 +80,8 @@ export function resolveSourceDocumentPath(
   filePath,
   {
     sourceDocumentStorageDir = config.sourceDocumentStorageDir,
-    legacyRawStorageDir = config.rawStorageDir,
+    legacySourceDocumentStorageDir = config.legacySourceDocumentStorageDir,
+    legacyRawStorageDir = config.legacyRawStorageDir,
   } = {},
 ) {
   if (!filePath) return filePath;
@@ -84,6 +91,7 @@ export function resolveSourceDocumentPath(
 
   const relativePath = toSourceDocumentRelativePath(filePath, {
     sourceDocumentStorageDir,
+    legacySourceDocumentStorageDir,
     legacyRawStorageDir,
   });
   if (!relativePath) {
@@ -93,6 +101,11 @@ export function resolveSourceDocumentPath(
   const sourceDocumentPath = path.join(sourceDocumentStorageDir, relativePath);
   if (fs.existsSync(sourceDocumentPath)) {
     return sourceDocumentPath;
+  }
+
+  const legacySourceDocumentPath = path.join(legacySourceDocumentStorageDir, relativePath);
+  if (fs.existsSync(legacySourceDocumentPath)) {
+    return legacySourceDocumentPath;
   }
 
   const legacyRawPath = path.join(legacyRawStorageDir, relativePath);

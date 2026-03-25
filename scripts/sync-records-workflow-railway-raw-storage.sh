@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-LOCAL_RAW_DIR="${1:-$ROOT_DIR/apps/records-workflow-api/storage/raw}"
+LOCAL_RAW_DIR="${1:-$ROOT_DIR/apps/records-workflow-api/storage/accepted-forms}"
 RAILWAY_API_SERVICE="${RAILWAY_RECORDS_WORKFLOW_API_SERVICE:-records-workflow-api}"
 REMOTE_RAW_DIR="${RAILWAY_RECORDS_WORKFLOW_REMOTE_RAW_DIR:-/app/storage/raw}"
 
@@ -16,12 +16,12 @@ if [[ -n "${RAILWAY_ENVIRONMENT_ID:-}" ]]; then
 fi
 
 if [[ ! -d "$LOCAL_RAW_DIR" ]]; then
-  echo "Local raw storage directory not found: $LOCAL_RAW_DIR" >&2
+  echo "Local accepted-form storage directory not found: $LOCAL_RAW_DIR" >&2
   exit 1
 fi
 
 if ! command -v railway >/dev/null 2>&1; then
-  echo "Railway CLI is required to sync raw storage." >&2
+  echo "Railway CLI is required to sync accepted-form storage." >&2
   exit 1
 fi
 

@@ -610,8 +610,8 @@ function buildStateAudit(state, roster, rawSnapshot, seedSnapshot, dbMetrics, ra
     state_name: getStateName(state),
     phase_1_scope_reason:
       rawSnapshot.raw_pdf_file_count > 0
-        ? 'state directory exists under storage/raw and contains PDFs'
-        : 'state has crawl data in the database but no raw PDF directory yet',
+        ? 'state directory exists under the accepted-form corpus and contains PDFs'
+        : 'state has crawl data in the database but no accepted-form PDF directory yet',
     raw_storage: rawSnapshot,
     raw_pdf_snapshot: {
       inferred_facility_candidate_count: rawPdfSnapshot.facility_candidates.length,
