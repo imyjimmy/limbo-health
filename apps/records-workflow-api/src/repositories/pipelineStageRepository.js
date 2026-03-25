@@ -542,9 +542,18 @@ export async function listLatestParsedArtifactsForSystem(
   },
   client = null,
 ) {
+  if (!systemId && (!Array.isArray(sourceDocumentIds) || sourceDocumentIds.length === 0)) {
+    return [];
+  }
+
   const q = client || { query };
-  const params = [systemId];
-  const clauses = ['sd.hospital_system_id = $1'];
+  const params = [];
+  const clauses = [];
+
+  if (systemId) {
+    params.push(systemId);
+    clauses.push(`sd.hospital_system_id = $${params.length}`);
+  }
 
   if (Array.isArray(sourceDocumentIds) && sourceDocumentIds.length > 0) {
     params.push(sourceDocumentIds);

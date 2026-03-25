@@ -295,6 +295,23 @@ describe('pdfFormUnderstandingExtractor', () => {
               { fieldName: 'Genetics', fieldType: 'Text', x: 325, y: 316, width: 37, height: 16 },
               { fieldName: 'HIV', fieldType: 'Text', x: 409, y: 316, width: 37, height: 16 },
               { fieldName: 'Mental Health', fieldType: 'Text', x: 496, y: 316, width: 37, height: 16 },
+              { fieldName: 'summaryabstractonly', fieldType: 'CheckBox', x: 16, y: 260, width: 10, height: 10 },
+              { fieldName: 'clinicnotes', fieldType: 'CheckBox', x: 16, y: 242, width: 10, height: 10 },
+              { fieldName: 'consultations', fieldType: 'CheckBox', x: 194, y: 242, width: 10, height: 10 },
+              { fieldName: 'lab', fieldType: 'CheckBox', x: 358, y: 242, width: 10, height: 10 },
+              { fieldName: 'radioloy images', fieldType: 'CheckBox', x: 523, y: 242, width: 10, height: 10 },
+              { fieldName: 'ED', fieldType: 'CheckBox', x: 16, y: 224, width: 10, height: 10 },
+              { fieldName: 'discharge summary', fieldType: 'CheckBox', x: 194, y: 224, width: 10, height: 10 },
+              { fieldName: 'medication', fieldType: 'CheckBox', x: 358, y: 224, width: 10, height: 10 },
+              { fieldName: 'radiology reports', fieldType: 'CheckBox', x: 523, y: 224, width: 10, height: 10 },
+              { fieldName: 'billing record', fieldType: 'CheckBox', x: 16, y: 206, width: 10, height: 10 },
+              { fieldName: 'history', fieldType: 'CheckBox', x: 194, y: 206, width: 10, height: 10 },
+              { fieldName: 'operative report', fieldType: 'CheckBox', x: 358, y: 206, width: 10, height: 10 },
+              { fieldName: 'complete chart', fieldType: 'CheckBox', x: 16, y: 188, width: 10, height: 10 },
+              { fieldName: 'immunization', fieldType: 'CheckBox', x: 194, y: 188, width: 10, height: 10 },
+              { fieldName: 'progress notes', fieldType: 'CheckBox', x: 358, y: 188, width: 10, height: 10 },
+              { fieldName: 'Release info - other', fieldType: 'CheckBox', x: 16, y: 170, width: 10, height: 10 },
+              { fieldName: 'release other fill', fieldType: 'Text', x: 65, y: 170, width: 420, height: 11 },
             ],
             lineCandidates: [],
             checkboxCandidates: [],
@@ -314,7 +331,6 @@ describe('pdfFormUnderstandingExtractor', () => {
     const questions = result.structuredOutput.form_understanding.questions;
     const labels = questions.map((question) => question.label);
 
-    expect(labels).toContain('Information to be released from these BSWH facilities');
     expect(labels).toContain('If selected, specify provider or location');
     expect(labels).toContain('Treatment date from');
     expect(labels).toContain('Treatment date to');
@@ -322,9 +338,50 @@ describe('pdfFormUnderstandingExtractor', () => {
     expect(labels).toContain('If applicable, enter patient initials for Genetics information');
     expect(labels).toContain('If applicable, enter patient initials for HIV/AIDS information');
     expect(labels).toContain('If applicable, enter patient initials for Mental Health information');
+    expect(labels).toContain('If other, specify what information to release');
     expect(labels).not.toContain('Please specify treatment date range (if applicable)');
     expect(labels).not.toContain(
       'If applicable, specify below if releasing Genetics or HIV/AIDS info',
+    );
+
+    const facilitiesQuestion = questions.find((question) =>
+      question.options?.some((option) =>
+        option.bindings?.some((binding) => binding.field_name === 'Clinic visits'),
+      ),
+    );
+    expect(
+      facilitiesQuestion?.options?.map((option) => option.bindings?.[0]?.field_name),
+    ).toEqual(
+      expect.arrayContaining(['Clinic visits', 'Hospital visits', 'specify provider']),
+    );
+
+    const detailedRecordsQuestion = questions.find((question) =>
+      question.options?.some(
+        (option) =>
+          option.bindings?.some((binding) => binding.field_name === 'summaryabstractonly'),
+      ),
+    );
+    expect(
+      detailedRecordsQuestion?.options?.map((option) => option.bindings?.[0]?.field_name),
+    ).toEqual(
+      expect.arrayContaining([
+        'summaryabstractonly',
+        'clinicnotes',
+        'consultations',
+        'lab',
+        'radioloy images',
+        'ED',
+        'discharge summary',
+        'medication',
+        'radiology reports',
+        'billing record',
+        'history',
+        'operative report',
+        'complete chart',
+        'immunization',
+        'progress notes',
+        'Release info - other',
+      ]),
     );
   });
 

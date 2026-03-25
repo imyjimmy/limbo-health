@@ -102,6 +102,40 @@ function normalizeFieldName(value) {
   return normalizeString(value).toLowerCase();
 }
 
+const CHECKBOX_FIELD_TYPE_PATTERN = /checkbox/i;
+const CHECKBOX_GROUP_MIN_SIZE = 3;
+const CHECKBOX_WIDGET_ROW_TOLERANCE = 4;
+const CHECKBOX_CLUSTER_ROW_GAP = 20;
+const CHECKBOX_LABEL_WORD_TOLERANCE = 5;
+const CHECKBOX_HEADING_LINE_TOLERANCE = 4;
+const CHECKBOX_HEADING_MAX_DISTANCE = 80;
+
+function slugifyQuestionId(value) {
+  return normalizeFieldName(value)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function humanizeFieldName(value) {
+  const trimmed = normalizeString(value);
+  if (!trimmed) return '';
+
+  const collapsed = trimmed.replace(/[_-]+/g, ' ');
+  if (/^[A-Z0-9\s/&().:-]+$/.test(collapsed)) {
+    return collapsed;
+  }
+
+  return collapsed.replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function normalizeRenderableWord(value) {
+  return normalizeString(value).replace(/[^\p{L}\p{N}&/().,:-]+/gu, ' ').trim();
+}
+
+function isCheckboxWidget(widget) {
+  return CHECKBOX_FIELD_TYPE_PATTERN.test(normalizeFieldName(widget?.fieldType));
+}
+
 function buildRawShortTextQuestion({
   id,
   label,
@@ -172,6 +206,387 @@ function getBindingFieldNames(question) {
     .filter((binding) => binding?.type === 'field_text' || binding?.type === 'field_checkbox')
     .map((binding) => normalizeFieldName(binding.field_name))
     .filter(Boolean);
+}
+
+function buildWordLines(words = []) {
+  const rows = [];
+  const sortedWords = [...words]
+    .map((word) => ({
+      ...word,
+      renderedText: normalizeRenderableWord(word?.text || ''),
+    }))
+    .filter((word) => word.renderedText)
+    .sort((left, right) => right.y - left.y || left.x - right.x);
+
+  for (const word of sortedWords) {
+    let matchedRow = null;
+
+    for (const row of rows) {
+      if (Math.abs(row.y - word.y) <= CHECKBOX_HEADING_LINE_TOLERANCE) {
+        matchedRow = row;
+        break;
+      }
+    }
+
+    if (!matchedRow) {
+      matchedRow = {
+        y: word.y,
+        words: [],
+      };
+      rows.push(matchedRow);
+    }
+
+    matchedRow.words.push(word);
+  }
+
+  return rows
+    .map((row) => {
+      const words = row.words.sort((left, right) => left.x - right.x);
+      return {
+        y: row.y,
+        x1: Math.min(...words.map((word) => Number(word.x || 0))),
+        x2: Math.max(...words.map((word) => Number(word.x || 0) + Number(word.width || 0))),
+        text: words.map((word) => word.renderedText).join(' ').replace(/\s+/g, ' ').trim(),
+        words,
+      };
+    })
+    .filter((row) => row.text);
+}
+
+function buildInlineHeadingText(words, minX) {
+  return words
+    .filter((word) => Number(word.x || 0) + Number(word.width || 0) <= minX - 4)
+    .map((word) => normalizeRenderableWord(word.text || ''))
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildCheckboxClusters(page) {
+  const wordLines = buildWordLines(page?.words || []);
+  const rows = [];
+
+  for (const widget of page?.widgets || []) {
+    if (!isCheckboxWidget(widget) || !normalizeFieldName(widget?.fieldName)) {
+      continue;
+    }
+
+    let matchedRow = null;
+    for (const row of rows) {
+      if (Math.abs(row.y - Number(widget.y || 0)) <= CHECKBOX_WIDGET_ROW_TOLERANCE) {
+        matchedRow = row;
+        break;
+      }
+    }
+
+    if (!matchedRow) {
+      matchedRow = {
+        y: Number(widget.y || 0),
+        widgets: [],
+      };
+      rows.push(matchedRow);
+    }
+
+    matchedRow.widgets.push(widget);
+  }
+
+  const sortedRows = rows
+    .map((row) => {
+      const widgets = row.widgets.sort((left, right) => left.x - right.x);
+      const minX = Math.min(...widgets.map((widget) => Number(widget.x || 0)));
+      const lineWords =
+        wordLines.find((line) => Math.abs(Number(line.y || 0) - row.y) <= CHECKBOX_LABEL_WORD_TOLERANCE)
+          ?.words || [];
+
+      return {
+        ...row,
+        widgets,
+        inlineHeadingText: buildInlineHeadingText(lineWords, minX),
+      };
+    })
+    .sort((left, right) => right.y - left.y);
+
+  const clusters = [];
+  let currentCluster = [];
+  let previousRow = null;
+
+  for (const row of sortedRows) {
+    const startsNewCluster =
+      !previousRow ||
+      previousRow.y - row.y > CHECKBOX_CLUSTER_ROW_GAP ||
+      Boolean(row.inlineHeadingText);
+
+    if (startsNewCluster) {
+      if (currentCluster.length >= CHECKBOX_GROUP_MIN_SIZE) {
+        clusters.push(currentCluster);
+      }
+      currentCluster = [...row.widgets];
+    } else {
+      currentCluster.push(...row.widgets);
+    }
+
+    previousRow = row;
+  }
+
+  if (currentCluster.length >= CHECKBOX_GROUP_MIN_SIZE) {
+    clusters.push(currentCluster);
+  }
+
+  return clusters;
+}
+
+function buildCheckboxFieldNameSet(cluster) {
+  return new Set(
+    cluster.map((widget) => normalizeFieldName(widget?.fieldName)).filter(Boolean),
+  );
+}
+
+function normalizeCheckboxOptionLabel(label, fieldName) {
+  const normalizedLabel = normalizeString(label)
+    .replace(/^\(+|\)+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (/^other:?$/i.test(normalizedLabel)) {
+    return 'Other (please specify)';
+  }
+
+  return normalizedLabel || humanizeFieldName(fieldName);
+}
+
+function cleanCheckboxPromptLabel(label) {
+  return normalizeString(label)
+    .replace(/\s*:\s*from\s+to(?=\s*\(select all that apply\):?$)/i, '')
+    .replace(/\s+from\s+to(?=\s*\(select all that apply\):?$)/i, '')
+    .replace(/\s*:\s*from\s+to\s*$/i, '')
+    .replace(/\s+from\s+to\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function buildClusterOption(widget, rowWidgets, page) {
+  const sortedRowWidgets = [...rowWidgets].sort((left, right) => left.x - right.x);
+  const widgetIndex = sortedRowWidgets.findIndex((candidate) => candidate === widget);
+  const nextWidget = widgetIndex >= 0 ? sortedRowWidgets[widgetIndex + 1] || null : null;
+  const labelWords = (page?.words || [])
+    .filter((word) => Math.abs(Number(word.y || 0) - Number(widget.y || 0)) <= CHECKBOX_LABEL_WORD_TOLERANCE)
+    .filter((word) => Number(word.x || 0) >= Number(widget.x || 0) + Number(widget.width || 0) + 2)
+    .filter((word) => !nextWidget || Number(word.x || 0) < Number(nextWidget.x || 0) - 4)
+    .sort((left, right) => left.x - right.x);
+
+  const derivedLabel = labelWords.map((word) => normalizeRenderableWord(word.text || '')).filter(Boolean).join(' ');
+  const label = normalizeCheckboxOptionLabel(derivedLabel || widget?.fieldLabel || '', widget?.fieldName);
+
+  if (!label) return null;
+
+  return {
+    id: slugifyQuestionId(label || widget.fieldName) || slugifyQuestionId(widget.fieldName),
+    label,
+    fieldName: widget.fieldName,
+  };
+}
+
+function buildCheckboxClusterPrompt(cluster, page) {
+  const minX = Math.min(...cluster.map((widget) => Number(widget.x || 0)));
+  const maxX = Math.max(...cluster.map((widget) => Number(widget.x || 0) + Number(widget.width || 0)));
+  const maxY = Math.max(...cluster.map((widget) => Number(widget.y || 0)));
+  const lines = buildWordLines(page?.words || []);
+  const inlineHeading = buildInlineHeadingText(
+    lines.find((line) => Math.abs(Number(line.y || 0) - maxY) <= CHECKBOX_LABEL_WORD_TOLERANCE)
+      ?.words || [],
+    minX,
+  );
+
+  if (inlineHeading) {
+    const cleanedInlineHeading = cleanCheckboxPromptLabel(inlineHeading);
+    return {
+      label: /\b(select|apply|choose|check)\b/i.test(cleanedInlineHeading)
+        ? cleanedInlineHeading
+        : `${cleanedInlineHeading.replace(/:\s*$/, '')} (select all that apply):`,
+      helpText: null,
+    };
+  }
+
+  const candidates = lines
+    .filter((line) => line.y > maxY + 4 && line.y <= maxY + CHECKBOX_HEADING_MAX_DISTANCE)
+    .filter((line) => line.x2 >= minX - 24 && line.x1 <= maxX + 220)
+    .map((line) => {
+      const text = normalizeString(line.text);
+      let score = /:/.test(text) ? 2 : 0;
+      if (/\b(select|apply|choose|release|records?|information|facilit|disclosure|purpose|delivery)\b/i.test(text)) {
+        score += 3;
+      }
+      if (/\bfollowing\b/i.test(text)) {
+        score += 2;
+      }
+      if (/\bif applicable\b/i.test(text)) {
+        score -= 2;
+      }
+      if (/\binitials?\b/i.test(text) || /_{3,}/.test(text)) {
+        score -= 4;
+      }
+      return {
+        ...line,
+        score,
+      };
+    })
+    .sort((left, right) => right.score - left.score || left.y - right.y);
+
+  const primary = candidates[0]?.text ? normalizeString(candidates[0].text) : '';
+  const secondary = candidates[1]?.text ? normalizeString(candidates[1].text) : null;
+
+  let label = primary;
+  if (!label) {
+    label = 'Select all that apply:';
+  } else if (!/\b(select|apply|choose|check)\b/i.test(label)) {
+    label = `${label.replace(/:\s*$/, '')} (select all that apply):`;
+  }
+  label = cleanCheckboxPromptLabel(label);
+
+  return {
+    label,
+    helpText: secondary && secondary !== primary ? secondary : null,
+  };
+}
+
+function buildCheckboxClusterQuestion(cluster, page) {
+  const rows = [];
+  const sortedCluster = [...cluster].sort((left, right) => right.y - left.y || left.x - right.x);
+
+  for (const widget of sortedCluster) {
+    let matchedRow = null;
+
+    for (const row of rows) {
+      if (Math.abs(row.y - Number(widget.y || 0)) <= CHECKBOX_WIDGET_ROW_TOLERANCE) {
+        matchedRow = row;
+        break;
+      }
+    }
+
+    if (!matchedRow) {
+      matchedRow = {
+        y: Number(widget.y || 0),
+        widgets: [],
+      };
+      rows.push(matchedRow);
+    }
+
+    matchedRow.widgets.push(widget);
+  }
+
+  const options = rows
+    .sort((left, right) => right.y - left.y)
+    .flatMap((row) => row.widgets.sort((left, right) => left.x - right.x))
+    .map((widget) => buildClusterOption(widget, rows.find((row) => row.widgets.includes(widget))?.widgets || [], page))
+    .filter(Boolean);
+
+  if (options.length < CHECKBOX_GROUP_MIN_SIZE) {
+    return null;
+  }
+
+  const { label, helpText } = buildCheckboxClusterPrompt(cluster, page);
+  const questionIdSeed = [
+    label,
+    ...options.slice(0, 3).map((option) => option.fieldName),
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return buildRawMultiSelectQuestion({
+    id:
+      slugifyQuestionId(questionIdSeed) ||
+      `checkbox-cluster-page-${Number(page?.pageIndex || 0)}`,
+    label,
+    required: false,
+    helpText,
+    confidence: 0.97,
+    options,
+  });
+}
+
+function buildQuestionOptionFieldNameMap(question) {
+  const optionFieldNames = new Map();
+  for (const option of question?.options || []) {
+    const fieldName = normalizeFieldName(option?.bindings?.[0]?.field_name);
+    if (fieldName) {
+      optionFieldNames.set(fieldName, option);
+    }
+  }
+  return optionFieldNames;
+}
+
+function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
+  const synthesizedQuestion = buildCheckboxClusterQuestion(cluster, page);
+  if (!synthesizedQuestion) return question;
+
+  const existingOptionFieldNames = buildQuestionOptionFieldNameMap(question);
+  const coveredClusterFieldCount = (synthesizedQuestion.options || []).filter((option) =>
+    existingOptionFieldNames.has(normalizeFieldName(option?.bindings?.[0]?.field_name)),
+  ).length;
+  const mergedOptions = [];
+  const seenFieldNames = new Set();
+
+  for (const option of synthesizedQuestion.options || []) {
+    const fieldName = normalizeFieldName(option?.bindings?.[0]?.field_name);
+    if (!fieldName || seenFieldNames.has(fieldName)) continue;
+    seenFieldNames.add(fieldName);
+
+    const existingOption = existingOptionFieldNames.get(fieldName);
+    mergedOptions.push(
+      existingOption
+        ? {
+            ...existingOption,
+            label: normalizeString(existingOption.label) || option.label,
+            bindings:
+              Array.isArray(existingOption.bindings) && existingOption.bindings.length > 0
+                ? existingOption.bindings
+                : option.bindings,
+          }
+        : option,
+    );
+  }
+
+  for (const option of question?.options || []) {
+    const fieldName = normalizeFieldName(option?.bindings?.[0]?.field_name);
+    if (!fieldName || seenFieldNames.has(fieldName)) continue;
+    seenFieldNames.add(fieldName);
+    mergedOptions.push(option);
+  }
+
+  return {
+    ...question,
+    kind: 'multi_select',
+    label:
+      coveredClusterFieldCount < (synthesizedQuestion.options || []).length
+        ? synthesizedQuestion.label
+        : normalizeString(question?.label) || synthesizedQuestion.label,
+    help_text:
+      coveredClusterFieldCount < (synthesizedQuestion.options || []).length
+        ? synthesizedQuestion.help_text || null
+        : normalizeString(question?.help_text || '') || synthesizedQuestion.help_text || null,
+    confidence: question?.confidence || synthesizedQuestion.confidence || 0.97,
+    bindings: mergedOptions.flatMap((option) => option.bindings || []),
+    options: mergedOptions,
+  };
+}
+
+function findBestMatchingCheckboxQuestionIndex(questions, clusterFieldNames) {
+  let bestIndex = -1;
+  let bestOverlap = 0;
+
+  questions.forEach((question, index) => {
+    const overlap = getBindingFieldNames(question).filter((fieldName) =>
+      clusterFieldNames.has(fieldName),
+    ).length;
+
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      bestIndex = index;
+    }
+  });
+
+  return bestIndex;
 }
 
 function buildFieldQuestionDefinition(fieldName, fieldLabel = '', confidence = 0.97) {
@@ -340,48 +755,30 @@ function addMissingWidgetQuestions(output, parsedPdf) {
   );
   const questions = [...(Array.isArray(output?.questions) ? output.questions : [])];
 
-  const facilityFieldNames = ['clinic visits', 'hospital visits', 'specify provider'];
-  const hasFacilitiesQuestion = facilityFieldNames.every((fieldName) => existingFieldNames.has(fieldName));
-
-  if (!hasFacilitiesQuestion) {
-    const facilityWidgets = [];
-    for (const page of parsedPdf?.pages || []) {
-      for (const widget of page.widgets || []) {
-        const normalizedFieldName = normalizeFieldName(widget?.fieldName);
-        if (!facilityFieldNames.includes(normalizedFieldName)) continue;
-        facilityWidgets.push(widget);
-      }
-    }
-
-    if (facilityWidgets.length === facilityFieldNames.length) {
-      questions.push(
-        buildRawMultiSelectQuestion({
-          id: 'facilities_records_to_release',
-          label: 'Information to be released from these BSWH facilities',
-          required: true,
-          helpText: 'Select all that apply.',
-          confidence: 0.97,
-          options: [
-            {
-              id: 'clinic_visits',
-              label: 'Clinic visits',
-              fieldName: 'Clinic visits',
-            },
-            {
-              id: 'hospital_visits',
-              label: 'Hospital visits',
-              fieldName: 'Hospital visits',
-            },
-            {
-              id: 'specify_provider',
-              label: 'Specify provider or location',
-              fieldName: 'specify provider',
-            },
-          ],
-        }),
+  for (const page of parsedPdf?.pages || []) {
+    for (const cluster of buildCheckboxClusters(page)) {
+      const clusterFieldNames = buildCheckboxFieldNameSet(cluster);
+      const matchingQuestionIndex = findBestMatchingCheckboxQuestionIndex(
+        questions,
+        clusterFieldNames,
       );
 
-      for (const fieldName of facilityFieldNames) {
+      if (matchingQuestionIndex >= 0) {
+        questions[matchingQuestionIndex] = mergeCheckboxClusterIntoQuestion(
+          questions[matchingQuestionIndex],
+          cluster,
+          page,
+        );
+        for (const fieldName of getBindingFieldNames(questions[matchingQuestionIndex])) {
+          existingFieldNames.add(fieldName);
+        }
+        continue;
+      }
+
+      const synthesizedQuestion = buildCheckboxClusterQuestion(cluster, page);
+      if (!synthesizedQuestion) continue;
+      questions.push(synthesizedQuestion);
+      for (const fieldName of getBindingFieldNames(synthesizedQuestion)) {
         existingFieldNames.add(fieldName);
       }
     }

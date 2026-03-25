@@ -100,29 +100,51 @@ async function loadLatestParsedArtifact(sourceDocument, client = null) {
   return result.rows[0] || null;
 }
 
+async function loadPersistedParsedDocument(sourceDocument, client = null) {
+  const parsedArtifact = await loadLatestParsedArtifact(sourceDocument, client);
+  if (!parsedArtifact?.storage_path) {
+    return {
+      parsedArtifact: null,
+      parsedDocument: null,
+    };
+  }
+
+  try {
+    const artifactPayload = JSON.parse(
+      await fs.readFile(resolveParsedArtifactPath(parsedArtifact.storage_path), 'utf8'),
+    );
+    return {
+      parsedArtifact,
+      parsedDocument: artifactPayload?.parsed_document || null,
+    };
+  } catch (error) {
+    console.warn('Failed to load persisted parsed artifact for question review:', {
+      sourceDocumentId: sourceDocument?.id || null,
+      parsedArtifactId: parsedArtifact.id,
+      storagePath: parsedArtifact.storage_path,
+      error,
+    });
+    return {
+      parsedArtifact,
+      parsedDocument: null,
+    };
+  }
+}
+
 async function loadPdfGeometry(sourceDocument, client = null) {
   if (!sourceDocument?.storage_path || sourceDocument?.source_type !== 'pdf') {
     return null;
   }
 
-  const parsedArtifact = await loadLatestParsedArtifact(sourceDocument, client);
+  const { parsedArtifact, parsedDocument: parsed } = await loadPersistedParsedDocument(
+    sourceDocument,
+    client,
+  );
   if (!parsedArtifact?.storage_path) {
     return null;
   }
 
-  let parsed = null;
-  try {
-    const artifactPayload = JSON.parse(
-      await fs.readFile(resolveParsedArtifactPath(parsedArtifact.storage_path), 'utf8'),
-    );
-    parsed = artifactPayload?.parsed_document || null;
-  } catch (error) {
-    console.warn('Failed to load persisted parsed artifact for question review:', {
-      sourceDocumentId: sourceDocument.id,
-      parsedArtifactId: parsedArtifact.id,
-      storagePath: parsedArtifact.storage_path,
-      error,
-    });
+  if (!parsed) {
     return {
       parse_status: 'artifact_missing',
       page_count: 0,
@@ -744,11 +766,17 @@ export async function reextractQuestionReview(
   }
 
   const resolvedPath = resolveSourceDocumentPath(sourceDocument.storage_path);
-  const buffer = await fs.readFile(resolvedPath);
-  const parsedPdf = await parsePdfDocument({
-    buffer,
-    filePath: resolvedPath,
-  });
+  const { parsedDocument: persistedParsedPdf } = await loadPersistedParsedDocument(sourceDocument);
+  let parsedPdf = persistedParsedPdf;
+
+  if (!parsedPdf) {
+    const buffer = await fs.readFile(resolvedPath);
+    parsedPdf = await parsePdfDocument({
+      buffer,
+      filePath: resolvedPath,
+    });
+  }
+
   const extraction = await extractPdfFormUnderstanding({
     parsedPdf,
     hospitalSystemName: sourceDocument.system_name,
