@@ -303,6 +303,21 @@ async function loadStateSystemStats(state) {
          from source_documents
          group by hospital_system_id
        ),
+       captured_form_counts as (
+         select
+           hospital_system_id,
+           count(
+             distinct coalesce(
+               nullif(lower(btrim(content_hash)), ''),
+               nullif(lower(btrim(final_url)), ''),
+               nullif(lower(btrim(requested_url)), ''),
+               id::text
+             )
+           )::int as captured_forms
+         from fetch_artifacts
+         where source_type = 'pdf'
+         group by hospital_system_id
+       ),
        workflow_counts as (
          select
            hospital_system_id,
@@ -319,6 +334,7 @@ async function loadStateSystemStats(state) {
          coalesce(sdc.source_documents, 0)::int as source_documents,
          coalesce(sdc.html_source_documents, 0)::int as html_source_documents,
          coalesce(sdc.pdf_source_documents, 0)::int as pdf_source_documents,
+         coalesce(cfc.captured_forms, 0)::int as captured_forms,
          coalesce(wc.workflows, 0)::int as workflows,
          sdc.last_crawl_at
        from hospital_systems hs
@@ -326,6 +342,8 @@ async function loadStateSystemStats(state) {
          on fc.hospital_system_id = hs.id
        left join source_document_counts sdc
          on sdc.hospital_system_id = hs.id
+       left join captured_form_counts cfc
+         on cfc.hospital_system_id = hs.id
        left join workflow_counts wc
          on wc.hospital_system_id = hs.id
        where hs.state = $1
@@ -536,6 +554,7 @@ export async function listStateSystems(state) {
           source_documents: toInt(dbSystem?.source_documents),
           html_source_documents: toInt(dbSystem?.html_source_documents),
           pdf_source_documents: toInt(dbSystem?.pdf_source_documents),
+          captured_forms: toInt(dbSystem?.captured_forms),
           workflows: toInt(dbSystem?.workflows),
           draft_templates: toInt(templateStats?.draft_templates),
           approved_templates: toInt(templateStats?.approved_templates),

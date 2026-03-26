@@ -380,8 +380,12 @@
           @apply mt-1 text-xs text-gray-500;
         }
 
+        .system-meta-row {
+          @apply mt-1 flex flex-wrap items-center gap-2;
+        }
+
         .system-subtext-link {
-          @apply mt-1 block max-w-full break-all text-xs font-medium text-gray-500 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-700;
+          @apply max-w-full break-all text-xs font-medium text-gray-500 underline decoration-gray-300 underline-offset-4 transition hover:text-gray-700;
         }
 
         .system-link {
@@ -594,6 +598,47 @@
 
         .pdf-result-card {
           @apply rounded-xl border border-gray-200 bg-white p-4;
+        }
+
+        .results-accordion-item {
+          @apply rounded-2xl border border-gray-200 bg-white p-4;
+        }
+
+        .results-accordion-item-open {
+          @apply shadow-sm;
+        }
+
+        .results-accordion-head {
+          @apply flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between;
+        }
+
+        .results-accordion-toggle {
+          @apply flex min-w-0 flex-1 items-start justify-between gap-4 rounded-xl text-left transition hover:bg-gray-50 px-1 py-1;
+        }
+
+        .results-accordion-copy {
+          @apply min-w-0;
+        }
+
+        .results-accordion-title {
+          @apply text-lg font-semibold text-gray-900;
+        }
+
+        .results-accordion-meta {
+          @apply flex shrink-0 items-center gap-3 pt-1;
+        }
+
+        .results-accordion-chevron {
+          @apply text-lg font-semibold text-gray-400;
+          line-height: 1;
+        }
+
+        .results-accordion-action {
+          @apply shrink-0;
+        }
+
+        .results-accordion-body {
+          @apply mt-4 space-y-4;
         }
 
         .pdf-result-button {

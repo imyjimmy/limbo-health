@@ -166,12 +166,19 @@ const state = {
   systemSourcePageEditor: null,
   systemPdfUploadTarget: null,
   systemPdfUploadInFlightKey: null,
+  pipelineResultsExpanded: {
+    targeted_pages: false,
+    captured_forms: false,
+    accepted_forms: false,
+  },
   pipelineRunResult: null,
   pipelineActionInFlight: null,
   pdfEditorReview: null,
   pdfEditorDraftPayload: null,
   pdfEditorQuestions: [],
+  pdfEditorSignatureAreas: [],
   pdfEditorActiveQuestionId: null,
+  pdfEditorActiveRectKey: null,
   pdfEditorRenderedPages: [],
   pdfEditorAuthoringOpen: false,
   pdfEditorDrawMode: false,
@@ -1199,7 +1206,9 @@ function resetPdfEditorState() {
   state.pdfEditorReview = null;
   state.pdfEditorDraftPayload = null;
   state.pdfEditorQuestions = [];
+  state.pdfEditorSignatureAreas = [];
   state.pdfEditorActiveQuestionId = null;
+  state.pdfEditorActiveRectKey = null;
   state.pdfEditorRenderedPages = [];
   state.pdfEditorAuthoringOpen = false;
   state.pdfEditorInteractionMode = null;
@@ -1286,6 +1295,26 @@ function deriveReachability(system) {
   }
 
   return { label: 'Needs assist', tone: 'red' };
+}
+
+function deriveResultsSummary(system) {
+  const acceptedForms = Number(system?.stats?.pdf_source_documents || 0);
+  const capturedForms = Number(system?.stats?.captured_forms || 0);
+
+  let tone = 'red';
+  if (capturedForms > 0 && acceptedForms === capturedForms) {
+    tone = 'green';
+  } else if (acceptedForms > 0 || capturedForms > 0) {
+    tone = 'yellow';
+  }
+
+  return {
+    acceptedForms,
+    capturedForms,
+    tone,
+    label: `${formatNumber(acceptedForms)}/${formatNumber(capturedForms)}`,
+    title: `${formatNumber(acceptedForms)} accepted forms / ${formatNumber(capturedForms)} captured forms`,
+  };
 }
 
 function deriveSystemUrl(system) {
@@ -2207,9 +2236,8 @@ function renderSystemsTable() {
       <thead>
         <tr>
           <th class="data-head min-w-[12.5rem] w-[24%]">${renderSystemSortHeader('System', 'system_name')}</th>
-          <th class="data-head min-w-[10rem]">${renderSystemSortHeader('Bot Reachability', 'reachability')}</th>
           <th class="data-head min-w-[5.5rem] w-[6.5rem]">${renderSystemSortHeader('PDF Link', 'pdf_links')}</th>
-          <th class="data-head min-w-[6.5rem] text-center">Results</th>
+          <th class="data-head min-w-[7rem] text-center">Accepted / Captured</th>
           <th class="data-head min-w-[4.5rem]">${renderSystemSortHeader('PDFs', 'pdf_source_documents')}</th>
           <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Source Docs', 'source_documents')}</th>
           <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Workflows', 'workflows')}</th>
@@ -2221,6 +2249,7 @@ function renderSystemsTable() {
         ${systems
           .map((system) => {
             const reachability = deriveReachability(system);
+            const resultsSummary = deriveResultsSummary(system);
             const entryUrl = deriveSystemUrl(system);
             const failures = systemFailures(system);
             const isSelected =
@@ -2237,14 +2266,14 @@ function renderSystemsTable() {
               <tr class="${rowClass}" ${system.hospital_system_id ? `data-system-id="${escapeHtml(system.hospital_system_id)}"` : ''}>
                 <td class="data-cell system-cell">
                   <div class="system-name">${escapeHtml(system.system_name)}</div>
-                  ${
-                    entryUrl
-                      ? `<a class="system-subtext-link" href="${escapeHtml(entryUrl)}" target="_blank" rel="noreferrer">${escapeHtml(system.domain || entryUrl)}</a>`
-                      : `<div class="system-subtext">${escapeHtml(system.domain || 'No canonical domain')}</div>`
-                  }
-                </td>
-                <td class="data-cell">
-                  <span class="${statusPillClass(reachability.tone)}">${escapeHtml(reachability.label)}</span>
+                  <div class="system-meta-row">
+                    ${
+                      entryUrl
+                        ? `<a class="system-subtext-link" href="${escapeHtml(entryUrl)}" target="_blank" rel="noreferrer">${escapeHtml(system.domain || entryUrl)}</a>`
+                        : `<div class="system-subtext">${escapeHtml(system.domain || 'No canonical domain')}</div>`
+                    }
+                    <span class="${statusPillClass(reachability.tone)}">${escapeHtml(reachability.label)}</span>
+                  </div>
                 </td>
                 <td class="data-cell pdf-link-cell">
                   ${renderSystemPdfPageLinks(system)}
@@ -2252,7 +2281,7 @@ function renderSystemsTable() {
                 <td class="data-cell text-center">
                   ${
                     system.hospital_system_id
-                      ? `<button type="button" class="ghost-button" data-action="open-system-results" data-system-id="${escapeHtml(system.hospital_system_id)}">Results</button>`
+                      ? `<span class="${statusPillClass(resultsSummary.tone)}" title="${escapeHtml(resultsSummary.title)}">${escapeHtml(resultsSummary.label)}</span>`
                       : '<span class="system-subtext">Unavailable</span>'
                   }
                 </td>
@@ -2735,44 +2764,82 @@ function capturedFormTone(form) {
   return 'yellow';
 }
 
+function pipelineResultsSectionExpanded(sectionId, { force = false } = {}) {
+  if (force) return true;
+  return Boolean(state.pipelineResultsExpanded?.[sectionId]);
+}
+
+function renderPipelineResultsAccordionSection({
+  sectionId,
+  kicker,
+  title,
+  copy,
+  countLabel,
+  countValue,
+  actionMarkup = '',
+  bodyMarkup = '',
+  forceExpanded = false,
+} = {}) {
+  const expanded = pipelineResultsSectionExpanded(sectionId, { force: forceExpanded });
+  const chevron = expanded ? '▾' : '▸';
+
+  return `
+    <section class="results-accordion-item${expanded ? ' results-accordion-item-open' : ''}">
+      <div class="results-accordion-head">
+        <button
+          type="button"
+          class="results-accordion-toggle"
+          data-action="toggle-results-accordion"
+          data-section-id="${escapeHtml(sectionId || '')}"
+          aria-expanded="${expanded ? 'true' : 'false'}"
+        >
+          <div class="results-accordion-copy">
+            <p class="section-kicker">${escapeHtml(kicker || '')}</p>
+            <h4 class="results-accordion-title">${escapeHtml(title || '')}</h4>
+            <p class="section-copy">${escapeHtml(copy || '')}</p>
+          </div>
+          <div class="results-accordion-meta">
+            <span class="status-pill status-yellow">${escapeHtml(String(countValue ?? 0))} ${escapeHtml(countLabel || 'items')}</span>
+            <span class="results-accordion-chevron" aria-hidden="true">${chevron}</span>
+          </div>
+        </button>
+        ${actionMarkup ? `<div class="results-accordion-action">${actionMarkup}</div>` : ''}
+      </div>
+      ${expanded ? `<div class="results-accordion-body">${bodyMarkup}</div>` : ''}
+    </section>
+  `;
+}
+
 function renderTargetedPagesSection(system) {
   const seedUrls = currentSeedUrls();
   const addEditor = currentTargetedPageEditor(null);
+  const hasInlineEditor = Boolean(addEditor || seedUrls.some((seed) => currentTargetedPageEditor(seed.id)));
   const emptyState = `
     <div class="empty-state">
       No targeted pages are active for ${escapeHtml(system.system_name)} yet. Add the page that should drive request discovery for this system.
     </div>
   `;
 
-  return `
-    <section class="space-y-4">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p class="section-kicker">Targeted Pages</p>
-          <h4 class="text-lg font-semibold text-gray-900">Choose the page the crawler should trust</h4>
-          <p class="section-copy">These are the operator-controlled pages that seed request discovery for the selected hospital system.</p>
-        </div>
-        ${
-          addEditor
-            ? ''
-            : `<button
-                type="button"
-                class="ghost-button"
-                data-action="add-targeted-page"
-                data-system-id="${escapeHtml(system.hospital_system_id || '')}"
-                data-system-name="${escapeHtml(system.system_name || '')}"
-                data-system-state="${escapeHtml(system.state || state.currentState || '')}"
-                data-system-domain="${escapeHtml(system.domain || system.canonical_domain || '')}"
-              >
-                Add Targeted Page
-              </button>`
-        }
-      </div>
-      ${addEditor ? `<article class="pdf-result-card">${renderInlineSourcePageEditor(addEditor, 'Save Page')}</article>` : ''}
-      ${
-        seedUrls.length === 0
-          ? emptyState
-          : `<div class="pdf-results-grid">
+  const actionMarkup = addEditor
+    ? ''
+    : `<button
+        type="button"
+        class="ghost-button"
+        data-action="add-targeted-page"
+        data-system-id="${escapeHtml(system.hospital_system_id || '')}"
+        data-system-name="${escapeHtml(system.system_name || '')}"
+        data-system-state="${escapeHtml(system.state || state.currentState || '')}"
+        data-system-domain="${escapeHtml(system.domain || system.canonical_domain || '')}"
+      >
+        Add Targeted Page
+      </button>`;
+
+  const bodyMarkup = `
+    ${addEditor ? `<article class="pdf-result-card">${renderInlineSourcePageEditor(addEditor, 'Save Page')}</article>` : ''}
+    ${
+      seedUrls.length === 0
+        ? emptyState
+        : `<div class="pdf-results-grid">
               ${seedUrls
                 .map((seed) => {
                   const editor = currentTargetedPageEditor(seed.id);
@@ -2844,38 +2911,42 @@ function renderTargetedPagesSection(system) {
                 })
                 .join('')}
             </div>`
-      }
-    </section>
+    }
   `;
+
+  return renderPipelineResultsAccordionSection({
+    sectionId: 'targeted_pages',
+    kicker: 'Targeted Pages',
+    title: 'Choose the page the crawler should trust',
+    copy: 'These are the operator-controlled pages that seed request discovery for the selected hospital system.',
+    countLabel: 'pages',
+    countValue: seedUrls.length,
+    actionMarkup,
+    bodyMarkup,
+    forceExpanded: hasInlineEditor,
+  });
 }
 
 function renderCapturedFormsSection(system) {
   const capturedForms = currentCapturedForms();
 
-  return `
-    <section class="space-y-4">
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p class="section-kicker">Captured Forms</p>
-          <h4 class="text-lg font-semibold text-gray-900">Review candidate PDFs before promotion</h4>
-          <p class="section-copy">These are fetched PDF artifacts for the selected system. Promote the right one, flag weak captures, or skip junk.</p>
-        </div>
-        <button
-          type="button"
-          class="ghost-button"
-          data-action="upload-system-pdf"
-          data-system-id="${escapeHtml(system.hospital_system_id || '')}"
-          data-system-name="${escapeHtml(system.system_name || '')}"
-          data-system-state="${escapeHtml(system.state || state.currentState || '')}"
-          data-source-view="results"
-        >
-          Upload Captured PDF
-        </button>
-      </div>
-      ${
-        capturedForms.length === 0
-          ? `<div class="empty-state">No captured PDF forms are available for ${escapeHtml(system.system_name)} yet. Refresh a targeted page or upload the right form manually.</div>`
-          : `<div class="pdf-results-grid">
+  const actionMarkup = `<button
+    type="button"
+    class="ghost-button"
+    data-action="upload-system-pdf"
+    data-system-id="${escapeHtml(system.hospital_system_id || '')}"
+    data-system-name="${escapeHtml(system.system_name || '')}"
+    data-system-state="${escapeHtml(system.state || state.currentState || '')}"
+    data-source-view="results"
+  >
+    Upload Captured PDF
+  </button>`;
+
+  const bodyMarkup = `
+    ${
+      capturedForms.length === 0
+        ? `<div class="empty-state">No captured PDF forms are available for ${escapeHtml(system.system_name)} yet. Refresh a targeted page or upload the right form manually.</div>`
+        : `<div class="pdf-results-grid">
               ${capturedForms
                 .map((form) => {
                   const tone = capturedFormTone(form);
@@ -2938,23 +3009,27 @@ function renderCapturedFormsSection(system) {
                 })
                 .join('')}
             </div>`
-      }
-    </section>
+    }
   `;
+
+  return renderPipelineResultsAccordionSection({
+    sectionId: 'captured_forms',
+    kicker: 'Captured Forms',
+    title: 'Review candidate PDFs before promotion',
+    copy: 'These are fetched PDF artifacts for the selected system. Promote the right one, flag weak captures, or skip junk.',
+    countLabel: 'forms',
+    countValue: capturedForms.length,
+    actionMarkup,
+    bodyMarkup,
+  });
 }
 
 function renderAcceptedFormsSection(pdfDocuments, system) {
-  return `
-    <section class="space-y-4">
-      <div>
-        <p class="section-kicker">Accepted Forms</p>
-        <h4 class="text-lg font-semibold text-gray-900">Canonical forms the app and editor depend on</h4>
-        <p class="section-copy">These accepted forms are the ones downstream parse, question mapping, and publish flows should trust.</p>
-      </div>
-      ${
-        pdfDocuments.length === 0
-          ? `<div class="empty-state">No accepted PDF forms are attached to ${escapeHtml(system.system_name)} yet. Promote a captured form or upload a replacement.</div>`
-          : `<div class="pdf-results-grid">
+  const bodyMarkup = `
+    ${
+      pdfDocuments.length === 0
+        ? `<div class="empty-state">No accepted PDF forms are attached to ${escapeHtml(system.system_name)} yet. Promote a captured form or upload a replacement.</div>`
+        : `<div class="pdf-results-grid">
               ${pdfDocuments
                 .map((document) => {
                   const displayName = sourceDocumentDisplayName(document);
@@ -3018,9 +3093,18 @@ function renderAcceptedFormsSection(pdfDocuments, system) {
                 })
                 .join('')}
             </div>`
-      }
-    </section>
+    }
   `;
+
+  return renderPipelineResultsAccordionSection({
+    sectionId: 'accepted_forms',
+    kicker: 'Accepted Forms',
+    title: 'Canonical forms the app and editor depend on',
+    copy: 'These accepted forms are the ones downstream parse, question mapping, and publish flows should trust.',
+    countLabel: 'forms',
+    countValue: pdfDocuments.length,
+    bodyMarkup,
+  });
 }
 
 function renderPipelineResults() {
@@ -3082,7 +3166,7 @@ function renderPipelineResults() {
   `;
 
   elements.pipelineResultsList.innerHTML = `
-    <div class="space-y-8 xl:col-span-2">
+    <div class="space-y-4 xl:col-span-2">
       ${renderTargetedPagesSection(system)}
       ${renderCapturedFormsSection(system)}
       ${renderAcceptedFormsSection(pdfDocuments, system)}
@@ -6778,6 +6862,13 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (button.dataset.action === 'toggle-results-accordion' && button.dataset.sectionId) {
+      const sectionId = button.dataset.sectionId;
+      state.pipelineResultsExpanded[sectionId] = !Boolean(state.pipelineResultsExpanded[sectionId]);
+      renderPipelineResults();
+      return;
+    }
+
     if (button.dataset.action === 'add-system-source-page') {
       await addSourcePageForSystem({
         systemId: button.dataset.systemId || null,
@@ -7234,7 +7325,7 @@ elements.systemsTable?.addEventListener('click', (event) => {
     .then(async () => {
       await selectSystem(row.dataset.systemId);
       setStateTab('pipeline');
-      setPipelineTab('flow');
+      setPipelineTab('results');
     })
     .catch((error) => {
       notify(error.message || 'Failed to select the hospital system.', true);
