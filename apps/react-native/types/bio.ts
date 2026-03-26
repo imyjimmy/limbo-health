@@ -1,6 +1,7 @@
 export interface BioProfile {
   fullName: string;
   dateOfBirth: string;
+  last4Ssn: string;
   phoneNumber: string;
   email: string;
   addressLine1: string;
@@ -16,6 +17,7 @@ export function emptyBioProfile(suggestedFullName = '', suggestedEmail = ''): Bi
   return {
     fullName: suggestedFullName,
     dateOfBirth: '',
+    last4Ssn: '',
     phoneNumber: '',
     email: suggestedEmail,
     addressLine1: '',
@@ -54,9 +56,20 @@ export function isValidDateOfBirth(value: string): boolean {
   );
 }
 
+export function formatLast4SsnInput(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 4);
+}
+
+export function isValidLast4Ssn(value: string): boolean {
+  return /^\d{4}$/.test(value.trim());
+}
+
 export function validateBioProfileBasicDetails(profile: BioProfile): string | null {
   if (!profile.fullName.trim()) return 'Please enter your full name.';
   if (!isValidDateOfBirth(profile.dateOfBirth.trim())) return 'Please enter a valid date of birth.';
+  if (!isValidLast4Ssn(profile.last4Ssn)) {
+    return 'Please enter the last 4 digits of your Social Security number.';
+  }
   if (profile.email.trim() && !SIMPLE_EMAIL_PATTERN.test(profile.email.trim())) {
     return 'Please enter a valid email address.';
   }
@@ -81,6 +94,7 @@ export function isBioProfileComplete(profile: BioProfile | null | undefined): pr
   return (
     profile.fullName.trim().length > 0 &&
     isValidDateOfBirth(profile.dateOfBirth) &&
+    isValidLast4Ssn(profile.last4Ssn) &&
     profile.addressLine1.trim().length > 0 &&
     profile.city.trim().length > 0 &&
     profile.state.trim().length > 0 &&

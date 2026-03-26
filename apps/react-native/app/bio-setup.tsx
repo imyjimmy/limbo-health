@@ -20,6 +20,7 @@ import { useBioProfile } from '../providers/BioProfileProvider';
 import {
   emptyBioProfile,
   formatDateOfBirthInput,
+  formatLast4SsnInput,
   isValidDateOfBirth,
   validateBioProfile,
   validateBioProfileAddress,
@@ -34,6 +35,7 @@ const FIELD_SCROLL_KEYBOARD_PADDING = 92;
 type BioFieldKey =
   | 'fullName'
   | 'dateOfBirth'
+  | 'last4Ssn'
   | 'phoneNumber'
   | 'email'
   | 'addressLine1'
@@ -87,7 +89,7 @@ export default function BioSetupScreen() {
         eyebrow: 'Step 2 of 3',
         title: 'Basic details',
         body:
-          'Add the name, date of birth, and contact details that should appear on request forms when a hospital asks for them.',
+          'Add the identity details that hospitals commonly require on request forms, including date of birth and the last 4 digits of your Social Security number.',
       },
       {
         eyebrow: 'Step 3 of 3',
@@ -312,6 +314,7 @@ export default function BioSetupScreen() {
               <Text style={styles.introCardTitle}>What we will ask for</Text>
               <Text style={styles.introCardBody}>Full name</Text>
               <Text style={styles.introCardBody}>Date of birth</Text>
+              <Text style={styles.introCardBody}>Last 4 of Social Security number</Text>
               <Text style={styles.introCardBody}>Phone number (optional)</Text>
               <Text style={styles.introCardBody}>Email (optional)</Text>
               <Text style={styles.introCardBody}>Mailing address</Text>
@@ -357,6 +360,26 @@ export default function BioSetupScreen() {
                   inputAccessoryViewButtonLabel={
                     Platform.OS === 'ios' && showsDateOfBirthDoneButton ? 'Done' : undefined
                   }
+                />
+              </View>
+
+              <View onLayout={registerFieldLayout('last4Ssn')}>
+                <Text style={styles.fieldLabel}>Last 4 of Social Security number</Text>
+                <TextInput
+                  value={form.last4Ssn}
+                  onChangeText={(value) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      last4Ssn: formatLast4SsnInput(value),
+                    }))
+                  }
+                  onFocus={() => focusField('last4Ssn')}
+                  onBlur={() => blurField('last4Ssn')}
+                  placeholder="1234"
+                  placeholderTextColor={theme.colors.inputPlaceholder}
+                  style={styles.input}
+                  keyboardType="number-pad"
+                  maxLength={4}
                 />
               </View>
 

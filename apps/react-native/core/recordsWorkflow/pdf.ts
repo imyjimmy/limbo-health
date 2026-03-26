@@ -245,6 +245,7 @@ function fillBioFields(
   const fields = form.getFields();
 
   const fullName = bioProfile.fullName.trim();
+  const last4Ssn = bioProfile.last4Ssn.trim();
   const phoneNumber = bioProfile.phoneNumber.trim();
   const email = bioProfile.email.trim();
   const addressLine = [bioProfile.addressLine1, bioProfile.addressLine2]
@@ -417,6 +418,23 @@ function fillBioFields(
       continue;
     }
 
+    if (
+      last4Ssn &&
+      matchesAny(normalized, [
+        /\blast 4 of social security number\b/,
+        /\blast four of social security number\b/,
+        /\bsocial security number last 4\b/,
+        /\bsocial security number last four\b/,
+        /\blast 4 social\b/,
+        /\blast four social\b/,
+        /\blast 4 ssn\b/,
+        /\blast four ssn\b/,
+      ])
+    ) {
+      filledCount += setTextFieldValue(field, last4Ssn) ? 1 : 0;
+      continue;
+    }
+
     if (matchesExactFieldName(normalized, ['date'])) {
       filledCount += setTextFieldValue(field, today) ? 1 : 0;
     }
@@ -507,6 +525,55 @@ function resolveSignatureFieldsForForm(
     : extractSignatureFields(pdf);
 }
 
+function resolveSignatureOverlayPlacement(
+  signatureField: RecordsRequestPdfSignatureField,
+  signatureBounds: { width: number; height: number },
+) {
+  const horizontalPadding = Math.min(signatureField.width * 0.06, 10);
+  const verticalPadding =
+    signatureField.fitMode === 'baseline'
+      ? Math.min(signatureField.height * 0.1, 4)
+      : Math.min(signatureField.height * 0.18, 6);
+  const availableWidth = Math.max(signatureField.width - horizontalPadding * 2, 1);
+  const availableHeight = Math.max(signatureField.height - verticalPadding * 2, 1);
+  const widthScale = availableWidth / signatureBounds.width;
+  const heightScale = availableHeight / signatureBounds.height;
+  let scale = Math.min(widthScale, heightScale);
+  let pathScaleY = 1;
+
+  if (signatureField.fitMode === 'baseline' && widthScale > heightScale) {
+    const minimumVerticalScale = 0.7;
+    scale = Math.min(widthScale, heightScale / minimumVerticalScale);
+    pathScaleY = Math.min(1, heightScale / scale);
+  }
+
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return null;
+  }
+
+  const renderedWidth = signatureBounds.width * scale;
+  const renderedHeight = signatureBounds.height * pathScaleY * scale;
+  const offsetX =
+    signatureField.fitMode === 'baseline'
+      ? signatureField.x + horizontalPadding
+      : signatureField.x + (signatureField.width - renderedWidth) / 2;
+  const offsetY =
+    signatureField.fitMode === 'baseline'
+      ? signatureField.y + verticalPadding + renderedHeight
+      : signatureField.y + signatureField.height - (signatureField.height - renderedHeight) / 2;
+
+  return {
+    horizontalPadding,
+    verticalPadding,
+    renderedWidth,
+    renderedHeight,
+    scale,
+    pathScaleY,
+    offsetX,
+    offsetY,
+  };
+}
+
 function applySignatureOverlays(
   pdf: PDFDocument,
   signatureFields: RecordsRequestPdfSignatureField[],
@@ -526,45 +593,21 @@ function applySignatureOverlays(
 
   for (const signatureField of signatureFields) {
     const page = pdf.getPage(signatureField.pageIndex);
-    const horizontalPadding = Math.min(signatureField.width * 0.06, 10);
-    const verticalPadding =
-      signatureField.fitMode === 'baseline'
-        ? Math.min(signatureField.height * 0.1, 4)
-        : Math.min(signatureField.height * 0.18, 6);
-    const availableWidth = Math.max(signatureField.width - horizontalPadding * 2, 1);
-    const availableHeight = Math.max(signatureField.height - verticalPadding * 2, 1);
-    const widthScale = availableWidth / signatureBounds.width;
-    const heightScale = availableHeight / signatureBounds.height;
-    let scale = Math.min(widthScale, heightScale);
-    let pathScaleY = 1;
-
-    if (signatureField.fitMode === 'baseline' && widthScale > heightScale) {
-      const minimumVerticalScale = 0.7;
-      scale = Math.min(widthScale, heightScale / minimumVerticalScale);
-      pathScaleY = Math.min(1, heightScale / scale);
-    }
+    const placement = resolveSignatureOverlayPlacement(signatureField, signatureBounds);
 
     const signaturePath = buildSignatureSvgPath(signature, {
       normalize: true,
-      scaleY: pathScaleY,
+      scaleY: placement?.pathScaleY || 1,
     });
 
-    if (!signaturePath || !Number.isFinite(scale) || scale <= 0) {
+    if (!signaturePath || !placement) {
       continue;
     }
 
-    const renderedWidth = signatureBounds.width * scale;
-    const renderedHeight = signatureBounds.height * pathScaleY * scale;
-    const offsetX = signatureField.x + (signatureField.width - renderedWidth) / 2;
-    const offsetY =
-      signatureField.fitMode === 'baseline'
-        ? signatureField.y + verticalPadding + renderedHeight
-        : signatureField.y + signatureField.height - (signatureField.height - renderedHeight) / 2;
-
     page.drawSvgPath(signaturePath, {
-      x: offsetX,
-      y: offsetY,
-      scale,
+      x: placement.offsetX,
+      y: placement.offsetY,
+      scale: placement.scale,
       borderColor: hexToPdfColor(pdfTheme.colors.text),
       borderWidth: 1.35,
       borderLineCap: LineCapStyle.Round,
@@ -1004,6 +1047,7 @@ export const __testing__ = {
   applySignatureOverlays,
   buildCurrentDateValue,
   resolveSignatureFieldsForForm,
+  resolveSignatureOverlayPlacement,
   extractSignatureFields,
   fillBioFields,
   getLanguagePreferenceScore,

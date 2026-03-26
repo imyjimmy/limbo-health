@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { formatMaskedMailingAddress, type BioProfile } from '../types/bio';
+import {
+  formatLast4SsnInput,
+  formatMaskedMailingAddress,
+  isValidLast4Ssn,
+  type BioProfile,
+} from '../types/bio';
 
 const profile: BioProfile = {
   fullName: 'Jimmy Zhang',
   dateOfBirth: '01/14/1989',
+  last4Ssn: '6789',
   phoneNumber: '5551234567',
   email: 'jimmy@example.com',
   addressLine1: '801 W 5th St',
@@ -14,6 +20,12 @@ const profile: BioProfile = {
 };
 
 describe('bio privacy helpers', () => {
+  it('normalizes and validates the last 4 of SSN', () => {
+    expect(formatLast4SsnInput('67-89')).toBe('6789');
+    expect(isValidLast4Ssn('6789')).toBe(true);
+    expect(isValidLast4Ssn('678')).toBe(false);
+  });
+
   it('masks the middle of mailing address parts while preserving enough edge characters to verify', () => {
     expect(formatMaskedMailingAddress(profile)).toBe('8*********St\nA*****2\nA****n, TX 7***3');
   });

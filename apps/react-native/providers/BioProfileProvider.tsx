@@ -110,6 +110,10 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
         const normalizedProfile = {
           ...defaultProfile,
           ...parsed,
+          last4Ssn:
+            typeof parsed.last4Ssn === 'string'
+              ? parsed.last4Ssn.replace(/\D/g, '').slice(0, 4)
+              : defaultProfile.last4Ssn,
         };
         setProfile(isBioProfileComplete(normalizedProfile) ? normalizedProfile : normalizedProfile);
 
@@ -154,6 +158,7 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
           ...nextProfile,
           fullName: nextProfile.fullName.trim(),
           dateOfBirth: nextProfile.dateOfBirth.trim(),
+          last4Ssn: nextProfile.last4Ssn.replace(/\D/g, '').slice(0, 4),
           phoneNumber: nextProfile.phoneNumber.trim(),
           email: nextProfile.email.trim(),
           addressLine1: nextProfile.addressLine1.trim(),
@@ -168,6 +173,7 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
         ...nextProfile,
         fullName: nextProfile.fullName.trim(),
         dateOfBirth: nextProfile.dateOfBirth.trim(),
+        last4Ssn: nextProfile.last4Ssn.replace(/\D/g, '').slice(0, 4),
         phoneNumber: nextProfile.phoneNumber.trim(),
         email: nextProfile.email.trim(),
         addressLine1: nextProfile.addressLine1.trim(),

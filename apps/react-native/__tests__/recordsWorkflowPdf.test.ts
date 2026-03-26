@@ -91,6 +91,7 @@ describe('records workflow pdf helpers', () => {
     };
 
     addTextField('Patient Name');
+    addTextField('Last 4 of Social Security Number');
     addTextField('Street');
     addTextField('City');
     addTextField('State');
@@ -102,6 +103,7 @@ describe('records workflow pdf helpers', () => {
     const bioProfile: BioProfile = {
       fullName: 'Jimmy Zhang',
       dateOfBirth: '03/20/1990',
+      last4Ssn: '6789',
       phoneNumber: '',
       email: '',
       addressLine1: '123 Main St',
@@ -115,6 +117,9 @@ describe('records workflow pdf helpers', () => {
 
     expect(result.filledCount).toBeGreaterThanOrEqual(8);
     expect((form.getField('Patient Name') as PDFTextField).getText()).toBe('Jimmy Zhang');
+    expect((form.getField('Last 4 of Social Security Number') as PDFTextField).getText()).toBe(
+      '6789',
+    );
     expect((form.getField('Street') as PDFTextField).getText()).toBe('123 Main St Apt 4B');
     expect((form.getField('City') as PDFTextField).getText()).toBe('Austin');
     expect((form.getField('State') as PDFTextField).getText()).toBe('TX');
@@ -145,6 +150,7 @@ describe('records workflow pdf helpers', () => {
     const bioProfile: BioProfile = {
       fullName: 'Jimmy Zhang',
       dateOfBirth: '03/20/1990',
+      last4Ssn: '6789',
       phoneNumber: '512 555 0123',
       email: 'jimmy@example.com',
       addressLine1: '123 Main St',
@@ -298,7 +304,50 @@ describe('records workflow pdf helpers', () => {
       ),
     ).toBe(1);
 
-    expect((await baselinePdf.save()).length).not.toBe((await centeredPdf.save()).length);
+    const bounds = {
+      width: 172,
+      height: 176,
+    };
+    const baselinePlacement = __testing__.resolveSignatureOverlayPlacement(
+      { ...area, fitMode: 'baseline' },
+      bounds,
+    );
+    const centeredPlacement = __testing__.resolveSignatureOverlayPlacement(
+      { ...area, fitMode: 'center' },
+      bounds,
+    );
+
+    expect(baselinePlacement?.renderedWidth).toBeGreaterThan(centeredPlacement?.renderedWidth || 0);
+    expect(baselinePlacement?.scale).toBeGreaterThan(centeredPlacement?.scale || 0);
+  });
+
+  it('left-aligns signatures inside baseline signature areas', () => {
+    const bounds = {
+      width: 172,
+      height: 58,
+    };
+    const area = {
+      fieldName: 'Signature1',
+      pageIndex: 0,
+      x: 36,
+      y: 44,
+      width: 220,
+      height: 44,
+    } as const;
+
+    const baselinePlacement = __testing__.resolveSignatureOverlayPlacement(
+      { ...area, fitMode: 'baseline' },
+      bounds,
+    );
+    const centeredPlacement = __testing__.resolveSignatureOverlayPlacement(
+      { ...area, fitMode: 'center' },
+      bounds,
+    );
+
+    expect(baselinePlacement).toBeTruthy();
+    expect(centeredPlacement).toBeTruthy();
+    expect(baselinePlacement?.offsetX).toBe(area.x + baselinePlacement!.horizontalPadding);
+    expect(centeredPlacement?.offsetX).toBeGreaterThan(baselinePlacement!.offsetX);
   });
 
   it('prefers persisted signature areas from the published form payload', async () => {

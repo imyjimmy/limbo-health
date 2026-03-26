@@ -17,6 +17,7 @@ import { useBioProfile } from '../../../providers/BioProfileProvider';
 import {
   emptyBioProfile,
   formatDateOfBirthInput,
+  formatLast4SsnInput,
   type BioProfile,
   validateBioProfile,
 } from '../../../types/bio';
@@ -120,6 +121,26 @@ export default function PersonalInfoScreen() {
               style={styles.fieldInput}
               keyboardType="number-pad"
               textContentType="birthdate"
+            />
+          </View>
+
+          <View style={styles.rowSeparator} />
+
+          <View style={styles.fieldBlock}>
+            <Text style={styles.fieldLabel}>Last 4 of Social Security number</Text>
+            <TextInput
+              value={form.last4Ssn}
+              onChangeText={(value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  last4Ssn: formatLast4SsnInput(value),
+                }))
+              }
+              placeholder="1234"
+              placeholderTextColor={chrome.secondaryText}
+              style={styles.fieldInput}
+              keyboardType="number-pad"
+              maxLength={4}
             />
           </View>
         </View>
