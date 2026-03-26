@@ -2,13 +2,17 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { parsePdfDocument } from '../parsers/pdfParser.js';
 import { query, withTransaction } from '../db.js';
-import { extractPdfFormUnderstanding } from '../extractors/pdfFormUnderstandingExtractor.js';
+import {
+  extractPdfFormUnderstanding,
+  repairPdfFormUnderstandingOutput,
+} from '../extractors/pdfFormUnderstandingExtractor.js';
 import { insertExtractionRun } from '../repositories/workflowRepository.js';
 import { resolveParsedArtifactPath } from '../utils/pipelineArtifactStorage.js';
 import { resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
 import {
   buildUnsupportedAutofillPayload,
   normalizePdfFormUnderstanding,
+  normalizePdfSignatureAreas,
   PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,
 } from '../utils/pdfFormUnderstanding.js';
 import { collapseWhitespace } from '../utils/text.js';
@@ -55,10 +59,10 @@ function humanizeFieldName(value) {
 }
 
 function normalizeCheckboxOptionLabel(label, fieldName) {
-  const normalizedLabel = normalizeString(label)
-    .replace(/^\(+|\)+$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let normalizedLabel = normalizeString(label).replace(/\s+/g, ' ').trim();
+  if (/^\(.+\)$/.test(normalizedLabel)) {
+    normalizedLabel = normalizedLabel.slice(1, -1).trim();
+  }
 
   if (/^other:?$/i.test(normalizedLabel)) {
     return 'Other (please specify)';
@@ -72,6 +76,10 @@ function tokenizeCheckboxLabel(value) {
     .toLowerCase()
     .split(/[^a-z0-9]+/g)
     .filter(Boolean);
+}
+
+function normalizeRenderableWord(value) {
+  return normalizeString(value).replace(/[^\p{L}\p{N}&/().,:-]+/gu, ' ').trim();
 }
 
 function shouldPreferFallbackCheckboxLabel(label, fallbackLabel) {
@@ -114,8 +122,8 @@ function findClosestCheckboxWidget(binding, page) {
     .map((widget) => ({
       widget,
       distance: Math.hypot(
-        Number(widget.x || 0) - Number(binding.x || 0),
-        Number(widget.y || 0) - Number(binding.y || 0),
+        Number(widget.x || 0) + Number(widget.width || 0) / 2 - Number(binding.x || 0),
+        Number(widget.y || 0) + Number(widget.height || 0) / 2 - Number(binding.y || 0),
       ),
     }))
     .sort((left, right) => left.distance - right.distance);
@@ -125,6 +133,35 @@ function findClosestCheckboxWidget(binding, page) {
   }
 
   return candidates[0].widget;
+}
+
+function buildCheckboxWidgetPrintedLabel(widget, page) {
+  if (!widget || !page) return '';
+
+  const rowWidgets = (page.widgets || [])
+    .filter((candidate) => /checkbox/i.test(normalizeString(candidate.field_type)))
+    .filter((candidate) => Math.abs(Number(candidate.y || 0) - Number(widget.y || 0)) <= 4)
+    .sort((left, right) => Number(left.x || 0) - Number(right.x || 0));
+  const widgetIndex = rowWidgets.findIndex(
+    (candidate) => normalizeString(candidate.field_name) === normalizeString(widget.field_name),
+  );
+  const nextWidget = widgetIndex >= 0 ? rowWidgets[widgetIndex + 1] || null : null;
+  const labelWords = (page.words || [])
+    .filter((word) => Math.abs(Number(word.y || 0) - Number(widget.y || 0)) <= 5)
+    .filter(
+      (word) =>
+        Number(word.x || 0) >=
+        Number(widget.x || 0) + Math.max(Number(widget.width || 0) - 3, 4),
+    )
+    .filter((word) => !nextWidget || Number(word.x || 0) < Number(nextWidget.x || 0) - 4)
+    .sort((left, right) => Number(left.x || 0) - Number(right.x || 0));
+
+  return labelWords
+    .map((word) => normalizeRenderableWord(word.text || ''))
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function repairQuestionOptionMetadata(payload, pdfGeometry) {
@@ -146,12 +183,18 @@ function repairQuestionOptionMetadata(payload, pdfGeometry) {
       const firstOverlayMark = (Array.isArray(option?.bindings) ? option.bindings : []).find(
         (binding) => binding?.type === 'overlay_mark' && Number.isInteger(binding?.page_index),
       );
-      const matchedWidget = firstOverlayMark
-        ? findClosestCheckboxWidget(firstOverlayMark, pagesByIndex.get(Number(firstOverlayMark.page_index)))
+      const page = firstOverlayMark
+        ? pagesByIndex.get(Number(firstOverlayMark.page_index))
         : null;
+      const matchedWidget = firstOverlayMark
+        ? findClosestCheckboxWidget(firstOverlayMark, page)
+        : null;
+      const printedLabel = matchedWidget ? buildCheckboxWidgetPrintedLabel(matchedWidget, page) : '';
       const fallbackLabel = matchedWidget
         ? normalizeCheckboxOptionLabel(
-            normalizeString(matchedWidget.field_label) || humanizeFieldName(matchedWidget.field_name),
+            printedLabel ||
+              normalizeString(matchedWidget.field_label) ||
+              humanizeFieldName(matchedWidget.field_name),
             matchedWidget.field_name,
           )
         : '';
@@ -198,6 +241,99 @@ function repairQuestionOptionMetadata(payload, pdfGeometry) {
   return {
     ...payload,
     questions: repairedQuestions,
+  };
+}
+
+function isSignatureWidget(widget) {
+  const fieldType = normalizeString(widget?.field_type || widget?.fieldType).toLowerCase();
+  if (fieldType === 'signature') {
+    return true;
+  }
+
+  const fieldName = normalizeString(widget?.field_name || widget?.fieldName).toLowerCase();
+  const fieldLabel = normalizeString(widget?.field_label || widget?.fieldLabel).toLowerCase();
+  return /\bsignature\b|\bfirma\b/.test(`${fieldName} ${fieldLabel}`);
+}
+
+function findBestSignatureBaseline(page, widget) {
+  const widgetLeft = Number(widget?.x || 0);
+  const widgetWidth = Math.max(Number(widget?.width || 0), 1);
+  const widgetRight = widgetLeft + widgetWidth;
+  const widgetMidY = Number(widget?.y || 0) + Number(widget?.height || 0) / 2;
+
+  const candidates = (page?.line_candidates || [])
+    .filter((line) => normalizeString(line?.orientation) === 'horizontal')
+    .map((line) => {
+      const lineLeft = Number(line.x || 0);
+      const lineWidth = Math.max(Number(line.width || 0), 0);
+      const lineRight = lineLeft + lineWidth;
+      const overlapWidth = Math.min(widgetRight, lineRight) - Math.max(widgetLeft, lineLeft);
+      const overlapRatio = overlapWidth / widgetWidth;
+      const verticalDistance = Math.abs(Number(line.y || 0) - widgetMidY);
+
+      return {
+        line,
+        overlapWidth,
+        overlapRatio,
+        verticalDistance,
+      };
+    })
+    .filter((candidate) => candidate.line.width > 0)
+    .filter((candidate) => candidate.verticalDistance <= 18)
+    .filter(
+      (candidate) =>
+        candidate.overlapWidth >= widgetWidth * 0.5 ||
+        candidate.overlapRatio >= 0.65 ||
+        (candidate.line.width >= widgetWidth * 0.85 &&
+          Math.abs(Number(candidate.line.x || 0) - widgetLeft) <= 18),
+    )
+    .sort((left, right) => {
+      if (left.verticalDistance !== right.verticalDistance) {
+        return left.verticalDistance - right.verticalDistance;
+      }
+      return Number(right.line.width || 0) - Number(left.line.width || 0);
+    });
+
+  return candidates[0]?.line || null;
+}
+
+function buildDerivedSignatureAreas(pdfGeometry) {
+  const derivedAreas = [];
+
+  for (const page of pdfGeometry?.pages || []) {
+    for (const widget of page.widgets || []) {
+      if (!isSignatureWidget(widget)) continue;
+
+      const baseline = findBestSignatureBaseline(page, widget);
+      const areaWidth = Math.max(Number(baseline?.width || widget.width || 0), 24);
+      const areaHeight = Math.max(Number(widget.height || 0) * 2.8, 32);
+      const areaX = Number(baseline?.x ?? widget.x ?? 0);
+      const areaY = Number(baseline?.y ?? widget.y ?? 0);
+
+      derivedAreas.push({
+        id: normalizeString(widget.field_name || widget.fieldName) || 'signature-area',
+        label: normalizeString(widget.field_label || widget.fieldLabel) || 'Signature Area',
+        field_name: normalizeString(widget.field_name || widget.fieldName) || null,
+        page_index: Number(page.page_index || 0),
+        x: Number(areaX.toFixed(2)),
+        y: Number(areaY.toFixed(2)),
+        width: Number(areaWidth.toFixed(2)),
+        height: Number(areaHeight.toFixed(2)),
+      });
+    }
+  }
+
+  return normalizePdfSignatureAreas(derivedAreas);
+}
+
+function attachSignatureAreasToPayload(payload, pdfGeometry) {
+  const normalizedPayload = payload || buildUnsupportedAutofillPayload();
+  const existingAreas = normalizePdfSignatureAreas(normalizedPayload.signature_areas);
+  const signatureAreas = existingAreas.length > 0 ? existingAreas : buildDerivedSignatureAreas(pdfGeometry);
+
+  return {
+    ...normalizedPayload,
+    signature_areas: signatureAreas,
   };
 }
 
@@ -357,6 +493,16 @@ async function loadPdfGeometry(sourceDocument, client = null) {
               height: Number(widget.height || 0),
             }))
           : [],
+        line_candidates: Array.isArray(page.lineCandidates)
+          ? page.lineCandidates.map((line) => ({
+              shape: line.shape || null,
+              orientation: line.orientation || null,
+              x: Number(line.x || 0),
+              y: Number(line.y || 0),
+              width: Number(line.width || 0),
+              height: Number(line.height || 0),
+            }))
+          : [],
       }))
     : [];
 
@@ -398,13 +544,16 @@ async function prepareDraftPayloadForPersistence(
   client = null,
 ) {
   const normalizedPayload = normalizeDraftPayload(payload, templateIdFallback);
-
-  if (normalizedPayload?.mode !== 'overlay') {
-    return normalizedPayload;
-  }
-
+  const { parsedDocument: persistedParsedPdf } = await loadPersistedParsedDocument(sourceDocument, client);
+  const enrichedPayload = persistedParsedPdf
+    ? repairPdfFormUnderstandingOutput(normalizedPayload, persistedParsedPdf)
+    : normalizedPayload;
   const pdfGeometry = await loadPdfGeometry(sourceDocument, client);
-  return repairQuestionOptionMetadata(normalizedPayload, pdfGeometry);
+  const repairedPayload =
+    enrichedPayload?.mode === 'overlay'
+      ? repairQuestionOptionMetadata(enrichedPayload, pdfGeometry)
+      : enrichedPayload;
+  return attachSignatureAreasToPayload(repairedPayload, pdfGeometry);
 }
 
 async function loadSourceDocument(sourceDocumentId, client = null) {
@@ -585,6 +734,15 @@ function buildQuestionReviewResponse({
   publishedVersions,
   pdfGeometry = null,
 }) {
+  const latestRunPayload = attachSignatureAreasToPayload(
+    latestRun?.structured_output?.form_understanding || buildUnsupportedAutofillPayload(),
+    pdfGeometry,
+  );
+  const draftPayload = attachSignatureAreasToPayload(
+    template?.payload || buildUnsupportedAutofillPayload(),
+    pdfGeometry,
+  );
+
   return {
     source_document: {
       id: sourceDocument.id,
@@ -618,8 +776,7 @@ function buildQuestionReviewResponse({
           id: latestRun.id,
           status: latestRun.status,
           created_at: latestRun.created_at,
-          payload:
-            latestRun.structured_output?.form_understanding || buildUnsupportedAutofillPayload(),
+          payload: latestRunPayload,
           metadata: latestRun.structured_output?.metadata || null,
         }
       : null,
@@ -627,7 +784,7 @@ function buildQuestionReviewResponse({
       ? {
           id: template.id,
           status: template.status,
-          payload: template.payload,
+          payload: draftPayload,
           confidence_summary: template.confidence_summary,
           review_notes: template.review_notes,
           approved_at: template.approved_at,
@@ -641,7 +798,7 @@ function buildQuestionReviewResponse({
       status: version.status,
       source_document_id: version.source_document_id,
       source_document_content_hash: version.source_document_content_hash,
-      payload: version.payload,
+      payload: attachSignatureAreasToPayload(version.payload, pdfGeometry),
       published_at: version.published_at,
     })),
     pdf_geometry: pdfGeometry,

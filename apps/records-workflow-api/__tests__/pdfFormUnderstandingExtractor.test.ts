@@ -16,7 +16,10 @@ vi.mock('../src/providers/openaiPdfFormUnderstandingClient.js', () => ({
   isOpenAiApiError: (error) => error?.name === 'OpenAiApiError',
 }));
 
-import { extractPdfFormUnderstanding } from '../src/extractors/pdfFormUnderstandingExtractor.js';
+import {
+  extractPdfFormUnderstanding,
+  repairPdfFormUnderstandingOutput,
+} from '../src/extractors/pdfFormUnderstandingExtractor.js';
 import { extractPdfFormUnderstandingWithOpenAI } from '../src/providers/openaiPdfFormUnderstandingClient.js';
 
 describe('pdfFormUnderstandingExtractor', () => {
@@ -140,6 +143,7 @@ describe('pdfFormUnderstandingExtractor', () => {
       mode: 'overlay',
       template_id: 'multicare-release-template',
       confidence: 0.92,
+      signature_areas: [],
       questions: [
         {
           id: 'record-types',
@@ -216,6 +220,7 @@ describe('pdfFormUnderstandingExtractor', () => {
         mode: null,
         template_id: null,
         confidence: null,
+        signature_areas: [],
         questions: [],
       },
       metadata: {
@@ -449,6 +454,221 @@ describe('pdfFormUnderstandingExtractor', () => {
         { id: 'hospital-visits', label: 'Hospital visits' },
       ]),
     );
+  });
+
+  it('synthesizes follow-up text fields that sit under a trigger option in the same question block', async () => {
+    vi.mocked(extractPdfFormUnderstandingWithOpenAI).mockResolvedValue({
+      responseId: 'resp_recipient_other',
+      usage: { total_tokens: 111 },
+      output: {
+        mode: 'acroform',
+        template_id: null,
+        confidence: 0.97,
+        questions: [],
+      },
+    });
+
+    const result = await extractPdfFormUnderstanding({
+      parsedPdf: {
+        title: 'Authorization',
+        text: '',
+        headerText: 'Authorization',
+        pages: [
+          {
+            pageIndex: 0,
+            width: 612,
+            height: 792,
+            words: [
+              { text: 'The', x: 53.61, y: 477.53, width: 12, height: 10 },
+              { text: 'information', x: 72.77, y: 477.53, width: 50, height: 10 },
+              { text: 'will', x: 126.52, y: 477.53, width: 14, height: 10 },
+              { text: 'be', x: 144.0, y: 477.53, width: 10, height: 10 },
+              { text: 'released', x: 157.44, y: 477.53, width: 36, height: 10 },
+              { text: 'to:', x: 197.78, y: 477.53, width: 12, height: 10 },
+              { text: 'Patient/Designee', x: 228.21, y: 478.01, width: 74, height: 10 },
+              { text: 'Health', x: 318.59, y: 478.01, width: 25, height: 10 },
+              { text: 'Care', x: 348.02, y: 478.01, width: 19, height: 10 },
+              { text: 'Entity', x: 370.77, y: 478.01, width: 26, height: 10 },
+              { text: 'Insurance', x: 412.86, y: 478.01, width: 39, height: 10 },
+              { text: 'Company', x: 457.21, y: 478.01, width: 34, height: 10 },
+              { text: 'Attorney', x: 516.24, y: 478.01, width: 33, height: 10 },
+              { text: 'Other', x: 228.22, y: 467.01, width: 20, height: 10 },
+              { text: 'Individual/Organization', x: 56.61, y: 456.86, width: 79, height: 10 },
+              { text: 'Name', x: 140.21, y: 456.86, width: 22, height: 10 },
+              { text: 'Telephone', x: 427.41, y: 456.86, width: 39, height: 10 },
+              { text: 'Number', x: 466.55, y: 456.86, width: 30, height: 10 },
+              { text: 'Street', x: 56.61, y: 429.86, width: 22, height: 10 },
+              { text: 'Address', x: 79.74, y: 429.86, width: 28, height: 10 },
+              { text: 'City,', x: 261.81, y: 429.86, width: 17, height: 10 },
+              { text: 'State,', x: 279.45, y: 429.86, width: 22, height: 10 },
+              { text: 'Zip', x: 302.57, y: 429.86, width: 12, height: 10 },
+              { text: 'Fax', x: 427.41, y: 429.86, width: 16, height: 10 },
+              { text: 'Number', x: 442.97, y: 429.86, width: 30, height: 10 },
+            ],
+            widgets: [
+              { fieldName: 'patient', fieldType: 'CheckBox', x: 216.83, y: 479.59, width: 9.28, height: 9.28 },
+              { fieldName: 'healthcareentity', fieldType: 'CheckBox', x: 307.42, y: 479.59, width: 9.28, height: 9.28 },
+              { fieldName: 'insuranceco', fieldType: 'CheckBox', x: 401.42, y: 479.31, width: 9.28, height: 9.65 },
+              { fieldName: 'attorney', fieldType: 'CheckBox', x: 505.36, y: 479.31, width: 9.28, height: 9.74 },
+              { fieldName: 'other', fieldType: 'CheckBox', x: 216.79, y: 468.31, width: 9.28, height: 9.65 },
+              { fieldName: 'IndividualOrganization Name', fieldType: 'Text', x: 55.44, y: 439.36, width: 368.76, height: 18.72 },
+              { fieldName: 'Telephone Number_2', fieldType: 'Text', x: 426.24, y: 439.36, width: 167.16, height: 18.72 },
+              { fieldName: 'Street Address', fieldType: 'Text', x: 55.44, y: 412.36, width: 203.16, height: 18.72 },
+              { fieldName: 'City State Zip', fieldType: 'Text', x: 260.64, y: 412.36, width: 163.56, height: 18.72 },
+              { fieldName: 'Fax Number', fieldType: 'Text', x: 426.24, y: 412.36, width: 167.16, height: 18.72 },
+            ],
+            lineCandidates: [],
+            checkboxCandidates: [],
+          },
+        ],
+      },
+      hospitalSystemName: 'Generic Health',
+      facilityName: null,
+      formName: 'Authorization',
+      sourceUrl: 'https://example.org/form.pdf',
+      promptProfile: 'expanded',
+      maxInputTokens: 20000,
+    });
+
+    const labels = result.structuredOutput.form_understanding.questions.map((question) => question.label);
+    const recipientQuestionIndex = labels.findIndex((label) =>
+      /released to/i.test(label),
+    );
+
+    expect(recipientQuestionIndex).toBeGreaterThanOrEqual(0);
+    expect(labels.slice(recipientQuestionIndex + 1, recipientQuestionIndex + 6)).toEqual([
+      'If Other selected, specify Individual/Organization Name',
+      'If Other selected, specify Telephone Number',
+      'If Other selected, specify Street Address',
+      'If Other selected, specify City, State, Zip',
+      'If Other selected, specify Fax Number',
+    ]);
+  });
+
+  it('repairs overlay-reviewed payloads without duplicating the parent checkbox question', () => {
+    const repaired = repairPdfFormUnderstandingOutput(
+      {
+        supported: true,
+        mode: 'overlay',
+        template_id: 'generic-release-form',
+        confidence: 0.97,
+        questions: [
+          {
+            id: 'release-to',
+            kind: 'multi_select',
+            label: 'Select who will receive the released information',
+            required: false,
+            help_text: null,
+            confidence: 0.99,
+            bindings: [],
+            options: [
+              {
+                id: 'patient',
+                label: 'Patient/Designee',
+                confidence: 0.99,
+                bindings: [
+                  { type: 'overlay_mark', page_index: 0, x: 222.83, y: 485.59, mark: 'x', size: 12 },
+                ],
+              },
+              {
+                id: 'healthcareentity',
+                label: 'Health Care Entity',
+                confidence: 0.99,
+                bindings: [
+                  { type: 'overlay_mark', page_index: 0, x: 313.42, y: 485.59, mark: 'x', size: 12 },
+                ],
+              },
+              {
+                id: 'insuranceco',
+                label: 'Insurance Company',
+                confidence: 0.99,
+                bindings: [
+                  { type: 'overlay_mark', page_index: 0, x: 407.42, y: 485.31, mark: 'x', size: 12 },
+                ],
+              },
+              {
+                id: 'attorney',
+                label: 'Attorney',
+                confidence: 0.99,
+                bindings: [
+                  { type: 'overlay_mark', page_index: 0, x: 511.36, y: 485.31, mark: 'x', size: 12 },
+                ],
+              },
+              {
+                id: 'other-please-specify',
+                label: 'Other (please specify)',
+                confidence: 0.99,
+                bindings: [
+                  { type: 'overlay_mark', page_index: 0, x: 222.79, y: 474.31, mark: 'x', size: 12 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        pages: [
+          {
+            pageIndex: 0,
+            width: 612,
+            height: 792,
+            words: [
+              { text: 'The', x: 53.61, y: 477.53, width: 12, height: 10 },
+              { text: 'information', x: 72.77, y: 477.53, width: 50, height: 10 },
+              { text: 'will', x: 126.52, y: 477.53, width: 14, height: 10 },
+              { text: 'be', x: 144.0, y: 477.53, width: 10, height: 10 },
+              { text: 'released', x: 157.44, y: 477.53, width: 36, height: 10 },
+              { text: 'to:', x: 197.78, y: 477.53, width: 12, height: 10 },
+              { text: 'Patient/Designee', x: 228.21, y: 478.01, width: 74, height: 10 },
+              { text: 'Health', x: 318.59, y: 478.01, width: 25, height: 10 },
+              { text: 'Care', x: 348.02, y: 478.01, width: 19, height: 10 },
+              { text: 'Entity', x: 370.77, y: 478.01, width: 26, height: 10 },
+              { text: 'Insurance', x: 412.86, y: 478.01, width: 39, height: 10 },
+              { text: 'Company', x: 457.21, y: 478.01, width: 34, height: 10 },
+              { text: 'Attorney', x: 516.24, y: 478.01, width: 33, height: 10 },
+              { text: 'Other', x: 228.22, y: 467.01, width: 20, height: 10 },
+              { text: 'Individual/Organization', x: 56.61, y: 456.86, width: 79, height: 10 },
+              { text: 'Name', x: 140.21, y: 456.86, width: 22, height: 10 },
+              { text: 'Telephone', x: 427.41, y: 456.86, width: 39, height: 10 },
+              { text: 'Number', x: 466.55, y: 456.86, width: 30, height: 10 },
+              { text: 'Street', x: 56.61, y: 429.86, width: 22, height: 10 },
+              { text: 'Address', x: 79.74, y: 429.86, width: 28, height: 10 },
+              { text: 'City,', x: 261.81, y: 429.86, width: 17, height: 10 },
+              { text: 'State,', x: 279.45, y: 429.86, width: 22, height: 10 },
+              { text: 'Zip', x: 302.57, y: 429.86, width: 12, height: 10 },
+              { text: 'Fax', x: 427.41, y: 429.86, width: 16, height: 10 },
+              { text: 'Number', x: 442.97, y: 429.86, width: 30, height: 10 },
+            ],
+            widgets: [
+              { fieldName: 'patient', fieldType: 'CheckBox', x: 216.83, y: 479.59, width: 9.28, height: 9.28 },
+              { fieldName: 'healthcareentity', fieldType: 'CheckBox', x: 307.42, y: 479.59, width: 9.28, height: 9.28 },
+              { fieldName: 'insuranceco', fieldType: 'CheckBox', x: 401.42, y: 479.31, width: 9.28, height: 9.65 },
+              { fieldName: 'attorney', fieldType: 'CheckBox', x: 505.36, y: 479.31, width: 9.28, height: 9.74 },
+              { fieldName: 'other', fieldType: 'CheckBox', x: 216.79, y: 468.31, width: 9.28, height: 9.65 },
+              { fieldName: 'IndividualOrganization Name', fieldType: 'Text', x: 55.44, y: 439.36, width: 368.76, height: 18.72 },
+              { fieldName: 'Telephone Number_2', fieldType: 'Text', x: 426.24, y: 439.36, width: 167.16, height: 18.72 },
+              { fieldName: 'Street Address', fieldType: 'Text', x: 55.44, y: 412.36, width: 203.16, height: 18.72 },
+              { fieldName: 'City State Zip', fieldType: 'Text', x: 260.64, y: 412.36, width: 163.56, height: 18.72 },
+              { fieldName: 'Fax Number', fieldType: 'Text', x: 426.24, y: 412.36, width: 167.16, height: 18.72 },
+            ],
+            lineCandidates: [],
+            checkboxCandidates: [],
+          },
+        ],
+      },
+    );
+
+    const labels = repaired.questions.map((question) => question.label);
+
+    expect(labels.filter((label) => /receive the released information/i.test(label))).toHaveLength(1);
+    expect(labels).toEqual([
+      'Select who will receive the released information',
+      'If Other selected, specify Individual/Organization Name',
+      'If Other selected, specify Telephone Number',
+      'If Other selected, specify Street Address',
+      'If Other selected, specify City, State, Zip',
+      'If Other selected, specify Fax Number',
+    ]);
   });
 
   it('returns a partial payload instead of calling OpenAI when the prompt stays over budget', async () => {

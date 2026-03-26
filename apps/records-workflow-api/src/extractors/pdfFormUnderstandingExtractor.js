@@ -109,6 +109,25 @@ const CHECKBOX_CLUSTER_ROW_GAP = 20;
 const CHECKBOX_LABEL_WORD_TOLERANCE = 5;
 const CHECKBOX_HEADING_LINE_TOLERANCE = 4;
 const CHECKBOX_HEADING_MAX_DISTANCE = 80;
+const FOLLOW_UP_OPTION_PATTERN = /\bother\b|\bspecify\b|\bprovider\b|\blocation\b|\bdescribe\b|\bdetail\b/i;
+const FOLLOW_UP_PARENT_MAX_DISTANCE = 84;
+const TEXT_FIELD_TYPE_PATTERN = /^text$/i;
+const EXCLUDED_AUTOFILL_FIELD_PATTERNS = [
+  /^patient name$/,
+  /^last 4 of social security number$/,
+  /^dob$/,
+  /^acct$/,
+  /^mrn$/,
+  /^patient street address$/,
+  /^patient city state$/,
+  /^patient zip$/,
+  /^patient telephone number$/,
+  /^patient email$/,
+  /^printed name of patient or legal representative$/,
+  /^relationship to patient$/,
+  /^representatives authority to act for patient$/,
+  /^date$/,
+];
 
 function slugifyQuestionId(value) {
   return normalizeFieldName(value)
@@ -120,7 +139,10 @@ function humanizeFieldName(value) {
   const trimmed = normalizeString(value);
   if (!trimmed) return '';
 
-  const collapsed = trimmed.replace(/[_-]+/g, ' ');
+  const collapsed = trimmed
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ');
   if (/^[A-Z0-9\s/&().:-]+$/.test(collapsed)) {
     return collapsed;
   }
@@ -134,6 +156,90 @@ function normalizeRenderableWord(value) {
 
 function isCheckboxWidget(widget) {
   return CHECKBOX_FIELD_TYPE_PATTERN.test(normalizeFieldName(widget?.fieldType));
+}
+
+function isTextWidget(widget) {
+  return TEXT_FIELD_TYPE_PATTERN.test(normalizeFieldName(widget?.fieldType));
+}
+
+function isExcludedAutofillFieldName(fieldName) {
+  const normalizedFieldName = normalizeFieldName(fieldName);
+  return EXCLUDED_AUTOFILL_FIELD_PATTERNS.some((pattern) => pattern.test(normalizedFieldName));
+}
+
+function findParsedPageForBinding(binding, parsedPages = []) {
+  const pageIndex = Number(binding?.page_index);
+  if (!Number.isInteger(pageIndex)) return null;
+
+  return (
+    parsedPages.find(
+      (page) => Number(page?.pageIndex ?? page?.page_index ?? -1) === pageIndex,
+    ) || null
+  );
+}
+
+function scoreBindingWidgetMatch(binding, widget) {
+  const bindingType = normalizeFieldName(binding?.type);
+  const x = Number(binding?.x);
+  const y = Number(binding?.y);
+  const widgetX = Number(widget?.x || 0);
+  const widgetY = Number(widget?.y || 0);
+  const widgetWidth = Number(widget?.width || 0);
+  const widgetHeight = Number(widget?.height || 0);
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return null;
+  }
+
+  if (bindingType === 'overlay_mark') {
+    if (!isCheckboxWidget(widget)) return null;
+    if (
+      x < widgetX - 6 ||
+      x > widgetX + widgetWidth + 12 ||
+      y < widgetY - 6 ||
+      y > widgetY + widgetHeight + 12
+    ) {
+      return null;
+    }
+  } else if (bindingType === 'overlay_text') {
+    if (!isTextWidget(widget)) return null;
+    if (
+      x < widgetX - 8 ||
+      x > widgetX + widgetWidth + 12 ||
+      y < widgetY - 14 ||
+      y > widgetY + widgetHeight + 14
+    ) {
+      return null;
+    }
+  } else {
+    return null;
+  }
+
+  const widgetAnchorX = bindingType === 'overlay_mark' ? widgetX + widgetWidth / 2 : widgetX;
+  const widgetAnchorY = bindingType === 'overlay_mark' ? widgetY + widgetHeight / 2 : widgetY;
+  return Math.abs(x - widgetAnchorX) + Math.abs(y - widgetAnchorY);
+}
+
+function resolveBindingFieldName(binding, parsedPages = []) {
+  const directFieldName = normalizeFieldName(binding?.field_name);
+  if (directFieldName) {
+    return directFieldName;
+  }
+
+  const page = findParsedPageForBinding(binding, parsedPages);
+  if (!page) {
+    return '';
+  }
+
+  const bestMatch = (page.widgets || [])
+    .map((widget) => ({
+      widget,
+      score: scoreBindingWidgetMatch(binding, widget),
+    }))
+    .filter((entry) => entry.score != null)
+    .sort((left, right) => left.score - right.score)[0];
+
+  return normalizeFieldName(bestMatch?.widget?.fieldName);
 }
 
 function buildRawShortTextQuestion({
@@ -196,15 +302,20 @@ function buildRawMultiSelectQuestion({
   };
 }
 
-function getBindingFieldNames(question) {
+function getBindingFieldNames(question, parsedPages = []) {
   return [
     ...(Array.isArray(question?.bindings) ? question.bindings : []),
     ...(Array.isArray(question?.options)
       ? question.options.flatMap((option) => option.bindings || [])
       : []),
   ]
-    .filter((binding) => binding?.type === 'field_text' || binding?.type === 'field_checkbox')
-    .map((binding) => normalizeFieldName(binding.field_name))
+    .filter((binding) =>
+      binding?.type === 'field_text' ||
+      binding?.type === 'field_checkbox' ||
+      binding?.type === 'overlay_text' ||
+      binding?.type === 'overlay_mark',
+    )
+    .map((binding) => resolveBindingFieldName(binding, parsedPages))
     .filter(Boolean);
 }
 
@@ -343,10 +454,10 @@ function buildCheckboxFieldNameSet(cluster) {
 }
 
 function normalizeCheckboxOptionLabel(label, fieldName) {
-  const normalizedLabel = normalizeString(label)
-    .replace(/^\(+|\)+$/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  let normalizedLabel = normalizeString(label).replace(/\s+/g, ' ').trim();
+  if (/^\(.+\)$/.test(normalizedLabel)) {
+    normalizedLabel = normalizedLabel.slice(1, -1).trim();
+  }
 
   if (/^other:?$/i.test(normalizedLabel)) {
     return 'Other (please specify)';
@@ -545,10 +656,10 @@ function buildCheckboxClusterQuestion(cluster, page) {
   });
 }
 
-function buildQuestionOptionFieldNameMap(question) {
+function buildQuestionOptionFieldNameMap(question, parsedPages = []) {
   const optionFieldNames = new Map();
   for (const option of question?.options || []) {
-    const fieldName = normalizeFieldName(option?.bindings?.[0]?.field_name);
+    const fieldName = resolveBindingFieldName(option?.bindings?.[0], parsedPages);
     if (fieldName) {
       optionFieldNames.set(fieldName, option);
     }
@@ -556,13 +667,221 @@ function buildQuestionOptionFieldNameMap(question) {
   return optionFieldNames;
 }
 
+function getOptionBindingFieldName(option, parsedPages = []) {
+  return resolveBindingFieldName(
+    option?.bindings?.find(
+      (binding) =>
+        binding?.type === 'field_checkbox' || binding?.type === 'overlay_mark',
+    ),
+    parsedPages,
+  );
+}
+
+function buildTextWidgetPrintedLabel(widget, page) {
+  const minX = Number(widget?.x || 0) - 1;
+  const maxX = Number(widget?.x || 0) + Number(widget?.width || 0) + 1;
+  const candidateWords = (page?.words || []).filter((word) => {
+    const wordX = Number(word.x || 0);
+    const wordRight = wordX + Number(word.width || 0);
+    return wordRight >= minX && wordX <= maxX;
+  });
+  const buildPrintedLabel = (words) =>
+    words
+      .map((word) => normalizeRenderableWord(word.text || ''))
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const sameRowWords = candidateWords
+    .filter((word) => Math.abs(Number(word.y || 0) - Number(widget?.y || 0)) <= CHECKBOX_LABEL_WORD_TOLERANCE)
+    .sort((left, right) => left.x - right.x);
+  const sameRowLabel = buildPrintedLabel(sameRowWords);
+  if (sameRowLabel) {
+    return sameRowLabel;
+  }
+
+  const aboveRowWords = candidateWords
+    .filter((word) => {
+      const y = Number(word.y || 0);
+      const widgetY = Number(widget?.y || 0);
+      return y > widgetY && y - widgetY <= 24;
+    })
+    .sort((left, right) => right.y - left.y || left.x - right.x);
+  const nearestAboveY = aboveRowWords[0]?.y ?? null;
+  const nearestAboveLabel =
+    nearestAboveY == null
+      ? ''
+      : buildPrintedLabel(
+          aboveRowWords.filter(
+            (word) => Math.abs(Number(word.y || 0) - Number(nearestAboveY || 0)) <= CHECKBOX_LABEL_WORD_TOLERANCE,
+          ),
+        );
+
+  return nearestAboveLabel || humanizeFieldName(widget?.fieldName);
+}
+
+function isFollowUpTriggerOption(option) {
+  const signal = normalizeFieldName(
+    [option?.label, option?.id, getOptionBindingFieldName(option)].filter(Boolean).join(' '),
+  );
+  return FOLLOW_UP_OPTION_PATTERN.test(signal);
+}
+
+function buildPageCheckboxQuestionEntries(questions, page) {
+  const widgetByFieldName = new Map(
+    (page?.widgets || [])
+      .map((widget) => [normalizeFieldName(widget?.fieldName), widget])
+      .filter(([fieldName]) => fieldName),
+  );
+
+  return questions
+    .map((question, questionIndex) => {
+      const optionEntries = (question?.options || [])
+        .map((option) => {
+          const fieldName = getOptionBindingFieldName(option, [page]);
+          const widget = fieldName ? widgetByFieldName.get(fieldName) || null : null;
+          if (!fieldName || !widget) return null;
+          return {
+            option,
+            widget,
+            fieldName,
+          };
+        })
+        .filter(Boolean);
+
+      if (optionEntries.length === 0) {
+        return null;
+      }
+
+      return {
+        question,
+        questionIndex,
+        optionEntries,
+        topY: Math.max(...optionEntries.map((entry) => Number(entry.widget.y || 0))),
+        bottomY: Math.min(...optionEntries.map((entry) => Number(entry.widget.y || 0))),
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.topY - left.topY || left.questionIndex - right.questionIndex);
+}
+
+function selectFollowUpTriggerOption(widget, optionEntries, page) {
+  if (optionEntries.length === 1) {
+    return optionEntries[0];
+  }
+
+  const widgetLabelTokens = new Set(
+    tokenizeCheckboxLabel(buildTextWidgetPrintedLabel(widget, page)).filter((token) => token !== 'other'),
+  );
+  const widgetCenterX = Number(widget?.x || 0) + Number(widget?.width || 0) / 2;
+  let bestEntry = null;
+  let bestScore = -Infinity;
+
+  for (const entry of optionEntries) {
+    const optionSignal = [
+      entry.option?.label,
+      entry.option?.id,
+      entry.fieldName,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const optionTokens = tokenizeCheckboxLabel(optionSignal);
+    const overlapScore = optionTokens.reduce(
+      (score, token) => score + (widgetLabelTokens.has(token) ? 4 : 0),
+      0,
+    );
+    const optionCenterX =
+      Number(entry.widget?.x || 0) + Number(entry.widget?.width || 0) / 2;
+    const distancePenalty = Math.abs(widgetCenterX - optionCenterX) / 50;
+    const specificityBonus = /\bother\b/i.test(optionSignal) ? 3 : 0;
+    const score = overlapScore + specificityBonus - distancePenalty;
+    if (score > bestScore) {
+      bestScore = score;
+      bestEntry = entry;
+    }
+  }
+
+  return bestEntry;
+}
+
+function findFollowUpParentForTextWidget(widget, questions, page) {
+  const pageQuestionEntries = buildPageCheckboxQuestionEntries(questions, page);
+  const widgetY = Number(widget?.y || 0);
+  let bestMatch = null;
+  let bestScore = -Infinity;
+
+  for (let index = 0; index < pageQuestionEntries.length; index += 1) {
+    const entry = pageQuestionEntries[index];
+    const nextLowerQuestionTopY =
+      index < pageQuestionEntries.length - 1
+        ? pageQuestionEntries[index + 1].topY
+        : Number.NEGATIVE_INFINITY;
+    const verticalDistance = entry.bottomY - widgetY;
+    if (verticalDistance < -CHECKBOX_LABEL_WORD_TOLERANCE || verticalDistance > FOLLOW_UP_PARENT_MAX_DISTANCE) {
+      continue;
+    }
+    if (widgetY <= nextLowerQuestionTopY + CHECKBOX_WIDGET_ROW_TOLERANCE) {
+      continue;
+    }
+
+    const triggerOptions = entry.optionEntries.filter(({ option }) => isFollowUpTriggerOption(option));
+    if (triggerOptions.length === 0) {
+      continue;
+    }
+
+    const selectedOption = selectFollowUpTriggerOption(widget, triggerOptions, page);
+    if (!selectedOption) {
+      continue;
+    }
+
+    const score = 200 - verticalDistance;
+    if (score > bestScore) {
+      bestScore = score;
+      bestMatch = {
+        parentQuestionId: entry.question.id,
+        parentOptionLabel: normalizeString(selectedOption.option?.label) || humanizeFieldName(selectedOption.fieldName),
+      };
+    }
+  }
+
+  return bestMatch;
+}
+
+function buildTriggeredShortTextQuestion(widget, page, parentContext) {
+  if (!parentContext?.parentQuestionId) return null;
+
+  const fieldName = normalizeString(widget?.fieldName);
+  if (!fieldName) return null;
+
+  const fieldLabel = buildTextWidgetPrintedLabel(widget, page);
+  const triggerLabel = normalizeString(parentContext.parentOptionLabel);
+  const labelPrefix = /\bother\b/i.test(triggerLabel)
+    ? 'If Other selected, specify'
+    : `If ${triggerLabel.replace(/\s*:\s*$/, '')} selected, specify`;
+
+  return {
+    parentQuestionId: parentContext.parentQuestionId,
+    question: buildRawShortTextQuestion({
+      id: `${parentContext.parentQuestionId}_${slugifyQuestionId(fieldName || fieldLabel)}`,
+      label: `${labelPrefix} ${fieldLabel.replace(/\s*:\s*$/, '')}`.replace(/\s+/g, ' ').trim(),
+      fieldName,
+      required: false,
+      helpText: null,
+      confidence: 0.96,
+    }),
+    sortY: Number(widget?.y || 0),
+    sortX: Number(widget?.x || 0),
+  };
+}
+
 function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
   const synthesizedQuestion = buildCheckboxClusterQuestion(cluster, page);
   if (!synthesizedQuestion) return question;
 
-  const existingOptionFieldNames = buildQuestionOptionFieldNameMap(question);
+  const existingOptionFieldNames = buildQuestionOptionFieldNameMap(question, [page]);
   const coveredClusterFieldCount = (synthesizedQuestion.options || []).filter((option) =>
-    existingOptionFieldNames.has(normalizeFieldName(option?.bindings?.[0]?.field_name)),
+    existingOptionFieldNames.has(resolveBindingFieldName(option?.bindings?.[0], [page])),
   ).length;
   const mergedOptions = [];
   const seenFieldNames = new Set();
@@ -611,12 +930,12 @@ function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
   };
 }
 
-function findBestMatchingCheckboxQuestionIndex(questions, clusterFieldNames) {
+function findBestMatchingCheckboxQuestionIndex(questions, clusterFieldNames, parsedPages = []) {
   let bestIndex = -1;
   let bestOverlap = 0;
 
   questions.forEach((question, index) => {
-    const overlap = getBindingFieldNames(question).filter((fieldName) =>
+    const overlap = getBindingFieldNames(question, parsedPages).filter((fieldName) =>
       clusterFieldNames.has(fieldName),
     ).length;
 
@@ -632,24 +951,7 @@ function findBestMatchingCheckboxQuestionIndex(questions, clusterFieldNames) {
 function buildFieldQuestionDefinition(fieldName, fieldLabel = '', confidence = 0.97) {
   const normalizedFieldName = normalizeFieldName(fieldName);
 
-  const excludedPatterns = [
-    /^patient name$/,
-    /^last 4 of social security number$/,
-    /^dob$/,
-    /^acct$/,
-    /^mrn$/,
-    /^patient street address$/,
-    /^patient city state$/,
-    /^patient zip$/,
-    /^patient telephone number$/,
-    /^patient email$/,
-    /^printed name of patient or legal representative$/,
-    /^relationship to patient$/,
-    /^representatives authority to act for patient$/,
-    /^date$/,
-  ];
-
-  if (excludedPatterns.some((pattern) => pattern.test(normalizedFieldName))) {
+  if (isExcludedAutofillFieldName(normalizedFieldName)) {
     return null;
   }
 
@@ -790,10 +1092,11 @@ function splitCompositeShortTextQuestions(questions) {
 function addMissingWidgetQuestions(output, parsedPdf) {
   const existingFieldNames = new Set(
     (Array.isArray(output?.questions) ? output.questions : []).flatMap((question) =>
-      getBindingFieldNames(question),
+      getBindingFieldNames(question, parsedPdf?.pages || []),
     ),
   );
   const questions = [...(Array.isArray(output?.questions) ? output.questions : [])];
+  const triggeredInsertions = new Map();
 
   for (const page of parsedPdf?.pages || []) {
     for (const cluster of buildCheckboxClusters(page)) {
@@ -801,6 +1104,7 @@ function addMissingWidgetQuestions(output, parsedPdf) {
       const matchingQuestionIndex = findBestMatchingCheckboxQuestionIndex(
         questions,
         clusterFieldNames,
+        [page],
       );
 
       if (matchingQuestionIndex >= 0) {
@@ -809,7 +1113,7 @@ function addMissingWidgetQuestions(output, parsedPdf) {
           cluster,
           page,
         );
-        for (const fieldName of getBindingFieldNames(questions[matchingQuestionIndex])) {
+        for (const fieldName of getBindingFieldNames(questions[matchingQuestionIndex], [page])) {
           existingFieldNames.add(fieldName);
         }
         continue;
@@ -825,37 +1129,60 @@ function addMissingWidgetQuestions(output, parsedPdf) {
   }
 
   for (const page of parsedPdf?.pages || []) {
-    for (const widget of page.widgets || []) {
-      if (normalizeFieldName(widget?.fieldType) !== 'text') continue;
+    const textWidgets = [...(page.widgets || [])]
+      .filter((widget) => isTextWidget(widget))
+      .sort((left, right) => Number(right.y || 0) - Number(left.y || 0) || Number(left.x || 0) - Number(right.x || 0));
 
+    for (const widget of textWidgets) {
       const fieldName = normalizeString(widget?.fieldName);
       const normalizedFieldName = normalizeFieldName(fieldName);
       if (!fieldName || existingFieldNames.has(normalizedFieldName)) continue;
+      if (isExcludedAutofillFieldName(normalizedFieldName)) continue;
 
       const definition = buildFieldQuestionDefinition(fieldName, widget?.fieldLabel || '');
-      if (!definition) continue;
+      if (definition) {
+        questions.push(
+          buildRawShortTextQuestion({
+            id: definition.id,
+            label: definition.label,
+            fieldName,
+            required: definition.required,
+            helpText: definition.helpText || null,
+            confidence: definition.confidence,
+          }),
+        );
+        existingFieldNames.add(normalizedFieldName);
+        continue;
+      }
 
-      questions.push(
-        buildRawShortTextQuestion({
-          id: definition.id,
-          label: definition.label,
-          fieldName,
-          required: definition.required,
-          helpText: definition.helpText || null,
-          confidence: definition.confidence,
-        }),
-      );
+      const parentContext = findFollowUpParentForTextWidget(widget, questions, page);
+      if (!parentContext) continue;
+
+      const triggeredQuestion = buildTriggeredShortTextQuestion(widget, page, parentContext);
+      if (!triggeredQuestion) continue;
+
+      const pending = triggeredInsertions.get(triggeredQuestion.parentQuestionId) || [];
+      pending.push(triggeredQuestion);
+      triggeredInsertions.set(triggeredQuestion.parentQuestionId, pending);
       existingFieldNames.add(normalizedFieldName);
     }
   }
 
+  const orderedQuestions = questions.flatMap((question) => {
+    const pending = triggeredInsertions.get(question.id) || [];
+    const orderedPending = pending
+      .sort((left, right) => right.sortY - left.sortY || left.sortX - right.sortX)
+      .map((entry) => entry.question);
+    return [question, ...orderedPending];
+  });
+
   return {
     ...output,
-    questions,
+    questions: orderedQuestions,
   };
 }
 
-function enrichRawPdfFormUnderstandingOutput(output, parsedPdf) {
+export function repairPdfFormUnderstandingOutput(output, parsedPdf) {
   const rawQuestions = Array.isArray(output?.questions) ? output.questions : [];
   const splitQuestions = splitCompositeShortTextQuestions(rawQuestions);
   return addMissingWidgetQuestions(
@@ -920,7 +1247,7 @@ export async function extractPdfFormUnderstanding({
       schema: PDF_FORM_UNDERSTANDING_RESPONSE_SCHEMA,
     });
 
-    const enrichedOutput = enrichRawPdfFormUnderstandingOutput(output, parsedPdf);
+    const enrichedOutput = repairPdfFormUnderstandingOutput(output, parsedPdf);
     const formUnderstanding = normalizePdfFormUnderstanding(enrichedOutput);
 
     return {

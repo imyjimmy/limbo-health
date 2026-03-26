@@ -54,6 +54,62 @@ function normalizeMode(value) {
   return null;
 }
 
+function normalizeSignatureArea(rawArea) {
+  if (!isPlainObject(rawArea)) return null;
+
+  const pageIndex = Number(rawArea.page_index);
+  const x = Number(rawArea.x);
+  const y = Number(rawArea.y);
+  const width = Number(rawArea.width);
+  const height = Number(rawArea.height);
+  if (
+    !Number.isInteger(pageIndex) ||
+    pageIndex < 0 ||
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height)
+  ) {
+    return null;
+  }
+
+  const label = normalizeString(rawArea.label) || 'Signature Area';
+  const fieldName = normalizeString(rawArea.field_name) || null;
+
+  return {
+    id: slugify(normalizeString(rawArea.id) || fieldName || label),
+    label,
+    field_name: fieldName,
+    page_index: pageIndex,
+    x,
+    y,
+    width: Math.max(width, 12),
+    height: Math.max(height, 12),
+  };
+}
+
+export function normalizePdfSignatureAreas(rawAreas = []) {
+  const normalizedAreas = [];
+  const seenAreaIds = new Set();
+
+  for (const rawArea of Array.isArray(rawAreas) ? rawAreas : []) {
+    const normalizedArea = normalizeSignatureArea(rawArea);
+    if (!normalizedArea) continue;
+    const uniqueAreaId = buildUniqueSlug(
+      [normalizedArea.id, normalizedArea.field_name, normalizedArea.label],
+      seenAreaIds,
+      'signature-area',
+    );
+    seenAreaIds.add(uniqueAreaId);
+    normalizedAreas.push({
+      ...normalizedArea,
+      id: uniqueAreaId,
+    });
+  }
+
+  return normalizedAreas;
+}
+
 function inferBindingFamily(type) {
   if (FIELD_BINDING_TYPES.has(type)) return 'acroform';
   if (OVERLAY_BINDING_TYPES.has(type)) return 'overlay';
@@ -283,6 +339,7 @@ export function buildUnsupportedAutofillPayload(overrides = {}) {
     template_id: null,
     confidence: null,
     questions: [],
+    signature_areas: [],
     ...overrides,
   };
 }
@@ -292,6 +349,7 @@ export function normalizePdfFormUnderstanding(rawValue, minimumConfidence = MIN_
     return buildUnsupportedAutofillPayload();
   }
 
+  const signatureAreas = normalizePdfSignatureAreas(rawValue.signature_areas);
   const normalizedQuestions = [];
   const families = new Set();
 
@@ -308,7 +366,9 @@ export function normalizePdfFormUnderstanding(rawValue, minimumConfidence = MIN_
   const inferredMode = families.size === 1 ? Array.from(families)[0] : null;
   const mode = explicitMode || inferredMode;
   if (!mode) {
-    return buildUnsupportedAutofillPayload();
+    return buildUnsupportedAutofillPayload({
+      signature_areas: signatureAreas,
+    });
   }
 
   const expectedFamily = mode;
@@ -329,6 +389,7 @@ export function normalizePdfFormUnderstanding(rawValue, minimumConfidence = MIN_
     return buildUnsupportedAutofillPayload({
       mode,
       confidence,
+      signature_areas: signatureAreas,
     });
   }
 
@@ -338,5 +399,6 @@ export function normalizePdfFormUnderstanding(rawValue, minimumConfidence = MIN_
     template_id: normalizeString(rawValue.template_id) || null,
     confidence,
     questions,
+    signature_areas: signatureAreas,
   };
 }

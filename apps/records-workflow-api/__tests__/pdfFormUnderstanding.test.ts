@@ -93,6 +93,7 @@ describe('normalizePdfFormUnderstanding', () => {
       mode: 'overlay',
       template_id: null,
       confidence: 0.9,
+      signature_areas: [],
       questions: [
         {
           id: 'record-types',
@@ -147,6 +148,7 @@ describe('normalizePdfFormUnderstanding', () => {
       template_id: null,
       confidence: 0.82,
       questions: [],
+      signature_areas: [],
     });
   });
 
@@ -195,6 +197,58 @@ describe('normalizePdfFormUnderstanding', () => {
     expect(result.questions[0]?.options?.map((option) => option.id)).toEqual([
       'visits',
       'hospital-visits',
+    ]);
+  });
+
+  it('preserves normalized signature areas alongside the published question payload', () => {
+    const result = normalizePdfFormUnderstanding({
+      mode: 'overlay',
+      confidence: 0.95,
+      signature_areas: [
+        {
+          id: 'Signature1',
+          label: 'Patient signature',
+          field_name: 'Signature1',
+          page_index: 0,
+          x: 54,
+          y: 176.5,
+          width: 324,
+          height: 40,
+        },
+      ],
+      questions: [
+        {
+          id: 'expiration',
+          label: 'Enter the expiration date',
+          kind: 'short_text',
+          required: false,
+          confidence: 0.96,
+          bindings: [
+            {
+              type: 'overlay_text',
+              page_index: 0,
+              x: 120,
+              y: 240,
+              max_width: 160,
+              font_size: 14,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.supported).toBe(true);
+    expect(result.signature_areas).toEqual([
+      {
+        id: 'signature1',
+        label: 'Patient signature',
+        field_name: 'Signature1',
+        page_index: 0,
+        x: 54,
+        y: 176.5,
+        width: 324,
+        height: 40,
+      },
     ]);
   });
 });
