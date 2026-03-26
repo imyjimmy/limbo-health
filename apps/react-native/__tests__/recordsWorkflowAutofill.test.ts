@@ -91,6 +91,54 @@ const dependentOtherQuestion: RecordsWorkflowAutofillQuestion = {
   options: [],
 };
 
+const topLevelSelectableQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'preferred-delivery-methods',
+  label: 'Select preferred method(s) for delivery of records',
+  kind: 'multi_select',
+  required: false,
+  helpText: 'Purpose of the use and/or disclosure: Continued Care Legal Insurance Personal Use Other',
+  confidence: 0.9,
+  bindings: [],
+  options: [
+    {
+      id: 'mail',
+      label: 'Mail',
+      confidence: 0.98,
+      bindings: [
+        {
+          type: 'field_checkbox',
+          fieldName: 'Mail',
+          checked: true,
+        },
+      ],
+    },
+    {
+      id: 'pdf',
+      label: 'PDF via email',
+      confidence: 0.98,
+      bindings: [
+        {
+          type: 'field_checkbox',
+          fieldName: 'PDF',
+          checked: true,
+        },
+      ],
+    },
+    {
+      id: 'other',
+      label: 'Other (please specify)',
+      confidence: 0.98,
+      bindings: [
+        {
+          type: 'field_checkbox',
+          fieldName: 'Delivery other',
+          checked: true,
+        },
+      ],
+    },
+  ],
+};
+
 const recipientOtherQuestion: RecordsWorkflowAutofillQuestion = {
   id: 'recipient-other-name',
   label: 'If Other selected, specify Individual/Organization Name',
@@ -379,6 +427,26 @@ describe('records workflow autofill helpers', () => {
       'recipient-other-name',
       'facility-selector',
       'provider-or-location',
+    ]);
+  });
+
+  it('keeps top-level selectable questions visible even when follow-up heuristics see "other" text', () => {
+    const questions = [
+      deliveryMethodQuestion,
+      dependentOtherQuestion,
+      topLevelSelectableQuestion,
+    ];
+    const dependencies = buildAutofillVisibilityDependencies(questions);
+
+    expect(dependencies.get('delivery-other-details')).toEqual({
+      parentQuestionId: 'delivery-method',
+      parentOptionIds: ['other'],
+    });
+    expect(dependencies.get('preferred-delivery-methods')).toBeUndefined();
+
+    expect(getVisibleAutofillQuestions(questions, {}).map((question) => question.id)).toEqual([
+      'delivery-method',
+      'preferred-delivery-methods',
     ]);
   });
 

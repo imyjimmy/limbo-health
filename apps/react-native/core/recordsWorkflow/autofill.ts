@@ -191,6 +191,9 @@ function inferQuestionVisibilityDependency(
 ): RecordsWorkflowVisibilityDependency | null {
   const question = questions[questionIndex];
   if (!question) return null;
+  if (question.kind !== 'short_text') {
+    return null;
+  }
 
   const questionSignal = buildQuestionDependencySignal(question);
   if (!FOLLOW_UP_HINT_PATTERN.test(questionSignal)) {
