@@ -72,8 +72,7 @@ export function buildRecordsRequestWorkflowSteps(
 
 const DATE_FORMAT_HINT_PATTERN =
   /\b(mm\s*\/\s*dd\s*\/\s*yyyy|mm-dd-yyyy|month\s*\/\s*day\s*\/\s*year|month day year)\b/i;
-const DATE_QUESTION_HINT_PATTERN =
-  /\b(date of birth|birth date|dob|service date|date of service|appointment date|visit date|admission date|discharge date|effective date|expiration date|expiry date|release date|event date)\b/i;
+const DATE_QUESTION_HINT_PATTERN = /\bdate\b|\bdob\b|\bbirth\b/i;
 const DATE_FIELD_NAME_HINT_PATTERN =
   /\b(date|dob|birth|service|visit|appointment|admission|admit|discharge|release|effective|expiration|expiry)\b/i;
 const DATE_EXCLUSION_PATTERN = /\bor event\b|\bor occurrence\b|\bor condition\b/i;

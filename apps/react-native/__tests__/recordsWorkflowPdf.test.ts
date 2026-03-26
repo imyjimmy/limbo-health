@@ -31,6 +31,7 @@ function createForm(
       templateId: null,
       confidence: 0.95,
       questions: [],
+      signatureAreas: [],
     },
     ...overrides,
   };
@@ -160,6 +161,7 @@ describe('records workflow pdf helpers', () => {
           mode: 'acroform',
           templateId: null,
           confidence: 0.95,
+          signatureAreas: [],
           questions: [
             {
               id: 'release-recipient',
@@ -240,6 +242,7 @@ describe('records workflow pdf helpers', () => {
           y: 40,
           width: 180,
           height: 44,
+          fitMode: 'center',
         },
       ],
       signature,
@@ -247,5 +250,96 @@ describe('records workflow pdf helpers', () => {
 
     expect(appliedCount).toBe(1);
     expect(await pdf.save()).toBeInstanceOf(Uint8Array);
+  });
+
+  it('fits baseline signatures wider than centered fallback widgets when height is the limiter', async () => {
+    const signature: RecordsRequestUserSignature = {
+      width: 280,
+      height: 220,
+      strokes: [
+        {
+          points: [
+            { x: 24, y: 28 },
+            { x: 42, y: 152 },
+            { x: 86, y: 204 },
+            { x: 128, y: 98 },
+            { x: 196, y: 170 },
+          ],
+        },
+      ],
+    };
+
+    const baselinePdf = await PDFDocument.create();
+    baselinePdf.addPage([320, 320]);
+    const centeredPdf = await PDFDocument.create();
+    centeredPdf.addPage([320, 320]);
+
+    const area = {
+      fieldName: 'Signature1',
+      pageIndex: 0,
+      x: 36,
+      y: 44,
+      width: 220,
+      height: 44,
+    };
+
+    expect(
+      __testing__.applySignatureOverlays(
+        baselinePdf,
+        [{ ...area, fitMode: 'baseline' }],
+        signature,
+      ),
+    ).toBe(1);
+    expect(
+      __testing__.applySignatureOverlays(
+        centeredPdf,
+        [{ ...area, fitMode: 'center' }],
+        signature,
+      ),
+    ).toBe(1);
+
+    expect((await baselinePdf.save()).length).not.toBe((await centeredPdf.save()).length);
+  });
+
+  it('prefers persisted signature areas from the published form payload', async () => {
+    const pdf = await PDFDocument.create();
+    pdf.addPage([300, 300]);
+
+    const signatureFields = __testing__.resolveSignatureFieldsForForm(
+      pdf,
+      createForm('authorization', {
+        autofill: {
+          supported: true,
+          mode: 'overlay',
+          templateId: 'authorization-template',
+          confidence: 0.95,
+          questions: [],
+          signatureAreas: [
+            {
+              id: 'signature1',
+              label: 'Patient signature',
+              fieldName: 'Signature1',
+              pageIndex: 0,
+              x: 40,
+              y: 72,
+              width: 220,
+              height: 42,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(signatureFields).toEqual([
+      {
+        fieldName: 'Signature1',
+        pageIndex: 0,
+        x: 40,
+        y: 72,
+        width: 220,
+        height: 42,
+        fitMode: 'baseline',
+      },
+    ]);
   });
 });

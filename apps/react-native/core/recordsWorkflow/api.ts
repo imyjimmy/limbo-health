@@ -62,6 +62,16 @@ interface ApiRecordsRequestPacket {
       mode: 'acroform' | 'overlay' | null;
       template_id: string | null;
       confidence?: number | null;
+      signature_areas?: {
+        id: string;
+        label: string | null;
+        field_name: string | null;
+        page_index: number;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }[];
       questions: {
         id: string;
         label: string;
@@ -301,7 +311,17 @@ export async function fetchRecordsRequestPacket(systemId: string): Promise<Recor
             label: option.label,
             confidence: option.confidence,
             bindings: option.bindings.map(mapAutofillBinding),
-          })),
+            })),
+        })),
+        signatureAreas: (form.autofill?.signature_areas || []).map((area) => ({
+          id: area.id,
+          label: area.label || 'Signature Area',
+          fieldName: area.field_name || null,
+          pageIndex: area.page_index,
+          x: area.x,
+          y: area.y,
+          width: area.width,
+          height: area.height,
         })),
       },
     })),

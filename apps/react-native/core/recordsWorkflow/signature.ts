@@ -23,24 +23,31 @@ function buildStrokeSegmentPath(
   options?: {
     offsetX?: number;
     offsetY?: number;
+    scaleY?: number;
   },
 ) {
   if (points.length === 0) return '';
 
   const offsetX = options?.offsetX || 0;
   const offsetY = options?.offsetY || 0;
+  const scaleY = options?.scaleY || 1;
   const [firstPoint, ...restPoints] = points;
   const startX = formatSignatureCoord(firstPoint.x - offsetX);
-  const startY = formatSignatureCoord(firstPoint.y - offsetY);
+  const startY = formatSignatureCoord((firstPoint.y - offsetY) * scaleY);
 
   if (restPoints.length === 0) {
     const dotX = formatSignatureCoord(firstPoint.x - offsetX + 0.01);
-    const dotY = formatSignatureCoord(firstPoint.y - offsetY + 0.01);
+    const dotY = formatSignatureCoord((firstPoint.y - offsetY + 0.01) * scaleY);
     return `M ${startX} ${startY} L ${dotX} ${dotY}`;
   }
 
   const lineSegments = restPoints
-    .map((point) => `L ${formatSignatureCoord(point.x - offsetX)} ${formatSignatureCoord(point.y - offsetY)}`)
+    .map(
+      (point) =>
+        `L ${formatSignatureCoord(point.x - offsetX)} ${formatSignatureCoord(
+          (point.y - offsetY) * scaleY,
+        )}`,
+    )
     .join(' ');
 
   return `M ${startX} ${startY} ${lineSegments}`;
@@ -95,17 +102,20 @@ export function buildSignatureSvgPath(
   signature: RecordsRequestUserSignature | null | undefined,
   options?: {
     normalize?: boolean;
+    scaleY?: number;
   },
 ) {
   if (!hasSignatureStrokeInput(signature)) return '';
 
   const bounds = options?.normalize ? getSignatureBounds(signature) : null;
+  const scaleY = options?.scaleY || 1;
 
   return signature.strokes
     .map((stroke) =>
       buildStrokeSegmentPath(stroke.points, {
         offsetX: bounds?.minX || 0,
         offsetY: bounds?.minY || 0,
+        scaleY,
       }),
     )
     .filter(Boolean)

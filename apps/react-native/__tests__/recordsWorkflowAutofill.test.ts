@@ -91,6 +91,22 @@ const dependentOtherQuestion: RecordsWorkflowAutofillQuestion = {
   options: [],
 };
 
+const recipientOtherQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'recipient-other-name',
+  label: 'If Other selected, specify Individual/Organization Name',
+  kind: 'short_text',
+  required: false,
+  helpText: null,
+  confidence: 0.91,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'IndividualOrganization Name',
+    },
+  ],
+  options: [],
+};
+
 const deliveryMethodQuestion: RecordsWorkflowAutofillQuestion = {
   id: 'delivery-method',
   label: 'How should we deliver the records?',
@@ -179,6 +195,42 @@ const facilityQuestion: RecordsWorkflowAutofillQuestion = {
   ],
 };
 
+const releaseToQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'release-to',
+  label: 'Select who will receive the released information',
+  kind: 'multi_select',
+  required: true,
+  helpText: null,
+  confidence: 0.97,
+  bindings: [],
+  options: [
+    {
+      id: 'patient-designee',
+      label: 'Patient/Designee',
+      confidence: 0.99,
+      bindings: [
+        {
+          type: 'field_checkbox',
+          fieldName: 'patient',
+          checked: true,
+        },
+      ],
+    },
+    {
+      id: 'other',
+      label: 'Other (please specify)',
+      confidence: 0.99,
+      bindings: [
+        {
+          type: 'field_checkbox',
+          fieldName: 'other',
+          checked: true,
+        },
+      ],
+    },
+  ],
+};
+
 const explicitDateQuestion: RecordsWorkflowAutofillQuestion = {
   id: 'service-date',
   label: 'Date of service',
@@ -206,6 +258,22 @@ const ambiguousDateOrEventQuestion: RecordsWorkflowAutofillQuestion = {
     {
       type: 'field_text',
       fieldName: 'expiration_date_or_event',
+    },
+  ],
+  options: [],
+};
+
+const treatmentDateQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'treatment-date-from',
+  label: 'Treatment date (from)',
+  kind: 'short_text',
+  required: false,
+  helpText: null,
+  confidence: 0.9,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'release from',
     },
   ],
   options: [],
@@ -244,6 +312,8 @@ describe('records workflow autofill helpers', () => {
     const questions = [
       deliveryMethodQuestion,
       dependentOtherQuestion,
+      releaseToQuestion,
+      recipientOtherQuestion,
       facilityQuestion,
       specifyProviderQuestion,
     ];
@@ -251,6 +321,10 @@ describe('records workflow autofill helpers', () => {
 
     expect(dependencies.get('delivery-other-details')).toEqual({
       parentQuestionId: 'delivery-method',
+      parentOptionIds: ['other'],
+    });
+    expect(dependencies.get('recipient-other-name')).toEqual({
+      parentQuestionId: 'release-to',
       parentOptionIds: ['other'],
     });
     expect(dependencies.get('provider-or-location')).toEqual({
@@ -270,20 +344,39 @@ describe('records workflow autofill helpers', () => {
     ).toBe(true);
 
     expect(
+      isAutofillQuestionVisible(
+        recipientOtherQuestion,
+        { 'release-to': ['patient-designee'] },
+        dependencies,
+      ),
+    ).toBe(false);
+    expect(
+      isAutofillQuestionVisible(
+        recipientOtherQuestion,
+        { 'release-to': ['other'] },
+        dependencies,
+      ),
+    ).toBe(true);
+
+    expect(
       getVisibleAutofillQuestions(questions, {
         'delivery-method': 'mail',
+        'release-to': ['patient-designee'],
         'facility-selector': ['clinic-visits'],
       }).map((question) => question.id),
-    ).toEqual(['delivery-method', 'facility-selector']);
+    ).toEqual(['delivery-method', 'release-to', 'facility-selector']);
 
     expect(
       getVisibleAutofillQuestions(questions, {
         'delivery-method': 'other',
+        'release-to': ['other'],
         'facility-selector': ['clinic-visits', 'specify-provider'],
       }).map((question) => question.id),
     ).toEqual([
       'delivery-method',
       'delivery-other-details',
+      'release-to',
+      'recipient-other-name',
       'facility-selector',
       'provider-or-location',
     ]);
@@ -311,6 +404,7 @@ describe('records workflow autofill helpers', () => {
 
   it('detects date-only questions conservatively and formats date input', () => {
     expect(isDateAutofillQuestion(explicitDateQuestion)).toBe(true);
+    expect(isDateAutofillQuestion(treatmentDateQuestion)).toBe(true);
     expect(isDateAutofillQuestion(shortTextQuestion)).toBe(false);
     expect(isDateAutofillQuestion(ambiguousDateOrEventQuestion)).toBe(true);
 

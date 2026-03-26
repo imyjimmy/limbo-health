@@ -72,12 +72,24 @@ export interface RecordsWorkflowAutofillQuestion {
   options: RecordsWorkflowAutofillOption[];
 }
 
+export interface RecordsWorkflowSignatureArea {
+  id: string;
+  label: string;
+  fieldName: string | null;
+  pageIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface RecordsWorkflowFormAutofill {
   supported: boolean;
   mode: RecordsWorkflowAutofillMode | null;
   templateId: string | null;
   confidence: number | null;
   questions: RecordsWorkflowAutofillQuestion[];
+  signatureAreas: RecordsWorkflowSignatureArea[];
 }
 
 export interface RecordsWorkflowInstruction {

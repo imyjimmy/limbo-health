@@ -72,6 +72,18 @@ describe('records workflow API client', () => {
                 mode: 'overlay',
                 template_id: 'authorization-template',
                 confidence: 0.93,
+                signature_areas: [
+                  {
+                    id: 'signature1',
+                    label: 'Patient signature',
+                    field_name: 'Signature1',
+                    page_index: 0,
+                    x: 54,
+                    y: 176.5,
+                    width: 324,
+                    height: 40,
+                  },
+                ],
                 questions: [
                   {
                     id: 'record-types',
@@ -129,6 +141,18 @@ describe('records workflow API client', () => {
       mode: 'overlay',
       templateId: 'authorization-template',
       confidence: 0.93,
+      signatureAreas: [
+        {
+          id: 'signature1',
+          label: 'Patient signature',
+          fieldName: 'Signature1',
+          pageIndex: 0,
+          x: 54,
+          y: 176.5,
+          width: 324,
+          height: 40,
+        },
+      ],
       questions: [
         {
           id: 'record-types',

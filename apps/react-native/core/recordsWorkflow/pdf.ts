@@ -40,12 +40,13 @@ interface GenerateRecordsRequestPdfInput {
 }
 
 interface RecordsRequestPdfSignatureField {
-  fieldName: string;
+  fieldName: string | null;
   pageIndex: number;
   x: number;
   y: number;
   width: number;
   height: number;
+  fitMode: 'center' | 'baseline';
 }
 
 interface PreparedRecordsRequestPdfTemplate {
@@ -477,11 +478,33 @@ function extractSignatureFields(pdf: PDFDocument): RecordsRequestPdfSignatureFie
         y: rect.y,
         width: rect.width,
         height: rect.height,
+        fitMode: 'center',
       });
     }
   }
 
   return signatureFields;
+}
+
+function buildPersistedSignatureFields(form: RecordsWorkflowForm): RecordsRequestPdfSignatureField[] {
+  return (form.autofill.signatureAreas || []).map((area) => ({
+    fieldName: area.fieldName,
+    pageIndex: area.pageIndex,
+    x: area.x,
+    y: area.y,
+    width: area.width,
+    height: area.height,
+    fitMode: 'baseline',
+  }));
+}
+
+function resolveSignatureFieldsForForm(
+  pdf: PDFDocument,
+  form: RecordsWorkflowForm,
+): RecordsRequestPdfSignatureField[] {
+  return form.autofill.signatureAreas.length > 0
+    ? buildPersistedSignatureFields(form)
+    : extractSignatureFields(pdf);
 }
 
 function applySignatureOverlays(
@@ -494,9 +517,8 @@ function applySignatureOverlays(
   }
 
   const signatureBounds = getSignatureBounds(signature);
-  const signaturePath = buildSignatureSvgPath(signature, { normalize: true });
 
-  if (!signatureBounds || !signaturePath) {
+  if (!signatureBounds) {
     return 0;
   }
 
@@ -504,23 +526,40 @@ function applySignatureOverlays(
 
   for (const signatureField of signatureFields) {
     const page = pdf.getPage(signatureField.pageIndex);
-    const padding = Math.min(signatureField.height * 0.18, signatureField.width * 0.08, 6);
-    const availableWidth = Math.max(signatureField.width - padding * 2, 1);
-    const availableHeight = Math.max(signatureField.height - padding * 2, 1);
-    const scale = Math.min(
-      availableWidth / signatureBounds.width,
-      availableHeight / signatureBounds.height,
-    );
+    const horizontalPadding = Math.min(signatureField.width * 0.06, 10);
+    const verticalPadding =
+      signatureField.fitMode === 'baseline'
+        ? Math.min(signatureField.height * 0.1, 4)
+        : Math.min(signatureField.height * 0.18, 6);
+    const availableWidth = Math.max(signatureField.width - horizontalPadding * 2, 1);
+    const availableHeight = Math.max(signatureField.height - verticalPadding * 2, 1);
+    const widthScale = availableWidth / signatureBounds.width;
+    const heightScale = availableHeight / signatureBounds.height;
+    let scale = Math.min(widthScale, heightScale);
+    let pathScaleY = 1;
 
-    if (!Number.isFinite(scale) || scale <= 0) {
+    if (signatureField.fitMode === 'baseline' && widthScale > heightScale) {
+      const minimumVerticalScale = 0.7;
+      scale = Math.min(widthScale, heightScale / minimumVerticalScale);
+      pathScaleY = Math.min(1, heightScale / scale);
+    }
+
+    const signaturePath = buildSignatureSvgPath(signature, {
+      normalize: true,
+      scaleY: pathScaleY,
+    });
+
+    if (!signaturePath || !Number.isFinite(scale) || scale <= 0) {
       continue;
     }
 
     const renderedWidth = signatureBounds.width * scale;
-    const renderedHeight = signatureBounds.height * scale;
+    const renderedHeight = signatureBounds.height * pathScaleY * scale;
     const offsetX = signatureField.x + (signatureField.width - renderedWidth) / 2;
-    const topPadding = (signatureField.height - renderedHeight) / 2;
-    const offsetY = signatureField.y + signatureField.height - topPadding;
+    const offsetY =
+      signatureField.fitMode === 'baseline'
+        ? signatureField.y + verticalPadding + renderedHeight
+        : signatureField.y + signatureField.height - (signatureField.height - renderedHeight) / 2;
 
     page.drawSvgPath(signaturePath, {
       x: offsetX,
@@ -592,7 +631,7 @@ async function prepareFormTemplate(
   const pdfBytes = new Uint8Array(await response.arrayBuffer());
   const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
   const flatTemplate = findFlatPdfTemplate({ packet, form, pdf });
-  const signatureFields = extractSignatureFields(pdf);
+  const signatureFields = resolveSignatureFieldsForForm(pdf, form);
 
   return {
     form,
@@ -652,8 +691,9 @@ async function chooseFillablePdfForm(
       const hasBioSupport = prepared.fieldCount > 0 || Boolean(prepared.flatTemplateId);
       const hasDynamicQuestionSupport =
         candidate.autofill.supported && candidate.autofill.questions.length > 0;
+      const hasSignatureSupport = prepared.signatureFields.length > 0;
 
-      if (hasBioSupport || hasDynamicQuestionSupport) {
+      if (hasBioSupport || hasDynamicQuestionSupport || hasSignatureSupport) {
         return prepared;
       }
 
@@ -709,10 +749,14 @@ async function applyOverlayMarkBinding(
   binding: Extract<RecordsWorkflowAutofillBinding, { type: 'overlay_mark' }>,
   font: PDFFont,
 ) {
+  const size = binding.size || 12;
+  const glyphWidth = font.widthOfTextAtSize('X', size);
+  const glyphHeight = font.heightAtSize(size, { descender: false });
+
   page.drawText('X', {
-    x: binding.x,
-    y: binding.y,
-    size: binding.size || 12,
+    x: binding.x - glyphWidth / 2,
+    y: binding.y - glyphHeight / 2,
+    size,
     font,
     color: pdfRgb(0, 0, 0),
   });
@@ -959,6 +1003,7 @@ export async function generateRecordsRequestPdf(input: GenerateRecordsRequestPdf
 export const __testing__ = {
   applySignatureOverlays,
   buildCurrentDateValue,
+  resolveSignatureFieldsForForm,
   extractSignatureFields,
   fillBioFields,
   getLanguagePreferenceScore,
