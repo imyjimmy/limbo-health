@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useBioProfile } from '../../../providers/BioProfileProvider';
 import {
@@ -26,6 +26,7 @@ import { getProfileChrome } from './profileChrome';
 
 export default function PersonalInfoScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
@@ -34,6 +35,7 @@ export default function PersonalInfoScreen() {
   const [form, setForm] = useState<BioProfile>(emptyBioProfile());
   const [didHydrate, setDidHydrate] = useState(false);
   const [saving, setSaving] = useState(false);
+  const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : params.returnTo;
 
   useEffect(() => {
     if (status !== 'ready' || didHydrate) return;
@@ -51,14 +53,14 @@ export default function PersonalInfoScreen() {
     setSaving(true);
     try {
       await saveProfile(form);
-      router.replace('/(tabs)/profile');
+      router.replace(returnTo || '/(tabs)/profile');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save your personal info.';
       Alert.alert('Could Not Save', message);
     } finally {
       setSaving(false);
     }
-  }, [form, router, saveProfile]);
+  }, [form, returnTo, router, saveProfile]);
 
   if (status === 'loading' && !didHydrate) {
     return (

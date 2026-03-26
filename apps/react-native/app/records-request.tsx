@@ -406,7 +406,7 @@ export default function RecordsRequestScreen() {
   if (!hasProfile || !profile) {
     return (
       <Redirect
-        href={{ pathname: '/bio-setup', params: { returnTo: '/records-request' } }}
+        href={{ pathname: '/(tabs)/profile/medical-info', params: { returnTo: '/records-request' } }}
         withAnchor
       />
     );
@@ -729,7 +729,7 @@ export default function RecordsRequestScreen() {
               <Pressable
                 onPress={() =>
                   router.push({
-                    pathname: '/bio-setup',
+                    pathname: '/(tabs)/profile/medical-info',
                     params: { returnTo: '/records-request' },
                   })
                 }

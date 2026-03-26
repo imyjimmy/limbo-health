@@ -5,7 +5,6 @@ import { CustomTabBar } from '../../components/navigation/CustomTabBar';
 import { ToastProvider, useToast } from '../../components/Toast';
 
 import { useAuthContext } from '../../providers/AuthProvider';
-import { useBioProfile } from '../../providers/BioProfileProvider';
 import { useCryptoContext } from '../../providers/CryptoProvider';
 import { InlineRecorderBar } from '../../components/audio/InlineRecorderBar';
 import type { AudioRecordingResult } from '../../hooks/useAudioRecorder';
@@ -27,7 +26,6 @@ function TabLayoutInner() {
   const router = useRouter();
   const pathname = usePathname();
   const { state } = useAuthContext();
-  const { status: bioStatus, hasProfile } = useBioProfile();
   const { masterConversationKey } = useCryptoContext();
   const { showToast } = useToast();
   const styles = useThemedStyles(createStyles);
@@ -162,18 +160,6 @@ function TabLayoutInner() {
     state.googleProfile?.name,
     state.googleProfile?.email,
   ]);
-
-  if (bioStatus === 'loading') {
-    return (
-      <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color={styles.loadingIndicator.color} />
-      </View>
-    );
-  }
-
-  if (!hasProfile) {
-    return <Redirect href="/bio-setup" withAnchor />;
-  }
 
   const handleInlineAudioComplete = async (result: AudioRecordingResult) => {
     if (!activeAudioContext || !recordingBinderService) {

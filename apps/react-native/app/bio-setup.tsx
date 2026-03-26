@@ -21,7 +21,6 @@ import {
   emptyBioProfile,
   formatDateOfBirthInput,
   formatLast4SsnInput,
-  isValidDateOfBirth,
   validateBioProfile,
   validateBioProfileAddress,
   validateBioProfileBasicDetails,
@@ -268,8 +267,6 @@ export default function BioSetupScreen() {
   const activeStep = steps[currentStep];
   const topBarLabel =
     currentStep > 0 ? 'Previous' : isEditingExistingProfile ? 'Back' : null;
-  const showsDateOfBirthDoneButton = isValidDateOfBirth(form.dateOfBirth.trim());
-  const showsPostalCodeDoneButton = form.postalCode.trim().length >= 5;
 
   return (
     <KeyboardAvoidingView
@@ -357,9 +354,7 @@ export default function BioSetupScreen() {
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   keyboardType="number-pad"
-                  inputAccessoryViewButtonLabel={
-                    Platform.OS === 'ios' && showsDateOfBirthDoneButton ? 'Done' : undefined
-                  }
+                  textContentType="birthdate"
                 />
               </View>
 
@@ -502,9 +497,6 @@ export default function BioSetupScreen() {
                   style={styles.input}
                   keyboardType="number-pad"
                   textContentType="postalCode"
-                  inputAccessoryViewButtonLabel={
-                    Platform.OS === 'ios' && showsPostalCodeDoneButton ? 'Done' : undefined
-                  }
                 />
               </View>
             </View>
