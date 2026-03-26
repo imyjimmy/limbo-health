@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DUMP_PATH="${1:-$ROOT_DIR/railway-export/records-workflow/records-workflow.dump}"
 RAILWAY_DATABASE_URL="${RAILWAY_RECORDS_WORKFLOW_DATABASE_URL:-}"
 RAILWAY_DATABASE_SERVICE="${RAILWAY_RECORDS_WORKFLOW_POSTGRES_SERVICE:-records-workflow-postgres}"
+POSTGRES_CLIENT_IMAGE="${POSTGRES_CLIENT_IMAGE:-postgres:18-alpine}"
 
 railway_args=()
 if [[ -n "${RAILWAY_PROJECT_ID:-}" ]]; then
@@ -17,11 +18,6 @@ fi
 
 if [[ ! -f "$DUMP_PATH" ]]; then
   echo "Dump file not found: $DUMP_PATH" >&2
-  exit 1
-fi
-
-if ! command -v pg_restore >/dev/null 2>&1; then
-  echo "pg_restore is required to import the dump." >&2
   exit 1
 fi
 
@@ -44,12 +40,23 @@ if [[ -z "$RAILWAY_DATABASE_URL" ]]; then
   exit 1
 fi
 
-pg_restore \
-  --clean \
-  --if-exists \
-  --no-owner \
-  --no-privileges \
-  --dbname="$RAILWAY_DATABASE_URL" \
-  "$DUMP_PATH"
+if command -v pg_restore >/dev/null 2>&1; then
+  pg_restore \
+    --clean \
+    --if-exists \
+    --no-owner \
+    --no-privileges \
+    --dbname="$RAILWAY_DATABASE_URL" \
+    "$DUMP_PATH"
+elif command -v docker >/dev/null 2>&1; then
+  docker run --rm \
+    -e RAILWAY_DATABASE_URL="$RAILWAY_DATABASE_URL" \
+    -v "$DUMP_PATH:/dump/records-workflow.dump:ro" \
+    "$POSTGRES_CLIENT_IMAGE" \
+    sh -lc 'pg_restore --clean --if-exists --no-owner --no-privileges --dbname="$RAILWAY_DATABASE_URL" /dump/records-workflow.dump'
+else
+  echo "pg_restore was not found and docker is unavailable." >&2
+  exit 1
+fi
 
 echo "Imported records workflow dump into Railway Postgres."

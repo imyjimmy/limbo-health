@@ -22,6 +22,7 @@
     "up": "docker-compose -f docker-compose.yml -f docker-compose.development.yml up -d",
     "db:migrate:mysql-to-postgres": "node scripts/migrate-core-mysql-to-postgres.mjs",
     "records-workflow:sync:railway-db": "./scripts/sync-records-workflow-railway-postgres.sh",
+    "records-workflow:sync:railway-parsed": "./scripts/sync-records-workflow-railway-parsed-storage.sh",
     "test:integration": "vitest run",
     "test:integration:watch": "vitest watch",
     "test:integration:verbose": "vitest run --reporter=verbose",
