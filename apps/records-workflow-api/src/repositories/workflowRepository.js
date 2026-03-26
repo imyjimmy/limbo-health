@@ -1319,6 +1319,232 @@ async function listLatestPublishedQuestionTemplatePayloads(sourceDocumentIds = [
   );
 }
 
+const QUESTION_FLOW_FOLLOW_UP_HINT_PATTERN = /\bif\b|\bother\b|\bspecify\b|\bdescribe\b|\bdetail\b|\bfill\b/i;
+const QUESTION_FLOW_OTHER_PATTERN =
+  /\bif\s*\(?other\)?\b|\bother\b|\bother\s*\(please specify\)|\bplease specify\b/i;
+const QUESTION_FLOW_TRAILING_HINT_PATTERN =
+  /\b(fill|field|text|value|answer|entry|details?|description)\b/g;
+const QUESTION_FLOW_STOP_WORDS = new Set([
+  'a',
+  'all',
+  'an',
+  'answer',
+  'and',
+  'applicable',
+  'apply',
+  'be',
+  'for',
+  'if',
+  'in',
+  'of',
+  'or',
+  'please',
+  'question',
+  'rest',
+  'selected',
+  'the',
+  'this',
+  'to',
+  'your',
+]);
+
+function normalizeQuestionFlowText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function trimQuestionFlowHintTokens(value) {
+  return normalizeQuestionFlowText(value).replace(QUESTION_FLOW_TRAILING_HINT_PATTERN, ' ').trim();
+}
+
+function tokenizeQuestionFlowText(value) {
+  return trimQuestionFlowHintTokens(value)
+    .split(/\s+/)
+    .filter((token) => token.length > 1 && !QUESTION_FLOW_STOP_WORDS.has(token));
+}
+
+function buildQuestionFlowSignal(question) {
+  return [
+    question?.label,
+    question?.help_text,
+    ...(Array.isArray(question?.bindings)
+      ? question.bindings
+          .filter((binding) => binding && typeof binding.field_name === 'string')
+          .map((binding) => binding.field_name)
+      : []),
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function buildOptionFlowSignal(option) {
+  return [
+    option?.label,
+    option?.id,
+    ...(Array.isArray(option?.bindings)
+      ? option.bindings
+          .filter((binding) => binding && typeof binding.field_name === 'string')
+          .map((binding) => binding.field_name)
+      : []),
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function scoreQuestionVisibilityOptionMatch(question, option) {
+  const questionSignal = normalizeQuestionFlowText(buildQuestionFlowSignal(question));
+  const questionSignalTrimmed = trimQuestionFlowHintTokens(buildQuestionFlowSignal(question));
+  const optionSignal = normalizeQuestionFlowText(buildOptionFlowSignal(option));
+  const optionSignalTrimmed = trimQuestionFlowHintTokens(buildOptionFlowSignal(option));
+  const questionTokens = new Set(tokenizeQuestionFlowText(buildQuestionFlowSignal(question)));
+  const optionTokens = new Set(tokenizeQuestionFlowText(buildOptionFlowSignal(option)));
+
+  let score = 0;
+
+  if (QUESTION_FLOW_OTHER_PATTERN.test(questionSignal) && /\bother\b/.test(optionSignal)) {
+    score += 6;
+  }
+
+  if (
+    questionSignalTrimmed &&
+    optionSignalTrimmed &&
+    (questionSignalTrimmed.includes(optionSignalTrimmed) ||
+      optionSignalTrimmed.includes(questionSignalTrimmed))
+  ) {
+    score += 5;
+  }
+
+  for (const token of questionTokens) {
+    if (optionTokens.has(token)) {
+      score += token === 'other' ? 3 : 2;
+    }
+  }
+
+  return score;
+}
+
+function normalizeVisibilityRule(rule) {
+  if (!rule || typeof rule !== 'object') return null;
+
+  const parentQuestionId = String(
+    rule.parent_question_id || rule.parentQuestionId || '',
+  ).trim();
+  const rawParentOptionIds = Array.isArray(rule.parent_option_ids)
+    ? rule.parent_option_ids
+    : Array.isArray(rule.parentOptionIds)
+      ? rule.parentOptionIds
+      : [];
+  const parentOptionIds = rawParentOptionIds
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  if (!parentQuestionId || parentOptionIds.length === 0) {
+    return null;
+  }
+
+  return {
+    parent_question_id: parentQuestionId,
+    parent_option_ids: Array.from(new Set(parentOptionIds)),
+  };
+}
+
+function inferLegacyVisibilityRule(questions = [], questionIndex = 0) {
+  const question = questions[questionIndex];
+  if (!question || question.kind !== 'short_text') return null;
+
+  const questionSignal = buildQuestionFlowSignal(question);
+  if (!QUESTION_FLOW_FOLLOW_UP_HINT_PATTERN.test(questionSignal)) {
+    return null;
+  }
+
+  let bestMatch = null;
+
+  for (let parentIndex = questionIndex - 1; parentIndex >= 0; parentIndex -= 1) {
+    const parentQuestion = questions[parentIndex];
+    if (!parentQuestion || parentQuestion.kind === 'short_text') continue;
+
+    const scoredOptions = (parentQuestion.options || [])
+      .map((option) => ({
+        option_id: option.id,
+        score: scoreQuestionVisibilityOptionMatch(question, option),
+      }))
+      .filter((entry) => entry.score > 0);
+
+    if (scoredOptions.length === 0) continue;
+
+    const topScore = Math.max(...scoredOptions.map((entry) => entry.score));
+    if (topScore < 4) continue;
+
+    const dependency = {
+      parent_question_id: parentQuestion.id,
+      parent_option_ids: scoredOptions
+        .filter((entry) => entry.score === topScore)
+        .map((entry) => entry.option_id),
+      score: topScore,
+      parentIndex,
+    };
+
+    if (
+      !bestMatch ||
+      dependency.parentIndex > bestMatch.parentIndex ||
+      (dependency.parentIndex === bestMatch.parentIndex && dependency.score > bestMatch.score)
+    ) {
+      bestMatch = dependency;
+    }
+  }
+
+  if (!bestMatch) return null;
+
+  return {
+    parent_question_id: bestMatch.parent_question_id,
+    parent_option_ids: bestMatch.parent_option_ids,
+  };
+}
+
+function normalizeQuestionFlowLinkId(questionId) {
+  const normalizedQuestionId = String(questionId || '').trim();
+  return normalizedQuestionId || null;
+}
+
+function attachQuestionFlowMetadataToAutofillPayload(autofill = buildUnsupportedAutofillPayload()) {
+  if (!autofill?.supported || !Array.isArray(autofill.questions) || autofill.questions.length === 0) {
+    return autofill;
+  }
+
+  const questions = autofill.questions.map((question, questionIndex, allQuestions) => {
+    const hasExplicitVisibilityRule =
+      Object.prototype.hasOwnProperty.call(question || {}, 'visibility_rule') ||
+      Object.prototype.hasOwnProperty.call(question || {}, 'visibilityRule');
+    const visibilityRule = hasExplicitVisibilityRule
+      ? normalizeVisibilityRule(question.visibility_rule || question.visibilityRule)
+      : inferLegacyVisibilityRule(allQuestions, questionIndex);
+    const previousQuestionId =
+      normalizeQuestionFlowLinkId(question.previous_question_id || question.previousQuestionId) ||
+      allQuestions[questionIndex - 1]?.id ||
+      null;
+    const nextQuestionId =
+      normalizeQuestionFlowLinkId(question.next_question_id || question.nextQuestionId) ||
+      allQuestions[questionIndex + 1]?.id ||
+      null;
+
+    return {
+      ...question,
+      visibility_rule: visibilityRule,
+      previous_question_id: previousQuestionId,
+      next_question_id: nextQuestionId,
+    };
+  });
+
+  return {
+    ...autofill,
+    questions,
+  };
+}
+
 async function attachAutofillMetadataToForms(forms = []) {
   const sourceDocumentIds = forms
     .map((form) => form?.cached_source_document_id)
@@ -1327,9 +1553,11 @@ async function attachAutofillMetadataToForms(forms = []) {
 
   return forms.map((form) => ({
     ...form,
-    autofill: form?.cached_source_document_id
-      ? bySourceDocumentId.get(form.cached_source_document_id) || buildUnsupportedAutofillPayload()
-      : buildUnsupportedAutofillPayload(),
+    autofill: attachQuestionFlowMetadataToAutofillPayload(
+      form?.cached_source_document_id
+        ? bySourceDocumentId.get(form.cached_source_document_id) || buildUnsupportedAutofillPayload()
+        : buildUnsupportedAutofillPayload(),
+    ),
   }));
 }
 
