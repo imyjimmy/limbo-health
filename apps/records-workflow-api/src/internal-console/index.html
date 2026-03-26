@@ -802,6 +802,8 @@
 
         .pdf-stage {
           @apply relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50;
+          user-select: none;
+          -webkit-user-select: none;
         }
 
         .pdf-canvas {
@@ -810,6 +812,8 @@
 
         .pdf-overlay {
           @apply pointer-events-none absolute inset-0 h-full w-full;
+          user-select: none;
+          -webkit-user-select: none;
         }
 
         .overlay-empty-note {
@@ -820,6 +824,18 @@
           fill: rgba(240, 68, 56, 0.12);
           stroke: #d92d20;
           stroke-width: 2;
+          pointer-events: none;
+        }
+
+        .overlay-hitbox {
+          fill: rgba(255, 255, 255, 0.001);
+          stroke: none;
+          pointer-events: fill;
+        }
+
+        .overlay-rect-signature {
+          fill: rgba(18, 183, 106, 0.1);
+          stroke: #039855;
         }
 
         .overlay-rect-active {
@@ -830,12 +846,16 @@
 
         .overlay-label {
           @apply fill-gray-800 text-[11px] font-semibold;
+          pointer-events: none;
+          user-select: none;
+          -webkit-user-select: none;
         }
 
         .overlay-handle {
           fill: #465fff;
           stroke: white;
           stroke-width: 2;
+          pointer-events: all;
         }
 
         .history-list {
@@ -1316,11 +1336,7 @@
                     <div class="flex flex-col gap-2">
                       <div class="editor-toolbar">
                         <button id="capture-question-from-pdf" type="button" class="ghost-button">Capture Question From PDF</button>
-                        <button id="map-selected-question" type="button" class="ghost-button">Rebind Selected Box</button>
-                        <button id="move-selected-rect" type="button" class="ghost-button">Move Box</button>
-                        <button id="resize-selected-rect" type="button" class="ghost-button">Resize Box</button>
-                        <button id="move-selected-question-up" type="button" class="ghost-button">Move Up</button>
-                        <button id="move-selected-question-down" type="button" class="ghost-button">Move Down</button>
+                        <button id="map-selected-question" type="button" class="ghost-button">Redraw Box</button>
                         <button id="cancel-pdf-editor-mode" type="button" class="tool-exit-button hidden">Exit Tool</button>
                         <button id="delete-selected-question" type="button" class="danger-button">Delete Question</button>
                       </div>
