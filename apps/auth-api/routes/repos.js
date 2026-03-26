@@ -104,9 +104,17 @@ router.post('/api/auth/check-access', requireInternalAuth, async (req, res) => {
     // --- UserId path ---
     if (userId) {
       const [rows] = await db.execute(
-        `SELECT access_level FROM repository_access
-         WHERE repo_id = ? AND user_id = ?`,
-        [repoId, userId]
+        `SELECT CASE
+                  WHEN r.owner_user_id = ? THEN 'admin'
+                  ELSE ra.access_level
+                END AS access_level
+         FROM repositories r
+         LEFT JOIN repository_access ra
+           ON ra.repo_id = r.id
+          AND ra.user_id = ?
+         WHERE r.id = ?
+           AND (r.owner_user_id = ? OR ra.user_id = ?)`,
+        [userId, userId, repoId, userId, userId]
       );
 
       if (rows.length === 0) {
@@ -146,12 +154,19 @@ router.get('/api/auth/user/repositories', requireInternalAuth, async (req, res) 
 
     const [rows] = await db.execute(
       `SELECT r.id AS "repoId", r.description, r.repo_type AS "repoType",
-              ra.access_level AS access, r.created_at AS "createdAt"
+              CASE
+                WHEN r.owner_user_id = ? THEN 'admin'
+                ELSE ra.access_level
+              END AS access,
+              r.created_at AS "createdAt"
        FROM repositories r
-       JOIN repository_access ra ON r.id = ra.repo_id
-       WHERE ra.user_id = ?
+       LEFT JOIN repository_access ra
+         ON r.id = ra.repo_id
+        AND ra.user_id = ?
+       WHERE r.owner_user_id = ?
+          OR ra.user_id = ?
        ORDER BY r.created_at DESC`,
-      [userId]
+      [userId, userId, userId, userId]
     );
 
     res.json(rows);
