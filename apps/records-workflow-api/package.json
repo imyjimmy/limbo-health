@@ -36,10 +36,12 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0",
+    "cloakbrowser": "^0.3.18",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
     "pdf-parse": "^1.1.1",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "playwright-core": "^1.58.2"
   }
 }
