@@ -16,6 +16,7 @@ import {
   backfillUserNameFromGoogle,
   resolveGoogleNameParts,
 } from './services/googleProfileBackfill.js';
+import { repairLinkedAccountArtifacts } from './services/accountLinking.js';
 
 const db = createPostgresCompatPool(resolveCoreDatabaseConfig());
 const coreDatabaseSummary = await ensureCoreDatabaseReady(db);
@@ -132,17 +133,52 @@ app.post('/api/auth/google/callback', async (req, res) => {
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
-      `SELECT oc.user_id, u.id_roles
+      `SELECT oc.id AS oauth_connection_id,
+              oc.user_id,
+              u.id AS resolved_user_id,
+              u.id_roles
        FROM oauth_connections oc
-       JOIN users u ON u.id = oc.user_id
-       WHERE oc.provider = 'google' AND oc.provider_user_id = ?`,
+       LEFT JOIN users u ON u.id = oc.user_id
+       WHERE oc.provider = 'google' AND oc.provider_user_id = ?
+       ORDER BY CASE WHEN u.id IS NULL THEN 1 ELSE 0 END, oc.id`,
       [userInfo.googleId]
     );
 
     let userId;
     let userRole;
 
-    if (connections.length === 0) {
+    const liveConnection = connections.find((connection) => connection.resolved_user_id);
+
+    if (liveConnection) {
+      userId = liveConnection.user_id;
+      userRole = liveConnection.id_roles;
+
+      // Update access token
+      await db.query(
+        `UPDATE oauth_connections SET access_token = ?, updated_at = NOW()
+         WHERE provider = 'google' AND provider_user_id = ?`,
+        [tokens.accessToken, userInfo.googleId]
+      );
+
+      await backfillUserNameFromGoogle(db, userId, userInfo);
+    } else if (connections.length > 0) {
+      const roleId = 2; // default to provider
+      const [insertResult] = await db.query(
+        `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
+         VALUES (?, ?, ?, ?, NOW())
+         RETURNING id`,
+        [userInfo.email, firstName, lastName, roleId]
+      );
+      userId = insertResult.insertId;
+      userRole = roleId;
+
+      await db.query(
+        `UPDATE oauth_connections
+            SET user_id = ?, provider_email = ?, access_token = ?, updated_at = NOW()
+          WHERE provider = 'google' AND provider_user_id = ?`,
+        [userId, userInfo.email, tokens.accessToken, userInfo.googleId]
+      );
+    } else {
       // New Google user — create user + oauth_connection
       const roleId = 2; // default to provider
       const [insertResult] = await db.query(
@@ -159,18 +195,22 @@ app.post('/api/auth/google/callback', async (req, res) => {
          VALUES (?, 'google', ?, ?, ?)`,
         [userId, userInfo.googleId, userInfo.email, tokens.accessToken]
       );
-    } else {
-      userId = connections[0].user_id;
-      userRole = connections[0].id_roles;
+    }
 
-      // Update access token
-      await db.query(
-        `UPDATE oauth_connections SET access_token = ?, updated_at = NOW()
-         WHERE provider = 'google' AND provider_user_id = ?`,
-        [tokens.accessToken, userInfo.googleId]
-      );
-
-      await backfillUserNameFromGoogle(db, userId, userInfo);
+    const repairConn = await db.getConnection();
+    try {
+      await repairConn.beginTransaction();
+      await repairLinkedAccountArtifacts(repairConn, {
+        currentUserId: userId,
+        googleId: userInfo.googleId,
+        email: userInfo.email,
+      });
+      await repairConn.commit();
+    } catch (repairError) {
+      await repairConn.rollback();
+      throw repairError;
+    } finally {
+      repairConn.release();
     }
 
     // Generate JWT with DB userId (integer), not googleId
@@ -217,10 +257,15 @@ app.post('/api/auth/google/token', async (req, res) => {
 
     // Look up existing oauth_connection for this Google account
     const [connections] = await db.query(
-      `SELECT oc.user_id, u.id_roles, u.nostr_pubkey
+      `SELECT oc.id AS oauth_connection_id,
+              oc.user_id,
+              u.id AS resolved_user_id,
+              u.id_roles,
+              u.nostr_pubkey
        FROM oauth_connections oc
-       JOIN users u ON u.id = oc.user_id
-       WHERE oc.provider = 'google' AND oc.provider_user_id = ?`,
+       LEFT JOIN users u ON u.id = oc.user_id
+       WHERE oc.provider = 'google' AND oc.provider_user_id = ?
+       ORDER BY CASE WHEN u.id IS NULL THEN 1 ELSE 0 END, oc.id`,
       [userInfo.googleId]
     );
 
@@ -230,7 +275,38 @@ app.post('/api/auth/google/token', async (req, res) => {
 
     const roleId = userType === 'patient' ? 3 : 2;
 
-    if (connections.length === 0) {
+    const liveConnection = connections.find((connection) => connection.resolved_user_id);
+
+    if (liveConnection) {
+      userId = liveConnection.user_id;
+      userRole = liveConnection.id_roles;
+      nostrPubkey = liveConnection.nostr_pubkey || null;
+
+      // Update access token
+      await db.query(
+        `UPDATE oauth_connections SET access_token = ?, updated_at = NOW()
+         WHERE provider = 'google' AND provider_user_id = ?`,
+        [accessToken, userInfo.googleId]
+      );
+
+      await backfillUserNameFromGoogle(db, userId, userInfo);
+    } else if (connections.length > 0) {
+      const [insertResult] = await db.query(
+        `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
+         VALUES (?, ?, ?, ?, NOW())
+         RETURNING id`,
+        [userInfo.email, firstName, lastName, roleId]
+      );
+      userId = insertResult.insertId;
+      userRole = roleId;
+
+      await db.query(
+        `UPDATE oauth_connections
+            SET user_id = ?, provider_email = ?, access_token = ?, updated_at = NOW()
+          WHERE provider = 'google' AND provider_user_id = ?`,
+        [userId, userInfo.email, accessToken, userInfo.googleId]
+      );
+    } else {
       // New Google user — create user + oauth_connection
       const [insertResult] = await db.query(
         `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
@@ -246,19 +322,24 @@ app.post('/api/auth/google/token', async (req, res) => {
          VALUES (?, 'google', ?, ?, ?)`,
         [userId, userInfo.googleId, userInfo.email, accessToken]
       );
-    } else {
-      userId = connections[0].user_id;
-      userRole = connections[0].id_roles;
-      nostrPubkey = connections[0].nostr_pubkey || null;
+    }
 
-      // Update access token
-      await db.query(
-        `UPDATE oauth_connections SET access_token = ?, updated_at = NOW()
-         WHERE provider = 'google' AND provider_user_id = ?`,
-        [accessToken, userInfo.googleId]
-      );
-
-      await backfillUserNameFromGoogle(db, userId, userInfo);
+    const repairConn = await db.getConnection();
+    try {
+      await repairConn.beginTransaction();
+      const repairResult = await repairLinkedAccountArtifacts(repairConn, {
+        currentUserId: userId,
+        googleId: userInfo.googleId,
+        email: userInfo.email,
+        desiredPubkey: nostrPubkey,
+      });
+      nostrPubkey = repairResult.currentPubkey;
+      await repairConn.commit();
+    } catch (repairError) {
+      await repairConn.rollback();
+      throw repairError;
+    } finally {
+      repairConn.release();
     }
 
     const token = jwt.sign({
@@ -342,79 +423,22 @@ app.post('/api/auth/link-nostr', async (req, res) => {
       }
 
       const existingPubkey = currentUser[0].nostr_pubkey;
-      if (existingPubkey === pubkey) {
-        // Idempotent — already linked to this exact key
-        await conn.rollback();
-        return res.json({ status: 'OK', pubkey, merged: false, message: 'Already linked' });
-      }
-      // If user had a different key (e.g. auto-generated), clear it so the new one can be set
-      if (existingPubkey) {
+      if (existingPubkey && existingPubkey !== pubkey) {
+        // User is switching from a placeholder/old key to the proven key.
         await conn.query(
           'UPDATE users SET nostr_pubkey = NULL WHERE id = ?',
           [googleUserId]
         );
       }
 
-      // Find old Nostr-only user by pubkey
-      const [oldUsers] = await conn.query(
-        'SELECT id FROM users WHERE nostr_pubkey = ?',
-        [pubkey]
-      );
+      const repairResult = await repairLinkedAccountArtifacts(conn, {
+        currentUserId: googleUserId,
+        googleId: decoded.googleId,
+        email: decoded.email,
+        desiredPubkey: pubkey,
+      });
 
-      let merged = false;
-
-      if (oldUsers.length > 0) {
-        const oldUserId = oldUsers[0].id;
-        merged = true;
-
-        // Transfer repositories ownership
-        await conn.query(
-          'UPDATE repositories SET owner_user_id = ? WHERE owner_user_id = ?',
-          [googleUserId, oldUserId]
-        );
-
-        // Transfer repository_access (handle unique constraint conflicts)
-        await conn.query(
-          `INSERT INTO repository_access (user_id, repo_id, access_level)
-           SELECT ?, repo_id, access_level
-           FROM repository_access WHERE user_id = ?
-           ON CONFLICT (repo_id, user_id) DO UPDATE
-           SET access_level = EXCLUDED.access_level`,
-          [googleUserId, oldUserId]
-        );
-        await conn.query(
-          'DELETE FROM repository_access WHERE user_id = ?',
-          [oldUserId]
-        );
-
-        // Transfer scan sessions
-        await conn.query(
-          'UPDATE scan_sessions SET patient_user_id = ? WHERE patient_user_id = ?',
-          [googleUserId, oldUserId]
-        );
-
-        // Transfer oauth connections (unlikely but safe)
-        await conn.query(
-          'UPDATE oauth_connections SET user_id = ? WHERE user_id = ?',
-          [googleUserId, oldUserId]
-        );
-
-        // Clear pubkey on old user (free UNIQUE constraint) then delete
-        await conn.query(
-          'UPDATE users SET nostr_pubkey = NULL WHERE id = ?',
-          [oldUserId]
-        );
-        await conn.query(
-          'DELETE FROM users WHERE id = ?',
-          [oldUserId]
-        );
-      }
-
-      // Set nostr_pubkey on the Google user
-      await conn.query(
-        'UPDATE users SET nostr_pubkey = ? WHERE id = ?',
-        [pubkey, googleUserId]
-      );
+      const merged = repairResult.transferredUserIds.length > 0;
 
       await conn.commit();
 
@@ -433,7 +457,13 @@ app.post('/api/auth/link-nostr', async (req, res) => {
 
       console.log(`Nostr key linked for Google user ${googleUserId}, pubkey: ${pubkey}, merged: ${merged}`);
 
-      res.json({ status: 'OK', token, pubkey, merged });
+      res.json({
+        status: 'OK',
+        token,
+        pubkey,
+        merged,
+        message: merged ? undefined : 'Already linked',
+      });
 
     } catch (txErr) {
       await conn.rollback();
