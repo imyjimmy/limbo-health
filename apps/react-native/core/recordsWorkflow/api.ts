@@ -79,6 +79,12 @@ interface ApiRecordsRequestPacket {
         required: boolean;
         help_text: string | null;
         confidence: number;
+        visibility_rule?: {
+          parent_question_id: string;
+          parent_option_ids: string[];
+        } | null;
+        previous_question_id?: string | null;
+        next_question_id?: string | null;
         bindings: ApiAutofillBinding[];
         options: {
           id: string;
@@ -257,8 +263,11 @@ export async function fetchHospitalSystems(
 }
 
 export async function fetchRecordsRequestPacket(systemId: string): Promise<RecordsRequestPacket> {
+  const params = new URLSearchParams({
+    _ts: Date.now().toString(),
+  });
   const data = await fetchJson<ApiRecordsRequestPacket>(
-    `/hospital-systems/${encodeURIComponent(systemId)}/records-request-packet`,
+    `/hospital-systems/${encodeURIComponent(systemId)}/records-request-packet?${params.toString()}`,
   );
 
   return {
@@ -305,6 +314,14 @@ export async function fetchRecordsRequestPacket(systemId: string): Promise<Recor
           required: question.required,
           helpText: question.help_text,
           confidence: question.confidence,
+          visibilityRule: question.visibility_rule
+            ? {
+                parentQuestionId: question.visibility_rule.parent_question_id,
+                parentOptionIds: question.visibility_rule.parent_option_ids,
+              }
+            : null,
+          previousQuestionId: question.previous_question_id || null,
+          nextQuestionId: question.next_question_id || null,
           bindings: question.bindings.map(mapAutofillBinding),
           options: question.options.map((option) => ({
             id: option.id,

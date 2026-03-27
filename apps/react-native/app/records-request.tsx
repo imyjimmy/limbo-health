@@ -33,6 +33,8 @@ import { fetchHospitalSystems, fetchRecordsRequestPacket } from '../core/records
 import {
   buildRecordsRequestWorkflowSteps,
   formatDateAutofillAnswerInput,
+  getNextAutofillQuestionId,
+  getPreviousAutofillQuestionId,
   getRecordsRequestQuestionStepId,
   getVisibleAutofillQuestions,
   isDateAutofillQuestion,
@@ -567,6 +569,22 @@ export default function RecordsRequestScreen() {
   };
 
   const goToPreviousStep = () => {
+    if (currentQuestion) {
+      const previousQuestionId = getPreviousAutofillQuestionId(
+        allDynamicQuestions,
+        currentQuestion.id,
+        autofillAnswersRef.current,
+      );
+
+      if (previousQuestionId) {
+        goToStep(getRecordsRequestQuestionStepId(previousQuestionId));
+        return;
+      }
+
+      goToStep('hospital');
+      return;
+    }
+
     goToStepByIndex(currentStepIndex - 1);
   };
 
@@ -578,18 +596,8 @@ export default function RecordsRequestScreen() {
     currentQuestionId: string,
     answers: RecordsWorkflowAutofillAnswers,
   ) => {
-    const nextVisibleQuestions = getVisibleAutofillQuestions(allDynamicQuestions, answers);
-    const nextSteps = buildRecordsRequestWorkflowSteps(nextVisibleQuestions, {
-      includeSignatureStep: hasSignatureStep,
-    });
-    const currentQuestionStepId = getRecordsRequestQuestionStepId(currentQuestionId);
-    const nextIndex = nextSteps.findIndex((step) => step.id === currentQuestionStepId);
-
-    if (nextIndex === -1) {
-      return nextSteps[0]?.id || 'bio';
-    }
-
-    return nextSteps[nextIndex + 1]?.id || 'submit';
+    const nextQuestionId = getNextAutofillQuestionId(allDynamicQuestions, currentQuestionId, answers);
+    return nextQuestionId ? getRecordsRequestQuestionStepId(nextQuestionId) : 'id';
   };
 
   const handleContinueFromHospital = () => {

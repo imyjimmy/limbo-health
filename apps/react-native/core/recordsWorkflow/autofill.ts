@@ -1,13 +1,8 @@
 import type {
-  RecordsWorkflowAutofillOption,
   RecordsWorkflowAutofillQuestion,
 } from '../../types/recordsRequest';
 
 export type RecordsWorkflowAutofillAnswers = Record<string, string | string[]>;
-export interface RecordsWorkflowVisibilityDependency {
-  parentQuestionId: string;
-  parentOptionIds: string[];
-}
 export type RecordsRequestWorkflowStep =
   | {
       id: 'bio';
@@ -76,32 +71,6 @@ const DATE_QUESTION_HINT_PATTERN = /\bdate\b|\bdob\b|\bbirth\b/i;
 const DATE_FIELD_NAME_HINT_PATTERN =
   /\b(date|dob|birth|service|visit|appointment|admission|admit|discharge|release|effective|expiration|expiry)\b/i;
 const DATE_EXCLUSION_PATTERN = /\bor event\b|\bor occurrence\b|\bor condition\b/i;
-const OTHER_DEPENDENCY_PATTERN = /\bif\s*\(?other\)?\b|\bother\b|\bother\s*\(please specify\)|\bplease specify\b/i;
-const FOLLOW_UP_HINT_PATTERN = /\bif\b|\bother\b|\bspecify\b|\bdescribe\b|\bdetail\b|\bfill\b/i;
-const STOP_WORDS = new Set([
-  'a',
-  'all',
-  'an',
-  'answer',
-  'and',
-  'applicable',
-  'apply',
-  'be',
-  'for',
-  'if',
-  'in',
-  'of',
-  'or',
-  'please',
-  'question',
-  'rest',
-  'the',
-  'this',
-  'to',
-  'your',
-]);
-const TRAILING_DEPENDENCY_HINT_PATTERN =
-  /\b(fill|field|text|value|answer|entry|details?|description)\b/g;
 
 function getQuestionBindingFieldNames(question: RecordsWorkflowAutofillQuestion) {
   return question.bindings
@@ -111,164 +80,11 @@ function getQuestionBindingFieldNames(question: RecordsWorkflowAutofillQuestion)
     .join(' ');
 }
 
-function getOptionBindingFieldNames(option: RecordsWorkflowAutofillOption) {
-  return option.bindings
-    .filter((binding) => 'fieldName' in binding)
-    .map((binding) => binding.fieldName)
-    .filter(Boolean)
-    .join(' ');
-}
-
-function normalizeDependencyText(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function trimDependencyHintTokens(value: string) {
-  return normalizeDependencyText(value).replace(TRAILING_DEPENDENCY_HINT_PATTERN, ' ').trim();
-}
-
-function tokenizeDependencyText(value: string) {
-  return trimDependencyHintTokens(value)
-    .split(/\s+/)
-    .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
-}
-
-function buildQuestionDependencySignal(question: RecordsWorkflowAutofillQuestion) {
-  return [question.label, question.helpText, getQuestionBindingFieldNames(question)]
-    .filter(Boolean)
-    .join(' ');
-}
-
-function buildOptionDependencySignal(option: RecordsWorkflowAutofillOption) {
-  return [option.label, option.id, getOptionBindingFieldNames(option)]
-    .filter(Boolean)
-    .join(' ');
-}
-
-function scoreOptionVisibilityDependency(
-  question: RecordsWorkflowAutofillQuestion,
-  option: RecordsWorkflowAutofillOption,
-) {
-  const questionSignal = normalizeDependencyText(buildQuestionDependencySignal(question));
-  const questionSignalTrimmed = trimDependencyHintTokens(buildQuestionDependencySignal(question));
-  const optionSignal = normalizeDependencyText(buildOptionDependencySignal(option));
-  const optionSignalTrimmed = trimDependencyHintTokens(buildOptionDependencySignal(option));
-  const questionTokens = new Set(tokenizeDependencyText(buildQuestionDependencySignal(question)));
-  const optionTokens = new Set(tokenizeDependencyText(buildOptionDependencySignal(option)));
-
-  let score = 0;
-
-  if (OTHER_DEPENDENCY_PATTERN.test(questionSignal) && /\bother\b/.test(optionSignal)) {
-    score += 6;
-  }
-
-  if (
-    questionSignalTrimmed &&
-    optionSignalTrimmed &&
-    (questionSignalTrimmed.includes(optionSignalTrimmed) ||
-      optionSignalTrimmed.includes(questionSignalTrimmed))
-  ) {
-    score += 5;
-  }
-
-  for (const token of questionTokens) {
-    if (optionTokens.has(token)) {
-      score += token === 'other' ? 3 : 2;
-    }
-  }
-
-  return score;
-}
-
-function inferQuestionVisibilityDependency(
-  questions: RecordsWorkflowAutofillQuestion[],
-  questionIndex: number,
-): RecordsWorkflowVisibilityDependency | null {
-  const question = questions[questionIndex];
-  if (!question) return null;
-  if (question.kind !== 'short_text') {
-    return null;
-  }
-
-  const questionSignal = buildQuestionDependencySignal(question);
-  if (!FOLLOW_UP_HINT_PATTERN.test(questionSignal)) {
-    return null;
-  }
-
-  let bestMatch:
-    | (RecordsWorkflowVisibilityDependency & {
-        score: number;
-        parentIndex: number;
-      })
-    | null = null;
-
-  for (let parentIndex = questionIndex - 1; parentIndex >= 0; parentIndex -= 1) {
-    const parentQuestion = questions[parentIndex];
-    if (!parentQuestion || parentQuestion.kind === 'short_text') continue;
-
-    const scoredOptions = parentQuestion.options
-      .map((option) => ({
-        optionId: option.id,
-        score: scoreOptionVisibilityDependency(question, option),
-      }))
-      .filter((entry) => entry.score > 0);
-
-    if (scoredOptions.length === 0) continue;
-
-    const topScore = Math.max(...scoredOptions.map((entry) => entry.score));
-    if (topScore < 4) continue;
-
-    const dependency = {
-      parentQuestionId: parentQuestion.id,
-      parentOptionIds: scoredOptions
-        .filter((entry) => entry.score === topScore)
-        .map((entry) => entry.optionId),
-      score: topScore,
-      parentIndex,
-    };
-
-    if (
-      !bestMatch ||
-      dependency.parentIndex > bestMatch.parentIndex ||
-      (dependency.parentIndex === bestMatch.parentIndex && dependency.score > bestMatch.score)
-    ) {
-      bestMatch = dependency;
-    }
-  }
-
-  if (!bestMatch) return null;
-
-  return {
-    parentQuestionId: bestMatch.parentQuestionId,
-    parentOptionIds: bestMatch.parentOptionIds,
-  };
-}
-
-export function buildAutofillVisibilityDependencies(
-  questions: RecordsWorkflowAutofillQuestion[],
-) {
-  const dependencies = new Map<string, RecordsWorkflowVisibilityDependency>();
-
-  for (let questionIndex = 0; questionIndex < questions.length; questionIndex += 1) {
-    const dependency = inferQuestionVisibilityDependency(questions, questionIndex);
-    if (!dependency) continue;
-    dependencies.set(questions[questionIndex].id, dependency);
-  }
-
-  return dependencies;
-}
-
 export function isAutofillQuestionVisible(
   question: RecordsWorkflowAutofillQuestion,
   answers: RecordsWorkflowAutofillAnswers,
-  dependencies: Map<string, RecordsWorkflowVisibilityDependency>,
 ) {
-  const dependency = dependencies.get(question.id);
+  const dependency = question.visibilityRule;
   if (!dependency) return true;
 
   const parentAnswer = answers[dependency.parentQuestionId];
@@ -287,8 +103,81 @@ export function getVisibleAutofillQuestions(
   questions: RecordsWorkflowAutofillQuestion[],
   answers: RecordsWorkflowAutofillAnswers,
 ) {
-  const dependencies = buildAutofillVisibilityDependencies(questions);
-  return questions.filter((question) => isAutofillQuestionVisible(question, answers, dependencies));
+  return questions.filter((question) => isAutofillQuestionVisible(question, answers));
+}
+
+function findQuestionById(
+  questions: RecordsWorkflowAutofillQuestion[],
+  questionId: string,
+) {
+  return questions.find((question) => question.id === questionId) || null;
+}
+
+function getAdjacentQuestionIdByOrder(
+  questions: RecordsWorkflowAutofillQuestion[],
+  currentQuestionId: string,
+  direction: 'next' | 'previous',
+) {
+  const currentQuestionIndex = questions.findIndex((question) => question.id === currentQuestionId);
+  if (currentQuestionIndex === -1) return null;
+
+  const adjacentQuestion =
+    direction === 'next'
+      ? questions[currentQuestionIndex + 1]
+      : questions[currentQuestionIndex - 1];
+
+  return adjacentQuestion?.id || null;
+}
+
+export function getNextAutofillQuestionId(
+  questions: RecordsWorkflowAutofillQuestion[],
+  currentQuestionId: string,
+  answers: RecordsWorkflowAutofillAnswers,
+) {
+  const visitedQuestionIds = new Set<string>();
+  let nextQuestionId =
+    findQuestionById(questions, currentQuestionId)?.nextQuestionId ||
+    getAdjacentQuestionIdByOrder(questions, currentQuestionId, 'next');
+
+  while (nextQuestionId && !visitedQuestionIds.has(nextQuestionId)) {
+    visitedQuestionIds.add(nextQuestionId);
+    const nextQuestion = findQuestionById(questions, nextQuestionId);
+    if (!nextQuestion) return null;
+    if (isAutofillQuestionVisible(nextQuestion, answers)) {
+      return nextQuestion.id;
+    }
+
+    nextQuestionId =
+      nextQuestion.nextQuestionId || getAdjacentQuestionIdByOrder(questions, nextQuestion.id, 'next');
+  }
+
+  return null;
+}
+
+export function getPreviousAutofillQuestionId(
+  questions: RecordsWorkflowAutofillQuestion[],
+  currentQuestionId: string,
+  answers: RecordsWorkflowAutofillAnswers,
+) {
+  const visitedQuestionIds = new Set<string>();
+  let previousQuestionId =
+    findQuestionById(questions, currentQuestionId)?.previousQuestionId ||
+    getAdjacentQuestionIdByOrder(questions, currentQuestionId, 'previous');
+
+  while (previousQuestionId && !visitedQuestionIds.has(previousQuestionId)) {
+    visitedQuestionIds.add(previousQuestionId);
+    const previousQuestion = findQuestionById(questions, previousQuestionId);
+    if (!previousQuestion) return null;
+    if (isAutofillQuestionVisible(previousQuestion, answers)) {
+      return previousQuestion.id;
+    }
+
+    previousQuestionId =
+      previousQuestion.previousQuestionId ||
+      getAdjacentQuestionIdByOrder(questions, previousQuestion.id, 'previous');
+  }
+
+  return null;
 }
 
 export function isDateAutofillQuestion(question: RecordsWorkflowAutofillQuestion) {

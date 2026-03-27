@@ -89,7 +89,7 @@ export default function ImportKeyForm({ mode, title, onBack, onSuccess }: Import
         onSuccess ? onSuccess() : router.back();
       } else {
         await login(privkeyBytes);
-        router.replace('/(tabs)/home');
+        router.replace('/');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';

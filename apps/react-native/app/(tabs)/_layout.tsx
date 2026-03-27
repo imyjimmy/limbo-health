@@ -25,7 +25,7 @@ function TabLayoutInner() {
   // Adjust these to match your actual AuthProvider shape
   const router = useRouter();
   const pathname = usePathname();
-  const { state } = useAuthContext();
+  const { state, needsOnboarding } = useAuthContext();
   const { masterConversationKey } = useCryptoContext();
   const { showToast } = useToast();
   const styles = useThemedStyles(createStyles);
@@ -33,6 +33,26 @@ function TabLayoutInner() {
     binderId: string;
     dirPath: string;
   } | null>(null);
+
+  if (state.status === 'loading') {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (state.status === 'onboarding') {
+    return <Redirect href="/" withAnchor />;
+  }
+
+  if (state.status === 'expired' && state.loginMethod === 'google') {
+    return <Redirect href="/" withAnchor />;
+  }
+
+  if (state.status === 'authenticated' && needsOnboarding) {
+    return <Redirect href="/bio-setup" withAnchor />;
+  }
 
   const profileImageUrl = state.metadata?.picture ?? state.googleProfile?.picture ?? null;
   const profileName = state.metadata?.name ?? state.googleProfile?.name;

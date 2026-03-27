@@ -102,6 +102,7 @@ describe('normalizePdfFormUnderstanding', () => {
           required: true,
           help_text: null,
           confidence: 0.89,
+          visibility_rule: null,
           bindings: [],
           options: [
             {
@@ -250,5 +251,40 @@ describe('normalizePdfFormUnderstanding', () => {
         height: 40,
       },
     ]);
+  });
+
+  it('preserves explicit visibility rules on normalized follow-up questions', () => {
+    const result = normalizePdfFormUnderstanding({
+      mode: 'acroform',
+      confidence: 0.96,
+      questions: [
+        {
+          id: 'purpose-other-details',
+          label: 'If other, specify the purpose of the use or disclosure',
+          kind: 'short_text',
+          required: false,
+          confidence: 0.96,
+          visibility_rule: {
+            parent_question_id: 'purpose-of-use',
+            parent_option_ids: ['other'],
+          },
+          bindings: [
+            {
+              type: 'field_text',
+              field_name: 'fill_4',
+            },
+          ],
+          options: [],
+        },
+      ],
+    });
+
+    expect(result.questions[0]).toMatchObject({
+      id: 'purpose-other-details',
+      visibility_rule: {
+        parent_question_id: 'purpose-of-use',
+        parent_option_ids: ['other'],
+      },
+    });
   });
 });

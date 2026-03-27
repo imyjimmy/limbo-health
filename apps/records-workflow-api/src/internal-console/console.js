@@ -3774,6 +3774,83 @@ function pdfRectToScreenRect(renderedPage, rect) {
   };
 }
 
+function buildPdfEditorOverlayRectsForPage(renderedPage) {
+  const activeQuestion = currentPdfEditorQuestion();
+  const activeSignatureArea = currentPdfEditorSignatureArea();
+  const activeRect = activePdfEditorEditableRect();
+  const previewRect = state.pdfEditorPendingRectEdit?.previewRect || null;
+
+  const questionRects = state.pdfEditorQuestions.flatMap((question) =>
+    question.rects
+      .filter((rect) => rect.page_index === renderedPage.page_index)
+      .map((rect) => {
+        const isActiveRect =
+          question.id === activeQuestion?.id &&
+          activeRect &&
+          rect.rect_key === activeRect.rect_key;
+
+        return {
+          ...(isActiveRect && previewRect ? { ...rect, ...previewRect } : rect),
+          active: question.id === activeQuestion?.id,
+          isActiveRect,
+          question_label: question.label,
+          overlay_kind: 'question',
+          owner_id: question.id,
+          owner_kind: 'question',
+        };
+      }),
+  );
+  const signatureRects = state.pdfEditorSignatureAreas.flatMap((area) =>
+    area.rects
+      .filter((rect) => rect.page_index === renderedPage.page_index)
+      .map((rect) => {
+        const isActiveRect =
+          area.id === activeSignatureArea?.id &&
+          activeRect &&
+          rect.rect_key === activeRect.rect_key;
+
+        return {
+          ...(isActiveRect && previewRect ? { ...rect, ...previewRect } : rect),
+          active: area.id === activeSignatureArea?.id,
+          isActiveRect,
+          question_label: area.label,
+          context_label: area.label,
+          overlay_kind: 'signature_area',
+          owner_id: area.id,
+          owner_kind: 'signature_area',
+        };
+      }),
+  );
+
+  return [...questionRects, ...signatureRects];
+}
+
+function hitTestPdfEditorRect(renderedPage, point) {
+  const rects = buildPdfEditorOverlayRectsForPage(renderedPage)
+    .map((rect) => ({
+      ...rect,
+      screenRect: pdfRectToScreenRect(renderedPage, rect),
+    }))
+    .filter((rect) => {
+      const left = rect.screenRect.left;
+      const top = rect.screenRect.top;
+      const right = left + rect.screenRect.width;
+      const bottom = top + rect.screenRect.height;
+      return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
+    })
+    .sort((left, right) => {
+      if (left.isActiveRect !== right.isActiveRect) {
+        return left.isActiveRect ? -1 : 1;
+      }
+
+      const leftArea = left.screenRect.width * left.screenRect.height;
+      const rightArea = right.screenRect.width * right.screenRect.height;
+      return leftArea - rightArea;
+    });
+
+  return rects[0] || null;
+}
+
 function activePdfEditorEditableRect() {
   const rects = currentPdfEditorRectsForActiveItem();
   if (!rects.length) return null;
@@ -4036,6 +4113,9 @@ function renderPdfEditorQuestions() {
   }
 
   const canDragQuestions = hasManualOverlayDraft() && state.pdfEditorAuthoringOpen;
+  const questionHierarchy = state.pdfEditorQuestions.map((question, index, questions) =>
+    buildPdfEditorQuestionHierarchy(question, index, questions),
+  );
   const signatureMarkup = state.pdfEditorSignatureAreas.length
     ? `
         <div class="section-kicker mb-2">Signature</div>
@@ -4069,11 +4149,15 @@ function renderPdfEditorQuestions() {
         ${signatureMarkup ? '<div class="section-kicker mt-4 mb-2">Questions</div>' : ''}
         ${state.pdfEditorQuestions
           .map((question, index) => {
+            const hierarchy = questionHierarchy[index] || null;
             const activeClass =
               question.id === state.pdfEditorActiveQuestionId
                 ? 'question-card question-card-active'
                 : 'question-card';
             const shellClasses = ['question-card-shell'];
+            if (hierarchy?.isDependent) {
+              shellClasses.push('question-card-shell-dependent');
+            }
             if (canDragQuestions) {
               shellClasses.push('question-card-shell-draggable');
             }
@@ -4092,6 +4176,7 @@ function renderPdfEditorQuestions() {
               <div
                 class="${shellClasses.join(' ')}"
                 data-question-id="${escapeHtml(question.id)}"
+                ${hierarchy?.parentId ? `data-parent-question-id="${escapeHtml(hierarchy.parentId)}"` : ''}
                 ${canDragQuestions ? 'draggable="true"' : ''}
               >
                 ${
@@ -4109,6 +4194,11 @@ function renderPdfEditorQuestions() {
                     : ''
                 }
                 <button type="button" class="${activeClass}" data-action="select-editor-question" data-question-id="${escapeHtml(question.id)}">
+                  ${
+                    hierarchy?.isDependent
+                      ? `<div class="question-followup-kicker">Follow-up to ${formatNumber(hierarchy.parentIndex + 1)}</div>`
+                      : ''
+                  }
                   <div class="question-title">${formatNumber(index + 1)}. ${escapeHtml(question.label)}</div>
                   <div class="question-copy">
                     ${
@@ -4133,6 +4223,66 @@ function renderPdfEditorQuestions() {
     : '';
 
   elements.pdfEditorQuestions.innerHTML = `${signatureMarkup}${questionMarkup}`;
+}
+
+const PDF_EDITOR_FOLLOW_UP_START_PATTERN = /^\s*if\b/i;
+const PDF_EDITOR_FOLLOW_UP_HINT_PATTERN = /\bselected\b|\bspecify\b|\bdescribe\b|\bdetail\b|\bfill\b/i;
+
+function isPdfEditorDependentQuestion(question) {
+  if (!question || question.kind !== 'short_text') {
+    return false;
+  }
+
+  const label = String(question.label || '').trim();
+  if (!label || !PDF_EDITOR_FOLLOW_UP_START_PATTERN.test(label)) {
+    return false;
+  }
+
+  return PDF_EDITOR_FOLLOW_UP_HINT_PATTERN.test(label);
+}
+
+function findPdfEditorParentQuestion(question, questionIndex, questions) {
+  if (!isPdfEditorDependentQuestion(question)) {
+    return null;
+  }
+
+  for (let index = questionIndex - 1; index >= 0; index -= 1) {
+    const candidate = questions[index];
+    if (!candidate) continue;
+
+    if (question.id && candidate.id && String(question.id).startsWith(`${candidate.id}_`)) {
+      return {
+        parentId: candidate.id,
+        parentIndex: index,
+        parentLabel: candidate.label,
+      };
+    }
+  }
+
+  for (let index = questionIndex - 1; index >= 0; index -= 1) {
+    const candidate = questions[index];
+    if (!candidate || isPdfEditorDependentQuestion(candidate)) {
+      continue;
+    }
+
+    return {
+      parentId: candidate.id,
+      parentIndex: index,
+      parentLabel: candidate.label,
+    };
+  }
+
+  return null;
+}
+
+function buildPdfEditorQuestionHierarchy(question, questionIndex, questions) {
+  const parent = findPdfEditorParentQuestion(question, questionIndex, questions);
+  return {
+    isDependent: Boolean(parent),
+    parentId: parent?.parentId || null,
+    parentIndex: parent?.parentIndex ?? -1,
+    parentLabel: parent?.parentLabel || null,
+  };
 }
 
 function exitPdfEditorInteractionMode() {
@@ -4225,12 +4375,6 @@ async function renderPdfEditorPages() {
 }
 
 function updatePdfEditorOverlays() {
-  const activeQuestion = currentPdfEditorQuestion();
-  const activeSignatureArea = currentPdfEditorSignatureArea();
-  const questionsToShow = state.pdfEditorQuestions;
-  const signatureAreasToShow = state.pdfEditorSignatureAreas;
-  const activeRect = activePdfEditorEditableRect();
-  const previewRect = state.pdfEditorPendingRectEdit?.previewRect || null;
   const authoringActive = hasManualOverlayDraft() && state.pdfEditorAuthoringOpen;
   const overlayCursor = !hasManualOverlayDraft() || !state.pdfEditorAuthoringOpen
     ? 'default'
@@ -4241,48 +4385,7 @@ function updatePdfEditorOverlays() {
         : 'default';
 
   for (const renderedPage of state.pdfEditorRenderedPages) {
-    const questionRects = questionsToShow.flatMap((question) =>
-      question.rects
-        .filter((rect) => rect.page_index === renderedPage.page_index)
-        .map((rect) => {
-          const isActiveRect =
-            question.id === activeQuestion?.id &&
-            activeRect &&
-            rect.rect_key === activeRect.rect_key;
-
-          return {
-            ...(isActiveRect && previewRect ? { ...rect, ...previewRect } : rect),
-            active: question.id === activeQuestion?.id,
-            isActiveRect,
-            question_label: question.label,
-            overlay_kind: 'question',
-            owner_id: question.id,
-            owner_kind: 'question',
-          };
-        }),
-    );
-    const signatureRects = signatureAreasToShow.flatMap((area) =>
-      area.rects
-        .filter((rect) => rect.page_index === renderedPage.page_index)
-        .map((rect) => {
-          const isActiveRect =
-            area.id === activeSignatureArea?.id &&
-            activeRect &&
-            rect.rect_key === activeRect.rect_key;
-
-          return {
-            ...(isActiveRect && previewRect ? { ...rect, ...previewRect } : rect),
-            active: area.id === activeSignatureArea?.id,
-            isActiveRect,
-            question_label: area.label,
-            context_label: area.label,
-            overlay_kind: 'signature_area',
-            owner_id: area.id,
-            owner_kind: 'signature_area',
-          };
-        }),
-    );
-    const rects = [...questionRects, ...signatureRects];
+    const rects = buildPdfEditorOverlayRectsForPage(renderedPage);
 
     renderedPage.overlay.innerHTML = rects
       .map((rect) => {
@@ -7723,21 +7826,35 @@ elements.pdfEditorPages.addEventListener('pointerdown', (event) => {
   }
 
   const overlayItem = event.target.closest('[data-overlay-owner-id]');
-  if (!overlayItem) {
+  let ownerId = overlayItem?.getAttribute('data-overlay-owner-id') || null;
+  let ownerKind = overlayItem?.getAttribute('data-overlay-owner-kind') || null;
+  let rectKey = overlayItem?.getAttribute('data-overlay-rect-key') || null;
+  let targetRect =
+    ownerId && ownerKind && rectKey
+      ? pdfEditorRectByOwner(ownerId, ownerKind, rectKey)
+      : null;
+
+  if (!targetRect) {
+    const geometricHit = hitTestPdfEditorRect(renderedPage, point);
+    if (!geometricHit) {
+      return;
+    }
+
+    ownerId = geometricHit.owner_id;
+    ownerKind = geometricHit.owner_kind;
+    rectKey = geometricHit.rect_key;
+    targetRect = geometricHit;
+  }
+
+  if (!ownerId || !ownerKind || !rectKey || !targetRect) {
     return;
   }
 
-  const ownerId = overlayItem.getAttribute('data-overlay-owner-id');
-  const ownerKind = overlayItem.getAttribute('data-overlay-owner-kind');
-  const rectKey = overlayItem.getAttribute('data-overlay-rect-key');
-  if (!ownerId || !ownerKind || !rectKey) {
-    return;
-  }
+  event.preventDefault();
 
   setActivePdfEditorItem(ownerId, rectKey);
   renderPdfEditorQuestions();
 
-  const targetRect = pdfEditorRectByOwner(ownerId, ownerKind, rectKey);
   const canDirectEdit =
     pdfEditorRectSupportsDirectEditing(ownerKind, targetRect) &&
     targetRect &&

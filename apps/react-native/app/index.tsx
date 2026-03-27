@@ -6,7 +6,7 @@ import { useAuthContext } from '../providers/AuthProvider';
 import { ActivityIndicator, View } from 'react-native';
 
 export default function Index() {
-  const { state } = useAuthContext();
+  const { state, needsOnboarding } = useAuthContext();
   if (state.status === 'loading') {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -26,6 +26,10 @@ export default function Index() {
     }
     // Nostr users: go to tabs and let refreshAuth handle it
     return <Redirect href="/(tabs)/home" withAnchor />;
+  }
+
+  if (state.status === 'authenticated' && needsOnboarding) {
+    return <Redirect href="/bio-setup" withAnchor />;
   }
 
   return <Redirect href="/(tabs)/home" withAnchor />;

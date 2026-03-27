@@ -18,6 +18,11 @@ import { authenticateNostr, signChallenge } from '../core/crypto/nostrAuth';
 import { API_BASE_URL, ENDPOINTS } from '../constants/api';
 import type { AuthState, AuthStatus, LoginMethod, GoogleProfile, NostrMetadata, OAuthConnection } from '../types/auth';
 import { decode as base64Decode } from '../core/crypto/base64';
+import {
+  clearLocalOnboardingComplete,
+  markLocalOnboardingComplete,
+  readLocalOnboardingComplete,
+} from '../core/onboarding/storage';
 
 // --- Constants ---
 
@@ -39,6 +44,7 @@ const DEV_RESET_LOCAL_STATE_TOKEN =
 
 interface AuthContextValue {
   state: AuthState;
+  needsOnboarding: boolean;
   /** Master privkey held in memory after biometric unlock. Never persisted in plaintext. */
   privkey: Uint8Array | null;
   /** True if a Nostr key already exists in local secure storage. */
@@ -51,6 +57,7 @@ interface AuthContextValue {
   storeNostrKey: (privkey: Uint8Array) => Promise<void>;
   logout: () => Promise<void>;
   resetLocalAppState: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   updateMetadata: (partial: Partial<NostrMetadata>) => Promise<void>;
   deleteAccount: () => Promise<void>;
@@ -256,6 +263,8 @@ async function clearLocalAppStateStorage({
     console.warn('[AuthProvider] Failed to delete stored Nostr key during local reset', err);
   }
 
+  await clearLocalOnboardingComplete();
+
   if (devResetToken) {
     await secureStoreSetSafe(DEV_RESET_MARKER_KEY, devResetToken);
   }
@@ -286,6 +295,7 @@ async function fetchProfile(jwt: string): Promise<ProfileSnapshot> {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(emptyState('loading'));
+  const [needsOnboarding, setNeedsOnboarding] = useState(true);
   const [privkeyRef, setPrivkeyRef] = useState<Uint8Array | null>(null);
   const [hasStoredNostrKey, setHasStoredNostrKey] = useState(false);
 
@@ -309,6 +319,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const setHasStoredNostrKeySafe = (next: boolean): void => {
       if (!cancelled) setHasStoredNostrKey(next);
+    };
+
+    const setNeedsOnboardingSafe = (next: boolean): void => {
+      if (!cancelled) setNeedsOnboarding(next);
     };
 
     const hasStoredKeySafe = async (): Promise<boolean> => {
@@ -355,9 +369,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (resetRan) {
           setPrivkeySafe(null);
           setHasStoredNostrKeySafe(false);
+          setNeedsOnboardingSafe(true);
           setStateSafe(emptyState('onboarding'));
           return;
         }
+
+        const onboardingComplete = await readLocalOnboardingComplete();
+        setNeedsOnboardingSafe(!onboardingComplete);
 
         const storedLoginMethod = await secureStoreGetSafe(LOGIN_METHOD_KEY);
         startupLoginMethod = storedLoginMethod === 'google' || storedLoginMethod === 'nostr'
@@ -453,6 +471,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error('Auth startup failed:', err);
         setHasStoredNostrKeySafe(false);
+        setNeedsOnboardingSafe(true);
         if (startupLoginMethod === 'google') {
           setStateSafe({ ...emptyState('expired'), loginMethod: 'google' });
           return;
@@ -501,6 +520,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (resp.ok && data.token) {
             await SecureStore.setItemAsync(JWT_STORAGE_KEY, data.token);
             setState(prev => ({ ...prev, jwt: data.token, pubkey }));
+            fetchProfile(data.token).then(profile => {
+              setState(prev => applyProfileSnapshot(prev, profile));
+            });
           }
         }
       } catch (err) {
@@ -639,6 +661,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.token) {
           await SecureStore.setItemAsync(JWT_STORAGE_KEY, data.token);
           setState(prev => ({ ...prev, jwt: data.token, pubkey }));
+          fetchProfile(data.token).then(profile => {
+            setState(prev => applyProfileSnapshot(prev, profile));
+          });
         }
       }
 
@@ -672,9 +697,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       currentState: state,
     });
     setHasStoredNostrKey(false);
+    setNeedsOnboarding(true);
     setPrivkeyRef(null);
     setState(emptyState('onboarding'));
   }, [keyManager, state]);
+
+  const completeOnboarding = useCallback(async () => {
+    await markLocalOnboardingComplete();
+    setNeedsOnboarding(false);
+  }, []);
 
   // --- Update metadata (display name, etc.) ---
 
@@ -704,18 +735,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Backend succeeded — safe to clean up locally
-    try {
-      await keyManager.deleteMasterPrivkey();
-    } catch (err) {
-      console.warn('Failed to delete master privkey from Keychain:', err);
-    }
-
-    await SecureStore.deleteItemAsync(JWT_STORAGE_KEY);
-    await SecureStore.deleteItemAsync(METADATA_STORAGE_KEY);
-    await SecureStore.deleteItemAsync(LOGIN_METHOD_KEY);
-    await SecureStore.deleteItemAsync(GOOGLE_PROFILE_KEY);
+    await clearLocalAppStateStorage({
+      keyManager,
+      currentState: state,
+    });
     setHasStoredNostrKey(false);
-
+    setNeedsOnboarding(true);
     setPrivkeyRef(null);
     setState(emptyState('onboarding'));
   }, [state.jwt, keyManager]);
@@ -751,6 +776,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       state,
+      needsOnboarding,
       privkey: privkeyRef,
       hasStoredNostrKey,
       login,
@@ -759,11 +785,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       storeNostrKey,
       logout,
       resetLocalAppState,
+      completeOnboarding,
       refreshAuth,
       updateMetadata,
       deleteAccount,
     }),
-    [state, privkeyRef, hasStoredNostrKey, login, loginWithGoogle, loginWithStoredNostr, storeNostrKey, logout, resetLocalAppState, refreshAuth, updateMetadata, deleteAccount],
+    [state, needsOnboarding, privkeyRef, hasStoredNostrKey, login, loginWithGoogle, loginWithStoredNostr, storeNostrKey, logout, resetLocalAppState, completeOnboarding, refreshAuth, updateMetadata, deleteAccount],
   );
 
   return (

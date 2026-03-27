@@ -88,13 +88,16 @@ describe('records workflow API client', () => {
                   {
                     id: 'record-types',
                     label: 'What kind of records do you want?',
-                    kind: 'multi_select',
-                    required: true,
-                    help_text: 'Select every category you need.',
-                    confidence: 0.91,
-                    bindings: [],
-                    options: [
-                      {
+                  kind: 'multi_select',
+                  required: true,
+                  help_text: 'Select every category you need.',
+                  confidence: 0.91,
+                  visibility_rule: null,
+                  previous_question_id: null,
+                  next_question_id: null,
+                  bindings: [],
+                  options: [
+                    {
                         id: 'xrays',
                         label: 'X-rays',
                         confidence: 0.95,
@@ -130,8 +133,10 @@ describe('records workflow API client', () => {
 
     const packet = await fetchRecordsRequestPacket('system-1');
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://limbo.health/api/records-workflow/hospital-systems/system-1/records-request-packet',
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [calledUrl] = fetchMock.mock.calls[0] || [];
+    expect(String(calledUrl)).toMatch(
+      /^https:\/\/limbo\.health\/api\/records-workflow\/hospital-systems\/system-1\/records-request-packet\?_ts=\d+$/,
     );
     expect(packet.forms[0]?.cachedContentUrl).toBe(
       'https://limbo.health/api/records-workflow/source-documents/doc-1/content',
@@ -161,6 +166,9 @@ describe('records workflow API client', () => {
           required: true,
           helpText: 'Select every category you need.',
           confidence: 0.91,
+          visibilityRule: null,
+          previousQuestionId: null,
+          nextQuestionId: null,
           bindings: [],
           options: [
             {

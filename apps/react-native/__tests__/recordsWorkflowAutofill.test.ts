@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRecordsRequestWorkflowSteps,
-  buildAutofillVisibilityDependencies,
   formatDateAutofillAnswerInput,
+  getNextAutofillQuestionId,
+  getPreviousAutofillQuestionId,
   getRecordsRequestQuestionStepId,
   getVisibleAutofillQuestions,
   isDateAutofillQuestion,
@@ -89,6 +90,10 @@ const dependentOtherQuestion: RecordsWorkflowAutofillQuestion = {
     },
   ],
   options: [],
+  visibilityRule: {
+    parentQuestionId: 'delivery-method',
+    parentOptionIds: ['other'],
+  },
 };
 
 const topLevelSelectableQuestion: RecordsWorkflowAutofillQuestion = {
@@ -153,6 +158,10 @@ const recipientOtherQuestion: RecordsWorkflowAutofillQuestion = {
     },
   ],
   options: [],
+  visibilityRule: {
+    parentQuestionId: 'release-to',
+    parentOptionIds: ['other'],
+  },
 };
 
 const deliveryMethodQuestion: RecordsWorkflowAutofillQuestion = {
@@ -205,6 +214,10 @@ const specifyProviderQuestion: RecordsWorkflowAutofillQuestion = {
     },
   ],
   options: [],
+  visibilityRule: {
+    parentQuestionId: 'facility-selector',
+    parentOptionIds: ['specify-provider'],
+  },
 };
 
 const facilityQuestion: RecordsWorkflowAutofillQuestion = {
@@ -365,45 +378,19 @@ describe('records workflow autofill helpers', () => {
       facilityQuestion,
       specifyProviderQuestion,
     ];
-    const dependencies = buildAutofillVisibilityDependencies(questions);
-
-    expect(dependencies.get('delivery-other-details')).toEqual({
-      parentQuestionId: 'delivery-method',
-      parentOptionIds: ['other'],
-    });
-    expect(dependencies.get('recipient-other-name')).toEqual({
-      parentQuestionId: 'release-to',
-      parentOptionIds: ['other'],
-    });
-    expect(dependencies.get('provider-or-location')).toEqual({
-      parentQuestionId: 'facility-selector',
-      parentOptionIds: ['specify-provider'],
-    });
 
     expect(
-      isAutofillQuestionVisible(dependentOtherQuestion, { 'delivery-method': 'mail' }, dependencies),
+      isAutofillQuestionVisible(dependentOtherQuestion, { 'delivery-method': 'mail' }),
     ).toBe(false);
     expect(
-      isAutofillQuestionVisible(
-        dependentOtherQuestion,
-        { 'delivery-method': 'other' },
-        dependencies,
-      ),
+      isAutofillQuestionVisible(dependentOtherQuestion, { 'delivery-method': 'other' }),
     ).toBe(true);
 
     expect(
-      isAutofillQuestionVisible(
-        recipientOtherQuestion,
-        { 'release-to': ['patient-designee'] },
-        dependencies,
-      ),
+      isAutofillQuestionVisible(recipientOtherQuestion, { 'release-to': ['patient-designee'] }),
     ).toBe(false);
     expect(
-      isAutofillQuestionVisible(
-        recipientOtherQuestion,
-        { 'release-to': ['other'] },
-        dependencies,
-      ),
+      isAutofillQuestionVisible(recipientOtherQuestion, { 'release-to': ['other'] }),
     ).toBe(true);
 
     expect(
@@ -430,24 +417,57 @@ describe('records workflow autofill helpers', () => {
     ]);
   });
 
-  it('keeps top-level selectable questions visible even when follow-up heuristics see "other" text', () => {
+  it('keeps top-level selectable questions visible even when nearby help text mentions other options', () => {
     const questions = [
       deliveryMethodQuestion,
       dependentOtherQuestion,
       topLevelSelectableQuestion,
     ];
-    const dependencies = buildAutofillVisibilityDependencies(questions);
-
-    expect(dependencies.get('delivery-other-details')).toEqual({
-      parentQuestionId: 'delivery-method',
-      parentOptionIds: ['other'],
-    });
-    expect(dependencies.get('preferred-delivery-methods')).toBeUndefined();
 
     expect(getVisibleAutofillQuestions(questions, {}).map((question) => question.id)).toEqual([
       'delivery-method',
       'preferred-delivery-methods',
     ]);
+  });
+
+  it('uses schema-provided next and previous question links instead of inferring navigation', () => {
+    const schemaQuestions: RecordsWorkflowAutofillQuestion[] = [
+      {
+        ...deliveryMethodQuestion,
+        previousQuestionId: null,
+        nextQuestionId: 'delivery-other-details',
+      },
+      {
+        ...dependentOtherQuestion,
+        previousQuestionId: 'delivery-method',
+        nextQuestionId: 'preferred-delivery-methods',
+      },
+      {
+        ...topLevelSelectableQuestion,
+        previousQuestionId: 'delivery-other-details',
+        nextQuestionId: null,
+      },
+    ];
+
+    expect(getNextAutofillQuestionId(schemaQuestions, 'delivery-method', {})).toBe(
+      'preferred-delivery-methods',
+    );
+    expect(
+      getNextAutofillQuestionId(schemaQuestions, 'delivery-method', {
+        'delivery-method': 'other',
+      }),
+    ).toBe('delivery-other-details');
+
+    expect(
+      getPreviousAutofillQuestionId(schemaQuestions, 'preferred-delivery-methods', {
+        'delivery-method': 'mail',
+      }),
+    ).toBe('delivery-method');
+    expect(
+      getPreviousAutofillQuestionId(schemaQuestions, 'preferred-delivery-methods', {
+        'delivery-method': 'other',
+      }),
+    ).toBe('delivery-other-details');
   });
 
   it('tracks whether single answers are actually present', () => {

@@ -61,6 +61,11 @@ export interface RecordsWorkflowAutofillOption {
   bindings: RecordsWorkflowAutofillBinding[];
 }
 
+export interface RecordsWorkflowAutofillVisibilityRule {
+  parentQuestionId: string;
+  parentOptionIds: string[];
+}
+
 export interface RecordsWorkflowAutofillQuestion {
   id: string;
   label: string;
@@ -70,6 +75,9 @@ export interface RecordsWorkflowAutofillQuestion {
   confidence: number;
   bindings: RecordsWorkflowAutofillBinding[];
   options: RecordsWorkflowAutofillOption[];
+  visibilityRule?: RecordsWorkflowAutofillVisibilityRule | null;
+  previousQuestionId?: string | null;
+  nextQuestionId?: string | null;
 }
 
 export interface RecordsWorkflowSignatureArea {

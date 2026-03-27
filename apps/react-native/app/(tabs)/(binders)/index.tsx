@@ -518,11 +518,19 @@ export default function BinderListScreen() {
 
   const openingRef = useRef(false);
 
-  // Reset double-tap guard when screen regains focus (user navigated back)
+  // Refresh binders when returning from key import or any other auth-side change.
   useFocusEffect(
     useCallback(() => {
       openingRef.current = false;
-    }, []),
+
+      if (jwt) {
+        fetchRepos();
+      }
+
+      return () => {
+        openingRef.current = false;
+      };
+    }, [fetchRepos, jwt]),
   );
 
   const openBinder = useCallback(

@@ -722,6 +722,12 @@
           @apply relative;
         }
 
+        .question-card-shell-dependent {
+          margin-left: 0.9rem;
+          padding-left: 0.9rem;
+          border-left: 2px solid #dbe4f0;
+        }
+
         .question-card-shell-draggable {
           @apply flex items-start gap-2;
         }
@@ -780,8 +786,16 @@
           border-color: #c7d7fe;
         }
 
+        .question-card-shell-dependent > .question-card:not(.question-card-active) {
+          background: #ffffff;
+        }
+
         .question-title {
           @apply text-sm font-semibold text-gray-900;
+        }
+
+        .question-followup-kicker {
+          @apply mb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400;
         }
 
         .question-copy {
@@ -828,9 +842,10 @@
         }
 
         .overlay-hitbox {
-          fill: rgba(255, 255, 255, 0.001);
+          fill: #ffffff;
+          fill-opacity: 0;
           stroke: none;
-          pointer-events: fill;
+          pointer-events: all;
         }
 
         .overlay-rect-signature {
@@ -1222,7 +1237,7 @@
                 <button id="history-tab" type="button" class="nav-pill">Run History</button>
               </div>
 
-              <div id="state-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"></div>
+              <div id="state-summary" class="!mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"></div>
               <div id="state-action-banner" aria-live="polite"></div>
               <input id="manual-pdf-upload-input" type="file" accept="application/pdf,.pdf" class="hidden" />
 

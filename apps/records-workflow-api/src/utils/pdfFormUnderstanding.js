@@ -268,6 +268,32 @@ function normalizeOption(rawOption, questionId, minimumConfidence) {
   };
 }
 
+function normalizeVisibilityRule(rawVisibilityRule) {
+  if (!isPlainObject(rawVisibilityRule)) return null;
+
+  const parentQuestionId = slugify(
+    normalizeString(rawVisibilityRule.parent_question_id || rawVisibilityRule.parentQuestionId),
+  );
+  if (!parentQuestionId) return null;
+
+  const rawParentOptionIds = Array.isArray(
+    rawVisibilityRule.parent_option_ids || rawVisibilityRule.parentOptionIds,
+  )
+    ? rawVisibilityRule.parent_option_ids || rawVisibilityRule.parentOptionIds
+    : [];
+  const seenOptionIds = new Set();
+  const parentOptionIds = rawParentOptionIds
+    .map((value) => slugify(normalizeString(value)))
+    .filter((value) => value && !seenOptionIds.has(value) && (seenOptionIds.add(value), true));
+
+  if (parentOptionIds.length === 0) return null;
+
+  return {
+    parent_question_id: parentQuestionId,
+    parent_option_ids: parentOptionIds,
+  };
+}
+
 function normalizeQuestion(rawQuestion, minimumConfidence) {
   if (!isPlainObject(rawQuestion)) return null;
 
@@ -290,6 +316,9 @@ function normalizeQuestion(rawQuestion, minimumConfidence) {
     confidence,
     bindings: [],
     options: [],
+    visibility_rule: normalizeVisibilityRule(
+      rawQuestion.visibility_rule || rawQuestion.visibilityRule,
+    ),
   };
   const families = new Set();
 

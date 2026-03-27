@@ -52,7 +52,7 @@ export default function GenerateKeyScreen() {
       } else {
         await login(keypair.privkey);
       }
-      router.replace('/(tabs)/home');
+      router.replace('/');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       Alert.alert('Authentication Failed', message);

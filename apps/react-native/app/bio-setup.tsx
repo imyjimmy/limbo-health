@@ -17,6 +17,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 import { useBioProfile } from '../providers/BioProfileProvider';
+import { useAuthContext } from '../providers/AuthProvider';
 import {
   emptyBioProfile,
   formatDateOfBirthInput,
@@ -61,6 +62,7 @@ export default function BioSetupScreen() {
   const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const returnTo = readParam(params.returnTo);
+  const { completeOnboarding } = useAuthContext();
   const { status, profile, suggestedProfile, saveProfile, hasProfile } = useBioProfile();
   const [form, setForm] = useState<BioProfile>(emptyBioProfile());
   const [didHydrate, setDidHydrate] = useState(false);
@@ -178,6 +180,7 @@ export default function BioSetupScreen() {
     setSaving(true);
     try {
       await saveProfile(form);
+      await completeOnboarding();
       router.replace(returnTo || '/(tabs)/home');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save your personal info.';

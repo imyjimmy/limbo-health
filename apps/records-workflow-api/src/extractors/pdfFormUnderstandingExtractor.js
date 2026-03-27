@@ -249,6 +249,7 @@ function buildRawShortTextQuestion({
   required = false,
   helpText = null,
   confidence = 0.97,
+  visibilityRule = null,
 }) {
   return {
     id,
@@ -264,6 +265,7 @@ function buildRawShortTextQuestion({
       },
     ],
     options: [],
+    ...(visibilityRule ? { visibility_rule: visibilityRule } : {}),
   };
 }
 
@@ -840,6 +842,7 @@ function findFollowUpParentForTextWidget(widget, questions, page) {
       bestScore = score;
       bestMatch = {
         parentQuestionId: entry.question.id,
+        parentOptionId: selectedOption.option?.id || null,
         parentOptionLabel: normalizeString(selectedOption.option?.label) || humanizeFieldName(selectedOption.fieldName),
       };
     }
@@ -869,6 +872,12 @@ function buildTriggeredShortTextQuestion(widget, page, parentContext) {
       required: false,
       helpText: null,
       confidence: 0.96,
+      visibilityRule: parentContext.parentOptionId
+        ? {
+            parent_question_id: parentContext.parentQuestionId,
+            parent_option_ids: [parentContext.parentOptionId],
+          }
+        : null,
     }),
     sortY: Number(widget?.y || 0),
     sortX: Number(widget?.x || 0),
