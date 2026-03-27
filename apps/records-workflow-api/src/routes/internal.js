@@ -46,6 +46,7 @@ import { promoteGeneratedSeedsFromStateDataStage } from '../services/stateDataSe
 import { getHospitalSystemDetail } from '../services/systemDetailService.js';
 import {
   activateTargetedPage,
+  deleteTargetedPage,
   retireTargetedPage,
 } from '../services/targetedPageService.js';
 import {
@@ -411,6 +412,17 @@ internalRouter.post('/targeted-pages/:id/retire', async (req, res) => {
   } catch (error) {
     console.error('Failed to retire targeted page:', error);
     const response = toErrorPayload(error, 'Failed to retire targeted page.');
+    return res.status(response.status).json(response.body);
+  }
+});
+
+internalRouter.delete('/targeted-pages/:id', async (req, res) => {
+  try {
+    const result = await deleteTargetedPage(req.params.id);
+    return res.json(result);
+  } catch (error) {
+    console.error('Failed to delete targeted page:', error);
+    const response = toErrorPayload(error, 'Failed to delete targeted page.');
     return res.status(response.status).json(response.body);
   }
 });

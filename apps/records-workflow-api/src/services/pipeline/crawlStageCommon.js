@@ -25,14 +25,19 @@ import {
   ensureSourceDocumentStateDir,
 } from '../../utils/sourceDocumentStorage.js';
 import { classifyMedicalRecordsRequestDocument } from '../../utils/urls.js';
+import {
+  filterBlockedTargetedPageItems,
+  getTargetedPageBlockedUrlSet,
+} from '../targetedPageBlocklistService.js';
 
 export function normalizeForVisited(url) {
   try {
     const value = new URL(url);
     value.hash = '';
+    value.pathname = value.pathname.replace(/\/+$/, '') || '/';
     return value.toString();
   } catch {
-    return url;
+    return String(url || '').replace(/#.*$/, '').replace(/\/+$/, '') || url;
   }
 }
 
@@ -240,16 +245,25 @@ export async function resolvePipelineSystems({
           hospitalSystemIds,
           state,
         });
+  const filteredActiveSeeds = await filterBlockedTargetedPageItems(activeSeeds, {
+    defaultState: state,
+  });
+  const filteredKnownPdfSourcePageSeeds = await filterBlockedTargetedPageItems(
+    knownPdfSourcePageSeeds,
+    {
+      defaultState: state,
+    },
+  );
   const systemsWithTargetedSeeds = new Set(
-    activeSeeds
+    filteredActiveSeeds
       .filter((seed) => hasTargetedRecordsSeed(seed))
       .map((seed) => seed.hospital_system_id)
       .filter(Boolean),
   );
-  const effectiveKnownPdfSourcePageSeeds = knownPdfSourcePageSeeds.filter(
+  const effectiveKnownPdfSourcePageSeeds = filteredKnownPdfSourcePageSeeds.filter(
     (seed) => !systemsWithTargetedSeeds.has(seed.hospital_system_id),
   );
-  const seeds = dedupeSeeds([...effectiveKnownPdfSourcePageSeeds, ...activeSeeds]);
+  const seeds = dedupeSeeds([...effectiveKnownPdfSourcePageSeeds, ...filteredActiveSeeds]);
 
   const perSystem = new Map();
   for (const seed of seeds) {
@@ -280,6 +294,10 @@ export async function runFetchStageForSystem({
   fetchStageRunId,
   maxDepth = config.crawl.maxDepth,
 } = {}) {
+  const blockedUrlSet = await getTargetedPageBlockedUrlSet({
+    state: system?.state,
+    hospitalSystemId: system?.systemId,
+  });
   const visited = new Set();
   const queue = [];
   const details = [];
@@ -287,6 +305,9 @@ export async function runFetchStageForSystem({
   let failedDocuments = 0;
 
   for (const seed of system?.seeds || []) {
+    if (blockedUrlSet.has(normalizeForVisited(seed.url))) {
+      continue;
+    }
     const frontierItem = await insertCrawlFrontierItem({
       fetchStageRunId,
       hospitalSystemId: system.systemId,
@@ -393,6 +414,7 @@ export async function runFetchStageForSystem({
 
         for (const link of nextLinks) {
           const nextNormalized = normalizeForVisited(link.url);
+          if (blockedUrlSet.has(nextNormalized)) continue;
           const existingQueuedItem = queue.find(
             (queuedItem) => normalizeForVisited(queuedItem.url) === nextNormalized,
           );

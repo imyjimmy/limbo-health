@@ -9,6 +9,7 @@ import {
   upsertSeedUrl
 } from '../repositories/workflowRepository.js';
 import { getStateName, normalizeStateCode } from '../utils/states.js';
+import { removeTargetedPagesFromBlocklist } from './targetedPageBlocklistService.js';
 
 export function buildStateSeedRelativePath(state) {
   const normalizedState = normalizeStateCode(state);
@@ -189,6 +190,12 @@ export async function reseedSystems(systems = []) {
         summary.facilities += 1;
         facilityMap.set(system.system_name, defaultFacilityId);
       }
+
+      await removeTargetedPagesFromBlocklist({
+        state: normalizedState,
+        hospitalSystemId: upserted.id,
+        urls: system.seed_urls || [],
+      });
 
       for (const url of system.seed_urls || []) {
         const normalizedSeedUrl = normalizeSeedMatchUrl(url);

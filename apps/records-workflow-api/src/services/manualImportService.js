@@ -21,6 +21,7 @@ import { collapseWhitespace } from '../utils/text.js';
 import { normalizeStateCode } from '../utils/states.js';
 import { runCrawl } from './crawlService.js';
 import { upsertHumanApprovedSeedInFile } from './seedEditorService.js';
+import { removeTargetedPagesFromBlocklist } from './targetedPageBlocklistService.js';
 
 function normalizeString(value) {
   return collapseWhitespace(typeof value === 'string' ? value : '');
@@ -276,6 +277,12 @@ export async function addManualApprovedUrl({
   if (approvedUrls.length === 0) {
     throw new Error('At least one approved URL is required.');
   }
+
+  await removeTargetedPagesFromBlocklist({
+    state: context.state,
+    hospitalSystemId: system.id,
+    urls: approvedUrls,
+  });
 
   const seedIds = [];
   await withTransaction(async (client) => {

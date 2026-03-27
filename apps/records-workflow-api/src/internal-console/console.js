@@ -3062,6 +3062,15 @@ function renderTargetedPagesSection(system) {
                         >
                           Refresh This Page
                         </button>
+                        <button
+                          type="button"
+                          class="ghost-button ghost-button-danger"
+                          data-action="delete-targeted-page"
+                          data-seed-url-id="${escapeHtml(seed.id || '')}"
+                          data-seed-url="${escapeHtml(seed.url || '')}"
+                        >
+                          Delete
+                        </button>
                         ${
                           seed.active
                             ? `<button
@@ -7015,6 +7024,63 @@ async function retireTargetedPageForSelectedSystem(seedUrlId) {
   }
 }
 
+async function deleteTargetedPageForSelectedSystem(seedUrlId, seedUrl) {
+  const system = currentSystem();
+  if (!system?.hospital_system_id || !seedUrlId) {
+    throw new Error('Choose a targeted page before deleting it.');
+  }
+
+  const confirmed = window.confirm(
+    `Delete this targeted page for ${system.system_name}?\n\n${seedUrl || ''}\n\nThis removes it now and keeps future crawls from bringing it back unless you add it again manually.`,
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  setPipelineActionState('seed_scope_stage');
+  setActionBanner({
+    tone: 'info',
+    title: 'Targeted page deletion started',
+    message: `Deleting ${formatInspectorUrl(seedUrl)} for ${system.system_name}.`,
+    badge: 'Deleting',
+  });
+  await waitForNextPaint();
+
+  try {
+    await fetchJson(`/internal/targeted-pages/${encodeURIComponent(seedUrlId)}`, {
+      method: 'DELETE',
+    });
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'pipeline',
+      pipelineTab: 'results',
+    });
+    setActionBanner(
+      {
+        tone: 'success',
+        title: 'Targeted page deleted',
+        message: `${formatInspectorUrl(seedUrl)} was removed and blocklisted for ${system.system_name}.`,
+        badge: 'Deleted',
+      },
+      { autoClearMs: 9000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: 'Targeted page deletion failed',
+        message: error?.message || 'The dashboard could not delete the targeted page.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
 async function refreshTargetedPageForSelectedSystem(seedUrl) {
   const system = currentSystem();
   const normalizedSeedUrl = String(seedUrl || '').trim();
@@ -7618,6 +7684,14 @@ document.addEventListener('click', async (event) => {
 
     if (button.dataset.action === 'retire-targeted-page' && button.dataset.seedUrlId) {
       await retireTargetedPageForSelectedSystem(button.dataset.seedUrlId);
+      return;
+    }
+
+    if (button.dataset.action === 'delete-targeted-page' && button.dataset.seedUrlId) {
+      await deleteTargetedPageForSelectedSystem(
+        button.dataset.seedUrlId,
+        button.dataset.seedUrl || '',
+      );
       return;
     }
 
