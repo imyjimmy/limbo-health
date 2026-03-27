@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -7,6 +7,30 @@ import { normalizeStateCode } from './utils/states.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const serviceRoot = path.resolve(__dirname, '..');
+const workspaceRoot = path.resolve(serviceRoot, '..', '..');
+
+function loadRecordsWorkflowEnv() {
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const envCandidates = [
+    path.join(serviceRoot, `.env.${nodeEnv}.local`),
+    path.join(serviceRoot, '.env.local'),
+    path.join(serviceRoot, `.env.${nodeEnv}`),
+    path.join(serviceRoot, '.env'),
+    path.join(workspaceRoot, `.env.${nodeEnv}.local`),
+    path.join(workspaceRoot, '.env.local'),
+    path.join(workspaceRoot, `.env.${nodeEnv}`),
+    path.join(workspaceRoot, '.env'),
+  ];
+
+  for (const envPath of envCandidates) {
+    dotenv.config({
+      path: envPath,
+      override: false,
+    });
+  }
+}
+
+loadRecordsWorkflowEnv();
 
 export function resolveFromServiceRoot(value, fallback) {
   const candidate = value || fallback;

@@ -127,10 +127,19 @@ export async function reseedSystems(systems = []) {
               client
             )
           : null);
+      const matchedByCompatibleFacility = isSameSystemName(
+        matchedByFacility?.system_name,
+        system.system_name
+      )
+        ? matchedByFacility
+        : null;
 
       const upserted = await upsertHospitalSystem(
         {
-          systemName: matchedByDomain?.system_name || matchedByFacility?.system_name || system.system_name,
+          systemName:
+            matchedByDomain?.system_name ||
+            matchedByCompatibleFacility?.system_name ||
+            system.system_name,
           domain: system.domain,
           state: normalizedState
         },

@@ -11,7 +11,10 @@ import {
   linkParsedArtifactToSourceDocument,
   listStageSourceDocuments,
 } from '../../repositories/pipelineStageRepository.js';
-import { ensureParsedArtifactStateDir } from '../../utils/pipelineArtifactStorage.js';
+import {
+  ensureParsedArtifactStateDir,
+  resolveParsedArtifactPath,
+} from '../../utils/pipelineArtifactStorage.js';
 import { resolveSourceDocumentPath } from '../../utils/sourceDocumentStorage.js';
 
 const PARSE_STAGE_KEY = 'parse_stage';
@@ -98,7 +101,8 @@ function buildParseStageStatus({ totalDocuments, parsedDocuments, failedDocument
 }
 
 export async function loadParsedArtifactPayload(storagePath) {
-  const fileContents = await fs.readFile(storagePath, 'utf8');
+  const resolvedPath = resolveParsedArtifactPath(storagePath);
+  const fileContents = await fs.readFile(resolvedPath, 'utf8');
   return JSON.parse(fileContents);
 }
 

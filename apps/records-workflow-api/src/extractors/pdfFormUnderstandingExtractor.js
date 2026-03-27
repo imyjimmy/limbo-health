@@ -774,7 +774,15 @@ function selectFollowUpTriggerOption(widget, optionEntries, page) {
   }
 
   const widgetLabelTokens = new Set(
-    tokenizeCheckboxLabel(buildTextWidgetPrintedLabel(widget, page)).filter((token) => token !== 'other'),
+    tokenizeCheckboxLabel(
+      [
+        buildTextWidgetPrintedLabel(widget, page),
+        widget?.fieldLabel,
+        widget?.fieldName,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    ).filter((token) => token !== 'fill'),
   );
   const widgetCenterX = Number(widget?.x || 0) + Number(widget?.width || 0) / 2;
   let bestEntry = null;
@@ -884,6 +892,259 @@ function buildTriggeredShortTextQuestion(widget, page, parentContext) {
   };
 }
 
+function getPrimaryShortTextFieldName(question, parsedPages = []) {
+  if (question?.kind !== 'short_text') return '';
+  const binding = (Array.isArray(question?.bindings) ? question.bindings : []).find(
+    (candidate) => candidate?.type === 'field_text' || candidate?.type === 'overlay_text',
+  );
+  return resolveBindingFieldName(binding, parsedPages);
+}
+
+function buildVisibilityRuleFromParentContext(parentContext) {
+  if (!parentContext?.parentQuestionId || !parentContext?.parentOptionId) {
+    return null;
+  }
+
+  return {
+    parent_question_id: parentContext.parentQuestionId,
+    parent_option_ids: [parentContext.parentOptionId],
+  };
+}
+
+function shouldAttachParentContextToDirectDefinition(fieldName, definition, widget, parentContext) {
+  if (!parentContext?.parentQuestionId || !parentContext?.parentOptionId) {
+    return false;
+  }
+
+  const followUpSignal = normalizeFieldName(
+    [
+      fieldName,
+      definition?.id,
+      definition?.label,
+      widget?.fieldLabel,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+
+  return FOLLOW_UP_OPTION_PATTERN.test(followUpSignal);
+}
+
+function buildCanonicalTextWidgetQuestionEntry(widget, questions, page) {
+  const fieldName = normalizeString(widget?.fieldName);
+  const normalizedFieldName = normalizeFieldName(fieldName);
+  if (!fieldName || !normalizedFieldName) return null;
+  if (isExcludedAutofillFieldName(normalizedFieldName)) return null;
+
+  const parentContext = findFollowUpParentForTextWidget(widget, questions, page);
+  const definition = buildFieldQuestionDefinition(fieldName, widget?.fieldLabel || '');
+
+  let question = null;
+  if (definition) {
+    question = buildRawShortTextQuestion({
+      id: definition.id,
+      label: definition.label,
+      fieldName,
+      required: definition.required,
+      helpText: definition.helpText || null,
+      confidence: definition.confidence,
+      visibilityRule: shouldAttachParentContextToDirectDefinition(
+        fieldName,
+        definition,
+        widget,
+        parentContext,
+      )
+        ? buildVisibilityRuleFromParentContext(parentContext)
+        : null,
+    });
+  } else {
+    const triggeredQuestion = buildTriggeredShortTextQuestion(widget, page, parentContext);
+    question = triggeredQuestion?.question || null;
+  }
+
+  if (!question) return null;
+
+  return {
+    fieldName: normalizedFieldName,
+    question,
+    parentQuestionId: question.visibility_rule?.parent_question_id || null,
+    sortY: Number(widget?.y || 0),
+    sortX: Number(widget?.x || 0),
+  };
+}
+
+function mergeCanonicalShortTextQuestion(existingQuestion, canonicalQuestion) {
+  return {
+    ...(existingQuestion || {}),
+    ...canonicalQuestion,
+    required: Boolean(existingQuestion?.required || canonicalQuestion?.required),
+    help_text:
+      normalizeString(canonicalQuestion?.help_text || '') ||
+      normalizeString(existingQuestion?.help_text || '') ||
+      null,
+    confidence: Math.max(
+      Number(existingQuestion?.confidence || 0),
+      Number(canonicalQuestion?.confidence || 0),
+      0,
+    ),
+    bindings:
+      Array.isArray(canonicalQuestion?.bindings) && canonicalQuestion.bindings.length > 0
+        ? canonicalQuestion.bindings
+        : Array.isArray(existingQuestion?.bindings)
+          ? existingQuestion.bindings
+          : [],
+    options: [],
+    visibility_rule: canonicalQuestion?.visibility_rule || existingQuestion?.visibility_rule || null,
+  };
+}
+
+function buildCanonicalTextWidgetQuestionMap(questions, parsedPdf) {
+  const canonicalQuestions = new Map();
+
+  for (const page of parsedPdf?.pages || []) {
+    const textWidgets = [...(page.widgets || [])]
+      .filter((widget) => isTextWidget(widget))
+      .sort(
+        (left, right) =>
+          Number(right.y || 0) - Number(left.y || 0) || Number(left.x || 0) - Number(right.x || 0),
+      );
+
+    for (const widget of textWidgets) {
+      const entry = buildCanonicalTextWidgetQuestionEntry(widget, questions, page);
+      if (!entry) continue;
+      canonicalQuestions.set(entry.fieldName, entry);
+    }
+  }
+
+  return canonicalQuestions;
+}
+
+function queueDependentQuestion(bucketMap, question, sortY = 0, sortX = 0, fallbackIndex = 0) {
+  const parentQuestionId = normalizeString(question?.visibility_rule?.parent_question_id);
+  if (!parentQuestionId) {
+    return false;
+  }
+
+  const pending = bucketMap.get(parentQuestionId) || [];
+  pending.push({
+    question,
+    sortY: Number(sortY || 0),
+    sortX: Number(sortX || 0),
+    fallbackIndex,
+  });
+  bucketMap.set(parentQuestionId, pending);
+  return true;
+}
+
+function reconcileTextWidgetQuestions(output, parsedPdf) {
+  const parsedPages = parsedPdf?.pages || [];
+  const sourceQuestions = Array.isArray(output?.questions) ? output.questions : [];
+  const canonicalQuestions = buildCanonicalTextWidgetQuestionMap(sourceQuestions, parsedPdf);
+  const usedCanonicalFields = new Set();
+  const seenStandaloneFieldNames = new Set();
+  const baseQuestions = [];
+  const pendingByParentQuestionId = new Map();
+
+  sourceQuestions.forEach((question, index) => {
+    if (question?.kind !== 'short_text') {
+      baseQuestions.push(question);
+      return;
+    }
+
+    const fieldName = getPrimaryShortTextFieldName(question, parsedPages);
+    if (!fieldName) {
+      if (!queueDependentQuestion(pendingByParentQuestionId, question, 0, 0, index)) {
+        baseQuestions.push(question);
+      }
+      return;
+    }
+
+    const canonicalEntry = canonicalQuestions.get(fieldName);
+    if (canonicalEntry) {
+      if (usedCanonicalFields.has(fieldName)) {
+        return;
+      }
+
+      usedCanonicalFields.add(fieldName);
+      const mergedQuestion = mergeCanonicalShortTextQuestion(question, canonicalEntry.question);
+      if (
+        !queueDependentQuestion(
+          pendingByParentQuestionId,
+          mergedQuestion,
+          canonicalEntry.sortY,
+          canonicalEntry.sortX,
+          index,
+        )
+      ) {
+        baseQuestions.push(mergedQuestion);
+      }
+      return;
+    }
+
+    if (seenStandaloneFieldNames.has(fieldName)) {
+      return;
+    }
+
+    seenStandaloneFieldNames.add(fieldName);
+    if (!queueDependentQuestion(pendingByParentQuestionId, question, 0, 0, index)) {
+      baseQuestions.push(question);
+    }
+  });
+
+  for (const [fieldName, canonicalEntry] of canonicalQuestions.entries()) {
+    if (usedCanonicalFields.has(fieldName)) continue;
+    usedCanonicalFields.add(fieldName);
+    if (
+      !queueDependentQuestion(
+        pendingByParentQuestionId,
+        canonicalEntry.question,
+        canonicalEntry.sortY,
+        canonicalEntry.sortX,
+        Number.MAX_SAFE_INTEGER,
+      )
+    ) {
+      baseQuestions.push(canonicalEntry.question);
+    }
+  }
+
+  const orderedQuestions = [];
+  const emittedParents = new Set();
+
+  for (const question of baseQuestions) {
+    orderedQuestions.push(question);
+    emittedParents.add(question.id);
+    const pending = pendingByParentQuestionId.get(question.id) || [];
+    if (pending.length === 0) continue;
+    pending
+      .sort(
+        (left, right) =>
+          Number(right.sortY || 0) - Number(left.sortY || 0) ||
+          Number(left.sortX || 0) - Number(right.sortX || 0) ||
+          Number(left.fallbackIndex || 0) - Number(right.fallbackIndex || 0),
+      )
+      .forEach((entry) => orderedQuestions.push(entry.question));
+    pendingByParentQuestionId.delete(question.id);
+  }
+
+  const remainingPending = Array.from(pendingByParentQuestionId.values())
+    .flat()
+    .sort(
+      (left, right) =>
+        Number(right.sortY || 0) - Number(left.sortY || 0) ||
+        Number(left.sortX || 0) - Number(right.sortX || 0) ||
+        Number(left.fallbackIndex || 0) - Number(right.fallbackIndex || 0),
+    )
+    .filter((entry) => !emittedParents.has(entry.question?.id));
+
+  return {
+    ...output,
+    questions: [
+      ...orderedQuestions,
+      ...remainingPending.map((entry) => entry.question),
+    ],
+  };
+}
+
 function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
   const synthesizedQuestion = buildCheckboxClusterQuestion(cluster, page);
   if (!synthesizedQuestion) return question;
@@ -922,8 +1183,20 @@ function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
     mergedOptions.push(option);
   }
 
+  const normalizedQuestionId = slugifyQuestionId(question?.id || '');
+  const mergedOptionIds = mergedOptions
+    .map((option) => slugifyQuestionId(option?.id || ''))
+    .filter(Boolean);
+  const questionIdLooksLikeOption =
+    Boolean(normalizedQuestionId) && mergedOptionIds.includes(normalizedQuestionId);
+  const nextQuestionId =
+    questionIdLooksLikeOption || !normalizedQuestionId
+      ? synthesizedQuestion.id
+      : question.id;
+
   return {
     ...question,
+    id: nextQuestionId,
     kind: 'multi_select',
     label:
       coveredClusterFieldCount < (synthesizedQuestion.options || []).length
@@ -936,6 +1209,108 @@ function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
     confidence: question?.confidence || synthesizedQuestion.confidence || 0.97,
     bindings: mergedOptions.flatMap((option) => option.bindings || []),
     options: mergedOptions,
+  };
+}
+
+function shouldCanonicalizeCheckboxQuestionId(question, synthesizedQuestion, parsedPages = []) {
+  const normalizedQuestionId = slugifyQuestionId(question?.id || '');
+  if (!normalizedQuestionId) {
+    return true;
+  }
+
+  const optionSignals = new Set();
+  const collectSignal = (value) => {
+    const normalized = slugifyQuestionId(value || '');
+    if (normalized) {
+      optionSignals.add(normalized);
+    }
+  };
+
+  for (const option of question?.options || []) {
+    collectSignal(option?.id);
+    collectSignal(option?.label);
+    collectSignal(getOptionBindingFieldName(option, parsedPages));
+    for (const binding of option?.bindings || []) {
+      collectSignal(binding?.field_name);
+    }
+  }
+
+  for (const option of synthesizedQuestion?.options || []) {
+    collectSignal(option?.id);
+    collectSignal(option?.label);
+    collectSignal(option?.fieldName);
+  }
+
+  return optionSignals.has(normalizedQuestionId);
+}
+
+function reconcileCheckboxQuestionIds(output, parsedPdf) {
+  const sourceQuestions = Array.isArray(output?.questions) ? output.questions : [];
+  if (sourceQuestions.length === 0) {
+    return output;
+  }
+
+  const remappedQuestionIds = new Map();
+
+  for (const page of parsedPdf?.pages || []) {
+    for (const cluster of buildCheckboxClusters(page)) {
+      const clusterFieldNames = buildCheckboxFieldNameSet(cluster);
+      const matchingQuestionIndex = findBestMatchingCheckboxQuestionIndex(
+        sourceQuestions,
+        clusterFieldNames,
+        [page],
+      );
+      if (matchingQuestionIndex < 0) {
+        continue;
+      }
+
+      const question = sourceQuestions[matchingQuestionIndex];
+      const synthesizedQuestion = buildCheckboxClusterQuestion(cluster, page);
+      if (!synthesizedQuestion) {
+        continue;
+      }
+
+      if (!shouldCanonicalizeCheckboxQuestionId(question, synthesizedQuestion, [page])) {
+        continue;
+      }
+
+      const currentQuestionId = slugifyQuestionId(question?.id || '');
+      const nextQuestionId = slugifyQuestionId(synthesizedQuestion.id || '');
+      if (!currentQuestionId || !nextQuestionId || currentQuestionId === nextQuestionId) {
+        continue;
+      }
+
+      remappedQuestionIds.set(currentQuestionId, nextQuestionId);
+    }
+  }
+
+  if (remappedQuestionIds.size === 0) {
+    return output;
+  }
+
+  return {
+    ...output,
+    questions: sourceQuestions.map((question) => {
+      const nextQuestionId = remappedQuestionIds.get(slugifyQuestionId(question?.id || '')) || null;
+      const currentVisibilityRule = question?.visibility_rule || null;
+      const nextParentQuestionId = currentVisibilityRule?.parent_question_id
+        ? remappedQuestionIds.get(slugifyQuestionId(currentVisibilityRule.parent_question_id)) ||
+          currentVisibilityRule.parent_question_id
+        : null;
+
+      return {
+        ...question,
+        ...(nextQuestionId ? { id: nextQuestionId } : {}),
+        ...(currentVisibilityRule
+          ? {
+              visibility_rule: {
+                ...currentVisibilityRule,
+                ...(nextParentQuestionId ? { parent_question_id: nextParentQuestionId } : {}),
+              },
+            }
+          : {}),
+      };
+    }),
   };
 }
 
@@ -1194,13 +1569,16 @@ function addMissingWidgetQuestions(output, parsedPdf) {
 export function repairPdfFormUnderstandingOutput(output, parsedPdf) {
   const rawQuestions = Array.isArray(output?.questions) ? output.questions : [];
   const splitQuestions = splitCompositeShortTextQuestions(rawQuestions);
-  return addMissingWidgetQuestions(
+  const widgetCompletedOutput = addMissingWidgetQuestions(
     {
       ...output,
       questions: splitQuestions,
     },
     parsedPdf,
   );
+  const checkboxReconciledOutput = reconcileCheckboxQuestionIds(widgetCompletedOutput, parsedPdf);
+
+  return reconcileTextWidgetQuestions(checkboxReconciledOutput, parsedPdf);
 }
 
 export function preparePdfFormUnderstandingExtraction(options) {
@@ -1257,7 +1635,10 @@ export async function extractPdfFormUnderstanding({
     });
 
     const enrichedOutput = repairPdfFormUnderstandingOutput(output, parsedPdf);
-    const formUnderstanding = normalizePdfFormUnderstanding(enrichedOutput);
+    const normalizedOutput = normalizePdfFormUnderstanding(enrichedOutput);
+    const formUnderstanding = normalizePdfFormUnderstanding(
+      repairPdfFormUnderstandingOutput(normalizedOutput, parsedPdf),
+    );
 
     return {
       extractorName: PDF_FORM_UNDERSTANDING_EXTRACTOR_NAME,

@@ -47,11 +47,23 @@ async function fetchWithNode({ url, timeoutMs }) {
   }
 }
 
-async function fetchWithScrapling({ url }) {
+async function fetchWithScrapling({ url, timeoutMs }) {
   const pythonBin = resolvePythonExecutable({ overrideEnvVar: 'RECORDS_FETCH_PYTHON_BIN' });
-  const { stdout } = await execFile(pythonBin, [SCRAPLING_FETCHER_PATH, url], {
-    maxBuffer: MAX_FETCH_BUFFER_BYTES
-  });
+  let stdout;
+
+  try {
+    const result = await execFile(pythonBin, [SCRAPLING_FETCHER_PATH, url], {
+      maxBuffer: MAX_FETCH_BUFFER_BYTES,
+      ...(Number.isFinite(timeoutMs) && timeoutMs > 0 ? { timeout: timeoutMs } : {})
+    });
+    stdout = result.stdout;
+  } catch (error) {
+    if (error?.killed && error?.signal === 'SIGTERM' && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      throw new Error(`Scrapling fetch timed out after ${timeoutMs}ms for ${url}`);
+    }
+    throw error;
+  }
+
   const payload = JSON.parse(stdout || '{}');
 
   return {

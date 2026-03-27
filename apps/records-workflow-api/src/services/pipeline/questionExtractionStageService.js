@@ -119,6 +119,7 @@ export async function runQuestionExtractionStage({
         },
         replaceDraft,
       });
+      const persistedPayload = persisted.reextraction_run?.payload || null;
 
       const artifactDir = await ensureQuestionArtifactDir(
         parsedArtifact.system_state,
@@ -136,8 +137,8 @@ export async function runQuestionExtractionStage({
             source_url: parsedArtifact.source_url,
             source_page_url: parsedArtifact.source_page_url || null,
             status: extraction.status,
-            form_understanding: structuredOutput.form_understanding || null,
-            metadata: structuredOutput.metadata || null,
+            form_understanding: persistedPayload,
+            metadata: persisted.reextraction_run?.metadata || structuredOutput.metadata || null,
           },
           null,
           2,
@@ -160,11 +161,9 @@ export async function runQuestionExtractionStage({
         source_url: parsedArtifact.source_url,
         status: extraction.status,
         supported:
-          typeof structuredOutput?.form_understanding?.supported === 'boolean'
-            ? structuredOutput.form_understanding.supported
-            : null,
-        confidence: Number(structuredOutput?.form_understanding?.confidence || 0),
-        question_count: countQuestions(structuredOutput?.form_understanding),
+          typeof persistedPayload?.supported === 'boolean' ? persistedPayload.supported : null,
+        confidence: Number(persistedPayload?.confidence || 0),
+        question_count: countQuestions(persistedPayload),
       });
     } catch (error) {
       failedDocuments += 1;

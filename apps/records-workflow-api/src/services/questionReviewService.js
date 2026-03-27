@@ -543,10 +543,22 @@ async function prepareDraftPayloadForPersistence(
   sourceDocument,
   client = null,
 ) {
-  const normalizedPayload = normalizeDraftPayload(payload, templateIdFallback);
   const { parsedDocument: persistedParsedPdf } = await loadPersistedParsedDocument(sourceDocument, client);
+  const repairedInputPayload = persistedParsedPdf
+    ? repairPdfFormUnderstandingOutput(
+        {
+          ...(payload || {}),
+          template_id: normalizeString(payload?.template_id) || templateIdFallback,
+        },
+        persistedParsedPdf,
+      )
+    : payload;
+  const normalizedPayload = normalizeDraftPayload(repairedInputPayload, templateIdFallback);
   const enrichedPayload = persistedParsedPdf
-    ? repairPdfFormUnderstandingOutput(normalizedPayload, persistedParsedPdf)
+    ? normalizePdfFormUnderstanding(
+        repairPdfFormUnderstandingOutput(normalizedPayload, persistedParsedPdf),
+        0,
+      )
     : normalizedPayload;
   const pdfGeometry = await loadPdfGeometry(sourceDocument, client);
   const repairedPayload =
@@ -957,21 +969,32 @@ async function persistQuestionExtractionResultInClient(
     throw new Error('Question review is only available for PDF source documents.');
   }
 
+  const nextPayload = await prepareDraftPayloadForPersistence(
+    buildQuestionExtractionDraftPayload(extraction, resolvedSourceDocument),
+    buildTemplateIdFallback(resolvedSourceDocument),
+    resolvedSourceDocument,
+    client,
+  );
+  const persistedExtraction = {
+    ...extraction,
+    structuredOutput: {
+      ...(extraction?.structuredOutput || {}),
+      form_understanding: nextPayload,
+    },
+  };
   const extractionRunId = await insertExtractionRun(
     {
       sourceDocumentId,
-      extractorName: extraction.extractorName,
-      extractorVersion: extraction.extractorVersion,
-      status: extraction.status,
-      structuredOutput: extraction.structuredOutput,
+      extractorName: persistedExtraction.extractorName,
+      extractorVersion: persistedExtraction.extractorVersion,
+      status: persistedExtraction.status,
+      structuredOutput: persistedExtraction.structuredOutput,
     },
     client,
   );
 
   const { template } = await ensureQuestionTemplate(sourceDocumentId, client);
   if (replaceDraft) {
-    const nextPayload = buildQuestionExtractionDraftPayload(extraction, resolvedSourceDocument);
-
     await client.query(
       `update pdf_question_templates
        set latest_extraction_run_id = $2,
@@ -1005,10 +1028,10 @@ async function persistQuestionExtractionResultInClient(
     extraction_run_id: extractionRunId,
     reextraction_run: {
       id: extractionRunId,
-      status: extraction.status,
+      status: persistedExtraction.status,
       payload:
-        extraction.structuredOutput?.form_understanding || buildUnsupportedAutofillPayload(),
-      metadata: extraction.structuredOutput?.metadata || null,
+        persistedExtraction.structuredOutput?.form_understanding || buildUnsupportedAutofillPayload(),
+      metadata: persistedExtraction.structuredOutput?.metadata || null,
     },
   };
 }

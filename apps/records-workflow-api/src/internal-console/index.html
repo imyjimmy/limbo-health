@@ -1230,15 +1230,15 @@
               </div>
             </section>
 
-            <section id="state-view" class="hidden space-y-6">
+            <section id="state-view" class="hidden space-y-3">
               <div id="state-tab-switcher" class="inline-flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1">
                 <button id="systems-tab" type="button" class="nav-pill nav-pill-active">Systems</button>
                 <button id="pipeline-tab" type="button" class="nav-pill">Pipeline</button>
                 <button id="history-tab" type="button" class="nav-pill">Run History</button>
               </div>
 
-              <div id="state-summary" class="!mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"></div>
-              <div id="state-action-banner" aria-live="polite"></div>
+              <div id="state-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"></div>
+              <div id="state-action-banner" class="hidden" aria-live="polite"></div>
               <input id="manual-pdf-upload-input" type="file" accept="application/pdf,.pdf" class="hidden" />
 
               <section id="systems-panel" class="space-y-6">
@@ -1246,7 +1246,13 @@
                   <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p class="section-kicker">Systems</p>
-                      <h3 class="section-title">Hospital Systems</h3>
+                      <h3 class="section-title flex items-center gap-2">
+                        <span>Hospital Systems</span>
+                        <span
+                          id="systems-title-count"
+                          class="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600"
+                        ></span>
+                      </h3>
                     </div>
                     <input id="system-filter" type="search" class="input-shell sm:w-80" placeholder="Filter systems" />
                   </div>
@@ -1267,8 +1273,19 @@
                       <h3 class="section-title">Workflow</h3>
                       <p class="section-copy">This view mirrors the real crawl checkpoints. The cards below show where the crawl can fail and where a human can intervene.</p>
                     </div>
-                    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                    <div class="flex flex-col gap-3 sm:items-end">
                       <select id="pipeline-system-select" class="input-shell sm:w-80"></select>
+                      <p id="pipeline-scope-copy" class="text-xs text-gray-500 sm:max-w-[42rem] sm:text-right">
+                        Discrete stage actions below run against the selected hospital system. Use the state action only when you want to batch the whole state.
+                      </p>
+                      <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                        <button id="run-selected-system-pipeline" type="button" class="primary-button">
+                          Run Selected System Pipeline
+                        </button>
+                        <button id="run-entire-state-pipeline" type="button" class="ghost-button">
+                          Run Entire State Pipeline
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div id="pipeline-run-result" class="mt-6"></div>

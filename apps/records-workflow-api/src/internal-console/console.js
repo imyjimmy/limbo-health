@@ -229,6 +229,7 @@ const elements = {
   stateSelect: document.querySelector('#state-select'),
   refreshState: document.querySelector('#refresh-state'),
   stateSummary: document.querySelector('#state-summary'),
+  systemsTitleCount: document.querySelector('#systems-title-count'),
   stateActionBanner: document.querySelector('#state-action-banner'),
   manualPdfUploadInput: document.querySelector('#manual-pdf-upload-input'),
   stateDataPipeline: document.querySelector('#state-data-pipeline'),
@@ -243,9 +244,11 @@ const elements = {
   systemsTable: document.querySelector('#systems-table'),
   priorityBuckets: document.querySelector('#priority-buckets'),
   pipelineSystemSelect: document.querySelector('#pipeline-system-select'),
+  pipelineScopeCopy: document.querySelector('#pipeline-scope-copy'),
   runCrawlStage: document.querySelector('#run-crawl-stage'),
   runQuestionStage: document.querySelector('#run-question-stage'),
-  runPipeline: document.querySelector('#run-pipeline'),
+  runPipeline: document.querySelector('#run-selected-system-pipeline'),
+  runStatePipeline: document.querySelector('#run-entire-state-pipeline'),
   pipelineFlowTab: document.querySelector('#pipeline-flow-tab'),
   pipelineResultsTab: document.querySelector('#pipeline-results-tab'),
   pipelineFlowPanel: document.querySelector('#pipeline-flow-panel'),
@@ -697,6 +700,7 @@ function renderStateActionBanner() {
 
   if (!state.stateSummary || !state.actionBanner) {
     elements.stateActionBanner.innerHTML = '';
+    elements.stateActionBanner.classList.add('hidden');
     return;
   }
 
@@ -727,6 +731,7 @@ function renderStateActionBanner() {
       </div>
     </div>
   `;
+  elements.stateActionBanner.classList.remove('hidden');
 }
 
 function overviewEntryForState(stateCode) {
@@ -766,7 +771,7 @@ function stageKeyLabel(stageKey) {
   const labels = {
     state_data_materialization_stage: 'Data Intake Stage',
     generated_seed_promotion: 'Promote Generated Seeds',
-    full_state_pipeline: 'Full State Pipeline',
+    full_state_pipeline: 'Entire State Pipeline',
     seed_scope_stage: 'Seed Scope Stage',
     fetch_stage: 'Fetch Stage',
     triage_stage: 'Document Triage Stage',
@@ -780,8 +785,8 @@ function stageKeyLabel(stageKey) {
 }
 
 function pipelineActionLabel(actionKey) {
-  if (actionKey === 'full_pipeline') return 'Full Pipeline';
-  if (actionKey === 'full_state_pipeline') return 'Full State Pipeline';
+  if (actionKey === 'full_pipeline') return 'Selected System Pipeline';
+  if (actionKey === 'full_state_pipeline') return 'Entire State Pipeline';
   return stageKeyLabel(actionKey);
 }
 
@@ -1051,6 +1056,48 @@ function renderPipelineRunButton({
   `;
 }
 
+function renderPipelineScopeActions() {
+  if (!elements.runPipeline || !elements.runStatePipeline) return;
+
+  const selectedSystem = currentSystem();
+  const seededSystems = Number(state.stateSummary?.counts?.seeded_systems || 0);
+  const stateName = STATE_NAMES[state.currentState] || state.currentState || 'this state';
+  const selectedSystemRunning = state.pipelineActionInFlight === 'full_pipeline';
+  const stateRunning = state.pipelineActionInFlight === 'full_state_pipeline';
+
+  elements.runPipeline.disabled = !selectedSystem || Boolean(state.pipelineActionInFlight);
+  elements.runPipeline.textContent = selectedSystemRunning
+    ? 'Running Selected System Pipeline...'
+    : 'Run Selected System Pipeline';
+
+  elements.runStatePipeline.disabled =
+    !state.currentState || seededSystems === 0 || Boolean(state.pipelineActionInFlight);
+  elements.runStatePipeline.textContent = stateRunning
+    ? 'Running Entire State Pipeline...'
+    : 'Run Entire State Pipeline';
+
+  if (!elements.pipelineScopeCopy) return;
+
+  if (!state.currentState) {
+    elements.pipelineScopeCopy.textContent =
+      'Open a state to run either a selected-system pipeline or a state-wide batch.';
+    return;
+  }
+
+  if (!selectedSystem) {
+    elements.pipelineScopeCopy.textContent =
+      seededSystems > 0
+        ? `Choose a hospital system for discrete stage reruns, or batch all ${formatNumber(seededSystems)} seeded systems in ${stateName}.`
+        : `Choose a hospital system for discrete stage reruns. ${stateName} has no seeded systems available for a state-wide batch yet.`;
+    return;
+  }
+
+  elements.pipelineScopeCopy.textContent =
+    seededSystems > 0
+      ? `Discrete stage buttons below run against ${selectedSystem.system_name}. Use the state action only when you want to batch all ${formatNumber(seededSystems)} seeded systems in ${stateName}.`
+      : `Discrete stage buttons below run against ${selectedSystem.system_name}. ${stateName} has no seeded systems available for a state-wide batch yet.`;
+}
+
 function renderStageInspectButton(stageRun, label = 'Inspect') {
   if (!stageRun?.id) return '';
   return `
@@ -1175,7 +1222,7 @@ function setPipelineActionState(actionKey = null) {
   const hasSystem = Boolean(state.selectedSystemId);
   const actions = [
     { key: 'state_data_materialization_stage', element: null, idleLabel: 'Run Data Intake Stage' },
-    { key: 'full_state_pipeline', element: null, idleLabel: 'Run Full State Pipeline' },
+    { key: 'full_state_pipeline', element: elements.runStatePipeline, idleLabel: 'Run Entire State Pipeline' },
     { key: 'seed_scope_stage', element: null, idleLabel: 'Run Seed Scope Stage' },
     { key: 'fetch_stage', element: elements.runCrawlStage, idleLabel: 'Run Fetch Stage' },
     { key: 'triage_stage', element: null, idleLabel: 'Run Triage Stage' },
@@ -1183,15 +1230,21 @@ function setPipelineActionState(actionKey = null) {
     { key: 'parse_stage', element: null, idleLabel: 'Run Parse Stage' },
     { key: 'workflow_extraction_stage', element: null, idleLabel: 'Run Workflow Stage' },
     { key: 'question_extraction_stage', element: elements.runQuestionStage, idleLabel: 'Run Question Stage' },
-    { key: 'full_pipeline', element: elements.runPipeline, idleLabel: 'Run Full Pipeline' },
+    { key: 'full_pipeline', element: elements.runPipeline, idleLabel: 'Run Selected System Pipeline' },
   ];
 
   for (const action of actions) {
     if (!action.element) continue;
     const running = actionKey === action.key;
-    action.element.disabled = !hasSystem || Boolean(actionKey);
+    const hasRequiredScope =
+      action.key === 'full_state_pipeline'
+        ? Boolean(state.currentState) && Number(state.stateSummary?.counts?.seeded_systems || 0) > 0
+        : hasSystem;
+    action.element.disabled = !hasRequiredScope || Boolean(actionKey);
     action.element.textContent = running ? 'Running...' : action.idleLabel;
   }
+
+  renderPipelineScopeActions();
 
   if (state.currentStateTab === 'pipeline') {
     renderPipelineVisual();
@@ -2298,6 +2351,10 @@ function renderStateSummary() {
 
 function renderSystemsTable() {
   if (!state.stateSummary) {
+    if (elements.systemsTitleCount) {
+      elements.systemsTitleCount.textContent = '';
+      elements.systemsTitleCount.classList.add('hidden');
+    }
     elements.systemsTable.innerHTML = '<div class="empty-state">State systems appear here after you open a state.</div>';
     return;
   }
@@ -2315,6 +2372,15 @@ function renderSystemsTable() {
       String(deriveSystemUrl(system) || '').toLowerCase().includes(query)
     );
   }));
+  const totalSystems = state.systems.length;
+
+  if (elements.systemsTitleCount) {
+    elements.systemsTitleCount.textContent =
+      query && systems.length !== totalSystems
+        ? `${formatNumber(systems.length)} of ${formatNumber(totalSystems)}`
+        : `${formatNumber(totalSystems)} total`;
+    elements.systemsTitleCount.classList.remove('hidden');
+  }
 
   if (systems.length === 0) {
     elements.systemsTable.innerHTML = '<div class="empty-state">No hospital systems match the current filter.</div>';
@@ -2580,6 +2646,10 @@ function buildStateDataPipelineStage({ isLast = false } = {}) {
             <h4 class="step-title">Data Files To Candidate Seeds</h4>
             <p class="step-copy">Discover state-prefixed files in data/, normalize them into hospital identities with OpenAI, and stage generated seed candidates under storage/ for operator review.</p>
             <p class="system-subtext">${escapeHtml(formatRunningAwareStageHeadline(latestRun, 'state_data_materialization_stage', 'Not run yet'))}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              ${renderInspectorMetaPill('Scope', 'Entire state')}
+              ${renderInspectorMetaPill('Seeded Systems', seededSystems)}
+            </div>
           </div>
           <span class="${statusPillClass(tone)}">${escapeHtml(STATUS_LABELS[tone] || tone)}</span>
         </div>
@@ -2615,7 +2685,7 @@ function buildStateDataPipelineStage({ isLast = false } = {}) {
               ${escapeHtml(
                 Number(counts.matched_files || 0) === 0
                   ? 'Place state-prefixed source files in data/ or edit the seed file directly.'
-                  : 'Run Data Intake Stage, inspect the staged candidates, promote the approved systems into canonical seeds, then batch the downstream pipeline from that registry.',
+                  : 'Run Data Intake Stage, inspect the staged candidates, promote the approved systems into canonical seeds, then run the entire-state batch from that registry.',
               )}
             </div>
           </div>
@@ -2635,7 +2705,7 @@ function buildStateDataPipelineStage({ isLast = false } = {}) {
             data-action="run-full-state-pipeline"
             ${disabled || seededSystems === 0 ? 'disabled' : ''}
           >
-            ${escapeHtml(batchRunning ? 'Running State Pipeline...' : 'Run Full State Pipeline')}
+            ${escapeHtml(batchRunning ? 'Running Entire State Pipeline...' : 'Run Entire State Pipeline')}
           </button>
           ${
             latestRun?.id
@@ -2748,6 +2818,7 @@ function renderPipelineSystemSelect() {
   if (!state.systems.length) {
     elements.pipelineSystemSelect.innerHTML = '<option value="">No systems available</option>';
     setPipelineActionState(null);
+    renderPipelineScopeActions();
     return;
   }
 
@@ -2763,6 +2834,7 @@ function renderPipelineSystemSelect() {
 
   elements.pipelineSystemSelect.value = state.selectedSystemId || state.systems[0].hospital_system_id || '';
   setPipelineActionState(state.pipelineActionInFlight);
+  renderPipelineScopeActions();
 }
 
 function renderPipelineInsights() {
@@ -4735,7 +4807,7 @@ function renderPipelineRunResult() {
 
     elements.pipelineRunResult.innerHTML = `
       <div class="empty-state">
-        Use Stage 1 to stage and review candidate seeds, promote the approved systems into the canonical seed file, or pick a hospital system above to run seed scope, fetch, triage, accept, parse, workflow, question, or the per-system full pipeline.
+        Use Stage 1 to stage and review candidate seeds, promote the approved systems into the canonical seed file, then either run the selected hospital system step by step or batch the entire state from the header.
       </div>
     `;
     return;
@@ -4970,7 +5042,7 @@ function renderPipelineVisual() {
   if (!system) {
     elements.pipelineVisual.innerHTML = `
       ${state.stateSummary ? buildStateDataPipelineStage({ isLast: true }) : ''}
-      <div class="empty-state">Use Stage 1 to stage and promote canonical seeds or run the full state batch. Choose a hospital system only when you want to inspect or rerun the downstream stages one by one.</div>
+      <div class="empty-state">Use the state-wide controls when you mean the entire state. Choose a hospital system when you want the downstream stages to run one system at a time.</div>
     `;
     return;
   }
@@ -5042,8 +5114,8 @@ function renderPipelineVisual() {
         renderPipelineRunButton({
           action: 'run-full-pipeline',
           actionKey: 'full_pipeline',
-          label: 'Run Full Pipeline',
-          runningLabel: 'Running Full Pipeline...',
+          label: 'Run Selected System Pipeline',
+          runningLabel: 'Running Selected System Pipeline...',
           primary: true,
         }),
       ],
@@ -5323,6 +5395,10 @@ function renderPipelineVisual() {
                 <h4 class="step-title">${escapeHtml(step.title)}</h4>
                 <p class="step-copy">${escapeHtml(step.copy)}</p>
                 <p class="system-subtext">${escapeHtml(step.runtime)}</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  ${renderInspectorMetaPill('Scope', 'Selected system')}
+                  ${renderInspectorMetaPill('System', system.system_name || 'Selected system')}
+                </div>
               </div>
               <span class="${statusPillClass(step.tone)}">${escapeHtml(STATUS_LABELS[step.tone] || step.tone)}</span>
             </div>
@@ -7256,6 +7332,11 @@ document.addEventListener('click', async (event) => {
 
     if (button === elements.runPipeline) {
       await runPipelineForSelectedSystem();
+      return;
+    }
+
+    if (button === elements.runStatePipeline) {
+      await runFullPipelineForCurrentState();
       return;
     }
 
