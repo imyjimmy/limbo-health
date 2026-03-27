@@ -758,12 +758,7 @@
         }
 
         .question-card-shell-draggable {
-          @apply flex items-start gap-2;
-        }
-
-        .question-card-shell-draggable > .question-card {
-          flex: 1 1 auto;
-          min-width: 0;
+          @apply cursor-default;
         }
 
         .question-card-shell-dragging {
@@ -791,23 +786,31 @@
         }
 
         .question-drag-handle {
-          @apply mt-1 inline-grid shrink-0 cursor-grab grid-cols-2 gap-1 rounded-xl border border-gray-200 bg-white px-2 py-3 text-gray-400 shadow-sm;
+          @apply ml-3 inline-flex shrink-0 cursor-grab flex-col gap-1 rounded-lg border border-gray-200 bg-white px-2 py-2 text-gray-400 shadow-sm;
         }
 
         .question-card-shell-dragging .question-drag-handle {
           cursor: grabbing;
         }
 
-        .question-drag-dot {
-          width: 4px;
-          height: 4px;
+        .question-drag-line {
+          width: 0.9rem;
+          height: 2px;
           border-radius: 999px;
           background: currentColor;
-          opacity: 0.7;
+          opacity: 0.72;
         }
 
         .question-card {
           @apply w-full rounded-xl border border-gray-200 bg-gray-50 p-2.5 text-left transition hover:bg-gray-100;
+        }
+
+        .question-card-row {
+          @apply flex items-start justify-between gap-3;
+        }
+
+        .question-card-copy-stack {
+          @apply min-w-0 flex-1;
         }
 
         .question-card-active {

@@ -3804,24 +3804,40 @@ function reorderPdfEditorQuestion({
     return;
   }
 
-  const sourceIndex = payload.questions.findIndex((question) => question.id === questionId);
-  const targetIndex = payload.questions.findIndex((question) => question.id === targetQuestionId);
-  if (sourceIndex < 0 || targetIndex < 0) {
+  const hierarchy = payload.questions.map((question, index, questions) =>
+    buildPdfEditorQuestionHierarchy(question, index, questions),
+  );
+
+  const sourceGroup = resolvePdfEditorQuestionGroup(questionId, payload.questions, hierarchy);
+  const targetGroup = resolvePdfEditorQuestionGroup(targetQuestionId, payload.questions, hierarchy);
+  if (!sourceGroup || !targetGroup) {
     throw new Error('Could not find the question to reorder.');
   }
-
-  const [question] = payload.questions.splice(sourceIndex, 1);
-  let insertionIndex = targetIndex;
-  if (position === 'after') {
-    insertionIndex += 1;
+  if (sourceGroup.isDependent) {
+    throw new Error('Dependent follow-up items move with their parent question.');
   }
-  if (sourceIndex < targetIndex) {
-    insertionIndex -= 1;
+  if (targetGroup.isDependent) {
+    throw new Error('Drop onto a parent question to reorder question groups.');
+  }
+  if (targetGroup.startIndex >= sourceGroup.startIndex && targetGroup.startIndex < sourceGroup.endIndex) {
+    return;
+  }
+
+  const movedQuestions = payload.questions.splice(
+    sourceGroup.startIndex,
+    sourceGroup.endIndex - sourceGroup.startIndex,
+  );
+  let insertionIndex = position === 'after' ? targetGroup.endIndex : targetGroup.startIndex;
+  if (sourceGroup.startIndex < insertionIndex) {
+    insertionIndex -= movedQuestions.length;
   }
   insertionIndex = Math.max(0, Math.min(payload.questions.length, insertionIndex));
-  payload.questions.splice(insertionIndex, 0, question);
+  payload.questions.splice(insertionIndex, 0, ...movedQuestions);
 
-  setActivePdfEditorItem(question.id);
+  const nextActiveQuestionId = movedQuestions.some((question) => question.id === state.pdfEditorActiveQuestionId)
+    ? state.pdfEditorActiveQuestionId
+    : movedQuestions[0]?.id || questionId;
+  setActivePdfEditorItem(nextActiveQuestionId);
   state.pdfEditorDragQuestionId = null;
   state.pdfEditorDropTargetQuestionId = null;
   state.pdfEditorDropPosition = null;
@@ -4330,6 +4346,7 @@ function renderPdfEditorQuestions() {
         ${state.pdfEditorQuestions
           .map((question, index) => {
             const hierarchy = questionHierarchy[index] || null;
+            const canReorderQuestion = canDragQuestions && !hierarchy?.isDependent;
             const activeClass =
               question.id === state.pdfEditorActiveQuestionId
                 ? 'question-card question-card-active'
@@ -4338,7 +4355,7 @@ function renderPdfEditorQuestions() {
             if (hierarchy?.isDependent) {
               shellClasses.push('question-card-shell-dependent');
             }
-            if (canDragQuestions) {
+            if (canReorderQuestion) {
               shellClasses.push('question-card-shell-draggable');
             }
             if (question.id === state.pdfEditorDragQuestionId) {
@@ -4357,43 +4374,50 @@ function renderPdfEditorQuestions() {
                 class="${shellClasses.join(' ')}"
                 data-question-id="${escapeHtml(question.id)}"
                 ${hierarchy?.parentId ? `data-parent-question-id="${escapeHtml(hierarchy.parentId)}"` : ''}
-                ${canDragQuestions ? 'draggable="true"' : ''}
               >
-                ${
-                  canDragQuestions
-                    ? `
-                      <div class="question-drag-handle" title="Drag to reorder" aria-hidden="true">
-                        <span class="question-drag-dot"></span>
-                        <span class="question-drag-dot"></span>
-                        <span class="question-drag-dot"></span>
-                        <span class="question-drag-dot"></span>
-                        <span class="question-drag-dot"></span>
-                        <span class="question-drag-dot"></span>
-                      </div>
-                    `
-                    : ''
-                }
                 <button type="button" class="${activeClass}" data-action="select-editor-question" data-question-id="${escapeHtml(question.id)}">
-                  ${
-                    hierarchy?.isDependent
-                      ? `<div class="question-followup-kicker">Follow-up to ${formatNumber(hierarchy.parentIndex + 1)}</div>`
-                      : ''
-                  }
-                  <div class="question-title">${formatNumber(index + 1)}. ${escapeHtml(question.label)}</div>
-                  <div class="question-copy">
+                  <div class="question-card-row">
+                    <div class="question-card-copy-stack">
+                      ${
+                        hierarchy?.isDependent
+                          ? `<div class="question-followup-kicker">Follow-up to ${formatNumber(hierarchy.parentIndex + 1)}</div>`
+                          : ''
+                      }
+                      <div class="question-title">${formatNumber(index + 1)}. ${escapeHtml(question.label)}</div>
+                      <div class="question-copy">
+                        ${
+                          question.rects.length > 0
+                            ? `${escapeHtml(question.kind)} • ${formatNumber(question.rects.length)} mapped rectangles • ${formatNumber(question.page_indexes.length)} pages`
+                            : question.binding_count > 0
+                              ? `${escapeHtml(question.kind)} • ${formatNumber(question.binding_count)} saved bindings • overlay unavailable`
+                              : `${escapeHtml(question.kind)} • no saved bindings`
+                        }
+                      </div>
+                      ${
+                        question.help_text
+                          ? `<div class="question-copy">${escapeHtml(question.help_text)}</div>`
+                          : ''
+                      }
+                    </div>
                     ${
-                      question.rects.length > 0
-                        ? `${escapeHtml(question.kind)} • ${formatNumber(question.rects.length)} mapped rectangles • ${formatNumber(question.page_indexes.length)} pages`
-                        : question.binding_count > 0
-                          ? `${escapeHtml(question.kind)} • ${formatNumber(question.binding_count)} saved bindings • overlay unavailable`
-                          : `${escapeHtml(question.kind)} • no saved bindings`
+                      canReorderQuestion
+                        ? `
+                          <span
+                            class="question-drag-handle"
+                            title="Drag to reorder"
+                            aria-label="Drag to reorder"
+                            data-question-drag-handle="true"
+                            data-question-id="${escapeHtml(question.id)}"
+                            draggable="true"
+                          >
+                            <span class="question-drag-line"></span>
+                            <span class="question-drag-line"></span>
+                            <span class="question-drag-line"></span>
+                          </span>
+                        `
+                        : ''
                     }
                   </div>
-                  ${
-                    question.help_text
-                      ? `<div class="question-copy">${escapeHtml(question.help_text)}</div>`
-                      : ''
-                  }
                 </button>
               </div>
             `;
@@ -4462,6 +4486,46 @@ function buildPdfEditorQuestionHierarchy(question, questionIndex, questions) {
     parentId: parent?.parentId || null,
     parentIndex: parent?.parentIndex ?? -1,
     parentLabel: parent?.parentLabel || null,
+  };
+}
+
+function resolvePdfEditorQuestionGroup(questionId, questions = [], hierarchy = null) {
+  const resolvedHierarchy =
+    hierarchy ||
+    questions.map((question, index, questionList) =>
+      buildPdfEditorQuestionHierarchy(question, index, questionList),
+    );
+  const questionIndex = questions.findIndex((question) => question.id === questionId);
+  if (questionIndex < 0) {
+    return null;
+  }
+
+  const hierarchyEntry = resolvedHierarchy[questionIndex] || null;
+  const rootIndex =
+    hierarchyEntry?.isDependent && Number.isInteger(hierarchyEntry.parentIndex) && hierarchyEntry.parentIndex >= 0
+      ? hierarchyEntry.parentIndex
+      : questionIndex;
+  const rootQuestion = questions[rootIndex] || null;
+  if (!rootQuestion) {
+    return null;
+  }
+
+  let endIndex = rootIndex + 1;
+  while (endIndex < questions.length) {
+    const nextHierarchy = resolvedHierarchy[endIndex] || null;
+    if (!nextHierarchy?.isDependent || nextHierarchy.parentId !== rootQuestion.id) {
+      break;
+    }
+    endIndex += 1;
+  }
+
+  return {
+    questionIndex,
+    startIndex: rootIndex,
+    endIndex,
+    questionId,
+    rootQuestionId: rootQuestion.id,
+    isDependent: Boolean(hierarchyEntry?.isDependent),
   };
 }
 
@@ -7790,6 +7854,12 @@ function pdfEditorQuestionCardFromEventTarget(target) {
   return target instanceof Element ? target.closest('.question-card-shell[data-question-id]') : null;
 }
 
+function pdfEditorQuestionDragHandleFromEventTarget(target) {
+  return target instanceof Element
+    ? target.closest('.question-drag-handle[data-question-drag-handle="true"][data-question-id]')
+    : null;
+}
+
 function clearPdfEditorQuestionDropState({ preserveDragQuestion = false } = {}) {
   const draggingQuestionId = state.pdfEditorDragQuestionId;
   if (!preserveDragQuestion) {
@@ -7815,9 +7885,10 @@ function clearPdfEditorQuestionDropState({ preserveDragQuestion = false } = {}) 
 
 elements.pdfEditorQuestions?.addEventListener('dragstart', (event) => {
   if (!hasManualOverlayDraft() || !state.pdfEditorAuthoringOpen) return;
-  const card = pdfEditorQuestionCardFromEventTarget(event.target);
-  const questionId = card?.dataset.questionId;
-  if (!card || !questionId || !event.dataTransfer) return;
+  const handle = pdfEditorQuestionDragHandleFromEventTarget(event.target);
+  const card = pdfEditorQuestionCardFromEventTarget(handle);
+  const questionId = handle?.dataset.questionId || null;
+  if (!handle || !card || !questionId || !event.dataTransfer) return;
 
   state.pdfEditorDragQuestionId = questionId;
   state.pdfEditorDropTargetQuestionId = null;
@@ -7835,11 +7906,19 @@ elements.pdfEditorQuestions?.addEventListener('dragover', (event) => {
     return;
   }
 
+  const hierarchy = state.pdfEditorQuestions.map((question, index, questions) =>
+    buildPdfEditorQuestionHierarchy(question, index, questions),
+  );
+  const targetGroup = resolvePdfEditorQuestionGroup(card.dataset.questionId, state.pdfEditorQuestions, hierarchy);
+  if (!targetGroup || targetGroup.isDependent) {
+    return;
+  }
+
   event.preventDefault();
   const bounds = card.getBoundingClientRect();
   const position = event.clientY - bounds.top < bounds.height / 2 ? 'before' : 'after';
   if (
-    state.pdfEditorDropTargetQuestionId === card.dataset.questionId &&
+    state.pdfEditorDropTargetQuestionId === targetGroup.rootQuestionId &&
     state.pdfEditorDropPosition === position
   ) {
     return;
@@ -7847,21 +7926,33 @@ elements.pdfEditorQuestions?.addEventListener('dragover', (event) => {
 
   clearPdfEditorQuestionDropState({ preserveDragQuestion: true });
   state.pdfEditorDragQuestionId = event.dataTransfer?.getData('text/plain') || state.pdfEditorDragQuestionId;
-  state.pdfEditorDropTargetQuestionId = card.dataset.questionId;
+  state.pdfEditorDropTargetQuestionId = targetGroup.rootQuestionId;
   state.pdfEditorDropPosition = position;
-  card.classList.add(position === 'after' ? 'question-card-shell-drop-after' : 'question-card-shell-drop-before');
+  const dropTargetCard =
+    elements.pdfEditorQuestions?.querySelector(
+      `.question-card-shell[data-question-id="${CSS.escape(targetGroup.rootQuestionId)}"]`,
+    ) || card;
+  dropTargetCard.classList.add(
+    position === 'after' ? 'question-card-shell-drop-after' : 'question-card-shell-drop-before',
+  );
 });
 
 elements.pdfEditorQuestions?.addEventListener('drop', (event) => {
   if (!hasManualOverlayDraft() || !state.pdfEditorAuthoringOpen || !state.pdfEditorDragQuestionId) return;
   const card = pdfEditorQuestionCardFromEventTarget(event.target);
-  const targetQuestionId = card?.dataset.questionId || null;
+  const hierarchy = state.pdfEditorQuestions.map((question, index, questions) =>
+    buildPdfEditorQuestionHierarchy(question, index, questions),
+  );
+  const targetGroup = card?.dataset.questionId
+    ? resolvePdfEditorQuestionGroup(card.dataset.questionId, state.pdfEditorQuestions, hierarchy)
+    : null;
+  const targetQuestionId = targetGroup?.rootQuestionId || null;
   const draggedQuestionId = state.pdfEditorDragQuestionId || event.dataTransfer?.getData('text/plain');
   const position = state.pdfEditorDropPosition || 'before';
   clearPdfEditorQuestionDropState();
   event.preventDefault();
 
-  if (!targetQuestionId || !draggedQuestionId || targetQuestionId === draggedQuestionId) {
+  if (!targetGroup || targetGroup.isDependent || !targetQuestionId || !draggedQuestionId || targetQuestionId === draggedQuestionId) {
     renderPdfEditor();
     updatePdfEditorOverlays();
     return;
