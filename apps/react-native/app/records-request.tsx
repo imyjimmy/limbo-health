@@ -21,9 +21,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import {
   HospitalSystemLogo,
   hasHospitalSystemLogo,
@@ -55,49 +57,57 @@ import {
 import { useCamera } from '../hooks/useCamera';
 import { useBioProfile } from '../providers/BioProfileProvider';
 import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
-import { formatMaskedMailingAddress } from '../types/bio';
 import type {
   HospitalSystemOption,
   RecordsRequestIdAttachment,
   RecordsRequestPacket,
   RecordsRequestUserSignature,
-  RecordsWorkflowAutofillQuestion,
   RecordsWorkflowForm,
 } from '../types/recordsRequest';
 
-function formatMethodLabel(method: string): string {
-  return method
-    .split('_')
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(' ');
-}
+type RecordsRequestInstruction = RecordsRequestPacket['instructions'][number];
 
 function buildFormKey(form: RecordsWorkflowForm): string {
   return form.cachedContentUrl || form.url;
 }
 
-function getAutofillAnswerLabel(
-  question: RecordsWorkflowAutofillQuestion,
-  answers: RecordsWorkflowAutofillAnswers,
-): string {
-  const answer = answers[question.id];
+function getSubmissionInstruction(
+  instructions: RecordsRequestInstruction[],
+  channel: 'email' | 'fax',
+): RecordsRequestInstruction | null {
+  return (
+    instructions.find(
+      (instruction) =>
+        instruction.kind === 'submission_channel' &&
+        instruction.channel === channel &&
+        Boolean(instruction.value?.trim() || instruction.details.trim()),
+    ) ||
+    instructions.find(
+      (instruction) =>
+        instruction.channel === channel &&
+        Boolean(instruction.value?.trim() || instruction.details.trim()),
+    ) ||
+    null
+  );
+}
 
-  if (question.kind === 'short_text') {
-    return typeof answer === 'string' ? answer.trim() : '';
+function getSubmissionInstructionValue(instruction: RecordsRequestInstruction | null): string {
+  if (!instruction) return '';
+
+  const explicitValue = instruction.value?.trim();
+  if (explicitValue) {
+    return explicitValue;
   }
 
-  if (question.kind === 'single_select') {
-    if (typeof answer !== 'string') return '';
-    return question.options.find((option) => option.id === answer)?.label || '';
-  }
+  return instruction.details.replace(/^submit by (email|fax):\s*/i, '').trim();
+}
 
-  if (!Array.isArray(answer)) return '';
+function extractEmailAddress(instruction: RecordsRequestInstruction | null): string | null {
+  const match = getSubmissionInstructionValue(instruction).match(
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
+  );
 
-  return question.options
-    .filter((option) => answer.includes(option.id))
-    .map((option) => option.label)
-    .join(', ');
+  return match?.[0] || null;
 }
 
 function getWorkflowStepTitle(step: RecordsRequestWorkflowStep): string {
@@ -168,6 +178,7 @@ export default function RecordsRequestScreen() {
   const [autofillAnswers, setAutofillAnswers] = useState<RecordsWorkflowAutofillAnswers>({});
   const [signature, setSignature] = useState<RecordsRequestUserSignature | null>(null);
   const [signaturePadActive, setSignaturePadActive] = useState(false);
+  const [pdfPreviewFailed, setPdfPreviewFailed] = useState(false);
   const packetLoadRequestIdRef = useRef(0);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const autofillAnswersRef = useRef<RecordsWorkflowAutofillAnswers>({});
@@ -290,6 +301,10 @@ export default function RecordsRequestScreen() {
     }
   }, [currentStepId]);
 
+  useEffect(() => {
+    setPdfPreviewFailed(false);
+  }, [generatedPdfUri]);
+
   const hasPdfForm = Boolean(packet?.forms.some((form) => form.format === 'pdf'));
   const selectedPdfForm =
     packet?.forms.find(
@@ -333,14 +348,32 @@ export default function RecordsRequestScreen() {
   const canGeneratePdf = hasPdfForm && templatePrefetchState !== 'loading';
   const formFillButtonLabel =
     dynamicQuestions.length > 0 || hasSignatureStep ? 'Fill Out Form' : 'Apply Bio To PDF';
+  const emailInstruction = packet ? getSubmissionInstruction(packet.instructions, 'email') : null;
+  const faxInstruction = packet ? getSubmissionInstruction(packet.instructions, 'fax') : null;
+  const emailDestination = extractEmailAddress(emailInstruction);
+  const faxDestination = getSubmissionInstructionValue(faxInstruction);
+  const displayedEmailDestination =
+    emailDestination || getSubmissionInstructionValue(emailInstruction) || '';
+  const displayedFaxDestination = faxDestination || '';
+  const filledPdfTitle =
+    activeAutofillForm?.name ||
+    prefetchedFormName ||
+    primaryDisplayForm?.name ||
+    'Filled hospital form';
   const currentStepTitle =
-    currentWorkflowStep.kind === 'hospital' && selectedSystem
-      ? selectedSystem.name
-      : getWorkflowStepTitle(currentWorkflowStep);
+    currentWorkflowStep.kind === 'submit' && generatedPdfUri
+      ? 'Ready to send'
+      : currentWorkflowStep.kind === 'hospital' && selectedSystem
+        ? selectedSystem.name
+        : getWorkflowStepTitle(currentWorkflowStep);
   const currentStepDescription =
-    currentWorkflowStep.kind === 'hospital' && selectedSystem
-      ? ''
-      : getWorkflowStepDescription(currentWorkflowStep);
+    currentWorkflowStep.kind === 'submit'
+      ? generatedPdfUri
+        ? 'Review the completed PDF and send it using the hospital instructions below.'
+        : 'Generate the completed PDF, then send it exactly the way this hospital asks.'
+      : currentWorkflowStep.kind === 'hospital' && selectedSystem
+        ? ''
+        : getWorkflowStepDescription(currentWorkflowStep);
   const currentQuestionIsDate = currentQuestion ? isDateAutofillQuestion(currentQuestion) : false;
   const nextWorkflowStep = workflowSteps[currentStepIndex + 1] || null;
   const compactHospitalSummary = packet
@@ -528,15 +561,6 @@ export default function RecordsRequestScreen() {
       });
 
       setGeneratedPdfUri(result.uri);
-      const hasSignature = hasSignatureStrokeInput(signature);
-      const appliedSummary =
-        dynamicQuestions.length > 0 || hasSignature
-          ? `Applied your bio${dynamicQuestions.length > 0 ? ', form answers' : ''}${hasSignature ? dynamicQuestions.length > 0 ? ', and signature' : ' and signature' : ''}`
-          : 'Applied your bio';
-      Alert.alert(
-        'Form Ready',
-        `${appliedSummary} to ${result.formName} and filled ${result.filledFieldCount} field${result.filledFieldCount === 1 ? '' : 's'}.`,
-      );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to generate the PDF.';
       Alert.alert('Generation Failed', message);
@@ -545,18 +569,63 @@ export default function RecordsRequestScreen() {
     }
   };
 
-  const handleSharePdf = async () => {
-    if (!generatedPdfUri || !packet) return;
+  const handleOpenGeneratedPdf = async () => {
+    if (!generatedPdfUri) return;
 
     try {
+      await Linking.openURL(generatedPdfUri);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to open the PDF.';
+      Alert.alert('Open Failed', message);
+    }
+  };
+
+  const handleEmailPdf = async () => {
+    if (!generatedPdfUri || !packet) return;
+
+    if (!emailDestination) {
+      Alert.alert('Email Unavailable', 'No hospital email destination was extracted for this form.');
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(emailDestination);
       await Share.share({
         title: `${packet.hospitalSystem.name} records request`,
+        message: `Email this completed records request PDF to ${emailDestination}.`,
         url: generatedPdfUri,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to share the PDF.';
-      Alert.alert('Share Failed', message);
+      const message = error instanceof Error ? error.message : 'Unable to prepare the email share.';
+      Alert.alert('Email Failed', message);
     }
+  };
+
+  const handleFaxPdf = async () => {
+    if (!generatedPdfUri || !packet) return;
+
+    if (!faxDestination) {
+      Alert.alert('Fax Unavailable', 'No hospital fax destination was extracted for this form.');
+      return;
+    }
+
+    try {
+      await Clipboard.setStringAsync(faxDestination);
+      await Share.share({
+        title: `${packet.hospitalSystem.name} records request`,
+        message: `Fax this completed records request PDF to ${faxDestination}.`,
+        url: generatedPdfUri,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to prepare the fax share.';
+      Alert.alert('Fax Failed', message);
+    }
+  };
+
+  const handleStartOver = () => {
+    setCurrentStepId('bio');
+    setGeneratedPdfUri(null);
+    setSignature(null);
   };
 
   const goToStep = (nextStepId: string) => {
@@ -1131,31 +1200,14 @@ export default function RecordsRequestScreen() {
 
         {currentWorkflowStep.kind === 'submit' && packet && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Fill out the selected form</Text>
-            <Text style={styles.sectionBody}>
-              When you tap below, we fill the selected hospital form with your saved info, any
-              answers you provided, your signature when needed, and append your ID image if you
-              attached one.
+            <Text style={styles.sectionTitle}>
+              {generatedPdfUri ? 'Filled PDF ready' : 'Create the filled PDF'}
             </Text>
-
-            <View style={styles.reviewSection}>
-              <Text style={styles.reviewHeader}>Bio info</Text>
-              <Text style={styles.reviewText}>{profile.fullName}</Text>
-              <Text style={styles.reviewText}>{profile.dateOfBirth}</Text>
-              {profile.phoneNumber ? <Text style={styles.reviewText}>{profile.phoneNumber}</Text> : null}
-              {profile.email ? <Text style={styles.reviewText}>{profile.email}</Text> : null}
-              <Text style={styles.reviewText}>{formatMaskedMailingAddress(profile)}</Text>
-            </View>
-
-            <View style={styles.reviewSection}>
-              <Text style={styles.reviewHeader}>Hospital system</Text>
-              <Text style={styles.reviewText}>{packet.hospitalSystem.name}</Text>
-              <Text style={styles.reviewMuted}>
-                {(packet.medicalWorkflow?.availableMethods || [])
-                  .map(formatMethodLabel)
-                  .join(' • ') || 'Workflow methods pending'}
-              </Text>
-            </View>
+            <Text style={styles.sectionBody}>
+              {generatedPdfUri
+                ? 'Review the completed form below, then send it by email or fax using the hospital instructions we recovered.'
+                : 'Generate the completed PDF, then send it exactly the way this hospital asks.'}
+            </Text>
 
             <View style={styles.reviewSection}>
               <Text style={styles.reviewHeader}>Official form</Text>
@@ -1192,34 +1244,6 @@ export default function RecordsRequestScreen() {
               )}
             </View>
 
-            {selectedPdfForm && primaryDisplayForm && selectedPdfForm.name !== primaryDisplayForm.name && (
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewHeader}>Selected autofill form</Text>
-                <Text style={styles.reviewText}>{selectedPdfForm.name}</Text>
-                <Text style={styles.reviewMuted}>
-                  {selectedPdfForm.autofill.mode
-                    ? `Autofill mode: ${selectedPdfForm.autofill.mode}`
-                    : 'Autofill mode pending'}
-                </Text>
-              </View>
-            )}
-
-            {dynamicQuestions.length > 0 && (
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewHeader}>Form answers</Text>
-                {dynamicQuestions.map((question) => {
-                  const answerLabel = getAutofillAnswerLabel(question, autofillAnswers);
-
-                  return (
-                    <View key={question.id} style={styles.answerSummaryRow}>
-                      <Text style={styles.answerSummaryLabel}>{question.label}</Text>
-                      <Text style={styles.reviewMuted}>{answerLabel || 'No answer recorded'}</Text>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-
             {!hasPdfForm && (
               <View style={styles.reviewSection}>
                 <Text style={styles.reviewHeader}>Form filling</Text>
@@ -1239,103 +1263,189 @@ export default function RecordsRequestScreen() {
               </View>
             )}
 
-            <View style={styles.reviewSection}>
-              <Text style={styles.reviewHeader}>Instructions</Text>
-              {packet.instructions.slice(0, 4).map((instruction) => (
-                <View key={`${instruction.sequenceNo}:${instruction.details}`} style={styles.instructionRow}>
-                  <Text style={styles.instructionBullet}>{instruction.sequenceNo || '•'}</Text>
-                  <Text style={styles.instructionText}>{instruction.details}</Text>
+            <View style={styles.deliveryCard}>
+              <Text style={styles.deliveryEyebrow}>Hospital Instructions</Text>
+              <View style={styles.deliveryRow}>
+                <View style={styles.deliveryIcon}>
+                  <Ionicons name="mail-outline" size={18} color={theme.colors.secondary} />
                 </View>
-              ))}
-            </View>
-
-            <View style={styles.reviewSection}>
-              <Text style={styles.reviewHeader}>ID attachment</Text>
-              <Text style={styles.reviewMuted}>
-                {idAttachment
-                  ? `Included from ${idAttachment.source === 'camera' ? 'camera' : 'photo library'}`
-                  : 'No ID image attached'}
-              </Text>
-            </View>
-
-            {hasSignatureStep && (
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewHeader}>Signature</Text>
-                <Text style={styles.reviewMuted}>
-                  {hasSignatureStrokeInput(signature) ? 'Included on the form' : 'No signature captured'}
+                <View style={styles.deliveryTextWrap}>
+                  <Text style={styles.deliveryLabel}>Email</Text>
+                  <Text style={styles.deliveryValue}>
+                    {displayedEmailDestination || 'No email destination recovered'}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.deliveryRow}>
+                <View style={styles.deliveryIcon}>
+                  <Ionicons name="print-outline" size={18} color={theme.colors.secondary} />
+                </View>
+                <View style={styles.deliveryTextWrap}>
+                  <Text style={styles.deliveryLabel}>Fax</Text>
+                  <Text style={styles.deliveryValue}>
+                    {displayedFaxDestination || 'No fax destination recovered'}
+                  </Text>
+                </View>
+              </View>
+              {generatedPdfUri ? (
+                <Text style={styles.deliveryHint}>
+                  Tapping Email or Fax copies the destination and opens your device share sheet with the filled PDF.
                 </Text>
+              ) : null}
+            </View>
+
+            {generatedPdfUri && (
+              <View style={styles.pdfCard}>
+                <View style={styles.pdfCardHeader}>
+                  <View style={styles.deliveryTextWrap}>
+                    <Text style={styles.deliveryEyebrow}>Filled PDF</Text>
+                    <Text style={styles.pdfCardTitle}>{filledPdfTitle}</Text>
+                  </View>
+                  <Pressable
+                    onPress={handleOpenGeneratedPdf}
+                    style={({ pressed }) => [
+                      styles.pdfOpenButton,
+                      pressed && styles.secondaryButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.pdfOpenButtonText}>Open</Text>
+                  </Pressable>
+                </View>
+
+                {Platform.OS === 'ios' && !pdfPreviewFailed ? (
+                  <View style={styles.pdfFrame}>
+                    <WebView
+                      key={generatedPdfUri}
+                      source={{ uri: generatedPdfUri }}
+                      style={styles.pdfWebView}
+                      allowingReadAccessToURL={generatedPdfUri}
+                      originWhitelist={['*']}
+                      onError={() => setPdfPreviewFailed(true)}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.pdfFallback}>
+                    <Ionicons
+                      name="document-text-outline"
+                      size={26}
+                      color={theme.colors.secondary}
+                    />
+                    <Text style={styles.pdfFallbackText}>
+                      Open the filled PDF to review the exact document you’re about to send.
+                    </Text>
+                    <Pressable
+                      onPress={handleOpenGeneratedPdf}
+                      style={({ pressed }) => [
+                        styles.secondaryButton,
+                        styles.fullWidthButton,
+                        pressed && styles.secondaryButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.secondaryButtonText}>Open PDF</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             )}
 
             <View style={styles.actionColumn}>
-              <Pressable
-                onPress={handleGeneratePdf}
-                disabled={submitting || !canGeneratePdf}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  styles.fullWidthButton,
-                  (pressed || submitting || !canGeneratePdf) && styles.primaryButtonPressed,
-                  !canGeneratePdf && styles.disabledButton,
-                ]}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {submitting
-                    ? 'Filling PDF...'
-                    : canGeneratePdf
-                      ? templatePrefetchState === 'error'
-                        ? `Retry ${formFillButtonLabel}`
-                        : formFillButtonLabel
-                      : hasPdfForm
-                        ? 'Fetching Form...'
-                        : 'No Fillable PDF Available Yet'}
-                </Text>
-              </Pressable>
-
-              {generatedPdfUri && (
-                <View style={styles.successCard}>
-                  <Text style={styles.successTitle}>Filled form ready</Text>
-                  <Text style={styles.successBody}>
-                    Your hospital PDF now has your bio
-                    {dynamicQuestions.length > 0 ? ', form answers' : ''}
-                    {hasSignatureStrokeInput(signature) ? ', and signature' : ''}
-                    {' '}applied and is ready to share, review, or save elsewhere on your device.
+              {!generatedPdfUri ? (
+                <Pressable
+                  onPress={handleGeneratePdf}
+                  disabled={submitting || !canGeneratePdf}
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    styles.fullWidthButton,
+                    (pressed || submitting || !canGeneratePdf) && styles.primaryButtonPressed,
+                    !canGeneratePdf && styles.disabledButton,
+                  ]}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {submitting
+                      ? 'Filling PDF...'
+                      : canGeneratePdf
+                        ? templatePrefetchState === 'error'
+                          ? `Retry ${formFillButtonLabel}`
+                          : formFillButtonLabel
+                        : hasPdfForm
+                          ? 'Fetching Form...'
+                          : 'No Fillable PDF Available Yet'}
                   </Text>
-                  <Pressable
-                    onPress={handleSharePdf}
-                    style={({ pressed }) => [
-                      styles.secondaryButton,
-                      styles.fullWidthButton,
-                      pressed && styles.secondaryButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.secondaryButtonText}>Share PDF</Text>
-                  </Pressable>
-                </View>
+                </Pressable>
+              ) : (
+                <>
+                  <View style={styles.inlineActionsRow}>
+                    <Pressable
+                      onPress={goToPreviousStep}
+                      style={({ pressed }) => [
+                        styles.inlineTextButton,
+                        pressed && styles.changeSelectionButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.inlineTextButtonText}>Back</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={handleStartOver}
+                      style={({ pressed }) => [
+                        styles.inlineTextButton,
+                        pressed && styles.changeSelectionButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.inlineTextButtonText}>Start Over</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.actionRow}>
+                    <Pressable
+                      onPress={handleEmailPdf}
+                      disabled={!emailDestination}
+                      style={({ pressed }) => [
+                        styles.primaryButton,
+                        (!emailDestination || pressed) && styles.primaryButtonPressed,
+                        !emailDestination && styles.disabledButton,
+                      ]}
+                    >
+                      <Text style={styles.primaryButtonText}>Email</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={handleFaxPdf}
+                      disabled={!faxDestination}
+                      style={({ pressed }) => [
+                        styles.secondaryButton,
+                        (!faxDestination || pressed) && styles.secondaryButtonPressed,
+                        !faxDestination && styles.disabledButton,
+                      ]}
+                    >
+                      <Text style={styles.secondaryButtonText}>Fax</Text>
+                    </Pressable>
+                  </View>
+                </>
               )}
             </View>
 
-            <View style={styles.actionRow}>
-              <Pressable
-                onPress={goToPreviousStep}
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  pressed && styles.secondaryButtonPressed,
-                ]}
-              >
-                <Text style={styles.secondaryButtonText}>Back</Text>
-              </Pressable>
+            {!generatedPdfUri && (
+              <View style={styles.actionRow}>
+                <Pressable
+                  onPress={goToPreviousStep}
+                  style={({ pressed }) => [
+                    styles.secondaryButton,
+                    pressed && styles.secondaryButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.secondaryButtonText}>Back</Text>
+                </Pressable>
 
-              <Pressable
-                onPress={() => {
-                  setCurrentStepId('bio');
-                  setGeneratedPdfUri(null);
-                  setSignature(null);
-                }}
-                style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-              >
-                <Text style={styles.primaryButtonText}>Start Over</Text>
-              </Pressable>
-            </View>
+                <Pressable
+                  onPress={handleStartOver}
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    pressed && styles.primaryButtonPressed,
+                  ]}
+                >
+                  <Text style={styles.primaryButtonText}>Start Over</Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -1494,6 +1604,20 @@ const createStyles = createThemedStyles((theme) => ({
   },
   actionColumn: {
     gap: 12,
+  },
+  inlineActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  inlineTextButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
+  },
+  inlineTextButtonText: {
+    color: theme.colors.secondary,
+    fontSize: 14,
+    fontWeight: '700',
   },
   primaryButton: {
     flex: 1,
@@ -1784,6 +1908,116 @@ const createStyles = createThemedStyles((theme) => ({
     color: theme.colors.textMuted,
     fontSize: 14,
     lineHeight: 20,
+  },
+  deliveryCard: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 12,
+  },
+  deliveryEyebrow: {
+    color: theme.colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  deliveryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  deliveryIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.secondarySoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  deliveryTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  deliveryLabel: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  deliveryValue: {
+    color: theme.colors.textSecondary,
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  deliveryHint: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  pdfCard: {
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 14,
+  },
+  pdfCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pdfCardTitle: {
+    color: theme.colors.text,
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 23,
+  },
+  pdfOpenButton: {
+    backgroundColor: theme.colors.secondarySoft,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.secondary,
+  },
+  pdfOpenButtonText: {
+    color: theme.colors.secondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  pdfFrame: {
+    overflow: 'hidden',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
+    minHeight: 440,
+  },
+  pdfWebView: {
+    flex: 1,
+    minHeight: 440,
+    backgroundColor: theme.colors.surface,
+  },
+  pdfFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 22,
+    gap: 12,
+  },
+  pdfFallbackText: {
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   linkRow: {
     flexDirection: 'row',

@@ -8,6 +8,12 @@ import {
   listHospitalSystems,
   searchFacilities
 } from '../repositories/workflowRepository.js';
+import {
+  closeWizardSession,
+  createWizardSession,
+  getWizardSessionState,
+  respondToWizardSession,
+} from '../services/wizardSessionService.js';
 import { resolveSourceDocumentPath } from '../utils/sourceDocumentStorage.js';
 
 export const publicRouter = Router();
@@ -102,5 +108,69 @@ publicRouter.get('/source-documents/:id/content', async (req, res) => {
       error,
     });
     return res.status(500).json({ error: 'Failed to fetch source document content.' });
+  }
+});
+
+publicRouter.post('/wizard-sessions', async (req, res) => {
+  try {
+    const session = await createWizardSession({
+      launchUrl: req.body?.launch_url,
+    });
+    return res.status(201).json({ session });
+  } catch (error) {
+    const statusCode = error?.statusCode || 500;
+    if (statusCode >= 500) {
+      console.error('Failed to create hosted wizard session:', error);
+    }
+
+    return res.status(statusCode).json({
+      error: error instanceof Error ? error.message : 'Failed to create hosted wizard session.',
+    });
+  }
+});
+
+publicRouter.get('/wizard-sessions/:sessionId', async (req, res) => {
+  try {
+    const session = await getWizardSessionState(req.params.sessionId);
+    return res.json({ session });
+  } catch (error) {
+    const statusCode = error?.statusCode || 500;
+    if (statusCode >= 500) {
+      console.error('Failed to refresh hosted wizard session:', error);
+    }
+
+    return res.status(statusCode).json({
+      error: error instanceof Error ? error.message : 'Failed to refresh hosted wizard session.',
+    });
+  }
+});
+
+publicRouter.post('/wizard-sessions/:sessionId/respond', async (req, res) => {
+  try {
+    const session = await respondToWizardSession(req.params.sessionId, req.body || {});
+    return res.json({ session });
+  } catch (error) {
+    const statusCode = error?.statusCode || 500;
+    if (statusCode >= 500) {
+      console.error('Failed to respond to hosted wizard session:', error);
+    }
+
+    return res.status(statusCode).json({
+      error: error instanceof Error ? error.message : 'Failed to respond to hosted wizard session.',
+    });
+  }
+});
+
+publicRouter.delete('/wizard-sessions/:sessionId', async (req, res) => {
+  try {
+    const closed = await closeWizardSession(req.params.sessionId);
+    if (!closed) {
+      return res.status(404).json({ error: 'Wizard session not found.' });
+    }
+
+    return res.status(204).end();
+  } catch (error) {
+    console.error('Failed to close hosted wizard session:', error);
+    return res.status(500).json({ error: 'Failed to close hosted wizard session.' });
   }
 });

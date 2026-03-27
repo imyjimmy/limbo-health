@@ -4,6 +4,14 @@ import type {
   RecordsRequestPacket,
   RecordsWorkflowAutofillBinding,
 } from '../../types/recordsRequest';
+import type {
+  RecordsWizardAction,
+  RecordsWizardField,
+  RecordsWizardFieldOption,
+  RecordsWizardOption,
+  RecordsWizardSession,
+  RecordsWizardStep,
+} from '../../types/wizard';
 import { normalizeHospitalSystemSearchQuery } from './search';
 
 const WORKFLOW_API_HOST = (
@@ -108,6 +116,60 @@ interface ApiRecordsRequestPacket {
     url: string;
     last_verified_at: string | null;
   }[];
+}
+
+interface ApiRecordsWizardFieldOption {
+  value: string;
+  label: string;
+}
+
+interface ApiRecordsWizardField {
+  id: string;
+  label: string;
+  name: string | null;
+  type: 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'file' | 'checkbox';
+  required: boolean;
+  placeholder: string | null;
+  value: string;
+  supported: boolean;
+  options: ApiRecordsWizardFieldOption[];
+}
+
+interface ApiRecordsWizardOption {
+  id: string;
+  label: string;
+  kind: 'radio' | 'checkbox';
+  selected: boolean;
+  disabled: boolean;
+}
+
+interface ApiRecordsWizardAction {
+  id: string;
+  label: string;
+  disabled: boolean;
+  style: 'primary' | 'secondary';
+}
+
+interface ApiRecordsWizardStep {
+  kind: 'dialog' | 'slide';
+  slideName: string | null;
+  prompt: string;
+  notes: string[];
+  options: ApiRecordsWizardOption[];
+  fields: ApiRecordsWizardField[];
+  primaryAction: ApiRecordsWizardAction | null;
+  secondaryActions: ApiRecordsWizardAction[];
+  manualRequiredReason: string | null;
+  isComplete: boolean;
+}
+
+interface ApiRecordsWizardSession {
+  id: string;
+  launch_url: string;
+  resolved_wizard_url: string | null;
+  status: 'awaiting_input' | 'manual_required' | 'completed';
+  updated_at: string;
+  step: ApiRecordsWizardStep | null;
 }
 
 type ApiAutofillBinding =
@@ -243,6 +305,74 @@ function mapAutofillBinding(binding: ApiAutofillBinding): RecordsWorkflowAutofil
   }
 }
 
+function mapWizardFieldOption(option: ApiRecordsWizardFieldOption): RecordsWizardFieldOption {
+  return {
+    value: option.value,
+    label: option.label,
+  };
+}
+
+function mapWizardField(field: ApiRecordsWizardField): RecordsWizardField {
+  return {
+    id: field.id,
+    label: field.label,
+    name: field.name,
+    type: field.type,
+    required: field.required,
+    placeholder: field.placeholder,
+    value: field.value,
+    supported: field.supported,
+    options: field.options.map(mapWizardFieldOption),
+  };
+}
+
+function mapWizardOption(option: ApiRecordsWizardOption): RecordsWizardOption {
+  return {
+    id: option.id,
+    label: option.label,
+    kind: option.kind,
+    selected: option.selected,
+    disabled: option.disabled,
+  };
+}
+
+function mapWizardAction(action: ApiRecordsWizardAction): RecordsWizardAction {
+  return {
+    id: action.id,
+    label: action.label,
+    disabled: action.disabled,
+    style: action.style,
+  };
+}
+
+function mapWizardStep(step: ApiRecordsWizardStep | null): RecordsWizardStep | null {
+  if (!step) return null;
+
+  return {
+    kind: step.kind,
+    slideName: step.slideName,
+    prompt: step.prompt,
+    notes: step.notes,
+    options: step.options.map(mapWizardOption),
+    fields: step.fields.map(mapWizardField),
+    primaryAction: step.primaryAction ? mapWizardAction(step.primaryAction) : null,
+    secondaryActions: step.secondaryActions.map(mapWizardAction),
+    manualRequiredReason: step.manualRequiredReason,
+    isComplete: step.isComplete,
+  };
+}
+
+function mapWizardSession(session: ApiRecordsWizardSession): RecordsWizardSession {
+  return {
+    id: session.id,
+    launchUrl: session.launch_url,
+    resolvedWizardUrl: session.resolved_wizard_url,
+    status: session.status,
+    updatedAt: session.updated_at,
+    step: mapWizardStep(session.step),
+  };
+}
+
 export async function fetchHospitalSystems(
   searchQuery = '',
   options?: { signal?: AbortSignal },
@@ -356,4 +486,72 @@ export async function fetchRecordsRequestPacket(systemId: string): Promise<Recor
       lastVerifiedAt: source.last_verified_at,
     })),
   };
+}
+
+export async function startRecordsWizardSession(launchUrl: string): Promise<RecordsWizardSession> {
+  const data = await fetchJson<{ session: ApiRecordsWizardSession }>('/wizard-sessions', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      launch_url: launchUrl,
+    }),
+  });
+
+  return mapWizardSession(data.session);
+}
+
+export async function fetchRecordsWizardSession(sessionId: string): Promise<RecordsWizardSession> {
+  const data = await fetchJson<{ session: ApiRecordsWizardSession }>(
+    `/wizard-sessions/${encodeURIComponent(sessionId)}`,
+  );
+
+  return mapWizardSession(data.session);
+}
+
+export async function respondToRecordsWizardSession(input: {
+  sessionId: string;
+  optionId?: string;
+  actionId?: string;
+  fieldValues?: Record<string, string>;
+}): Promise<RecordsWizardSession> {
+  const data = await fetchJson<{ session: ApiRecordsWizardSession }>(
+    `/wizard-sessions/${encodeURIComponent(input.sessionId)}/respond`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        option_id: input.optionId,
+        action_id: input.actionId,
+        field_values: input.fieldValues,
+      }),
+    },
+  );
+
+  return mapWizardSession(data.session);
+}
+
+export async function closeRecordsWizardSession(sessionId: string): Promise<void> {
+  const response = await fetch(buildWorkflowUrl(`/wizard-sessions/${encodeURIComponent(sessionId)}`), {
+    method: 'DELETE',
+  });
+
+  if (response.status === 404) {
+    return;
+  }
+
+  if (!response.ok) {
+    const contentType = response.headers.get('content-type')?.toLowerCase() || '';
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      throw new Error(
+        typeof data?.error === 'string' ? data.error : 'Unable to close the wizard session.',
+      );
+    }
+
+    throw new Error(`Unable to close the wizard session (status ${response.status}).`);
+  }
 }
