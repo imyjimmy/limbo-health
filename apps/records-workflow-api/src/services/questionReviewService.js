@@ -544,17 +544,17 @@ async function prepareDraftPayloadForPersistence(
   client = null,
 ) {
   const { parsedDocument: persistedParsedPdf } = await loadPersistedParsedDocument(sourceDocument, client);
-  const repairedInputPayload = persistedParsedPdf
-    ? repairPdfFormUnderstandingOutput(
-        {
-          ...(payload || {}),
-          template_id: normalizeString(payload?.template_id) || templateIdFallback,
-        },
-        persistedParsedPdf,
-      )
-    : payload;
+  const inputPayload = {
+    ...(payload || {}),
+    template_id: normalizeString(payload?.template_id) || templateIdFallback,
+  };
+  const shouldRepairAgainstParsedPdf =
+    Boolean(persistedParsedPdf) && normalizeString(inputPayload.mode) !== 'overlay';
+  const repairedInputPayload = shouldRepairAgainstParsedPdf
+    ? repairPdfFormUnderstandingOutput(inputPayload, persistedParsedPdf)
+    : inputPayload;
   const normalizedPayload = normalizeDraftPayload(repairedInputPayload, templateIdFallback);
-  const enrichedPayload = persistedParsedPdf
+  const enrichedPayload = shouldRepairAgainstParsedPdf
     ? normalizePdfFormUnderstanding(
         repairPdfFormUnderstandingOutput(normalizedPayload, persistedParsedPdf),
         0,

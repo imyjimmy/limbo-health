@@ -251,6 +251,7 @@ const elements = {
   runStatePipeline: document.querySelector('#run-entire-state-pipeline'),
   pipelineFlowTab: document.querySelector('#pipeline-flow-tab'),
   pipelineResultsTab: document.querySelector('#pipeline-results-tab'),
+  pipelineWorkspaceNav: document.querySelector('#pipeline-workspace-nav'),
   pipelineFlowPanel: document.querySelector('#pipeline-flow-panel'),
   pipelineResultsPanel: document.querySelector('#pipeline-results-panel'),
   pipelineRunResult: document.querySelector('#pipeline-run-result'),
@@ -1184,7 +1185,7 @@ function pdfEditorRectSupportsDirectEditing(ownerKind, rect) {
     return true;
   }
 
-  return rect.binding_type === 'overlay_text' || rect.binding_type === 'overlay_mark';
+  return isPdfEditorDirectEditableBindingType(rect.binding_type);
 }
 
 function syncActivePdfEditorQuestion() {
@@ -1286,10 +1287,8 @@ function selectedPdfEditorQuestionSupportsRectEditing() {
     hasManualOverlayDraft() &&
       question &&
       bindingTarget &&
-      (bindingTarget.binding?.type === 'overlay_text' ||
-        bindingTarget.binding?.type === 'overlay_mark' ||
-        bindingTarget.rect?.binding_type === 'overlay_text' ||
-        bindingTarget.rect?.binding_type === 'overlay_mark'),
+      (isPdfEditorDirectEditableBindingType(bindingTarget.binding?.type) ||
+        isPdfEditorDirectEditableBindingType(bindingTarget.rect?.binding_type)),
   );
 }
 
@@ -2068,14 +2067,29 @@ function setStateTab(nextTab) {
 
 function setPipelineTab(nextTab) {
   state.currentPipelineTab = nextTab;
-  elements.pipelineFlowPanel.classList.toggle('hidden', nextTab !== 'flow');
-  elements.pipelineResultsPanel.classList.toggle('hidden', nextTab !== 'results');
   elements.pipelineFlowTab.className =
     nextTab === 'flow' ? 'subnav-pill subnav-pill-active' : 'subnav-pill';
   elements.pipelineResultsTab.className =
     nextTab === 'results' ? 'subnav-pill subnav-pill-active' : 'subnav-pill';
+  syncPipelineWorkspacePanels();
   scrollDashboardToTop();
   updateDashboardChrome();
+}
+
+function syncPipelineWorkspacePanels() {
+  const showingPdfEditor = Boolean(state.pdfEditorReview) && state.currentStateTab === 'pipeline';
+  elements.pipelineFlowPanel.classList.toggle(
+    'hidden',
+    state.currentPipelineTab !== 'flow' || showingPdfEditor,
+  );
+  elements.pipelineResultsPanel.classList.toggle(
+    'hidden',
+    state.currentPipelineTab !== 'results' || showingPdfEditor,
+  );
+  elements.pdfEditorPanel.classList.toggle('hidden', !showingPdfEditor);
+  if (elements.pipelineWorkspaceNav) {
+    elements.pipelineWorkspaceNav.classList.toggle('hidden', showingPdfEditor);
+  }
 }
 
 function showHomeView() {
@@ -3570,7 +3584,65 @@ function convertBindingToOverlayBindings(binding, widgetsByField) {
   return [];
 }
 
-function convertQuestionToEditableOverlay(question, widgetsByField) {
+function isPdfEditorMarkBindingType(bindingType) {
+  return bindingType === 'overlay_mark' || bindingType === 'field_checkbox' || bindingType === 'field_radio';
+}
+
+function isPdfEditorDirectEditableBindingType(bindingType) {
+  return (
+    bindingType === 'overlay_text' ||
+    bindingType === 'overlay_mark' ||
+    bindingType === 'field_text' ||
+    bindingType === 'field_checkbox' ||
+    bindingType === 'field_radio'
+  );
+}
+
+function overlayBindingFromRect(rect, fallbackType = 'overlay_text') {
+  if (!rect || typeof rect !== 'object') return null;
+
+  const bindingType = isPdfEditorMarkBindingType(rect.binding_type) ? 'overlay_mark' : fallbackType;
+  if (bindingType === 'overlay_mark') {
+    const size = Math.max(Number(rect.width || 0), Number(rect.height || 0), 12);
+    return {
+      type: 'overlay_mark',
+      page_index: Number(rect.page_index || 0),
+      x: Number((Number(rect.x || 0) + Number(rect.width || 0) / 2).toFixed(2)),
+      y: Number((Number(rect.y || 0) + Number(rect.height || 0) / 2).toFixed(2)),
+      mark: 'x',
+      size: Number(size.toFixed(2)),
+    };
+  }
+
+  return {
+    type: 'overlay_text',
+    page_index: Number(rect.page_index || 0),
+    x: Number(Number(rect.x || 0).toFixed(2)),
+    y: Number(Number(rect.y || 0).toFixed(2)),
+    max_width: Number(Math.max(Number(rect.width || 0), 24).toFixed(2)),
+    font_size: Number(Math.max(Number(rect.height || 0) / 1.8, 12).toFixed(2)),
+  };
+}
+
+function sortedOverlayCandidateRects(rects = []) {
+  return [...(Array.isArray(rects) ? rects : [])].sort((left, right) => {
+    const bindingDelta = Number(left.binding_index || 0) - Number(right.binding_index || 0);
+    if (bindingDelta !== 0) return bindingDelta;
+    const pageDelta = Number(left.page_index || 0) - Number(right.page_index || 0);
+    if (pageDelta !== 0) return pageDelta;
+    const yDelta = Number(right.y || 0) - Number(left.y || 0);
+    if (yDelta !== 0) return yDelta;
+    return Number(left.x || 0) - Number(right.x || 0);
+  });
+}
+
+function overlayBindingsFromQuestionRects(questionRects = [], fallbackType = 'overlay_text') {
+  return sortedOverlayCandidateRects(questionRects)
+    .map((rect) => overlayBindingFromRect(rect, fallbackType))
+    .filter(Boolean);
+}
+
+function convertQuestionToEditableOverlay(question, questionMapping, widgetsByField) {
   const nextQuestion = {
     id: question.id,
     label: question.label,
@@ -3578,22 +3650,41 @@ function convertQuestionToEditableOverlay(question, widgetsByField) {
     required: Boolean(question.required),
     help_text: question.help_text || null,
     confidence: typeof question.confidence === 'number' ? question.confidence : 1,
+    visibility_rule: cloneJson(question.visibility_rule || null),
     bindings: [],
     options: [],
   };
 
   if (question.kind === 'short_text') {
-    nextQuestion.bindings = (Array.isArray(question.bindings) ? question.bindings : []).flatMap((binding) =>
-      convertBindingToOverlayBindings(binding, widgetsByField),
+    const mappedRects = overlayBindingsFromQuestionRects(
+      (Array.isArray(questionMapping?.rects) ? questionMapping.rects : []).filter(
+        (rect) => rect.binding_scope === 'question',
+      ),
+      'overlay_text',
     );
+    nextQuestion.bindings =
+      mappedRects.length > 0
+        ? mappedRects
+        : (Array.isArray(question.bindings) ? question.bindings : []).flatMap((binding) =>
+            convertBindingToOverlayBindings(binding, widgetsByField),
+          );
     return nextQuestion.bindings.length > 0 ? nextQuestion : null;
   }
 
   nextQuestion.options = (Array.isArray(question.options) ? question.options : [])
     .map((option) => {
-      const bindings = (Array.isArray(option.bindings) ? option.bindings : []).flatMap((binding) =>
-        convertBindingToOverlayBindings(binding, widgetsByField),
+      const mappedRects = overlayBindingsFromQuestionRects(
+        (Array.isArray(questionMapping?.rects) ? questionMapping.rects : []).filter(
+          (rect) => rect.binding_scope === 'option' && rect.option_id === option.id,
+        ),
+        'overlay_mark',
       );
+      const bindings =
+        mappedRects.length > 0
+          ? mappedRects
+          : (Array.isArray(option.bindings) ? option.bindings : []).flatMap((binding) =>
+              convertBindingToOverlayBindings(binding, widgetsByField),
+            );
       if (!bindings.length) return null;
       return {
         id: option.id,
@@ -3616,8 +3707,13 @@ function buildEditableOverlayPayload() {
   }
 
   const widgetsByField = buildPdfWidgetsByField(state.pdfEditorReview);
+  const questionMappingsById = new Map(
+    buildQuestionMappings(state.pdfEditorReview, currentPayload).map((question) => [question.id, question]),
+  );
   const questions = currentPayload.questions
-    .map((question) => convertQuestionToEditableOverlay(question, widgetsByField))
+    .map((question) =>
+      convertQuestionToEditableOverlay(question, questionMappingsById.get(question.id) || null, widgetsByField),
+    )
     .filter(Boolean);
 
   return {
@@ -3676,6 +3772,16 @@ function togglePdfEditorAuthoring() {
   if (!hasManualOverlayDraft()) {
     beginManualMapping();
     return;
+  }
+
+  if (!state.pdfEditorAuthoringOpen) {
+    const nextPayload = buildEditableOverlayPayload();
+    if (JSON.stringify(nextPayload) !== JSON.stringify(state.pdfEditorDraftPayload)) {
+      state.pdfEditorDraftPayload = nextPayload;
+      state.pdfEditorDraftDirty = true;
+      state.pdfEditorSaveStatus = null;
+      refreshPdfEditorQuestionsFromDraft();
+    }
   }
 
   state.pdfEditorAuthoringOpen = !state.pdfEditorAuthoringOpen;
@@ -3764,7 +3870,8 @@ function upsertManualBindingForActiveQuestion(renderedPage, rect) {
 
   const pdfRect = screenRectToPdfRect(renderedPage, rect);
   const nextBindingType =
-    bindingTarget.binding?.type === 'overlay_mark' || bindingTarget.rect?.binding_type === 'overlay_mark'
+    isPdfEditorMarkBindingType(bindingTarget.binding?.type) ||
+    isPdfEditorMarkBindingType(bindingTarget.rect?.binding_type)
       ? 'overlay_mark'
       : 'overlay_text';
 
@@ -3972,7 +4079,8 @@ function updateActiveQuestionRectFromPdfRect(pdfRect) {
   const bindingTarget = activePdfEditorBindingTarget();
   if (bindingTarget) {
     const nextBindingType =
-      bindingTarget.binding?.type === 'overlay_mark' || bindingTarget.rect?.binding_type === 'overlay_mark'
+      isPdfEditorMarkBindingType(bindingTarget.binding?.type) ||
+      isPdfEditorMarkBindingType(bindingTarget.rect?.binding_type)
         ? 'overlay_mark'
         : 'overlay_text';
 
@@ -4598,13 +4706,18 @@ async function savePdfEditorDraft({ publish = false } = {}) {
 
   const endpoint = publish ? 'publish' : 'draft';
   const authoringWasOpen = state.pdfEditorAuthoringOpen;
+  const nextPayload = buildEditableOverlayPayload();
+  if (JSON.stringify(nextPayload) !== JSON.stringify(state.pdfEditorDraftPayload)) {
+    state.pdfEditorDraftPayload = nextPayload;
+    refreshPdfEditorQuestionsFromDraft();
+  }
   const response = await fetchJson(
     `/internal/source-documents/${encodeURIComponent(state.pdfEditorReview.source_document.id)}/question-review/${endpoint}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        payload: state.pdfEditorDraftPayload,
+        payload: nextPayload,
       }),
     },
   );
@@ -4621,7 +4734,7 @@ async function savePdfEditorDraft({ publish = false } = {}) {
     message: publish
       ? 'Published the repaired question template.'
       : authoringWasOpen
-        ? 'Saved the repaired question-mapping draft. Click Edit Draft to keep editing.'
+        ? 'Saved the repaired question-mapping draft. Click Edit to keep editing.'
         : 'Saved the repaired question-mapping draft.',
   };
   refreshPdfEditorQuestionsFromDraft();
@@ -4697,12 +4810,7 @@ function renderPdfEditor() {
   const canEditRect = selectedPdfEditorItemSupportsRectEditing();
   const canRebindRect = selectedPdfEditorQuestionSupportsRectEditing();
   const authoringOpen = hasManualOverlayDraft() && state.pdfEditorAuthoringOpen;
-  const createDraftLabel =
-    currentPdfDraftPayload()?.supported && currentPdfDraftPayload()?.mode === 'acroform'
-      ? 'Create Editable Overlay Draft'
-      : hasManualOverlayDraft()
-        ? 'Edit Draft'
-        : 'Create Editable Draft';
+  const createDraftLabel = 'Edit';
 
   elements.pdfEditorTitle.textContent = review.source_document.title || 'PDF Editor';
   elements.pdfEditorCopy.textContent =
@@ -4759,7 +4867,7 @@ function renderPdfEditor() {
         : authoringOpen
           ? 'Drag question cards to reorder them. Drag a selected box directly on the PDF to move it. Use Capture or Redraw Box only when you need to draw a new box.'
           : hasManualOverlayDraft()
-            ? 'This PDF already has an editable draft. Click Edit Draft when you want repair controls.'
+            ? 'This PDF already has an editable draft. Click Edit when you want repair controls.'
           : 'Select a question to inspect its order or mapping.');
   }
   elements.pdfEditorSaveStatus.classList.toggle('hidden', !state.pdfEditorSaveStatus);
@@ -6063,6 +6171,9 @@ function renderStateView() {
     elements.runHistoryInsights.innerHTML = '';
     elements.pdfEditorMetrics.innerHTML = '';
     elements.pdfEditorPanel.classList.add('hidden');
+    if (elements.pipelineWorkspaceNav) {
+      elements.pipelineWorkspaceNav.classList.remove('hidden');
+    }
     updateDashboardChrome();
     return;
   }
@@ -6085,12 +6196,11 @@ function renderStateView() {
   renderRunHistoryList();
   renderRunHistoryInsights();
   renderPdfEditor();
-  const showingPdfEditor = Boolean(state.pdfEditorReview);
-  elements.stateSummary.classList.toggle('hidden', state.currentStateTab !== 'systems' || showingPdfEditor);
-  elements.systemsPanel.classList.toggle('hidden', state.currentStateTab !== 'systems' || showingPdfEditor);
-  elements.pipelinePanel.classList.toggle('hidden', state.currentStateTab !== 'pipeline' || showingPdfEditor);
-  elements.runHistoryPanel.classList.toggle('hidden', state.currentStateTab !== 'history' || showingPdfEditor);
-  elements.pdfEditorPanel.classList.toggle('hidden', !showingPdfEditor);
+  elements.stateSummary.classList.toggle('hidden', state.currentStateTab !== 'systems');
+  elements.systemsPanel.classList.toggle('hidden', state.currentStateTab !== 'systems');
+  elements.pipelinePanel.classList.toggle('hidden', state.currentStateTab !== 'pipeline');
+  elements.runHistoryPanel.classList.toggle('hidden', state.currentStateTab !== 'history');
+  syncPipelineWorkspacePanels();
   updateDashboardChrome();
 }
 

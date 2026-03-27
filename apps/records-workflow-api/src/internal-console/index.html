@@ -686,7 +686,36 @@
         }
 
         .editor-grid {
-          @apply grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)];
+          @apply grid gap-4 xl:grid-cols-[minmax(22rem,0.82fr)_minmax(0,1.18fr)];
+          align-items: start;
+        }
+
+        .editor-pane {
+          @apply flex flex-col;
+          min-height: 0;
+        }
+
+        .editor-pane-scroll {
+          min-height: 0;
+        }
+
+        @media (min-width: 1280px) {
+          .editor-grid {
+            min-height: calc(100vh - 17.5rem);
+          }
+
+          .editor-pane {
+            max-height: calc(100vh - 17.5rem);
+            overflow: hidden;
+          }
+
+          .editor-pane-scroll {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-gutter: stable both-edges;
+            padding-right: 0.2rem;
+          }
         }
 
         .editor-toolbar {
@@ -1297,7 +1326,7 @@
                       <p class="section-kicker">Workspace</p>
                       <h3 class="section-title">Flow and Results</h3>
                     </div>
-                    <div class="subnav-shell">
+                    <div id="pipeline-workspace-nav" class="subnav-shell">
                       <button id="pipeline-flow-tab" type="button" class="subnav-pill subnav-pill-active">Flow</button>
                       <button id="pipeline-results-tab" type="button" class="subnav-pill">Results</button>
                     </div>
@@ -1313,6 +1342,52 @@
                   <div id="pipeline-results-panel" class="hidden mt-6 space-y-6">
                     <div id="pipeline-results-summary" class="results-summary"></div>
                     <div id="pipeline-results-list" class="pdf-results-grid"></div>
+                  </div>
+
+                  <div id="pdf-editor-panel" class="hidden mt-6 editor-shell editor-shell-tight">
+                    <div class="app-card editor-card">
+                      <div class="editor-header">
+                        <div>
+                          <button id="back-to-results" type="button" class="ghost-button">Back To Results</button>
+                          <p class="section-kicker mt-2">PDF Editor</p>
+                          <h3 id="pdf-editor-title" class="section-title">PDF Editor</h3>
+                          <p id="pdf-editor-copy" class="section-copy">Question mappings over the rendered PDF.</p>
+                          <p id="pdf-editor-save-status" class="section-copy hidden"></p>
+                        </div>
+                        <div class="flex flex-col gap-3 sm:flex-row">
+                          <button id="start-manual-mapping" type="button" class="ghost-button">Edit</button>
+                          <button id="save-pdf-draft" type="button" class="ghost-button">Save Draft</button>
+                          <button id="publish-pdf-draft" type="button" class="primary-button">Publish</button>
+                          <a id="open-cached-pdf" href="#" target="_blank" rel="noreferrer" class="link-button">Open Cached PDF</a>
+                        </div>
+                      </div>
+
+                      <div id="pdf-editor-authoring" class="mt-3 hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
+                        <div class="flex flex-col gap-2">
+                          <div class="editor-toolbar">
+                            <button id="capture-question-from-pdf" type="button" class="ghost-button">Capture Question From PDF</button>
+                            <button id="map-selected-question" type="button" class="ghost-button">Redraw Box</button>
+                            <button id="cancel-pdf-editor-mode" type="button" class="tool-exit-button hidden">Exit Tool</button>
+                            <button id="delete-selected-question" type="button" class="danger-button">Delete Question</button>
+                          </div>
+                          <p id="pdf-editor-selection-copy" class="editor-status-copy"></p>
+                        </div>
+                      </div>
+
+                      <div id="pdf-editor-metrics" class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"></div>
+                    </div>
+
+                    <div class="editor-grid">
+                      <section class="app-card editor-pane">
+                        <p class="section-kicker">Questions</p>
+                        <div id="pdf-editor-questions" class="question-list editor-pane-scroll mt-3"></div>
+                      </section>
+
+                      <section class="app-card editor-pane">
+                        <p class="section-kicker">PDF</p>
+                        <div id="pdf-editor-pages" class="page-stack editor-pane-scroll mt-4"></div>
+                      </section>
+                    </div>
                   </div>
                 </section>
               </section>
@@ -1343,52 +1418,6 @@
                       <div id="run-history-insights" class="mt-4 focus-stack"></div>
                     </section>
                   </aside>
-                </div>
-              </section>
-
-              <section id="pdf-editor-panel" class="hidden editor-shell editor-shell-tight">
-                <div class="app-card editor-card">
-                  <div class="editor-header">
-                    <div>
-                      <button id="back-to-results" type="button" class="ghost-button">Back To Results</button>
-                      <p class="section-kicker mt-2">PDF Editor</p>
-                      <h3 id="pdf-editor-title" class="section-title">PDF Editor</h3>
-                      <p id="pdf-editor-copy" class="section-copy">Question mappings over the rendered PDF.</p>
-                      <p id="pdf-editor-save-status" class="section-copy hidden"></p>
-                    </div>
-                    <div class="flex flex-col gap-3 sm:flex-row">
-                      <button id="start-manual-mapping" type="button" class="ghost-button">Start Manual Mapping</button>
-                      <button id="save-pdf-draft" type="button" class="ghost-button">Save Draft</button>
-                      <button id="publish-pdf-draft" type="button" class="primary-button">Publish</button>
-                      <a id="open-cached-pdf" href="#" target="_blank" rel="noreferrer" class="link-button">Open Cached PDF</a>
-                    </div>
-                  </div>
-
-                  <div id="pdf-editor-authoring" class="mt-3 hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
-                    <div class="flex flex-col gap-2">
-                      <div class="editor-toolbar">
-                        <button id="capture-question-from-pdf" type="button" class="ghost-button">Capture Question From PDF</button>
-                        <button id="map-selected-question" type="button" class="ghost-button">Redraw Box</button>
-                        <button id="cancel-pdf-editor-mode" type="button" class="tool-exit-button hidden">Exit Tool</button>
-                        <button id="delete-selected-question" type="button" class="danger-button">Delete Question</button>
-                      </div>
-                      <p id="pdf-editor-selection-copy" class="editor-status-copy"></p>
-                    </div>
-                  </div>
-
-                  <div id="pdf-editor-metrics" class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"></div>
-                </div>
-
-                <div class="editor-grid">
-                  <section class="app-card">
-                    <p class="section-kicker">Questions</p>
-                    <div id="pdf-editor-questions" class="question-list mt-3"></div>
-                  </section>
-
-                  <section class="app-card">
-                    <p class="section-kicker">PDF</p>
-                    <div id="pdf-editor-pages" class="page-stack mt-4"></div>
-                  </section>
                 </div>
               </section>
             </section>
