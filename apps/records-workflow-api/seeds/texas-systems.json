@@ -51,7 +51,7 @@
     "state": "TX",
     "domain": "healthcare.ascension.org",
     "seed_urls": [
-      "https://healthcare.ascension.org/medical-records"
+      "https://healthcare.ascension.org/patient-portal/texas-ascension-seton"
     ],
     "facilities": []
   },

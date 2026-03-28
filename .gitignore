@@ -48,6 +48,8 @@ tasks/
 .DS_Store
 __pycache__/
 *.pyc
+/tmp/
+/test-results/
 .env
 .env.local
 .env.development

@@ -192,6 +192,42 @@
           @apply rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-5;
         }
 
+        .state-summary-shell {
+          @apply space-y-3;
+        }
+
+        .state-summary-inline {
+          @apply flex flex-wrap items-center gap-2;
+        }
+
+        .state-summary-pill {
+          @apply inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm;
+        }
+
+        .state-summary-pill-label {
+          @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400;
+        }
+
+        .state-summary-pill-value {
+          @apply text-sm font-semibold text-gray-900;
+        }
+
+        .state-summary-details {
+          @apply rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm;
+        }
+
+        .state-summary-details > summary {
+          @apply cursor-pointer list-none text-sm font-medium text-gray-600;
+        }
+
+        .state-summary-details > summary::-webkit-details-marker {
+          display: none;
+        }
+
+        .state-summary-detail-grid {
+          @apply mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3;
+        }
+
         .ghost-button {
           @apply inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 hover:text-gray-900;
         }
@@ -655,16 +691,8 @@
           @apply flex w-full items-start justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:bg-gray-100;
         }
 
-        .pdf-result-button-secondary {
-          @apply bg-white;
-        }
-
         .pdf-result-icon {
           @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-xs font-semibold uppercase tracking-[0.2em] text-rose-600;
-        }
-
-        .pdf-result-icon-schema {
-          @apply bg-sky-50 text-sky-700;
         }
 
         .pdf-result-title {
@@ -673,6 +701,22 @@
 
         .pdf-result-copy {
           @apply mt-2 text-sm text-gray-500;
+        }
+
+        .editor-metric-bar {
+          @apply flex flex-wrap gap-2;
+        }
+
+        .editor-metric-chip {
+          @apply inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-600;
+        }
+
+        .editor-metric-value-inline {
+          @apply font-semibold text-gray-900;
+        }
+
+        .editor-metric-copy-inline {
+          @apply text-[11px] font-medium uppercase tracking-[0.14em] text-gray-500;
         }
 
         .pdf-result-meta {
@@ -1287,7 +1331,7 @@
                 <button id="history-tab" type="button" class="nav-pill">Run History</button>
               </div>
 
-              <div id="state-summary" class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"></div>
+              <div id="state-summary" class="space-y-3"></div>
               <div id="state-action-banner" class="hidden" aria-live="polite"></div>
               <input id="manual-pdf-upload-input" type="file" accept="application/pdf,.pdf" class="hidden" />
 
@@ -1364,55 +1408,61 @@
                     <div id="pipeline-results-summary" class="results-summary"></div>
                     <div id="pipeline-results-list" class="pdf-results-grid"></div>
                   </div>
-
-                  <div id="pdf-editor-panel" class="hidden mt-6 editor-shell editor-shell-tight">
-                    <div class="app-card editor-card">
-                      <div class="editor-header">
-                        <div>
-                          <button id="back-to-results" type="button" class="ghost-button">Back To Results</button>
-                          <p class="section-kicker mt-2">PDF Editor</p>
-                          <h3 id="pdf-editor-title" class="section-title">PDF Editor</h3>
-                          <p id="pdf-editor-copy" class="section-copy">Question mappings over the rendered PDF.</p>
-                          <p id="pdf-editor-save-status" class="section-copy hidden"></p>
-                        </div>
-                        <div class="flex flex-col gap-3 sm:flex-row">
-                          <button id="parse-pdf-in-editor" type="button" class="ghost-button">Parse PDF</button>
-                          <button id="reextract-questions-in-editor" type="button" class="ghost-button">Reextract Questions</button>
-                          <button id="start-manual-mapping" type="button" class="ghost-button">Edit</button>
-                          <button id="save-pdf-draft" type="button" class="ghost-button">Save Draft</button>
-                          <button id="publish-pdf-draft" type="button" class="primary-button">Publish</button>
-                          <a id="open-cached-pdf" href="#" target="_blank" rel="noreferrer" class="link-button">Open Cached PDF</a>
-                        </div>
-                      </div>
-
-                      <div id="pdf-editor-authoring" class="mt-3 hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
-                        <div class="flex flex-col gap-2">
-                          <div class="editor-toolbar">
-                            <button id="capture-question-from-pdf" type="button" class="ghost-button">Capture Question From PDF</button>
-                            <button id="map-selected-question" type="button" class="ghost-button">Redraw Box</button>
-                            <button id="cancel-pdf-editor-mode" type="button" class="tool-exit-button hidden">Exit Tool</button>
-                            <button id="delete-selected-question" type="button" class="danger-button">Delete Question</button>
-                          </div>
-                          <p id="pdf-editor-selection-copy" class="editor-status-copy"></p>
-                        </div>
-                      </div>
-
-                      <div id="pdf-editor-metrics" class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"></div>
-                    </div>
-
-                    <div class="editor-grid">
-                      <section class="app-card editor-pane">
-                        <p class="section-kicker">Questions</p>
-                        <div id="pdf-editor-questions" class="question-list editor-pane-scroll mt-3"></div>
-                      </section>
-
-                      <section class="app-card editor-pane">
-                        <p class="section-kicker">PDF</p>
-                        <div id="pdf-editor-pages" class="page-stack editor-pane-scroll mt-4"></div>
-                      </section>
-                    </div>
-                  </div>
                 </section>
+              </section>
+
+              <section id="editor-panel" class="hidden space-y-6">
+                <div id="pdf-editor-panel" class="hidden editor-shell editor-shell-tight">
+                  <div class="app-card editor-card">
+                    <div class="editor-header">
+                      <div>
+                        <button id="back-to-results" type="button" class="ghost-button">Back To Results</button>
+                        <p class="section-kicker mt-2">PDF Editor</p>
+                        <h3 id="pdf-editor-title" class="section-title">PDF Editor</h3>
+                        <p id="pdf-editor-system-context" class="section-copy"></p>
+                        <p id="pdf-editor-copy" class="section-copy">Question mappings over the rendered PDF.</p>
+                        <p id="pdf-editor-save-status" class="section-copy hidden"></p>
+                        <div id="pdf-editor-run-summary" class="mt-2 hidden">
+                          <button id="inspect-pdf-editor-run" type="button" class="ghost-button">View Parse Run</button>
+                        </div>
+                      </div>
+                      <div class="flex flex-col gap-3 sm:flex-row">
+                        <button id="parse-pdf-in-editor" type="button" class="ghost-button">Parse PDF</button>
+                        <button id="reextract-questions-in-editor" type="button" class="ghost-button">Reextract Questions</button>
+                        <button id="start-manual-mapping" type="button" class="ghost-button">Edit</button>
+                        <button id="save-pdf-draft" type="button" class="ghost-button">Save Draft</button>
+                        <button id="publish-pdf-draft" type="button" class="primary-button">Publish</button>
+                        <a id="open-cached-pdf" href="#" target="_blank" rel="noreferrer" class="link-button">Open Cached PDF</a>
+                      </div>
+                    </div>
+
+                    <div id="pdf-editor-authoring" class="mt-3 hidden rounded-xl border border-gray-200 bg-gray-50 p-3">
+                      <div class="flex flex-col gap-2">
+                        <div class="editor-toolbar">
+                          <button id="capture-question-from-pdf" type="button" class="ghost-button">Capture Question From PDF</button>
+                          <button id="map-selected-question" type="button" class="ghost-button">Redraw Box</button>
+                          <button id="cancel-pdf-editor-mode" type="button" class="tool-exit-button hidden">Exit Tool</button>
+                          <button id="delete-selected-question" type="button" class="danger-button">Delete Question</button>
+                        </div>
+                        <p id="pdf-editor-selection-copy" class="editor-status-copy"></p>
+                      </div>
+                    </div>
+
+                    <div id="pdf-editor-metrics" class="mt-2"></div>
+                  </div>
+
+                  <div class="editor-grid">
+                    <section class="app-card editor-pane">
+                      <p class="section-kicker">Questions</p>
+                      <div id="pdf-editor-questions" class="question-list editor-pane-scroll mt-3"></div>
+                    </section>
+
+                    <section class="app-card editor-pane">
+                      <p class="section-kicker">PDF</p>
+                      <div id="pdf-editor-pages" class="page-stack editor-pane-scroll mt-4"></div>
+                    </section>
+                  </div>
+                </div>
               </section>
 
               <section id="run-history-panel" class="hidden space-y-6">

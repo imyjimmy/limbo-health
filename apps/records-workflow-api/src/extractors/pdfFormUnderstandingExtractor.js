@@ -7,6 +7,7 @@ import {
   PDF_FORM_UNDERSTANDING_EXTRACTOR_VERSION,
 } from '../utils/pdfFormUnderstanding.js';
 import {
+  collectFlatTextEntryCandidates,
   DEFAULT_MAX_INPUT_TOKENS,
   DEFAULT_PROMPT_PROFILE,
   PDF_FORM_UNDERSTANDING_RESPONSE_SCHEMA,
@@ -110,8 +111,43 @@ const CHECKBOX_LABEL_WORD_TOLERANCE = 5;
 const CHECKBOX_HEADING_LINE_TOLERANCE = 4;
 const CHECKBOX_HEADING_MAX_DISTANCE = 80;
 const FOLLOW_UP_OPTION_PATTERN = /\bother\b|\bspecify\b|\bprovider\b|\blocation\b|\bdescribe\b|\bdetail\b/i;
+const CONTACT_FOLLOW_UP_FIELD_PATTERN =
+  /\bindividual\/organization\b|\btelephone\b|\bstreet\b|\bcity\b|\bstate\b|\bzip\b|\bfax\b|\bemail\b/i;
 const FOLLOW_UP_PARENT_MAX_DISTANCE = 84;
 const TEXT_FIELD_TYPE_PATTERN = /^text$/i;
+const DIRECT_DEFINITION_FOLLOW_UP_IDS = new Set([
+  'specify_provider_details',
+  'delivery_other_details',
+  'release_other_details',
+  'purpose_other_details',
+]);
+const FLAT_TEXT_ENTRY_EXCLUDE_PATTERNS = [
+  /^patient name$/,
+  /^age$/,
+  /^dob$/,
+  /^sex$/,
+  /^medical record$/,
+  /^information account #$/,
+  /^name of patient$/,
+  /^address$/,
+  /^date of birth$/,
+  /^ss#$/,
+  /^phone$/,
+  /^date$/,
+  /^time$/,
+  /^date time$/,
+  /^representative \(when applicable\)$/,
+  /^applicable\) date$/,
+  /^physician orders$/,
+  /\bsignature\b/,
+  /\bprinted name\b/,
+  /\bmedical record\b/,
+];
+const FLAT_TEXT_ENTRY_INCLUDE_PATTERN =
+  /\bauthorize\b|\brelease\b|\breleased\b|\brecipient\b|\bpurpose\b|\btreatment\b|\bperiod of service\b|\bprovider\b|\blocation\b|\bphysician\b|\bfacility\b|\bindividual\b|\bother\b|\bspecify\b|\brelationship\b|\bdeceased\b|\badministrator\b|\bexecutor\b|\bnext of kin\b|\bexpiration\b|\bevent\b/i;
+const FLAT_TEXT_ENTRY_MAX_RECOVERED_QUESTIONS = 8;
+const IMPLICIT_OTHER_FOLLOW_UP_LABEL_PATTERN =
+  /\bif\b.*\bother\b.*\b(specify|specified|checked|details?|below|above)\b/i;
 const EXCLUDED_AUTOFILL_FIELD_PATTERNS = [
   /^patient name$/,
   /^last 4 of social security number$/,
@@ -301,6 +337,131 @@ function buildRawMultiSelectQuestion({
         },
       ],
     })),
+  };
+}
+
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function cleanupFlatTextEntryLabel(label) {
+  let normalized = normalizeString(label)
+    .replace(/\|/g, ' ')
+    .replace(/^[0-9]+\s+/, '')
+    .replace(/^[Oo]\s+(?=[A-Z])/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const trailingWordMatch = normalized.match(/^(.*?)(?::)?\s+([A-Za-z#/-]+)$/);
+  if (trailingWordMatch) {
+    const prefix = normalizeString(trailingWordMatch[1]);
+    const trailingWord = normalizeString(trailingWordMatch[2]);
+    if (
+      prefix &&
+      trailingWord &&
+      new RegExp(`\\b${escapeRegex(trailingWord)}\\b`, 'i').test(prefix)
+    ) {
+      normalized = prefix;
+    }
+  }
+
+  return normalized.replace(/\s+/g, ' ').trim();
+}
+
+function canonicalizeFlatTextEntryLabel(label) {
+  const cleaned = cleanupFlatTextEntryLabel(label);
+  const normalized = normalizeFieldName(cleaned);
+  if (!normalized) {
+    return '';
+  }
+
+  if (/\bi hereby authorize\b/.test(normalized)) {
+    return 'Provider or facility authorized to release information';
+  }
+
+  if (/\bperiod of service\b|\bmonth\b|\byear of treatment\b|\btreatment\b/.test(normalized)) {
+    return 'Treatment period or month / year of treatment';
+  }
+
+  if (/\brelease to\b/.test(normalized)) {
+    return 'Recipient of released information';
+  }
+
+  if (/\bother\b.*\bspecify\b/.test(normalized) && /\bphysician orders\b/.test(normalized)) {
+    return 'If Physician Orders selected, specify details';
+  }
+
+  if (/\bother\b.*\bspecify\b/.test(normalized)) {
+    return 'If Other selected, specify details';
+  }
+
+  if (/\brelationship\b|\bdeceased\b|\badministrator\b|\bexecutor\b|\bnext of kin\b/.test(normalized)) {
+    return 'Relationship to the deceased';
+  }
+
+  return cleaned;
+}
+
+function shouldRecoverFlatTextEntryLabel(label) {
+  const canonicalLabel = canonicalizeFlatTextEntryLabel(label);
+  const normalized = normalizeFieldName(canonicalLabel);
+  if (!normalized) {
+    return false;
+  }
+
+  if (FLAT_TEXT_ENTRY_EXCLUDE_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return false;
+  }
+
+  if (!FLAT_TEXT_ENTRY_INCLUDE_PATTERN.test(canonicalLabel)) {
+    return false;
+  }
+
+  if (/^recipient of released information$/.test(normalized)) {
+    return true;
+  }
+
+  if (/^provider or facility authorized to release information$/.test(normalized)) {
+    return true;
+  }
+
+  if (/^treatment period or month \/ year of treatment$/.test(normalized)) {
+    return true;
+  }
+
+  return true;
+}
+
+function buildOverlayShortTextQuestion({
+  id,
+  label,
+  pageIndex,
+  x,
+  y,
+  width,
+  height,
+  confidence = 0.9,
+  visibilityRule = null,
+}) {
+  return {
+    id,
+    label,
+    kind: 'short_text',
+    required: false,
+    help_text: null,
+    confidence,
+    bindings: [
+      {
+        type: 'overlay_text',
+        page_index: pageIndex,
+        x,
+        y,
+        max_width: Number(Math.max(width || 24, 24).toFixed(2)),
+        font_size: Number(Math.max((height || 18) / 1.8, 12).toFixed(2)),
+      },
+    ],
+    options: [],
+    ...(visibilityRule ? { visibility_rule: visibilityRule } : {}),
   };
 }
 
@@ -703,6 +864,19 @@ function buildTextWidgetPrintedLabel(widget, page) {
     return sameRowLabel;
   }
 
+  const leftRowWords = (page?.words || [])
+    .filter((word) => Math.abs(Number(word.y || 0) - Number(widget?.y || 0)) <= CHECKBOX_LABEL_WORD_TOLERANCE)
+    .filter((word) => {
+      const wordRight = Number(word.x || 0) + Number(word.width || 0);
+      const widgetX = Number(widget?.x || 0);
+      return wordRight <= widgetX - 4 && widgetX - wordRight <= 96;
+    })
+    .sort((left, right) => left.x - right.x);
+  const leftRowLabel = buildPrintedLabel(leftRowWords);
+  if (leftRowLabel) {
+    return leftRowLabel;
+  }
+
   const aboveRowWords = candidateWords
     .filter((word) => {
       const y = Number(word.y || 0);
@@ -892,6 +1066,55 @@ function buildTriggeredShortTextQuestion(widget, page, parentContext) {
   };
 }
 
+function buildStandaloneShortTextQuestion(widget, page) {
+  const fieldName = normalizeString(widget?.fieldName);
+  if (!fieldName) return null;
+
+  const printedLabel = buildTextWidgetPrintedLabel(widget, page);
+  const fieldLabel = normalizeString(widget?.fieldLabel);
+  const label = printedLabel || fieldLabel || humanizeFieldName(fieldName);
+  if (!label) return null;
+
+  return buildRawShortTextQuestion({
+    id: slugifyQuestionId(fieldName),
+    label,
+    fieldName,
+    required: false,
+    helpText: null,
+    confidence: 0.95,
+    visibilityRule: null,
+  });
+}
+
+function shouldTreatTextWidgetAsFollowUp(widget, page, parentContext) {
+  if (!parentContext?.parentQuestionId || !parentContext?.parentOptionId) {
+    return false;
+  }
+
+  const signal = normalizeFieldName(
+    [
+      widget?.fieldName,
+      widget?.fieldLabel,
+      buildTextWidgetPrintedLabel(widget, page),
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+
+  if (!signal) {
+    return false;
+  }
+
+  if (FOLLOW_UP_OPTION_PATTERN.test(signal)) {
+    return true;
+  }
+
+  return (
+    /\bother\b/i.test(parentContext?.parentOptionLabel || '') &&
+    CONTACT_FOLLOW_UP_FIELD_PATTERN.test(signal)
+  );
+}
+
 function getPrimaryShortTextFieldName(question, parsedPages = []) {
   if (question?.kind !== 'short_text') return '';
   const binding = (Array.isArray(question?.bindings) ? question.bindings : []).find(
@@ -916,6 +1139,10 @@ function shouldAttachParentContextToDirectDefinition(fieldName, definition, widg
     return false;
   }
 
+  if (definition?.id && !DIRECT_DEFINITION_FOLLOW_UP_IDS.has(definition.id)) {
+    return false;
+  }
+
   const followUpSignal = normalizeFieldName(
     [
       fieldName,
@@ -937,7 +1164,11 @@ function buildCanonicalTextWidgetQuestionEntry(widget, questions, page) {
   if (isExcludedAutofillFieldName(normalizedFieldName)) return null;
 
   const parentContext = findFollowUpParentForTextWidget(widget, questions, page);
-  const definition = buildFieldQuestionDefinition(fieldName, widget?.fieldLabel || '');
+  const printedLabel = buildTextWidgetPrintedLabel(widget, page);
+  const definition = buildFieldQuestionDefinition(
+    fieldName,
+    printedLabel || widget?.fieldLabel || '',
+  );
 
   let question = null;
   if (definition) {
@@ -958,8 +1189,10 @@ function buildCanonicalTextWidgetQuestionEntry(widget, questions, page) {
         : null,
     });
   } else {
-    const triggeredQuestion = buildTriggeredShortTextQuestion(widget, page, parentContext);
-    question = triggeredQuestion?.question || null;
+    const triggeredQuestion = shouldTreatTextWidgetAsFollowUp(widget, page, parentContext)
+      ? buildTriggeredShortTextQuestion(widget, page, parentContext)
+      : null;
+    question = triggeredQuestion?.question || buildStandaloneShortTextQuestion(widget, page);
   }
 
   if (!question) return null;
@@ -1145,6 +1378,117 @@ function reconcileTextWidgetQuestions(output, parsedPdf) {
   };
 }
 
+function getQuestionPrimaryBindingPosition(question) {
+  const bindings = [
+    ...(Array.isArray(question?.bindings) ? question.bindings : []),
+    ...(Array.isArray(question?.options)
+      ? question.options.flatMap((option) => (Array.isArray(option?.bindings) ? option.bindings : []))
+      : []),
+  ];
+  const binding =
+    bindings.find((candidate) => Number.isFinite(candidate?.page_index)) || bindings[0] || null;
+  if (!binding) {
+    return {
+      pageIndex: null,
+      y: null,
+      x: null,
+    };
+  }
+
+  return {
+    pageIndex: Number.isFinite(binding?.page_index) ? Number(binding.page_index) : null,
+    y: Number.isFinite(binding?.y) ? Number(binding.y) : null,
+    x: Number.isFinite(binding?.x) ? Number(binding.x) : null,
+  };
+}
+
+function isImplicitOtherFollowUpQuestion(question) {
+  if (question?.kind !== 'short_text') {
+    return false;
+  }
+  if (question?.visibility_rule?.parent_question_id) {
+    return false;
+  }
+
+  const signal = [question?.label, question?.id, question?.help_text].filter(Boolean).join(' ');
+  return IMPLICIT_OTHER_FOLLOW_UP_LABEL_PATTERN.test(signal);
+}
+
+function findImplicitOtherParentQuestion(questions, childIndex) {
+  const childQuestion = questions[childIndex];
+  const childPosition = getQuestionPrimaryBindingPosition(childQuestion);
+  let bestParent = null;
+  let bestScore = -Infinity;
+
+  for (let index = childIndex - 1; index >= 0; index -= 1) {
+    const candidate = questions[index];
+    if (!candidate || !['multi_select', 'single_select'].includes(candidate.kind)) {
+      continue;
+    }
+
+    const otherOption = (Array.isArray(candidate.options) ? candidate.options : []).find((option) =>
+      /\bother\b/i.test(`${option?.label || ''} ${option?.id || ''}`),
+    );
+    if (!otherOption?.id) {
+      continue;
+    }
+
+    const candidatePosition = getQuestionPrimaryBindingPosition(candidate);
+    let score = 1000 - (childIndex - index);
+
+    if (
+      childPosition.pageIndex != null &&
+      candidatePosition.pageIndex != null &&
+      childPosition.pageIndex !== candidatePosition.pageIndex
+    ) {
+      score -= 500;
+    }
+
+    if (childPosition.y != null && candidatePosition.y != null) {
+      score -= Math.abs(childPosition.y - candidatePosition.y) / 10;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestParent = {
+        parentQuestionId: candidate.id,
+        parentOptionId: otherOption.id,
+      };
+    }
+  }
+
+  return bestParent;
+}
+
+function attachImplicitOtherFollowUps(output) {
+  const questions = Array.isArray(output?.questions) ? output.questions : [];
+  if (questions.length === 0) {
+    return output;
+  }
+
+  return {
+    ...output,
+    questions: questions.map((question, index) => {
+      if (!isImplicitOtherFollowUpQuestion(question)) {
+        return question;
+      }
+
+      const parent = findImplicitOtherParentQuestion(questions, index);
+      if (!parent?.parentQuestionId || !parent?.parentOptionId) {
+        return question;
+      }
+
+      return {
+        ...question,
+        visibility_rule: {
+          parent_question_id: parent.parentQuestionId,
+          parent_option_ids: [parent.parentOptionId],
+        },
+      };
+    }),
+  };
+}
+
 function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
   const synthesizedQuestion = buildCheckboxClusterQuestion(cluster, page);
   if (!synthesizedQuestion) return question;
@@ -1209,6 +1553,159 @@ function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
     confidence: question?.confidence || synthesizedQuestion.confidence || 0.97,
     bindings: mergedOptions.flatMap((option) => option.bindings || []),
     options: mergedOptions,
+  };
+}
+
+function isSingletonCheckboxQuestion(question) {
+  if (question?.kind !== 'single_select') {
+    return false;
+  }
+  if (question?.visibility_rule?.parent_question_id) {
+    return false;
+  }
+
+  const options = Array.isArray(question?.options) ? question.options : [];
+  if (options.length !== 1) {
+    return false;
+  }
+
+  return Boolean(getOptionBindingFieldName(options[0]));
+}
+
+function hasDependentQuestions(questionId, questions = []) {
+  const normalizedQuestionId = slugifyQuestionId(questionId || '');
+  if (!normalizedQuestionId) {
+    return false;
+  }
+
+  return questions.some((question) => {
+    const parentQuestionId = slugifyQuestionId(question?.visibility_rule?.parent_question_id || '');
+    return parentQuestionId === normalizedQuestionId;
+  });
+}
+
+function absorbSingletonCheckboxQuestions(output, parsedPdf) {
+  const sourceQuestions = Array.isArray(output?.questions) ? output.questions : [];
+  if (sourceQuestions.length === 0) {
+    return output;
+  }
+
+  const questions = [...sourceQuestions];
+  const absorbedQuestionIndexes = new Set();
+  const parentRemap = new Map();
+
+  for (const page of parsedPdf?.pages || []) {
+    const pageEntries = buildPageCheckboxQuestionEntries(questions, page)
+      .filter((entry) => entry?.question?.kind === 'multi_select');
+    const widgetsByFieldName = new Map(
+      (page?.widgets || [])
+        .map((widget) => [normalizeFieldName(widget?.fieldName), widget])
+        .filter(([fieldName]) => fieldName),
+    );
+
+    questions.forEach((question, index) => {
+      if (absorbedQuestionIndexes.has(index) || !isSingletonCheckboxQuestion(question)) {
+        return;
+      }
+      if (hasDependentQuestions(question?.id, questions)) {
+        return;
+      }
+
+      const option = question.options[0];
+      const fieldName = getOptionBindingFieldName(option, [page]);
+      const singletonWidget = fieldName ? widgetsByFieldName.get(fieldName) || null : null;
+      if (!fieldName || !singletonWidget) {
+        return;
+      }
+
+      let bestEntry = null;
+      let bestScore = -Infinity;
+
+      for (const entry of pageEntries) {
+        const existingOptionsByField = buildQuestionOptionFieldNameMap(entry.question, [page]);
+        if (existingOptionsByField.has(fieldName)) {
+          continue;
+        }
+
+        const singletonY = Number(singletonWidget.y || 0);
+        const topY = Number(entry.topY || 0);
+        const bottomY = Number(entry.bottomY || 0);
+        const withinBand = singletonY <= topY + CHECKBOX_WIDGET_ROW_TOLERANCE &&
+          singletonY >= bottomY - CHECKBOX_WIDGET_ROW_TOLERANCE;
+        const verticalDistance =
+          singletonY > topY
+            ? singletonY - topY
+            : singletonY < bottomY
+              ? bottomY - singletonY
+              : 0;
+        const score = (withinBand ? 200 : 0) - verticalDistance;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestEntry = entry;
+        }
+      }
+
+      if (!bestEntry || bestScore < -24) {
+        return;
+      }
+
+      const parentQuestion = questions[bestEntry.questionIndex];
+      const existingOptionsByField = buildQuestionOptionFieldNameMap(parentQuestion, [page]);
+      let mergedParentQuestion = parentQuestion;
+
+      if (!existingOptionsByField.has(fieldName)) {
+        mergedParentQuestion = {
+          ...mergedParentQuestion,
+          bindings: [...(mergedParentQuestion.bindings || []), ...(option.bindings || [])],
+          options: [...(mergedParentQuestion.options || []), option],
+        };
+      }
+
+      questions[bestEntry.questionIndex] = mergedParentQuestion;
+      absorbedQuestionIndexes.add(index);
+      parentRemap.set(question.id, {
+        parentQuestionId: mergedParentQuestion.id,
+        parentOptionId: option.id,
+      });
+    });
+  }
+
+  const nextQuestions = questions
+    .filter((_question, index) => !absorbedQuestionIndexes.has(index))
+    .map((question) => {
+      const currentVisibilityRule = question?.visibility_rule || null;
+      if (!currentVisibilityRule?.parent_question_id) {
+        return question;
+      }
+
+      const remappedParent = parentRemap.get(currentVisibilityRule.parent_question_id);
+      if (!remappedParent?.parentQuestionId) {
+        return question;
+      }
+
+      const existingOptionIds = Array.isArray(currentVisibilityRule.parent_option_ids)
+        ? currentVisibilityRule.parent_option_ids.filter(Boolean)
+        : [];
+      const nextOptionIds =
+        existingOptionIds.length === 0 ||
+        existingOptionIds.includes(currentVisibilityRule.parent_question_id)
+          ? [remappedParent.parentOptionId]
+          : existingOptionIds;
+
+      return {
+        ...question,
+        visibility_rule: {
+          ...currentVisibilityRule,
+          parent_question_id: remappedParent.parentQuestionId,
+          parent_option_ids: nextOptionIds,
+        },
+      };
+    });
+
+  return {
+    ...output,
+    questions: nextQuestions,
   };
 }
 
@@ -1314,6 +1811,206 @@ function reconcileCheckboxQuestionIds(output, parsedPdf) {
   };
 }
 
+function isProviderLocationSignal(value) {
+  return /\bprovider\b|\blocation\b/.test(
+    normalizeFieldName(normalizeString(value)),
+  );
+}
+
+function remapSplitQuestionVisibility(question, originalQuestion, splitQuestions, page) {
+  const currentVisibilityRule = question?.visibility_rule || null;
+  const questionSignal = [question?.label, question?.id, question?.help_text].filter(Boolean).join(' ');
+
+  if (
+    currentVisibilityRule?.parent_question_id &&
+    normalizeString(currentVisibilityRule.parent_question_id) === normalizeString(originalQuestion?.id)
+  ) {
+    const parentOptionIds = Array.isArray(currentVisibilityRule.parent_option_ids)
+      ? currentVisibilityRule.parent_option_ids.filter(Boolean)
+      : [];
+    const matchedParent = splitQuestions.find((candidate) =>
+      (candidate.options || []).some((option) => parentOptionIds.includes(option?.id)),
+    );
+    if (matchedParent) {
+      return {
+        ...question,
+        visibility_rule: {
+          ...currentVisibilityRule,
+          parent_question_id: matchedParent.id,
+        },
+      };
+    }
+  }
+
+  if (!currentVisibilityRule?.parent_question_id && isProviderLocationSignal(questionSignal)) {
+    const matchedParent = splitQuestions.find((candidate) =>
+      (candidate.options || []).some((option) =>
+        isProviderLocationSignal([option?.label, option?.id].filter(Boolean).join(' ')),
+      ),
+    );
+    if (matchedParent) {
+      const matchedOption = (matchedParent.options || []).find((option) =>
+        isProviderLocationSignal([option?.label, option?.id].filter(Boolean).join(' ')),
+      );
+      return {
+        ...question,
+        visibility_rule: matchedOption?.id
+          ? {
+              parent_question_id: matchedParent.id,
+              parent_option_ids: [matchedOption.id],
+            }
+          : {
+              parent_question_id: matchedParent.id,
+              parent_option_ids: [],
+            },
+      };
+    }
+  }
+
+  return question;
+}
+
+function splitMergedCheckboxClusterQuestions(output, parsedPdf) {
+  const sourceQuestions = Array.isArray(output?.questions) ? output.questions : [];
+  if (sourceQuestions.length === 0) {
+    return output;
+  }
+
+  let questions = [...sourceQuestions];
+
+  for (const page of parsedPdf?.pages || []) {
+    const clusterEntries = buildCheckboxClusters(page)
+      .map((cluster) => {
+        const synthesizedQuestion = buildCheckboxClusterQuestion(cluster, page);
+        if (!synthesizedQuestion) {
+          return null;
+        }
+
+        return {
+          cluster,
+          synthesizedQuestion,
+          fieldNames: buildCheckboxFieldNameSet(cluster),
+          topY: Math.max(...cluster.map((widget) => Number(widget.y || 0))),
+        };
+      })
+      .filter(Boolean);
+
+    if (clusterEntries.length < 2) {
+      continue;
+    }
+
+    const matchedClustersByQuestionIndex = new Map();
+    for (const entry of clusterEntries) {
+      const matchedQuestionIndex = findBestMatchingCheckboxQuestionIndex(
+        questions,
+        entry.fieldNames,
+        [page],
+      );
+      if (matchedQuestionIndex < 0) {
+        continue;
+      }
+
+      const matchedQuestion = questions[matchedQuestionIndex];
+      if (matchedQuestion?.kind !== 'multi_select') {
+        continue;
+      }
+
+      const questionFieldNames = new Set(getBindingFieldNames(matchedQuestion, [page]));
+      const overlapCount = Array.from(entry.fieldNames).filter((fieldName) =>
+        questionFieldNames.has(fieldName),
+      ).length;
+      if (overlapCount < Math.min(entry.fieldNames.size, CHECKBOX_GROUP_MIN_SIZE)) {
+        continue;
+      }
+
+      const existingEntries = matchedClustersByQuestionIndex.get(matchedQuestionIndex) || [];
+      existingEntries.push(entry);
+      matchedClustersByQuestionIndex.set(matchedQuestionIndex, existingEntries);
+    }
+
+    if (matchedClustersByQuestionIndex.size === 0) {
+      continue;
+    }
+
+    const nextQuestions = [];
+    questions.forEach((question, questionIndex) => {
+      const matchedEntries = matchedClustersByQuestionIndex.get(questionIndex) || [];
+      if (matchedEntries.length < 2 || question?.kind !== 'multi_select') {
+        nextQuestions.push(question);
+        return;
+      }
+
+      const splitQuestions = matchedEntries
+        .sort((left, right) => right.topY - left.topY)
+        .map((entry) => {
+          const options = (question.options || []).filter((option) =>
+            entry.fieldNames.has(getOptionBindingFieldName(option, [page])),
+          );
+          if (options.length < CHECKBOX_GROUP_MIN_SIZE) {
+            return null;
+          }
+
+          return {
+            ...question,
+            id: entry.synthesizedQuestion.id,
+            label: entry.synthesizedQuestion.label,
+            help_text:
+              normalizeString(entry.synthesizedQuestion.help_text || '') ||
+              normalizeString(question?.help_text || '') ||
+              null,
+            bindings: options.flatMap((option) => option.bindings || []),
+            options,
+          };
+        })
+        .filter(Boolean);
+
+      if (splitQuestions.length < 2) {
+        nextQuestions.push(question);
+        return;
+      }
+
+      nextQuestions.push(...splitQuestions);
+    });
+
+    questions = nextQuestions.map((question) => {
+      for (const [questionIndex, matchedEntries] of matchedClustersByQuestionIndex.entries()) {
+        if (matchedEntries.length < 2) {
+          continue;
+        }
+
+        const originalQuestion = sourceQuestions[questionIndex];
+        if (!originalQuestion) {
+          continue;
+        }
+
+        const splitQuestions = nextQuestions.filter((candidate) =>
+          matchedEntries.some((entry) => candidate?.id === entry.synthesizedQuestion.id),
+        );
+        if (splitQuestions.length < 2) {
+          continue;
+        }
+
+        const remappedQuestion = remapSplitQuestionVisibility(
+          question,
+          originalQuestion,
+          splitQuestions,
+          page,
+        );
+        if (remappedQuestion !== question) {
+          return remappedQuestion;
+        }
+      }
+
+      return question;
+    });
+  }
+
+  return {
+    ...output,
+    questions,
+  };
+}
+
 function findBestMatchingCheckboxQuestionIndex(questions, clusterFieldNames, parsedPages = []) {
   let bestIndex = -1;
   let bestOverlap = 0;
@@ -1334,6 +2031,8 @@ function findBestMatchingCheckboxQuestionIndex(questions, clusterFieldNames, par
 
 function buildFieldQuestionDefinition(fieldName, fieldLabel = '', confidence = 0.97) {
   const normalizedFieldName = normalizeFieldName(fieldName);
+  const normalizedFieldLabel = normalizeFieldName(fieldLabel);
+  const fieldSignal = `${normalizedFieldName} ${normalizedFieldLabel}`.trim();
 
   if (isExcludedAutofillFieldName(normalizedFieldName)) {
     return null;
@@ -1425,6 +2124,42 @@ function buildFieldQuestionDefinition(fieldName, fieldLabel = '', confidence = 0
     if (match.pattern.test(normalizedFieldName)) {
       return {
         ...match.question,
+        fieldName,
+        required: false,
+        confidence,
+      };
+    }
+  }
+
+  if (/^pt initials(?:_\d+)?$/.test(normalizedFieldName) || /^pt initials(?:_\d+)?$/.test(normalizedFieldLabel)) {
+    const sensitiveLabelMatches = [
+      {
+        pattern: /\balcohol\b|\bdrug\b/,
+        id: 'alcohol_drug_initials',
+        question: 'If applicable, enter patient initials for Alcohol/Drug information',
+      },
+      {
+        pattern: /\bgenetic/,
+        id: 'genetics_initials',
+        question: 'If applicable, enter patient initials for Genetics information',
+      },
+      {
+        pattern: /\bhiv\b|\baids\b/,
+        id: 'hiv_initials',
+        question: 'If applicable, enter patient initials for HIV/AIDS information',
+      },
+      {
+        pattern: /\bmental\b|\bpsychiatric\b/,
+        id: 'mental_health_initials',
+        question: 'If applicable, enter patient initials for Mental Health information',
+      },
+    ];
+
+    const sensitiveMatch = sensitiveLabelMatches.find(({ pattern }) => pattern.test(fieldSignal));
+    if (sensitiveMatch) {
+      return {
+        id: sensitiveMatch.id,
+        label: sensitiveMatch.question,
         fieldName,
         required: false,
         confidence,
@@ -1566,7 +2301,154 @@ function addMissingWidgetQuestions(output, parsedPdf) {
   };
 }
 
-export function repairPdfFormUnderstandingOutput(output, parsedPdf) {
+function isFlatOverlayPdf(parsedPdf) {
+  const pages = Array.isArray(parsedPdf?.pages) ? parsedPdf.pages : [];
+  const widgetCount = pages.reduce(
+    (count, page) => count + (Array.isArray(page?.widgets) ? page.widgets.length : 0),
+    0,
+  );
+  return widgetCount === 0;
+}
+
+function buildOverlayQuestionMatchKey(question) {
+  return normalizeFieldName(
+    canonicalizeFlatTextEntryLabel(question?.label || question?.help_text || ''),
+  );
+}
+
+function isOverlayBindingNearCandidate(binding, candidate) {
+  if (binding?.type !== 'overlay_text') {
+    return false;
+  }
+
+  const candidatePageIndex = Number(candidate?.pageIndex);
+  const bindingPageIndex = Number(binding?.page_index);
+  if (!Number.isFinite(candidatePageIndex) || !Number.isFinite(bindingPageIndex)) {
+    return false;
+  }
+  if (candidatePageIndex != bindingPageIndex) {
+    return false;
+  }
+
+  const xDelta = Math.abs(Number(binding?.x || 0) - Number(candidate?.x || 0));
+  const yDelta = Math.abs(Number(binding?.y || 0) - Number(candidate?.y || 0));
+  return xDelta <= 24 && yDelta <= 18;
+}
+
+function questionAlreadyCoversFlatTextEntry(question, candidate, canonicalLabel) {
+  const normalizedLabel = normalizeFieldName(canonicalLabel);
+  if (!normalizedLabel) {
+    return false;
+  }
+
+  if (buildOverlayQuestionMatchKey(question) === normalizedLabel) {
+    return true;
+  }
+
+  const bindings = [
+    ...(Array.isArray(question?.bindings) ? question.bindings : []),
+    ...(Array.isArray(question?.options)
+      ? question.options.flatMap((option) => (Array.isArray(option?.bindings) ? option.bindings : []))
+      : []),
+  ];
+
+  return bindings.some((binding) => isOverlayBindingNearCandidate(binding, candidate));
+}
+
+function ensureUniqueQuestionId(baseId, questions) {
+  const normalizedBaseId = slugifyQuestionId(baseId) || 'overlay-question';
+  const existingIds = new Set((questions || []).map((question) => normalizeString(question?.id)).filter(Boolean));
+  if (!existingIds.has(normalizedBaseId)) {
+    return normalizedBaseId;
+  }
+
+  let suffix = 2;
+  while (existingIds.has(`${normalizedBaseId}-${suffix}`)) {
+    suffix += 1;
+  }
+
+  return `${normalizedBaseId}-${suffix}`;
+}
+
+function insertQuestionByVisualPosition(questions, question) {
+  const questionPosition = getQuestionPrimaryBindingPosition(question);
+  if (questionPosition.pageIndex == null || questionPosition.y == null) {
+    questions.push(question);
+    return questions;
+  }
+
+  const insertionIndex = questions.findIndex((candidate) => {
+    const candidatePosition = getQuestionPrimaryBindingPosition(candidate);
+    if (candidatePosition.pageIndex == null || candidatePosition.y == null) {
+      return false;
+    }
+    if (candidatePosition.pageIndex !== questionPosition.pageIndex) {
+      return candidatePosition.pageIndex > questionPosition.pageIndex;
+    }
+    if (Math.abs(candidatePosition.y - questionPosition.y) > 8) {
+      return candidatePosition.y < questionPosition.y;
+    }
+    return (candidatePosition.x ?? 0) > (questionPosition.x ?? 0);
+  });
+
+  if (insertionIndex < 0) {
+    questions.push(question);
+    return questions;
+  }
+
+  questions.splice(insertionIndex, 0, question);
+  return questions;
+}
+
+function addRecoveredFlatTextEntryQuestions(output, parsedPdf, promptProfile = undefined) {
+  if (!isFlatOverlayPdf(parsedPdf)) {
+    return output;
+  }
+
+  const sourceQuestions = Array.isArray(output?.questions) ? output.questions : [];
+  const { candidates } = collectFlatTextEntryCandidates(parsedPdf, promptProfile);
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return output;
+  }
+
+  const nextQuestions = [...sourceQuestions];
+  let recoveredCount = 0;
+
+  for (const candidate of candidates) {
+    if (recoveredCount >= FLAT_TEXT_ENTRY_MAX_RECOVERED_QUESTIONS) {
+      break;
+    }
+
+    const canonicalLabel = canonicalizeFlatTextEntryLabel(candidate?.label || '');
+    if (!shouldRecoverFlatTextEntryLabel(canonicalLabel)) {
+      continue;
+    }
+
+    if (nextQuestions.some((question) => questionAlreadyCoversFlatTextEntry(question, candidate, canonicalLabel))) {
+      continue;
+    }
+
+    const question = buildOverlayShortTextQuestion({
+      id: ensureUniqueQuestionId(canonicalLabel, nextQuestions),
+      label: canonicalLabel,
+      pageIndex: Number(candidate?.pageIndex || 0),
+      x: Number(candidate?.x || 0),
+      y: Number(candidate?.y || 0),
+      width: Number(candidate?.width || 0),
+      height: Number(candidate?.height || 0),
+      confidence: 0.9,
+    });
+    insertQuestionByVisualPosition(nextQuestions, question);
+    recoveredCount += 1;
+  }
+
+  return {
+    ...output,
+    questions: nextQuestions,
+  };
+}
+
+export function repairPdfFormUnderstandingOutput(output, parsedPdf, options = {}) {
   const rawQuestions = Array.isArray(output?.questions) ? output.questions : [];
   const splitQuestions = splitCompositeShortTextQuestions(rawQuestions);
   const widgetCompletedOutput = addMissingWidgetQuestions(
@@ -1576,15 +2458,26 @@ export function repairPdfFormUnderstandingOutput(output, parsedPdf) {
     },
     parsedPdf,
   );
-  const checkboxReconciledOutput = reconcileCheckboxQuestionIds(widgetCompletedOutput, parsedPdf);
+  const flatRecoveredOutput = addRecoveredFlatTextEntryQuestions(
+    widgetCompletedOutput,
+    parsedPdf,
+    options?.promptProfile,
+  );
+  const checkboxReconciledOutput = reconcileCheckboxQuestionIds(flatRecoveredOutput, parsedPdf);
+  const clusterSplitOutput = splitMergedCheckboxClusterQuestions(
+    checkboxReconciledOutput,
+    parsedPdf,
+  );
+  const checkboxAbsorbedOutput = absorbSingletonCheckboxQuestions(clusterSplitOutput, parsedPdf);
+  const followUpReconciledOutput = attachImplicitOtherFollowUps(checkboxAbsorbedOutput);
 
-  return reconcileTextWidgetQuestions(checkboxReconciledOutput, parsedPdf);
+  return reconcileTextWidgetQuestions(followUpReconciledOutput, parsedPdf);
 }
 
 export function preparePdfFormUnderstandingExtraction(options) {
   return preparePdfFormUnderstandingRequest({
     ...options,
-    promptProfile: options.promptProfile || DEFAULT_PROMPT_PROFILE,
+    promptProfile: options.promptProfile,
     maxInputTokens: options.maxInputTokens || DEFAULT_MAX_INPUT_TOKENS,
   });
 }
@@ -1595,7 +2488,7 @@ export async function extractPdfFormUnderstanding({
   facilityName = null,
   formName,
   sourceUrl,
-  promptProfile = DEFAULT_PROMPT_PROFILE,
+  promptProfile = undefined,
   maxInputTokens = DEFAULT_MAX_INPUT_TOKENS,
   preparedRequest = null,
 }) {
@@ -1634,10 +2527,14 @@ export async function extractPdfFormUnderstanding({
       schema: PDF_FORM_UNDERSTANDING_RESPONSE_SCHEMA,
     });
 
-    const enrichedOutput = repairPdfFormUnderstandingOutput(output, parsedPdf);
+    const enrichedOutput = repairPdfFormUnderstandingOutput(output, parsedPdf, {
+      promptProfile: requestPlan.promptMetadata.prompt_profile,
+    });
     const normalizedOutput = normalizePdfFormUnderstanding(enrichedOutput);
     const formUnderstanding = normalizePdfFormUnderstanding(
-      repairPdfFormUnderstandingOutput(normalizedOutput, parsedPdf),
+      repairPdfFormUnderstandingOutput(normalizedOutput, parsedPdf, {
+        promptProfile: requestPlan.promptMetadata.prompt_profile,
+      }),
     );
 
     return {

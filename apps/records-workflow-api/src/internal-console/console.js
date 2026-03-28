@@ -190,6 +190,7 @@ const state = {
   pdfEditorDropPosition: null,
   pdfEditorDraftDirty: false,
   pdfEditorSaveStatus: null,
+  pdfEditorLatestRun: null,
   pdfDocumentProxy: null,
   pdfJsLib: null,
   pdfEditorRenderToken: 0,
@@ -228,6 +229,7 @@ const elements = {
   pageCopy: document.querySelector('#page-copy'),
   stateSelect: document.querySelector('#state-select'),
   refreshState: document.querySelector('#refresh-state'),
+  stateTabSwitcher: document.querySelector('#state-tab-switcher'),
   stateSummary: document.querySelector('#state-summary'),
   systemsTitleCount: document.querySelector('#systems-title-count'),
   stateActionBanner: document.querySelector('#state-action-banner'),
@@ -239,6 +241,7 @@ const elements = {
   historyTab: document.querySelector('#history-tab'),
   systemsPanel: document.querySelector('#systems-panel'),
   pipelinePanel: document.querySelector('#pipeline-panel'),
+  editorPanel: document.querySelector('#editor-panel'),
   runHistoryPanel: document.querySelector('#run-history-panel'),
   systemFilter: document.querySelector('#system-filter'),
   systemsTable: document.querySelector('#systems-table'),
@@ -268,8 +271,11 @@ const elements = {
   pdfEditorPanel: document.querySelector('#pdf-editor-panel'),
   backToResults: document.querySelector('#back-to-results'),
   pdfEditorTitle: document.querySelector('#pdf-editor-title'),
+  pdfEditorSystemContext: document.querySelector('#pdf-editor-system-context'),
   pdfEditorCopy: document.querySelector('#pdf-editor-copy'),
   pdfEditorSaveStatus: document.querySelector('#pdf-editor-save-status'),
+  pdfEditorRunSummary: document.querySelector('#pdf-editor-run-summary'),
+  inspectPdfEditorRun: document.querySelector('#inspect-pdf-editor-run'),
   pdfEditorMetrics: document.querySelector('#pdf-editor-metrics'),
   parsePdfInEditor: document.querySelector('#parse-pdf-in-editor'),
   reextractQuestionsInEditor: document.querySelector('#reextract-questions-in-editor'),
@@ -390,6 +396,19 @@ function normalizeConsoleString(value) {
   return String(value || '')
     .trim()
     .replace(/\s+/g, ' ');
+}
+
+function normalizeString(value) {
+  return normalizeConsoleString(value);
+}
+
+function normalizeComparableLabel(value) {
+  return normalizeConsoleString(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 function systemMatchesGeneratedCandidate(system, entry) {
@@ -973,53 +992,6 @@ function sourceDocumentDisplayName(document) {
   );
 }
 
-function sourceDocumentSchemaSummary(document) {
-  const questionCount = Number(document?.schema_question_count || 0);
-  const signatureAreaCount = Number(document?.schema_signature_area_count || 0);
-  const mode = normalizeConsoleString(document?.schema_mode) || null;
-  const supported = Boolean(document?.schema_supported);
-  const extractionStatus = normalizeConsoleString(document?.latest_question_extraction_status) || null;
-  const templateStatus = normalizeConsoleString(document?.question_template_status) || 'not reviewed';
-
-  if (!supported && questionCount === 0 && signatureAreaCount === 0) {
-    if (extractionStatus === 'failed') {
-      return {
-        tone: 'red',
-        title: 'Schema extraction failed',
-        copy: 'The latest question extraction did not produce a usable schema yet.',
-      };
-    }
-
-    return {
-      tone: templateStatus === 'unsupported' ? 'yellow' : 'gray',
-      title: 'No schema surfaced yet',
-      copy: 'Open the schema editor to inspect the current draft or rerun extraction.',
-    };
-  }
-
-  const parts = [];
-  parts.push(`${formatNumber(questionCount)} question${questionCount === 1 ? '' : 's'}`);
-  if (signatureAreaCount > 0) {
-    parts.push(
-      `${formatNumber(signatureAreaCount)} signature area${signatureAreaCount === 1 ? '' : 's'}`,
-    );
-  }
-  if (mode) {
-    parts.push(mode === 'overlay' ? 'overlay draft' : mode);
-  }
-
-  return {
-    tone:
-      extractionStatus === 'failed'
-        ? 'yellow'
-        : supported || questionCount > 0 || signatureAreaCount > 0
-          ? 'green'
-          : 'gray',
-    title: 'Current schema',
-    copy: parts.join(' • '),
-  };
-}
-
 function currentSeedUrls() {
   return Array.isArray(state.selectedSystemDetail?.seed_urls) ? state.selectedSystemDetail.seed_urls : [];
 }
@@ -1306,9 +1278,9 @@ function setPipelineActionState(actionKey = null) {
     renderPipelineRunResult();
     renderStateDataPipeline();
     renderStateDataStageInspector();
-    if (state.pdfEditorReview) {
-      renderPdfEditor();
-    }
+  }
+  if (state.currentStateTab === 'editor' && state.pdfEditorReview) {
+    renderPdfEditor();
   }
   if (state.currentStateTab === 'systems') {
     renderStateDataPipeline();
@@ -1419,6 +1391,7 @@ function resetPdfEditorState() {
   state.pdfEditorDropPosition = null;
   state.pdfEditorDraftDirty = false;
   state.pdfEditorSaveStatus = null;
+  state.pdfEditorLatestRun = null;
   state.pdfDocumentProxy = null;
 }
 
@@ -1708,14 +1681,8 @@ function sortSystems(systems) {
       case 'pdf_source_documents':
         comparison = compareNumber(left?.stats?.pdf_source_documents, right?.stats?.pdf_source_documents);
         break;
-      case 'source_documents':
-        comparison = compareNumber(left?.stats?.source_documents, right?.stats?.source_documents);
-        break;
-      case 'workflows':
-        comparison = compareNumber(left?.stats?.workflows, right?.stats?.workflows);
-        break;
-      case 'failures':
-        comparison = compareNumber(systemFailures(left), systemFailures(right));
+      case 'automated_pdfs':
+        comparison = compareNumber(left?.stats?.automated_pdfs, right?.stats?.automated_pdfs);
         break;
       case 'system_name':
       default:
@@ -1964,6 +1931,11 @@ function updateBreadcrumb() {
     return;
   }
 
+  if (state.currentStateTab === 'editor') {
+    elements.stateBreadcrumb.textContent = 'State View > PDF Editor';
+    return;
+  }
+
   if (state.currentStateTab === 'history') {
     elements.stateBreadcrumb.textContent = 'State View > Run History';
     return;
@@ -2026,8 +1998,8 @@ function renderSidebarStateSummary() {
         <div class="sidebar-metric-value">${formatNumber(state.stateSummary?.counts?.pdf_source_documents || 0)}</div>
       </div>
       <div class="sidebar-metric">
-        <div class="sidebar-metric-label">Failures</div>
-        <div class="sidebar-metric-value">${formatNumber(state.stateSummary?.counts?.failures || 0)}</div>
+        <div class="sidebar-metric-label">Auto PDFs</div>
+        <div class="sidebar-metric-value">${formatNumber(state.stateSummary?.counts?.automated_pdfs || 0)}</div>
       </div>
     </div>
   `;
@@ -2047,7 +2019,8 @@ function updateSidebarSectionNav() {
     state.currentStateTab === 'pipeline' &&
     state.currentPipelineTab === 'results' &&
     !state.pdfEditorReview;
-  const editorActive = state.currentView === 'state' && Boolean(state.pdfEditorReview);
+  const editorActive =
+    state.currentView === 'state' && state.currentStateTab === 'editor' && Boolean(state.pdfEditorReview);
 
   elements.sidebarEditorNav.classList.toggle('hidden', !state.pdfEditorReview);
 
@@ -2076,7 +2049,7 @@ function updateDashboardChrome() {
   }
 
   const stateName = STATE_NAMES[state.currentState] || state.currentState || 'State';
-  elements.stateTitle.textContent = state.pdfEditorReview
+  elements.stateTitle.textContent = state.currentStateTab === 'editor'
     ? `${stateName} PDF Editor`
     : state.currentStateTab === 'history'
       ? `${stateName} Run History`
@@ -2103,16 +2076,23 @@ function setNavState() {
 }
 
 function setStateTab(nextTab) {
+  if (nextTab === 'editor' && !state.pdfEditorReview) {
+    nextTab = 'pipeline';
+  }
   state.currentStateTab = nextTab;
+  if (elements.stateTabSwitcher) {
+    elements.stateTabSwitcher.hidden = nextTab === 'editor';
+  }
   elements.stateSummary.classList.toggle('hidden', nextTab !== 'systems');
   elements.systemsPanel.classList.toggle('hidden', nextTab !== 'systems');
   elements.pipelinePanel.classList.toggle('hidden', nextTab !== 'pipeline');
+  elements.editorPanel.classList.toggle('hidden', nextTab !== 'editor');
   elements.runHistoryPanel.classList.toggle('hidden', nextTab !== 'history');
   elements.systemsTab.className = nextTab === 'systems' ? 'nav-pill nav-pill-active' : 'nav-pill';
   elements.pipelineTab.className = nextTab === 'pipeline' ? 'nav-pill nav-pill-active' : 'nav-pill';
   elements.historyTab.className = nextTab === 'history' ? 'nav-pill nav-pill-active' : 'nav-pill';
   scrollDashboardToTop();
-  if (nextTab !== 'pipeline') {
+  if (nextTab !== 'editor') {
     resetPdfEditorState();
   }
   if (nextTab === 'pipeline') {
@@ -2134,18 +2114,10 @@ function setPipelineTab(nextTab) {
 }
 
 function syncPipelineWorkspacePanels() {
-  const showingPdfEditor = Boolean(state.pdfEditorReview) && state.currentStateTab === 'pipeline';
-  elements.pipelineFlowPanel.classList.toggle(
-    'hidden',
-    state.currentPipelineTab !== 'flow' || showingPdfEditor,
-  );
-  elements.pipelineResultsPanel.classList.toggle(
-    'hidden',
-    state.currentPipelineTab !== 'results' || showingPdfEditor,
-  );
-  elements.pdfEditorPanel.classList.toggle('hidden', !showingPdfEditor);
+  elements.pipelineFlowPanel.classList.toggle('hidden', state.currentPipelineTab !== 'flow');
+  elements.pipelineResultsPanel.classList.toggle('hidden', state.currentPipelineTab !== 'results');
   if (elements.pipelineWorkspaceNav) {
-    elements.pipelineWorkspaceNav.classList.toggle('hidden', showingPdfEditor);
+    elements.pipelineWorkspaceNav.classList.remove('hidden');
   }
 }
 
@@ -2396,28 +2368,51 @@ function renderStateSummary() {
   }
 
   const counts = state.stateSummary.counts || {};
-  const cards = [
-    ['Data Files', counts.data_source_files, 'State-prefixed files currently discovered under data/.'],
+  const quickStats = [
+    ['Systems', state.systems.length],
+    ['PDFs', counts.pdf_source_documents],
+    ['Auto PDFs', counts.automated_pdfs],
+  ];
+  const details = [
     ['Seeded Systems', counts.seeded_systems, 'Systems currently present in the seed file.'],
-    ['Source Documents', counts.source_documents, 'HTML and PDF source documents cached in the DB.'],
-    ['PDFs', counts.pdf_source_documents, 'PDF-backed documents discovered for this state.'],
-    ['Workflows', counts.workflows, 'Structured workflow rows extracted from crawled documents.'],
+    ['Source Docs', counts.source_documents, 'HTML and PDF source documents cached in the DB.'],
     ['Failures', counts.failures, 'Parse failures, partial workflows, and weak PDF drafts.'],
     ['Last Data Intake', counts.last_data_intake_at ? formatDateTime(counts.last_data_intake_at) : 'n/a', 'Most recent data-to-seed materialization run for this state.'],
     ['Last Crawl', counts.last_crawl_at ? formatDateTime(counts.last_crawl_at) : 'n/a', 'Most recent document fetch seen for this state.'],
   ];
 
-  elements.stateSummary.innerHTML = cards
-    .map(
-      ([label, value, note]) => `
-        <article class="metric-card">
-          <div class="metric-label">${escapeHtml(label)}</div>
-          <div class="metric-value">${escapeHtml(typeof value === 'number' ? formatNumber(value) : value)}</div>
-          <p class="metric-note">${escapeHtml(note)}</p>
-        </article>
-      `,
-    )
-    .join('');
+  elements.stateSummary.innerHTML = `
+    <div class="state-summary-shell">
+      <div class="state-summary-inline">
+        ${quickStats
+          .map(
+            ([label, value]) => `
+              <div class="state-summary-pill">
+                <span class="state-summary-pill-label">${escapeHtml(label)}</span>
+                <span class="state-summary-pill-value">${escapeHtml(typeof value === 'number' ? formatNumber(value) : value)}</span>
+              </div>
+            `,
+          )
+          .join('')}
+      </div>
+      <details class="state-summary-details">
+        <summary>Show crawl stats</summary>
+        <div class="state-summary-detail-grid">
+          ${details
+            .map(
+              ([label, value, note]) => `
+                <article class="metric-card">
+                  <div class="metric-label">${escapeHtml(label)}</div>
+                  <div class="metric-value">${escapeHtml(typeof value === 'number' ? formatNumber(value) : value)}</div>
+                  <p class="metric-note">${escapeHtml(note)}</p>
+                </article>
+              `,
+            )
+            .join('')}
+        </div>
+      </details>
+    </div>
+  `;
 }
 
 function renderSystemsTable() {
@@ -2466,9 +2461,7 @@ function renderSystemsTable() {
           <th class="data-head min-w-[5.5rem] w-[6.5rem]">${renderSystemSortHeader('PDF Link', 'pdf_links')}</th>
           <th class="data-head min-w-[7rem] text-center">Accepted / Captured</th>
           <th class="data-head min-w-[4.5rem]">${renderSystemSortHeader('PDFs', 'pdf_source_documents')}</th>
-          <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Source Docs', 'source_documents')}</th>
-          <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Workflows', 'workflows')}</th>
-          <th class="data-head min-w-[5.5rem]">${renderSystemSortHeader('Failures', 'failures')}</th>
+          <th class="data-head min-w-[6.5rem]">${renderSystemSortHeader('Auto PDFs', 'automated_pdfs')}</th>
           <th class="data-head min-w-[7.5rem] w-[8.5rem]">Action</th>
         </tr>
       </thead>
@@ -2478,7 +2471,6 @@ function renderSystemsTable() {
             const reachability = deriveReachability(system);
             const resultsSummary = deriveResultsSummary(system);
             const entryUrl = deriveSystemUrl(system);
-            const failures = systemFailures(system);
             const isSelected =
               Boolean(system.hospital_system_id) && system.hospital_system_id === state.selectedSystemId;
             const rowClass = [
@@ -2513,9 +2505,7 @@ function renderSystemsTable() {
                   }
                 </td>
                 <td class="data-cell">${formatNumber(system.stats?.pdf_source_documents || 0)}</td>
-                <td class="data-cell">${formatNumber(system.stats?.source_documents || 0)}</td>
-                <td class="data-cell">${formatNumber(system.stats?.workflows || 0)}</td>
-                <td class="data-cell">${formatNumber(failures)}</td>
+                <td class="data-cell">${formatNumber(system.stats?.automated_pdfs || 0)}</td>
                 <td class="data-cell system-action-cell">
                   ${renderSystemActionButtonGroup(system)}
                 </td>
@@ -3275,7 +3265,6 @@ function renderAcceptedFormsSection(pdfDocuments, system) {
               ${pdfDocuments
                 .map((document) => {
                   const displayName = sourceDocumentDisplayName(document);
-                  const schemaSummary = sourceDocumentSchemaSummary(document);
 
                   return `
                     <article class="pdf-result-card">
@@ -3289,27 +3278,10 @@ function renderAcceptedFormsSection(pdfDocuments, system) {
                           <div class="pdf-result-icon">PDF</div>
                           <div>
                             <h4 class="pdf-result-title">${escapeHtml(displayName)}</h4>
-                            <p class="pdf-result-copy">Open question mapping editor</p>
+                            <p class="pdf-result-copy">Open PDF editor</p>
                           </div>
                         </div>
                         <span class="status-pill status-yellow">Inspect</span>
-                      </button>
-                      <button
-                        type="button"
-                        class="pdf-result-button pdf-result-button-secondary mt-3"
-                        data-action="open-pdf-editor"
-                        data-source-document-id="${escapeHtml(document.id)}"
-                      >
-                        <div class="flex items-start gap-4">
-                          <div class="pdf-result-icon pdf-result-icon-schema">Schema</div>
-                          <div>
-                            <h4 class="pdf-result-title">${escapeHtml(schemaSummary.title)}</h4>
-                            <p class="pdf-result-copy">${escapeHtml(schemaSummary.copy)}</p>
-                          </div>
-                        </div>
-                        <span class="${statusPillClass(schemaSummary.tone)}">${escapeHtml(
-                          normalizeConsoleString(document.question_template_status) || 'draft',
-                        )}</span>
                       </button>
                       <div class="icon-link-row mt-3">
                         ${renderIconLink(document.source_page_url, `Open source page for ${displayName}`)}
@@ -3328,7 +3300,7 @@ function renderAcceptedFormsSection(pdfDocuments, system) {
                       <div class="pdf-result-actions">
                         <a class="link-button" href="${escapeHtml(document.content_url)}" target="_blank" rel="noreferrer">Open Accepted PDF</a>
                         <button type="button" class="ghost-button" data-action="open-pdf-editor" data-source-document-id="${escapeHtml(document.id)}">
-                          Open Mapping Editor
+                          PDF Editor
                         </button>
                         <button type="button" class="ghost-button" data-action="reparse-results-source-document" data-source-document-id="${escapeHtml(document.id)}">
                           Reparse
@@ -3438,6 +3410,7 @@ function buildQuestionMappings(review, payloadOverride = null) {
   const payload =
     payloadOverride || review?.draft?.payload || review?.latest_extraction_run?.payload || { supported: false, questions: [] };
   const pdfPages = Array.isArray(review?.pdf_geometry?.pages) ? review.pdf_geometry.pages : [];
+  const suppressedSignatureQuestionIds = buildSuppressedSignatureQuestionIds(payload);
   const widgetsByField = new Map();
 
   function buildRectKey(bindingMeta, rectIndex = 0) {
@@ -3533,7 +3506,9 @@ function buildQuestionMappings(review, payloadOverride = null) {
     return [];
   }
 
-  return (Array.isArray(payload.questions) ? payload.questions : []).map((question) => {
+  return (Array.isArray(payload.questions) ? payload.questions : [])
+    .filter((question) => !suppressedSignatureQuestionIds.has(normalizeString(question?.id)))
+    .map((question) => {
     const baseBindings = Array.isArray(question.bindings) ? question.bindings : [];
     const optionBindings = (Array.isArray(question.options) ? question.options : []).flatMap((option) =>
       Array.isArray(option.bindings) ? option.bindings : [],
@@ -3569,7 +3544,7 @@ function buildQuestionMappings(review, payloadOverride = null) {
       page_indexes: pages,
       option_count: Array.isArray(question.options) ? question.options.length : 0,
     };
-  });
+    });
 }
 
 function buildSignatureAreaMappings(review, payloadOverride = null) {
@@ -3604,6 +3579,51 @@ function buildSignatureAreaMappings(review, payloadOverride = null) {
     ],
     page_indexes: [Number(area.page_index || 0)],
   }));
+}
+
+function buildSuppressedSignatureQuestionIds(payload) {
+  const questions = Array.isArray(payload?.questions) ? payload.questions : [];
+  const signatureAreas = Array.isArray(payload?.signature_areas) ? payload.signature_areas : [];
+  if (!questions.length || !signatureAreas.length) {
+    return new Set();
+  }
+
+  const signatureIds = new Set(
+    signatureAreas.map((area) => normalizeComparableLabel(area?.id)).filter(Boolean),
+  );
+  const signatureLabels = new Set(
+    signatureAreas.map((area) => normalizeComparableLabel(area?.label)).filter(Boolean),
+  );
+  const signatureFieldNames = new Set(
+    signatureAreas.map((area) => normalizeComparableLabel(area?.field_name)).filter(Boolean),
+  );
+
+  return new Set(
+    questions
+      .filter((question) => {
+        if (normalizeString(question?.kind) !== 'short_text') {
+          return false;
+        }
+        if (!Array.isArray(question?.bindings) || question.bindings.length !== 1) {
+          return false;
+        }
+        if (Array.isArray(question?.options) && question.options.length > 0) {
+          return false;
+        }
+
+        const questionId = normalizeComparableLabel(question?.id);
+        const questionLabel = normalizeComparableLabel(question?.label);
+        const bindingFieldName = normalizeComparableLabel(question?.bindings?.[0]?.field_name);
+
+        return (
+          (questionId && signatureIds.has(questionId)) ||
+          (questionLabel && signatureLabels.has(questionLabel)) ||
+          (bindingFieldName && signatureFieldNames.has(bindingFieldName))
+        );
+      })
+      .map((question) => normalizeString(question?.id))
+      .filter(Boolean),
+  );
 }
 
 function buildPdfWidgetsByField(review) {
@@ -3790,11 +3810,13 @@ function buildEditableOverlayPayload() {
     return basePayload;
   }
 
+  const suppressedSignatureQuestionIds = buildSuppressedSignatureQuestionIds(currentPayload);
   const widgetsByField = buildPdfWidgetsByField(state.pdfEditorReview);
   const questionMappingsById = new Map(
     buildQuestionMappings(state.pdfEditorReview, currentPayload).map((question) => [question.id, question]),
   );
   const questions = currentPayload.questions
+    .filter((question) => !suppressedSignatureQuestionIds.has(normalizeString(question?.id)))
     .map((question) =>
       convertQuestionToEditableOverlay(question, questionMappingsById.get(question.id) || null, widgetsByField),
     )
@@ -4920,9 +4942,9 @@ async function openPdfEditor(sourceDocumentId) {
   state.pdfEditorPendingRectEdit = null;
   state.pdfEditorDraftDirty = false;
   state.pdfEditorSaveStatus = null;
-  state.currentStateTab = 'pipeline';
+  state.pdfEditorLatestRun = null;
   state.currentPipelineTab = 'results';
-  scrollDashboardToTop();
+  setStateTab('editor');
   renderStateView();
   await renderPdfEditorPages();
 }
@@ -4948,8 +4970,7 @@ function renderPdfEditor() {
     (Array.isArray(review.pdf_geometry?.pages) ? review.pdf_geometry.pages.length : 0);
   const parseStatus =
     review.pdf_geometry?.parse_status || review.source_document.pdf_parse_status || 'unknown';
-  const mappingMetricLabel =
-    totalRects > 0 || totalBindings === 0 ? 'Mapped Rectangles' : 'Saved Bindings';
+  const mappingMetricLabel = totalRects > 0 || totalBindings === 0 ? 'rects' : 'bindings';
   const mappingMetricValue =
     totalRects > 0 || totalBindings === 0 ? formatNumber(totalRects) : formatNumber(totalBindings);
   const interactionLabel = currentPdfEditorInteractionLabel();
@@ -4964,8 +4985,18 @@ function renderPdfEditor() {
   const candidateNotice = candidateExtraction
     ? `A newer extraction candidate exists from ${formatDateTime(candidateExtraction.created_at)} and has not replaced the current draft.`
     : '';
+  const hospitalSystemName =
+    normalizeConsoleString(review?.source_document?.hospital_system?.name) || '';
+  const facilityName = normalizeConsoleString(review?.source_document?.facility?.name) || '';
+  const systemContext = facilityName
+    ? `${hospitalSystemName} · ${facilityName}`
+    : hospitalSystemName;
 
   elements.pdfEditorTitle.textContent = review.source_document.title || 'PDF Editor';
+  if (elements.pdfEditorSystemContext) {
+    elements.pdfEditorSystemContext.textContent = systemContext;
+    elements.pdfEditorSystemContext.classList.toggle('hidden', !systemContext);
+  }
   elements.pdfEditorCopy.textContent =
     authoringOpen
       ? interactionLabel ||
@@ -5040,36 +5071,45 @@ function renderPdfEditor() {
   elements.pdfEditorSaveStatus.className = `section-copy${state.pdfEditorSaveStatus ? '' : ' hidden'} ${
     state.pdfEditorSaveStatus?.tone === 'error' ? 'text-rose-600' : 'text-emerald-600'
   }`;
+  if (elements.pdfEditorRunSummary) {
+    elements.pdfEditorRunSummary.classList.toggle('hidden', !state.pdfEditorLatestRun?.stageRunId);
+  }
+  if (elements.inspectPdfEditorRun) {
+    elements.inspectPdfEditorRun.textContent = state.pdfEditorLatestRun?.label
+      ? `View ${state.pdfEditorLatestRun.label}`
+      : 'View Parse Run';
+  }
   elements.pdfEditorMetrics.innerHTML = `
-    <article class="metric-card">
-      <div class="metric-label">Pages</div>
-      <div class="metric-value">${formatNumber(pageCount)}</div>
-    </article>
-    <article class="metric-card">
-      <div class="metric-label">Questions</div>
-      <div class="metric-value">${formatNumber(state.pdfEditorQuestions.length)}</div>
-    </article>
-    <article class="metric-card">
-      <div class="metric-label">${mappingMetricLabel}</div>
-      <div class="metric-value">${mappingMetricValue}</div>
-    </article>
-    <article class="metric-card">
-      <div class="metric-label">Parse Status</div>
-      <div class="metric-value">${escapeHtml(parseStatus)}</div>
-    </article>
+    <div class="editor-metric-bar">
+      <span class="editor-metric-chip">
+        <span class="editor-metric-value-inline">${formatNumber(pageCount)}</span>
+        <span class="editor-metric-copy-inline">page${pageCount === 1 ? '' : 's'}</span>
+      </span>
+      <span class="editor-metric-chip">
+        <span class="editor-metric-value-inline">${formatNumber(state.pdfEditorQuestions.length)}</span>
+        <span class="editor-metric-copy-inline">question${state.pdfEditorQuestions.length === 1 ? '' : 's'}</span>
+      </span>
+      <span class="editor-metric-chip">
+        <span class="editor-metric-value-inline">${mappingMetricValue}</span>
+        <span class="editor-metric-copy-inline">${escapeHtml(mappingMetricLabel)}</span>
+      </span>
+      <span class="editor-metric-chip">
+        <span class="editor-metric-value-inline">${escapeHtml(String(parseStatus || '').toLowerCase())}</span>
+        <span class="editor-metric-copy-inline">parse</span>
+      </span>
     ${
       candidateExtraction
-        ? `<article class="metric-card">
-      <div class="metric-label">Candidate Run</div>
-      <div class="metric-value">${escapeHtml(candidateExtraction.status || 'unknown')}</div>
-      <div class="metric-subtext">${
+        ? `<span class="editor-metric-chip">
+      <span class="editor-metric-value-inline">${escapeHtml(candidateExtraction.status || 'unknown')}</span>
+      <span class="editor-metric-copy-inline">${
         candidateDelta
           ? `${candidateDelta.question_count >= 0 ? '+' : ''}${formatNumber(candidateDelta.question_count)}q · ${candidateDelta.binding_count >= 0 ? '+' : ''}${formatNumber(candidateDelta.binding_count)}b`
-          : 'Not yet compared'
-      }</div>
-    </article>`
+          : 'candidate'
+      }</span>
+    </span>`
         : ''
     }
+    </div>
   `;
   renderPdfEditorQuestions();
 }
@@ -6348,7 +6388,11 @@ function renderStateView() {
     elements.runHistoryList.innerHTML = '';
     elements.runHistoryInsights.innerHTML = '';
     elements.pdfEditorMetrics.innerHTML = '';
+    if (elements.stateTabSwitcher) {
+      elements.stateTabSwitcher.hidden = false;
+    }
     elements.pdfEditorPanel.classList.add('hidden');
+    elements.editorPanel.classList.add('hidden');
     if (elements.pipelineWorkspaceNav) {
       elements.pipelineWorkspaceNav.classList.remove('hidden');
     }
@@ -6374,9 +6418,13 @@ function renderStateView() {
   renderRunHistoryList();
   renderRunHistoryInsights();
   renderPdfEditor();
+  if (elements.stateTabSwitcher) {
+    elements.stateTabSwitcher.hidden = state.currentStateTab === 'editor';
+  }
   elements.stateSummary.classList.toggle('hidden', state.currentStateTab !== 'systems');
   elements.systemsPanel.classList.toggle('hidden', state.currentStateTab !== 'systems');
   elements.pipelinePanel.classList.toggle('hidden', state.currentStateTab !== 'pipeline');
+  elements.editorPanel.classList.toggle('hidden', state.currentStateTab !== 'editor');
   elements.runHistoryPanel.classList.toggle('hidden', state.currentStateTab !== 'history');
   syncPipelineWorkspacePanels();
   updateDashboardChrome();
@@ -7026,6 +7074,12 @@ async function rerunParseForOpenPdfEditor() {
       (count, question) => count + question.rects.length,
       0,
     );
+    state.pdfEditorLatestRun = result?.stage_run_id
+      ? {
+          stageRunId: result.stage_run_id,
+          label: result.stage_label || 'Parse Run',
+        }
+      : null;
     state.pdfEditorSaveStatus = {
       tone: 'success',
       message:
@@ -7127,6 +7181,7 @@ async function reextractQuestionsForOpenPdfEditor() {
     );
     const questionCount = Array.isArray(state.pdfEditorQuestions) ? state.pdfEditorQuestions.length : 0;
 
+    state.pdfEditorLatestRun = null;
     state.pdfEditorSaveStatus = {
       tone: refreshedRectCount > 0 ? 'success' : 'info',
       message:
@@ -7815,6 +7870,7 @@ document.addEventListener('click', async (event) => {
     if (button === elements.sidebarEditorNav) {
       if (!state.pdfEditorReview) return;
       showStateView();
+      setStateTab('editor');
       renderStateView();
       return;
     }
@@ -7902,6 +7958,7 @@ document.addEventListener('click', async (event) => {
       await loadStateView(state.currentState, {
         preserveSelectedSystem: true,
         keepPipelineResult: true,
+        keepPdfEditor: state.currentStateTab === 'editor' && Boolean(state.pdfEditorReview),
         stateTab: state.currentStateTab,
       });
       return;

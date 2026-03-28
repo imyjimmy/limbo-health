@@ -37,6 +37,7 @@ export async function requestStructuredOutputWithOpenAI({
       },
       body: JSON.stringify({
         model,
+        temperature: 0,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },

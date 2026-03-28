@@ -85,6 +85,13 @@ services:
   records-workflow-api:
     env_file:
       - .env.development
+    environment:
+      - PDF_OCR_ENGINE=chandra
+      - CHANDRA_OCR_URL=http://host.docker.internal:8765/ocr
+      - CHANDRA_OCR_TIMEOUT_SECONDS=600
+      - CHANDRA_OCR_RENDER_SCALE=1.0
+      - CHANDRA_OCR_PROMPT_TYPE=ocr
+      - CHANDRA_OCR_MAX_OUTPUT_TOKENS=3072
     ports:
       - "3020:3020"
     volumes:

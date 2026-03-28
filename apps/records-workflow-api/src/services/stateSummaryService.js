@@ -89,6 +89,7 @@ function createEmptySummaryCounts() {
     db_facilities: 0,
     source_documents: 0,
     pdf_source_documents: 0,
+    automated_pdfs: 0,
     workflows: 0,
     approved_templates: 0,
     stale_templates: 0,
@@ -108,6 +109,7 @@ function summarizeStateSystems(stateSystems) {
     summary.db_facilities += system.stats.db_facilities;
     summary.source_documents += system.stats.source_documents;
     summary.pdf_source_documents += system.stats.pdf_source_documents;
+    summary.automated_pdfs += system.stats.automated_pdfs;
     summary.workflows += system.stats.workflows;
     summary.approved_templates += system.stats.approved_templates;
     summary.stale_templates += system.stats.stale_templates;
@@ -352,18 +354,38 @@ async function loadStateSystemStats(state) {
       [state],
     ),
     query(
-      `select
+      `with latest_form_runs as (
+         select distinct on (er.source_document_id)
+           er.source_document_id,
+           er.status,
+           er.structured_output
+         from extraction_runs er
+         join source_documents sd on sd.id = er.source_document_id
+         join hospital_systems hs on hs.id = sd.hospital_system_id
+         where hs.state = $1
+           and er.extractor_name = 'pdf_form_understanding_openai'
+         order by er.source_document_id, er.created_at desc
+       )
+       select
          hs.system_name,
          count(*) filter (where pqt.status = 'draft')::int as draft_templates,
          count(*) filter (where pqt.status = 'approved')::int as approved_templates,
          count(*) filter (where pqt.status = 'stale')::int as stale_templates,
-         count(*) filter (where pqt.status = 'unsupported')::int as unsupported_templates
+         count(*) filter (where pqt.status = 'unsupported')::int as unsupported_templates,
+         count(*) filter (
+           where coalesce(
+             nullif(coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->>'supported', '')::boolean,
+             false
+           ) = true
+         )::int as automated_pdfs
        from hospital_systems hs
        join source_documents sd
          on sd.hospital_system_id = hs.id
         and sd.source_type = 'pdf'
        left join pdf_question_templates pqt
          on pqt.source_document_id = sd.id
+       left join latest_form_runs
+         on latest_form_runs.source_document_id = sd.id
        where hs.state = $1
          and hs.active = true
        group by hs.system_name`,
@@ -555,6 +577,7 @@ export async function listStateSystems(state) {
           html_source_documents: toInt(dbSystem?.html_source_documents),
           pdf_source_documents: toInt(dbSystem?.pdf_source_documents),
           captured_forms: toInt(dbSystem?.captured_forms),
+          automated_pdfs: toInt(templateStats?.automated_pdfs),
           workflows: toInt(dbSystem?.workflows),
           draft_templates: toInt(templateStats?.draft_templates),
           approved_templates: toInt(templateStats?.approved_templates),

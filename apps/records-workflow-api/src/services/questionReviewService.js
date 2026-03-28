@@ -330,10 +330,77 @@ function attachSignatureAreasToPayload(payload, pdfGeometry) {
   const normalizedPayload = payload || buildUnsupportedAutofillPayload();
   const existingAreas = normalizePdfSignatureAreas(normalizedPayload.signature_areas);
   const signatureAreas = existingAreas.length > 0 ? existingAreas : buildDerivedSignatureAreas(pdfGeometry);
-
-  return {
+  const payloadWithSignatureAreas = {
     ...normalizedPayload,
     signature_areas: signatureAreas,
+  };
+
+  return removeDuplicateSignatureQuestions(payloadWithSignatureAreas);
+}
+
+function removeDuplicateSignatureQuestions(payload) {
+  const questions = Array.isArray(payload?.questions) ? payload.questions : [];
+  const signatureAreas = normalizePdfSignatureAreas(payload?.signature_areas);
+  if (!questions.length || !signatureAreas.length) {
+    return payload;
+  }
+
+  const normalizeKey = (value) =>
+    normalizeString(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+
+  const signatureKeys = new Set();
+  for (const area of signatureAreas) {
+    for (const candidate of [area?.id, area?.label, area?.field_name]) {
+      const normalizedCandidate = normalizeKey(candidate);
+      if (normalizedCandidate) {
+        signatureKeys.add(normalizedCandidate);
+      }
+    }
+  }
+
+  const filteredQuestions = questions.filter((question) => {
+    if (getQuestionKind(question) !== 'short_text') {
+      return true;
+    }
+
+    const questionKeys = new Set();
+    for (const candidate of [question?.id, question?.label]) {
+      const normalizedCandidate = normalizeKey(candidate);
+      if (normalizedCandidate) {
+        questionKeys.add(normalizedCandidate);
+      }
+    }
+
+    for (const binding of Array.isArray(question?.bindings) ? question.bindings : []) {
+      for (const candidate of [binding?.field_name, binding?.field_label, binding?.label]) {
+        const normalizedCandidate = normalizeKey(candidate);
+        if (normalizedCandidate) {
+          questionKeys.add(normalizedCandidate);
+        }
+      }
+    }
+
+    for (const key of questionKeys) {
+      if (signatureKeys.has(key)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  if (filteredQuestions.length === questions.length) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    questions: filteredQuestions,
   };
 }
 
