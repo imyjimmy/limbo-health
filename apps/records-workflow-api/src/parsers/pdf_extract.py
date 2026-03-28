@@ -529,6 +529,26 @@ def extract_header_lines(page, top_ratio=0.15, expanded_top_ratio=0.18):
     return lines[:18]
 
 
+def should_request_ocr(page_text, words, widgets):
+    if widgets:
+        return False
+
+    normalized_text = (page_text or "").strip()
+    if not normalized_text:
+        return True
+
+    word_count = len(words or [])
+    text_length = len(normalized_text)
+
+    # Many flattened hospital PDFs still contain rich embedded text and vector
+    # geometry even when they do not expose AcroForm widgets. For those docs,
+    # OCR adds cost without improving the parse.
+    if word_count >= 40 or text_length >= 400:
+        return False
+
+    return True
+
+
 def extract_pdf(path):
     with fitz.open(path) as document:
         text_parts = []
@@ -551,7 +571,7 @@ def extract_pdf(path):
             ocr_words = []
             ocr_blocks = []
             ocr_engine = None
-            if len(widgets) == 0:
+            if should_request_ocr(page_text, words, widgets):
                 if PDF_OCR_ENGINE == "chandra":
                     chandra_payload = request_chandra_ocr(page)
                     ocr_words = chandra_payload.get("words", []) if chandra_payload else []

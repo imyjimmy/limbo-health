@@ -377,7 +377,36 @@ async function loadStateSystemStats(state) {
              nullif(coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->>'supported', '')::boolean,
              false
            ) = true
-         )::int as automated_pdfs
+         )::int as automated_pdfs,
+         count(*) filter (
+           where coalesce(
+             nullif(coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->>'supported', '')::boolean,
+             false
+           ) = true
+             and (
+               coalesce(
+                 jsonb_array_length(
+                   coalesce(coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->'questions', '[]'::jsonb)
+                 ),
+                 0
+               ) <= 3
+               or (
+                 coalesce(coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->>'mode', '') = 'overlay'
+                 and coalesce(
+                   jsonb_array_length(
+                     coalesce(coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->'questions', '[]'::jsonb)
+                   ),
+                   0
+                 ) <= 6
+                 and coalesce(
+                   jsonb_array_length(
+                     coalesce(coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->'signature_areas', '[]'::jsonb)
+                   ),
+                   0
+                 ) = 0
+               )
+             )
+         )::int as shallow_automated_pdfs
        from hospital_systems hs
        join source_documents sd
          on sd.hospital_system_id = hs.id
@@ -578,6 +607,7 @@ export async function listStateSystems(state) {
           pdf_source_documents: toInt(dbSystem?.pdf_source_documents),
           captured_forms: toInt(dbSystem?.captured_forms),
           automated_pdfs: toInt(templateStats?.automated_pdfs),
+          shallow_automated_pdfs: toInt(templateStats?.shallow_automated_pdfs),
           workflows: toInt(dbSystem?.workflows),
           draft_templates: toInt(templateStats?.draft_templates),
           approved_templates: toInt(templateStats?.approved_templates),

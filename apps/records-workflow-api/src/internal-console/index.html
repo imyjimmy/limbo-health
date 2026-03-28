@@ -635,7 +635,27 @@
         }
 
         .results-summary {
-          @apply grid gap-4 md:grid-cols-3;
+          @apply rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5;
+        }
+
+        .results-summary-bar {
+          @apply flex flex-wrap items-center gap-2 md:gap-3;
+        }
+
+        .results-summary-system {
+          @apply mr-2 text-sm font-semibold text-gray-900;
+        }
+
+        .results-summary-chip {
+          @apply inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600;
+        }
+
+        .results-summary-chip-label {
+          @apply text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400;
+        }
+
+        .results-summary-chip-value {
+          @apply font-semibold text-gray-900;
         }
 
         .pdf-results-grid {
@@ -1404,7 +1424,7 @@
                     <div id="state-data-stage-inspector" class="inspector-shell"></div>
                   </div>
 
-                  <div id="pipeline-results-panel" class="hidden mt-6 space-y-6">
+                  <div id="pipeline-results-panel" class="hidden mt-4 space-y-4">
                     <div id="pipeline-results-summary" class="results-summary"></div>
                     <div id="pipeline-results-list" class="pdf-results-grid"></div>
                   </div>

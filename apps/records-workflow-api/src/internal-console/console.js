@@ -459,6 +459,19 @@ function formatDateTime(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
+function formatCompactDateTime(value) {
+  if (!value) return 'n/a';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString([], {
+    month: 'numeric',
+    day: 'numeric',
+    year: '2-digit',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 function isDesktopSidebarViewport() {
   return DESKTOP_SIDEBAR_MEDIA_QUERY.matches;
 }
@@ -1489,6 +1502,38 @@ function deriveResultsSummary(system) {
   };
 }
 
+function deriveAutomatedPdfSummary(system) {
+  const pdfs = Number(system?.stats?.pdf_source_documents || 0);
+  const automated = Number(system?.stats?.automated_pdfs || 0);
+  const shallowAutomated = Number(system?.stats?.shallow_automated_pdfs || 0);
+
+  let tone = 'red';
+  let title = 'No supported PDF schemas yet.';
+
+  if (automated > 0) {
+    if (automated === pdfs && shallowAutomated === 0) {
+      tone = 'green';
+      title = `${formatNumber(automated)} of ${formatNumber(pdfs)} PDFs have supported schemas.`;
+    } else {
+      tone = 'yellow';
+      const notes = [];
+      if (automated < pdfs) {
+        notes.push(`${formatNumber(pdfs - automated)} PDFs still unsupported`);
+      }
+      if (shallowAutomated > 0) {
+        notes.push(`${formatNumber(shallowAutomated)} shallow schema${shallowAutomated === 1 ? '' : 's'}`);
+      }
+      title = notes.join(' • ') || `${formatNumber(automated)} supported PDF schemas`;
+    }
+  }
+
+  return {
+    tone,
+    label: formatNumber(automated),
+    title,
+  };
+}
+
 function deriveSystemUrl(system) {
   return (
     system?.db_seed_urls?.[0]?.url ||
@@ -2470,6 +2515,7 @@ function renderSystemsTable() {
           .map((system) => {
             const reachability = deriveReachability(system);
             const resultsSummary = deriveResultsSummary(system);
+            const automatedPdfSummary = deriveAutomatedPdfSummary(system);
             const entryUrl = deriveSystemUrl(system);
             const isSelected =
               Boolean(system.hospital_system_id) && system.hospital_system_id === state.selectedSystemId;
@@ -2505,7 +2551,9 @@ function renderSystemsTable() {
                   }
                 </td>
                 <td class="data-cell">${formatNumber(system.stats?.pdf_source_documents || 0)}</td>
-                <td class="data-cell">${formatNumber(system.stats?.automated_pdfs || 0)}</td>
+                <td class="data-cell">
+                  <span class="${statusPillClass(automatedPdfSummary.tone)}" title="${escapeHtml(automatedPdfSummary.title)}">${escapeHtml(automatedPdfSummary.label)}</span>
+                </td>
                 <td class="data-cell system-action-cell">
                   ${renderSystemActionButtonGroup(system)}
                 </td>
@@ -3370,31 +3418,25 @@ function renderPipelineResults() {
   }
 
   elements.pipelineResultsSummary.innerHTML = `
-    <article class="metric-card">
-      <div class="metric-label">Selected System</div>
-      <div class="metric-value">${escapeHtml(system.system_name)}</div>
-      <p class="metric-note">Results are scoped to this hospital system inside the current state.</p>
-    </article>
-    <article class="metric-card">
-      <div class="metric-label">Targeted Pages</div>
-      <div class="metric-value">${formatNumber(seedUrls.filter((seed) => seed.active).length)} / ${formatNumber(seedUrls.length)}</div>
-      <p class="metric-note">Active targeted pages vs total known pages for this system.</p>
-    </article>
-    <article class="metric-card">
-      <div class="metric-label">Captured Forms</div>
-      <div class="metric-value">${formatNumber(capturedForms.length)}</div>
-      <p class="metric-note">Fetched PDF candidates waiting for review or already promoted.</p>
-    </article>
-    <article class="metric-card">
-      <div class="metric-label">Accepted Forms</div>
-      <div class="metric-value">${formatNumber(pdfDocuments.length)}</div>
-      <p class="metric-note">Canonical PDF source documents currently attached to this system.</p>
-    </article>
-    <article class="metric-card">
-      <div class="metric-label">${escapeHtml(latestActivityLabel)}</div>
-      <div class="metric-value">${escapeHtml(latestActivityAt ? formatDateTime(latestActivityAt) : 'No record')}</div>
-      <p class="metric-note">${escapeHtml(latestActivityNote)}</p>
-    </article>
+    <div class="results-summary-bar">
+      <div class="results-summary-system">${escapeHtml(system.system_name)}</div>
+      <div class="results-summary-chip">
+        <span class="results-summary-chip-label">Targeted</span>
+        <span class="results-summary-chip-value">${formatNumber(seedUrls.filter((seed) => seed.active).length)} / ${formatNumber(seedUrls.length)}</span>
+      </div>
+      <div class="results-summary-chip">
+        <span class="results-summary-chip-label">Captured</span>
+        <span class="results-summary-chip-value">${formatNumber(capturedForms.length)}</span>
+      </div>
+      <div class="results-summary-chip">
+        <span class="results-summary-chip-label">Accepted</span>
+        <span class="results-summary-chip-value">${formatNumber(pdfDocuments.length)}</span>
+      </div>
+      <div class="results-summary-chip">
+        <span class="results-summary-chip-label">${escapeHtml(latestActivityLabel)}</span>
+        <span class="results-summary-chip-value">${escapeHtml(latestActivityAt ? formatCompactDateTime(latestActivityAt) : 'No record')}</span>
+      </div>
+    </div>
   `;
 
   elements.pipelineResultsList.innerHTML = `
