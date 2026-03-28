@@ -388,6 +388,417 @@ function buildConfidenceSummary(payload) {
   };
 }
 
+const SEMANTIC_LABEL_STOP_WORDS = new Set([
+  'a',
+  'all',
+  'an',
+  'and',
+  'apply',
+  'be',
+  'below',
+  'by',
+  'date',
+  'enter',
+  'for',
+  'from',
+  'if',
+  'information',
+  'method',
+  'methods',
+  'of',
+  'or',
+  'record',
+  'records',
+  's',
+  'select',
+  'should',
+  'specify',
+  'that',
+  'the',
+  'these',
+  'this',
+  'to',
+  'use',
+  'will',
+]);
+
+function getQuestionKind(question) {
+  return normalizeString(question?.kind || question?.type);
+}
+
+function tokenizeSemanticLabel(value) {
+  return normalizeComparableLabel(value)
+    .split(' ')
+    .filter(Boolean)
+    .filter((token) => !SEMANTIC_LABEL_STOP_WORDS.has(token));
+}
+
+function scoreTokenOverlap(leftTokens = [], rightTokens = []) {
+  if (!leftTokens.length || !rightTokens.length) {
+    return 0;
+  }
+
+  const leftSet = new Set(leftTokens);
+  const rightSet = new Set(rightTokens);
+  let intersection = 0;
+  for (const token of leftSet) {
+    if (rightSet.has(token)) {
+      intersection += 1;
+    }
+  }
+
+  if (intersection === 0) {
+    return 0;
+  }
+
+  const union = new Set([...leftSet, ...rightSet]).size;
+  return intersection / Math.max(union, 1);
+}
+
+function normalizeQuestionOptionLabels(question) {
+  return (Array.isArray(question?.options) ? question.options : [])
+    .map((option) => normalizeComparableLabel(option?.label))
+    .filter(Boolean);
+}
+
+function getQuestionChoiceCount(question) {
+  const kind = getQuestionKind(question);
+  if (kind !== 'single_select' && kind !== 'multi_select') {
+    return 0;
+  }
+
+  const optionCount = Array.isArray(question?.options) ? question.options.length : 0;
+  if (optionCount > 0) {
+    return optionCount;
+  }
+
+  return Array.isArray(question?.bindings) ? question.bindings.length : 0;
+}
+
+function scoreOptionLabelOverlap(candidateQuestion, referenceQuestion) {
+  const candidateOptions = normalizeQuestionOptionLabels(candidateQuestion);
+  const referenceOptions = normalizeQuestionOptionLabels(referenceQuestion);
+  const candidateChoiceCount = getQuestionChoiceCount(candidateQuestion);
+  const referenceChoiceCount = getQuestionChoiceCount(referenceQuestion);
+  if (
+    candidateOptions.length === 0 &&
+    referenceOptions.length === 0 &&
+    candidateChoiceCount > 0 &&
+    referenceChoiceCount > 0
+  ) {
+    return 0.35;
+  }
+  if (candidateOptions.length === 0 && referenceOptions.length === 0) {
+    return 0.5;
+  }
+  if (candidateOptions.length === 0 || referenceOptions.length === 0) {
+    return 0;
+  }
+
+  const candidateSet = new Set(candidateOptions);
+  const referenceSet = new Set(referenceOptions);
+  let overlap = 0;
+  for (const label of candidateSet) {
+    if (referenceSet.has(label)) {
+      overlap += 1;
+    }
+  }
+  const union = new Set([...candidateSet, ...referenceSet]).size;
+  return overlap / Math.max(union, 1);
+}
+
+function scoreQuestionSemanticMatch(candidateQuestion, referenceQuestion) {
+  const candidateKind = getQuestionKind(candidateQuestion);
+  const referenceKind = getQuestionKind(referenceQuestion);
+  if (!candidateKind || !referenceKind || candidateKind !== referenceKind) {
+    return -Infinity;
+  }
+
+  const candidateLabel = normalizeComparableLabel(candidateQuestion?.label);
+  const referenceLabel = normalizeComparableLabel(referenceQuestion?.label);
+  const labelTokensScore = scoreTokenOverlap(
+    tokenizeSemanticLabel(candidateQuestion?.label),
+    tokenizeSemanticLabel(referenceQuestion?.label),
+  );
+  const optionOverlapScore = scoreOptionLabelOverlap(candidateQuestion, referenceQuestion);
+  const candidateOptionCount = getQuestionChoiceCount(candidateQuestion);
+  const referenceOptionCount = getQuestionChoiceCount(referenceQuestion);
+  const optionCountPenalty = Math.abs(candidateOptionCount - referenceOptionCount) * 8;
+  const visibilitySimilarity =
+    Boolean(candidateQuestion?.visibility_rule?.parent_question_id) ===
+    Boolean(referenceQuestion?.visibility_rule?.parent_question_id)
+      ? 6
+      : 0;
+  const exactLabelBonus = candidateLabel && candidateLabel === referenceLabel ? 50 : 0;
+
+  return exactLabelBonus + labelTokensScore * 80 + optionOverlapScore * 50 + visibilitySimilarity - optionCountPenalty;
+}
+
+function alignQuestionToReference(currentQuestion, referenceQuestion) {
+  return {
+    ...currentQuestion,
+    id: normalizeString(referenceQuestion?.id) || currentQuestion?.id,
+    label: normalizeString(referenceQuestion?.label) || currentQuestion?.label,
+    help_text:
+      normalizeString(referenceQuestion?.help_text || '') ||
+      normalizeString(currentQuestion?.help_text || '') ||
+      null,
+    ...(referenceQuestion?.required != null ? { required: referenceQuestion.required } : {}),
+  };
+}
+
+function orderQuestionsByReferenceIds(questions, referenceQuestions) {
+  const referenceOrder = new Map(
+    referenceQuestions.map((question, index) => [
+      normalizeComparableLabel(question?.id),
+      index,
+    ]),
+  );
+
+  const matchedQuestions = [];
+  const unmatchedQuestions = [];
+
+  questions.forEach((question, originalIndex) => {
+    const referenceIndex = referenceOrder.get(normalizeComparableLabel(question?.id));
+    if (referenceIndex == null) {
+      unmatchedQuestions.push({
+        question,
+        originalIndex,
+      });
+      return;
+    }
+
+    matchedQuestions.push({
+      question,
+      originalIndex,
+      referenceIndex,
+    });
+  });
+
+  matchedQuestions.sort(
+    (left, right) =>
+      left.referenceIndex - right.referenceIndex || left.originalIndex - right.originalIndex,
+  );
+
+  return [
+    ...matchedQuestions.map((entry) => entry.question),
+    ...unmatchedQuestions.map((entry) => entry.question),
+  ];
+}
+
+function alignPayloadQuestionsToPublishedReference(payload, referencePayload) {
+  const currentQuestions = Array.isArray(payload?.questions) ? payload.questions : [];
+  const referenceQuestions = Array.isArray(referencePayload?.questions) ? referencePayload.questions : [];
+  if (currentQuestions.length === 0 || referenceQuestions.length === 0) {
+    return payload;
+  }
+
+  const usedCurrentIndexes = new Set();
+  const matchedQuestions = [];
+  const questionIdRemap = new Map();
+
+  for (const referenceQuestion of referenceQuestions) {
+    let bestIndex = -1;
+    let bestScore = -Infinity;
+
+    currentQuestions.forEach((candidateQuestion, index) => {
+      if (usedCurrentIndexes.has(index)) {
+        return;
+      }
+
+      const score = scoreQuestionSemanticMatch(candidateQuestion, referenceQuestion);
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    });
+
+    if (bestIndex < 0 || bestScore < 55) {
+      continue;
+    }
+
+    const currentQuestion = currentQuestions[bestIndex];
+    const alignedQuestion = alignQuestionToReference(currentQuestion, referenceQuestion);
+    usedCurrentIndexes.add(bestIndex);
+    matchedQuestions.push(alignedQuestion);
+    questionIdRemap.set(normalizeString(currentQuestion?.id), normalizeString(alignedQuestion?.id));
+  }
+
+  const matchedCoverage = matchedQuestions.length / Math.max(referenceQuestions.length, currentQuestions.length, 1);
+  if (matchedCoverage < 0.6) {
+    return payload;
+  }
+
+  const trailingQuestions = currentQuestions.filter((_question, index) => !usedCurrentIndexes.has(index));
+  const orderedQuestions = orderQuestionsByReferenceIds(
+    [...matchedQuestions, ...trailingQuestions],
+    referenceQuestions,
+  ).map((question) => {
+    const currentVisibilityRule = question?.visibility_rule || null;
+    const remappedParentQuestionId = normalizeString(currentVisibilityRule?.parent_question_id)
+      ? questionIdRemap.get(normalizeString(currentVisibilityRule.parent_question_id)) ||
+        currentVisibilityRule.parent_question_id
+      : null;
+
+    return currentVisibilityRule && remappedParentQuestionId
+      ? {
+          ...question,
+          visibility_rule: {
+            ...currentVisibilityRule,
+            parent_question_id: remappedParentQuestionId,
+          },
+        }
+      : question;
+  });
+
+  return {
+    ...payload,
+    questions: orderedQuestions,
+  };
+}
+
+function reorderPayloadQuestionsByPublishedReference(payload, referencePayload) {
+  const questions = Array.isArray(payload?.questions) ? payload.questions : [];
+  const referenceQuestions = Array.isArray(referencePayload?.questions) ? referencePayload.questions : [];
+  if (questions.length === 0 || referenceQuestions.length === 0) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    questions: orderQuestionsByReferenceIds(questions, referenceQuestions),
+  };
+}
+
+function normalizeQuestionDependencyStructure(payload) {
+  const questions = Array.isArray(payload?.questions) ? payload.questions : [];
+  if (questions.length === 0) {
+    return payload;
+  }
+
+  const normalizedIds = new Set(
+    questions
+      .map((question) => normalizeString(question?.id))
+      .filter(Boolean),
+  );
+
+  const sanitizedQuestions = questions.map((question) => {
+    const visibilityRule = question?.visibility_rule || null;
+    const parentQuestionId = normalizeString(visibilityRule?.parent_question_id);
+    const questionId = normalizeString(question?.id);
+    const parentExists = parentQuestionId && normalizedIds.has(parentQuestionId);
+    const hasValidParent = parentExists && parentQuestionId !== questionId;
+
+    if (!visibilityRule || hasValidParent) {
+      return question;
+    }
+
+    return {
+      ...question,
+      visibility_rule: null,
+    };
+  });
+
+  const childrenByParentId = new Map();
+  sanitizedQuestions.forEach((question) => {
+    const parentQuestionId = normalizeString(question?.visibility_rule?.parent_question_id);
+    if (!parentQuestionId) {
+      return;
+    }
+    const siblings = childrenByParentId.get(parentQuestionId) || [];
+    siblings.push(question);
+    childrenByParentId.set(parentQuestionId, siblings);
+  });
+
+  const orderedQuestions = [];
+  const visitedQuestionIds = new Set();
+
+  function appendQuestionBranch(question) {
+    const questionId = normalizeString(question?.id);
+    if (!questionId || visitedQuestionIds.has(questionId)) {
+      return;
+    }
+    visitedQuestionIds.add(questionId);
+    orderedQuestions.push(question);
+
+    const children = childrenByParentId.get(questionId) || [];
+    children.forEach(appendQuestionBranch);
+  }
+
+  sanitizedQuestions.forEach((question) => {
+    if (normalizeString(question?.visibility_rule?.parent_question_id)) {
+      return;
+    }
+    appendQuestionBranch(question);
+  });
+
+  sanitizedQuestions.forEach(appendQuestionBranch);
+
+  return {
+    ...payload,
+    questions: orderedQuestions,
+  };
+}
+
+function summarizePayloadMetrics(payload) {
+  const questions = Array.isArray(payload?.questions) ? payload.questions : [];
+  const signatureAreas = Array.isArray(payload?.signature_areas) ? payload.signature_areas : [];
+  let bindingCount = 0;
+  let optionCount = 0;
+  let dependentQuestionCount = 0;
+
+  for (const question of questions) {
+    if (Array.isArray(question?.bindings)) {
+      bindingCount += question.bindings.length;
+    }
+    if (question?.visibility_rule?.parent_question_id) {
+      dependentQuestionCount += 1;
+    }
+
+    const options = Array.isArray(question?.options) ? question.options : [];
+    optionCount += options.length;
+    for (const option of options) {
+      if (Array.isArray(option?.bindings)) {
+        bindingCount += option.bindings.length;
+      }
+    }
+  }
+
+  return {
+    supported: Boolean(payload?.supported),
+    question_count: questions.length,
+    option_count: optionCount,
+    binding_count: bindingCount,
+    dependent_question_count: dependentQuestionCount,
+    signature_count: signatureAreas.length,
+    mode: payload?.mode ?? null,
+  };
+}
+
+function buildCandidateComparisonSummary(currentPayload, candidatePayload) {
+  if (!candidatePayload) {
+    return null;
+  }
+
+  const candidate = summarizePayloadMetrics(candidatePayload);
+  const current = currentPayload ? summarizePayloadMetrics(currentPayload) : null;
+
+  return {
+    current,
+    candidate,
+    deltas: current
+      ? {
+          question_count: candidate.question_count - current.question_count,
+          option_count: candidate.option_count - current.option_count,
+          binding_count: candidate.binding_count - current.binding_count,
+          dependent_question_count:
+            candidate.dependent_question_count - current.dependent_question_count,
+          signature_count: candidate.signature_count - current.signature_count,
+        }
+      : null,
+  };
+}
+
 async function loadLatestParsedArtifact(sourceDocument, client = null) {
   if (!sourceDocument?.id) return null;
 
@@ -754,6 +1165,21 @@ function buildQuestionReviewResponse({
     template?.payload || buildUnsupportedAutofillPayload(),
     pdfGeometry,
   );
+  const latestRunMatchesDraft =
+    Boolean(latestRun?.id) &&
+    Boolean(template?.latest_extraction_run_id) &&
+    latestRun.id === template.latest_extraction_run_id;
+  const candidateExtraction =
+    latestRun && !latestRunMatchesDraft
+      ? {
+          id: latestRun.id,
+          status: latestRun.status,
+          created_at: latestRun.created_at,
+          payload: latestRunPayload,
+          metadata: latestRun.structured_output?.metadata || null,
+          comparison: buildCandidateComparisonSummary(template?.payload || null, latestRunPayload),
+        }
+      : null;
 
   return {
     source_document: {
@@ -795,6 +1221,7 @@ function buildQuestionReviewResponse({
     draft: template
       ? {
           id: template.id,
+          latest_extraction_run_id: template.latest_extraction_run_id,
           status: template.status,
           payload: draftPayload,
           confidence_summary: template.confidence_summary,
@@ -804,6 +1231,7 @@ function buildQuestionReviewResponse({
           updated_at: template.updated_at,
         }
       : null,
+    candidate_extraction: candidateExtraction,
     published_versions: publishedVersions.map((version) => ({
       id: version.id,
       version_no: version.version_no,
@@ -975,11 +1403,24 @@ async function persistQuestionExtractionResultInClient(
     resolvedSourceDocument,
     client,
   );
+  const { template } = await ensureQuestionTemplate(sourceDocumentId, client);
+  const publishedVersions = await loadPublishedVersions(template.id, client);
+  const latestPublishedPayload = publishedVersions[0]?.payload || null;
+  const semanticallyAlignedPayload = latestPublishedPayload
+    ? alignPayloadQuestionsToPublishedReference(nextPayload, latestPublishedPayload)
+    : nextPayload;
+  const alignedPayload = latestPublishedPayload
+    ? reorderPayloadQuestionsByPublishedReference(
+        semanticallyAlignedPayload,
+        latestPublishedPayload,
+      )
+    : semanticallyAlignedPayload;
+  const normalizedPayload = normalizeQuestionDependencyStructure(alignedPayload);
   const persistedExtraction = {
     ...extraction,
     structuredOutput: {
       ...(extraction?.structuredOutput || {}),
-      form_understanding: nextPayload,
+      form_understanding: normalizedPayload,
     },
   };
   const extractionRunId = await insertExtractionRun(
@@ -992,8 +1433,6 @@ async function persistQuestionExtractionResultInClient(
     },
     client,
   );
-
-  const { template } = await ensureQuestionTemplate(sourceDocumentId, client);
   if (replaceDraft) {
     await client.query(
       `update pdf_question_templates
@@ -1007,9 +1446,9 @@ async function persistQuestionExtractionResultInClient(
       [
         template.id,
         extractionRunId,
-        nextPayload,
+        normalizedPayload,
         resolvedSourceDocument.content_hash || null,
-        buildConfidenceSummary(nextPayload),
+        buildConfidenceSummary(normalizedPayload),
       ],
     );
   } else {
@@ -1029,8 +1468,7 @@ async function persistQuestionExtractionResultInClient(
     reextraction_run: {
       id: extractionRunId,
       status: persistedExtraction.status,
-      payload:
-        persistedExtraction.structuredOutput?.form_understanding || buildUnsupportedAutofillPayload(),
+      payload: alignedPayload,
       metadata: persistedExtraction.structuredOutput?.metadata || null,
     },
   };

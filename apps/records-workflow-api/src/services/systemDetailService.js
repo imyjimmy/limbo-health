@@ -271,7 +271,33 @@ export async function getHospitalSystemDetail(systemId) {
            ) as pdf_parse_status,
            pqt.status as question_template_status,
            coalesce(version_counts.published_versions, 0) as published_versions,
-           latest_form_runs.status as latest_question_extraction_status
+           latest_form_runs.status as latest_question_extraction_status,
+           coalesce(
+             jsonb_array_length(
+               coalesce(
+                 coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->'questions',
+                 '[]'::jsonb
+               )
+             ),
+             0
+           )::int as schema_question_count,
+           coalesce(
+             jsonb_array_length(
+               coalesce(
+                 coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->'signature_areas',
+                 '[]'::jsonb
+               )
+             ),
+             0
+           )::int as schema_signature_area_count,
+           coalesce(
+             coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->>'mode',
+             null
+           ) as schema_mode,
+           coalesce(
+             nullif(coalesce(pqt.payload, latest_form_runs.structured_output->'form_understanding')->>'supported', '')::boolean,
+             false
+           ) as schema_supported
          from source_documents sd
          left join facilities f on f.id = sd.facility_id
          left join latest_parsed_artifacts on latest_parsed_artifacts.source_document_id = sd.id

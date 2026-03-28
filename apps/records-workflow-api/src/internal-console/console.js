@@ -271,6 +271,8 @@ const elements = {
   pdfEditorCopy: document.querySelector('#pdf-editor-copy'),
   pdfEditorSaveStatus: document.querySelector('#pdf-editor-save-status'),
   pdfEditorMetrics: document.querySelector('#pdf-editor-metrics'),
+  parsePdfInEditor: document.querySelector('#parse-pdf-in-editor'),
+  reextractQuestionsInEditor: document.querySelector('#reextract-questions-in-editor'),
   startManualMapping: document.querySelector('#start-manual-mapping'),
   savePdfDraft: document.querySelector('#save-pdf-draft'),
   publishPdfDraft: document.querySelector('#publish-pdf-draft'),
@@ -971,6 +973,53 @@ function sourceDocumentDisplayName(document) {
   );
 }
 
+function sourceDocumentSchemaSummary(document) {
+  const questionCount = Number(document?.schema_question_count || 0);
+  const signatureAreaCount = Number(document?.schema_signature_area_count || 0);
+  const mode = normalizeConsoleString(document?.schema_mode) || null;
+  const supported = Boolean(document?.schema_supported);
+  const extractionStatus = normalizeConsoleString(document?.latest_question_extraction_status) || null;
+  const templateStatus = normalizeConsoleString(document?.question_template_status) || 'not reviewed';
+
+  if (!supported && questionCount === 0 && signatureAreaCount === 0) {
+    if (extractionStatus === 'failed') {
+      return {
+        tone: 'red',
+        title: 'Schema extraction failed',
+        copy: 'The latest question extraction did not produce a usable schema yet.',
+      };
+    }
+
+    return {
+      tone: templateStatus === 'unsupported' ? 'yellow' : 'gray',
+      title: 'No schema surfaced yet',
+      copy: 'Open the schema editor to inspect the current draft or rerun extraction.',
+    };
+  }
+
+  const parts = [];
+  parts.push(`${formatNumber(questionCount)} question${questionCount === 1 ? '' : 's'}`);
+  if (signatureAreaCount > 0) {
+    parts.push(
+      `${formatNumber(signatureAreaCount)} signature area${signatureAreaCount === 1 ? '' : 's'}`,
+    );
+  }
+  if (mode) {
+    parts.push(mode === 'overlay' ? 'overlay draft' : mode);
+  }
+
+  return {
+    tone:
+      extractionStatus === 'failed'
+        ? 'yellow'
+        : supported || questionCount > 0 || signatureAreaCount > 0
+          ? 'green'
+          : 'gray',
+    title: 'Current schema',
+    copy: parts.join(' • '),
+  };
+}
+
 function currentSeedUrls() {
   return Array.isArray(state.selectedSystemDetail?.seed_urls) ? state.selectedSystemDetail.seed_urls : [];
 }
@@ -1137,6 +1186,10 @@ function currentPdfDraftSignatureArea() {
   return payload.signature_areas.find((area) => area.id === state.pdfEditorActiveQuestionId) || null;
 }
 
+function currentPdfEditorCandidateExtraction() {
+  return state.pdfEditorReview?.candidate_extraction || null;
+}
+
 function currentPdfEditorRectsForActiveItem() {
   const question = currentPdfEditorQuestion();
   if (question) {
@@ -1249,9 +1302,13 @@ function setPipelineActionState(actionKey = null) {
 
   if (state.currentStateTab === 'pipeline') {
     renderPipelineVisual();
+    renderPipelineResults();
     renderPipelineRunResult();
     renderStateDataPipeline();
     renderStateDataStageInspector();
+    if (state.pdfEditorReview) {
+      renderPdfEditor();
+    }
   }
   if (state.currentStateTab === 'systems') {
     renderStateDataPipeline();
@@ -3218,6 +3275,7 @@ function renderAcceptedFormsSection(pdfDocuments, system) {
               ${pdfDocuments
                 .map((document) => {
                   const displayName = sourceDocumentDisplayName(document);
+                  const schemaSummary = sourceDocumentSchemaSummary(document);
 
                   return `
                     <article class="pdf-result-card">
@@ -3235,6 +3293,23 @@ function renderAcceptedFormsSection(pdfDocuments, system) {
                           </div>
                         </div>
                         <span class="status-pill status-yellow">Inspect</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="pdf-result-button pdf-result-button-secondary mt-3"
+                        data-action="open-pdf-editor"
+                        data-source-document-id="${escapeHtml(document.id)}"
+                      >
+                        <div class="flex items-start gap-4">
+                          <div class="pdf-result-icon pdf-result-icon-schema">Schema</div>
+                          <div>
+                            <h4 class="pdf-result-title">${escapeHtml(schemaSummary.title)}</h4>
+                            <p class="pdf-result-copy">${escapeHtml(schemaSummary.copy)}</p>
+                          </div>
+                        </div>
+                        <span class="${statusPillClass(schemaSummary.tone)}">${escapeHtml(
+                          normalizeConsoleString(document.question_template_status) || 'draft',
+                        )}</span>
                       </button>
                       <div class="icon-link-row mt-3">
                         ${renderIconLink(document.source_page_url, `Open source page for ${displayName}`)}
@@ -4884,6 +4959,11 @@ function renderPdfEditor() {
   const canRebindRect = selectedPdfEditorQuestionSupportsRectEditing();
   const authoringOpen = hasManualOverlayDraft() && state.pdfEditorAuthoringOpen;
   const createDraftLabel = 'Edit';
+  const candidateExtraction = currentPdfEditorCandidateExtraction();
+  const candidateDelta = candidateExtraction?.comparison?.deltas || null;
+  const candidateNotice = candidateExtraction
+    ? `A newer extraction candidate exists from ${formatDateTime(candidateExtraction.created_at)} and has not replaced the current draft.`
+    : '';
 
   elements.pdfEditorTitle.textContent = review.source_document.title || 'PDF Editor';
   elements.pdfEditorCopy.textContent =
@@ -4892,6 +4972,8 @@ function renderPdfEditor() {
         (selectedQuestion
           ? `Editing draft for ${selectedQuestion.label}. Drag the six-dot handle to reorder questions.`
           : 'Editing draft. Drag the six-dot handle beside a question to reorder it.')
+      : candidateNotice
+        ? candidateNotice
       : totalRects > 0
         ? 'SVG rectangles show where the current question mappings land on the rendered PDF.'
         : pageCount > 0
@@ -4899,6 +4981,16 @@ function renderPdfEditor() {
           : 'Saved question data exists, but persisted PDF geometry is unavailable for overlay rendering.';
   elements.openCachedPdf.href = review.source_document.content_url;
   const manualAvailable = canStartManualMapping();
+  elements.parsePdfInEditor.disabled =
+    !review?.source_document?.id || Boolean(state.pipelineActionInFlight);
+  elements.parsePdfInEditor.textContent =
+    state.pipelineActionInFlight === 'parse_stage' ? 'Parsing...' : 'Parse PDF';
+  elements.reextractQuestionsInEditor.disabled =
+    !review?.source_document?.id || Boolean(state.pipelineActionInFlight);
+  elements.reextractQuestionsInEditor.textContent =
+    state.pipelineActionInFlight === 'question_extraction_stage'
+      ? 'Reextracting...'
+      : 'Reextract Questions';
   elements.startManualMapping.disabled = !manualAvailable;
   elements.startManualMapping.textContent = createDraftLabel;
   elements.startManualMapping.classList.toggle('hidden', authoringOpen && hasManualOverlayDraft());
@@ -4965,6 +5057,19 @@ function renderPdfEditor() {
       <div class="metric-label">Parse Status</div>
       <div class="metric-value">${escapeHtml(parseStatus)}</div>
     </article>
+    ${
+      candidateExtraction
+        ? `<article class="metric-card">
+      <div class="metric-label">Candidate Run</div>
+      <div class="metric-value">${escapeHtml(candidateExtraction.status || 'unknown')}</div>
+      <div class="metric-subtext">${
+        candidateDelta
+          ? `${candidateDelta.question_count >= 0 ? '+' : ''}${formatNumber(candidateDelta.question_count)}q · ${candidateDelta.binding_count >= 0 ? '+' : ''}${formatNumber(candidateDelta.binding_count)}b`
+          : 'Not yet compared'
+      }</div>
+    </article>`
+        : ''
+    }
   `;
   renderPdfEditorQuestions();
 }
@@ -6757,19 +6862,57 @@ async function rerunParseFromInspector(
     openInspector = true,
   } = {},
 ) {
-  const result = await fetchJson(`/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reparse`, {
-    method: 'POST',
+  const actionKey = 'parse_stage';
+  const actionLabel = pipelineActionLabel(actionKey);
+  setPipelineActionState(actionKey);
+  setActionBanner({
+    tone: 'info',
+    title: `${actionLabel} started`,
+    message: 'Reparsing the selected source document.',
+    badge: 'Running',
   });
+  await waitForNextPaint();
 
-  notify('Reparse started for the selected source document.');
-  await loadStateView(state.currentState, {
-    preserveSelectedSystem: true,
-    keepPipelineResult: true,
-    stateTab: 'pipeline',
-    pipelineTab,
-  });
-  if (openInspector && result.stage_run_id) {
-    await openStageInspector(result.stage_run_id, { force: true });
+  try {
+    const result = await fetchJson(
+      `/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reparse`,
+      {
+        method: 'POST',
+      },
+    );
+
+    const nextPipelineTab = openInspector ? 'flow' : pipelineTab;
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'pipeline',
+      pipelineTab: nextPipelineTab,
+    });
+    if (openInspector && result.stage_run_id) {
+      await openStageInspector(result.stage_run_id, { force: true });
+    }
+    setActionBanner(
+      {
+        tone: actionBannerToneForStatus(result.stage_status || result.status),
+        title: `${actionLabel} finished`,
+        message: 'Reparse finished for the selected source document.',
+        badge: formatStageStatusLabel(result.stage_status || result.status),
+      },
+      { autoClearMs: 8000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: `${actionLabel} failed`,
+        message: error?.message || 'The reparse request failed.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
   }
 }
 
@@ -6780,19 +6923,246 @@ async function rerunWorkflowFromInspector(
     openInspector = true,
   } = {},
 ) {
-  const result = await fetchJson(`/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reextract-workflow`, {
-    method: 'POST',
+  const actionKey = 'workflow_extraction_stage';
+  const actionLabel = pipelineActionLabel(actionKey);
+  setPipelineActionState(actionKey);
+  setActionBanner({
+    tone: 'info',
+    title: `${actionLabel} started`,
+    message: 'Reextracting workflow requirements for the selected source document.',
+    badge: 'Running',
   });
+  await waitForNextPaint();
 
-  notify('Workflow extraction reran for the selected source document.');
-  await loadStateView(state.currentState, {
-    preserveSelectedSystem: true,
-    keepPipelineResult: true,
-    stateTab: 'pipeline',
-    pipelineTab,
+  try {
+    const result = await fetchJson(
+      `/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reextract-workflow`,
+      {
+        method: 'POST',
+      },
+    );
+
+    const nextPipelineTab = openInspector ? 'flow' : pipelineTab;
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      stateTab: 'pipeline',
+      pipelineTab: nextPipelineTab,
+    });
+    if (openInspector && result.stage_run_id) {
+      await openStageInspector(result.stage_run_id, { force: true });
+    }
+    setActionBanner(
+      {
+        tone: actionBannerToneForStatus(result.stage_status || result.status),
+        title: `${actionLabel} finished`,
+        message: 'Workflow extraction finished for the selected source document.',
+        badge: formatStageStatusLabel(result.stage_status || result.status),
+      },
+      { autoClearMs: 8000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: `${actionLabel} failed`,
+        message: error?.message || 'The workflow reextraction request failed.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
+async function rerunParseForOpenPdfEditor() {
+  const sourceDocumentId = state.pdfEditorReview?.source_document?.id || null;
+  const sourceTitle =
+    normalizeConsoleString(state.pdfEditorReview?.source_document?.title) || 'the selected PDF';
+  if (!sourceDocumentId) {
+    throw new Error('Open a PDF before reparsing it.');
+  }
+
+  if (state.pdfEditorDraftDirty) {
+    const confirmed = window.confirm(
+      'You have unsaved PDF editor changes. Parse PDF will reload this editor and discard those unsaved edits. Continue?',
+    );
+    if (!confirmed) {
+      return;
+    }
+  }
+
+  const actionKey = 'parse_stage';
+  const actionLabel = pipelineActionLabel(actionKey);
+  setPipelineActionState(actionKey);
+  setActionBanner({
+    tone: 'info',
+    title: `${actionLabel} started`,
+    message: `Reparsing ${sourceTitle}.`,
+    badge: 'Running',
   });
-  if (openInspector && result.stage_run_id) {
-    await openStageInspector(result.stage_run_id, { force: true });
+  await waitForNextPaint();
+
+  try {
+    const result = await fetchJson(
+      `/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/reparse`,
+      {
+        method: 'POST',
+      },
+    );
+
+    await loadStateView(state.currentState, {
+      preserveSelectedSystem: true,
+      keepPipelineResult: true,
+      keepPdfEditor: true,
+      stateTab: 'pipeline',
+      pipelineTab: 'results',
+    });
+    await openPdfEditor(sourceDocumentId);
+
+    const refreshedRectCount = state.pdfEditorQuestions.reduce(
+      (count, question) => count + question.rects.length,
+      0,
+    );
+    state.pdfEditorSaveStatus = {
+      tone: 'success',
+      message:
+        refreshedRectCount > 0
+          ? 'Parse finished. The PDF editor reloaded with the latest geometry.'
+          : 'Parse finished. This PDF still has no mapped rectangles yet. Reextract requirements or capture questions manually.',
+    };
+    renderPdfEditor();
+
+    setActionBanner(
+      {
+        tone: actionBannerToneForStatus(result.stage_status || result.status),
+        title: `${actionLabel} finished`,
+        message:
+          refreshedRectCount > 0
+            ? `Parse finished and ${sourceTitle} reloaded in the editor.`
+            : `Parse finished for ${sourceTitle}, but no mapped rectangles are available yet.`,
+        badge: formatStageStatusLabel(result.stage_status || result.status),
+      },
+      { autoClearMs: 8000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: `${actionLabel} failed`,
+        message: error?.message || 'The parse request failed.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
+  }
+}
+
+async function reextractQuestionsForOpenPdfEditor() {
+  const sourceDocumentId = state.pdfEditorReview?.source_document?.id || null;
+  const sourceTitle =
+    normalizeConsoleString(state.pdfEditorReview?.source_document?.title) || 'the selected PDF';
+  if (!sourceDocumentId) {
+    throw new Error('Open a PDF before reextracting questions.');
+  }
+
+  if (state.pdfEditorDraftDirty) {
+    const confirmed = window.confirm(
+      'You have unsaved PDF editor changes. Reextract Questions will reload this editor and discard those unsaved edits. Continue?',
+    );
+    if (!confirmed) {
+      return;
+    }
+  }
+
+  const actionKey = 'question_extraction_stage';
+  const actionLabel = pipelineActionLabel(actionKey);
+  setPipelineActionState(actionKey);
+  setActionBanner({
+    tone: 'info',
+    title: `${actionLabel} started`,
+    message: `Reextracting mapped questions for ${sourceTitle}.`,
+    badge: 'Running',
+  });
+  await waitForNextPaint();
+
+  try {
+    const review = await fetchJson(
+      `/internal/source-documents/${encodeURIComponent(sourceDocumentId)}/question-review/reextract`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          replace_draft: false,
+        }),
+      },
+    );
+
+    state.pdfEditorReview = review;
+    state.pdfEditorDraftPayload = cloneJson(
+      review?.draft?.payload ||
+        review?.latest_extraction_run?.payload || {
+          supported: false,
+          mode: null,
+          template_id: `manual-${sourceDocumentId}`,
+          confidence: null,
+          signature_areas: [],
+          questions: [],
+        },
+    );
+    state.pdfEditorAuthoringOpen = false;
+    clearPdfEditorInteraction({ preserveStatus: true });
+    state.pdfEditorDraftDirty = false;
+    refreshPdfEditorQuestionsFromDraft();
+    await renderPdfEditorPages();
+
+    const refreshedRectCount = state.pdfEditorQuestions.reduce(
+      (count, question) => count + question.rects.length,
+      0,
+    );
+    const questionCount = Array.isArray(state.pdfEditorQuestions) ? state.pdfEditorQuestions.length : 0;
+
+    state.pdfEditorSaveStatus = {
+      tone: refreshedRectCount > 0 ? 'success' : 'info',
+      message:
+        review?.candidate_extraction
+          ? `Question reextraction finished. A newer candidate run was saved for ${sourceTitle} without replacing the current draft.`
+          : refreshedRectCount > 0
+            ? `Question reextraction finished. Reloaded ${formatNumber(questionCount)} question${questionCount === 1 ? '' : 's'} with ${formatNumber(refreshedRectCount)} mapped rectangle${refreshedRectCount === 1 ? '' : 's'}.`
+            : `Question reextraction finished for ${sourceTitle}, but this PDF still has no mapped rectangles yet.`,
+    };
+    renderPdfEditor();
+
+    setActionBanner(
+      {
+        tone: refreshedRectCount > 0 ? 'success' : 'warning',
+        title: `${actionLabel} finished`,
+        message:
+          refreshedRectCount > 0
+            ? `${sourceTitle} reloaded with extracted question mappings.`
+            : `${sourceTitle} reextracted, but no mapped rectangles were produced.`,
+        badge: refreshedRectCount > 0 ? 'Mapped' : 'No rectangles',
+      },
+      { autoClearMs: 10000 },
+    );
+  } catch (error) {
+    setActionBanner(
+      {
+        tone: 'error',
+        title: `${actionLabel} failed`,
+        message: error?.message || 'The question reextraction request failed.',
+        badge: 'Failed',
+      },
+      { autoClearMs: 12000 },
+    );
+    throw error;
+  } finally {
+    setPipelineActionState(null);
   }
 }
 
@@ -7468,6 +7838,16 @@ document.addEventListener('click', async (event) => {
       return;
     }
 
+    if (button === elements.parsePdfInEditor) {
+      await rerunParseForOpenPdfEditor();
+      return;
+    }
+
+    if (button === elements.reextractQuestionsInEditor) {
+      await reextractQuestionsForOpenPdfEditor();
+      return;
+    }
+
     if (button === elements.startManualMapping) {
       togglePdfEditorAuthoring();
       return;
@@ -7863,7 +8243,6 @@ document.addEventListener('click', async (event) => {
     ) {
       await rerunParseFromInspector(button.dataset.sourceDocumentId, {
         pipelineTab: 'results',
-        openInspector: false,
       });
       return;
     }
@@ -7882,7 +8261,6 @@ document.addEventListener('click', async (event) => {
     ) {
       await rerunWorkflowFromInspector(button.dataset.sourceDocumentId, {
         pipelineTab: 'results',
-        openInspector: false,
       });
       return;
     }

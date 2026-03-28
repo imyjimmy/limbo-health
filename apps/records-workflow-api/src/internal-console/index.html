@@ -655,8 +655,16 @@
           @apply flex w-full items-start justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-left transition hover:bg-gray-100;
         }
 
+        .pdf-result-button-secondary {
+          @apply bg-white;
+        }
+
         .pdf-result-icon {
           @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-xs font-semibold uppercase tracking-[0.2em] text-rose-600;
+        }
+
+        .pdf-result-icon-schema {
+          @apply bg-sky-50 text-sky-700;
         }
 
         .pdf-result-title {
@@ -1368,6 +1376,8 @@
                           <p id="pdf-editor-save-status" class="section-copy hidden"></p>
                         </div>
                         <div class="flex flex-col gap-3 sm:flex-row">
+                          <button id="parse-pdf-in-editor" type="button" class="ghost-button">Parse PDF</button>
+                          <button id="reextract-questions-in-editor" type="button" class="ghost-button">Reextract Questions</button>
                           <button id="start-manual-mapping" type="button" class="ghost-button">Edit</button>
                           <button id="save-pdf-draft" type="button" class="ghost-button">Save Draft</button>
                           <button id="publish-pdf-draft" type="button" class="primary-button">Publish</button>
