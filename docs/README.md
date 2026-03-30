@@ -26,6 +26,7 @@ This directory keeps planning docs, specs, diagrams, and working notes out of th
 - [Mobile app requirements](specs/limbo-health-mobile-requirements.md)
 - [Medical repository structure](specs/medical-repo-structure.md)
 - [NOSTR storage service spec](specs/nostr-storage-service-spec.md)
+- [Records workflow explicit scope spec](specs/records-workflow-explicit-scope-spec.md)
 - [Records request monetization spec](specs/records-request-tracking-monetization-spec.md)
 - [User-assisted hospital portal login spec](specs/user-assisted-hospital-portal-login-spec.md)
 - [`/scan` endpoint requirements](specs/scan-endpoint-requirements.md)
