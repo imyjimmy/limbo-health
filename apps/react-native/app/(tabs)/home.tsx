@@ -18,13 +18,14 @@ import {
 import { SvgUri } from 'react-native-svg';
 import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
 import {
-  TEXAS_HOSPITAL_LOGOS,
+  PRESENTABLE_TEXAS_HOSPITAL_LOGOS,
   type TexasHospitalLogo,
 } from '../../constants/texasHospitalLogos';
 
 const LOGO_TILE_WIDTH = 112;
 const LOGO_TILE_HEIGHT = 58;
 const LOGO_TILE_GAP = 10;
+const MARQUEE_SCROLL_SPEED_PX_PER_SECOND = 15;
 const INFO_PILLS = ['Find hospital systems', 'Re-Use Your Bio', 'Send Official Forms'];
 const APP_ICON = require('../../assets/icon.png');
 
@@ -57,7 +58,7 @@ type MarqueeDirection = 'left' | 'right';
 interface LogoMarqueeRowProps {
   logos: TexasHospitalLogo[];
   direction: MarqueeDirection;
-  durationMs: number;
+  speedPxPerSecond: number;
   renderHospitalLogo: (logo: TexasHospitalLogo) => React.ReactNode;
   startOffsetPx?: number;
   style?: ViewStyle;
@@ -66,7 +67,7 @@ interface LogoMarqueeRowProps {
 function LogoMarqueeRow({
   logos,
   direction,
-  durationMs,
+  speedPxPerSecond,
   renderHospitalLogo,
   startOffsetPx = 0,
   style,
@@ -74,10 +75,15 @@ function LogoMarqueeRow({
   const styles = useThemedStyles(createStyles);
   const translateX = useRef(new Animated.Value(0)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const normalizedSpeedPxPerSecond = Math.max(speedPxPerSecond, 1);
   const loopDistance = useMemo(
     () => logos.length * (LOGO_TILE_WIDTH + LOGO_TILE_GAP),
     [logos.length],
   );
+  const loopDurationMs = useMemo(() => {
+    if (loopDistance === 0) return 0;
+    return (loopDistance / normalizedSpeedPxPerSecond) * 1000;
+  }, [loopDistance, normalizedSpeedPxPerSecond]);
   const normalizedOffset = useMemo(() => {
     if (loopDistance === 0) return 0;
     const mod = startOffsetPx % loopDistance;
@@ -98,7 +104,7 @@ function LogoMarqueeRow({
     loopRef.current = Animated.loop(
       Animated.timing(translateX, {
         toValue: to,
-        duration: durationMs,
+        duration: loopDurationMs,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
@@ -109,7 +115,7 @@ function LogoMarqueeRow({
     return () => {
       loopRef.current?.stop();
     };
-  }, [direction, durationMs, loopDistance, normalizedOffset, translateX]);
+  }, [direction, loopDistance, loopDurationMs, normalizedOffset, translateX]);
 
   return (
     <View style={[styles.marqueeRow, style]}>
@@ -130,10 +136,10 @@ export default function HomeScreen() {
   const styles = useThemedStyles(createStyles);
   const [failedLogos, setFailedLogos] = useState<Record<string, boolean>>({});
   const logoRows = useMemo(() => {
-    const midpoint = Math.ceil(TEXAS_HOSPITAL_LOGOS.length / 2);
+    const midpoint = Math.ceil(PRESENTABLE_TEXAS_HOSPITAL_LOGOS.length / 2);
     return [
-      TEXAS_HOSPITAL_LOGOS.slice(0, midpoint),
-      TEXAS_HOSPITAL_LOGOS.slice(midpoint),
+      PRESENTABLE_TEXAS_HOSPITAL_LOGOS.slice(0, midpoint),
+      PRESENTABLE_TEXAS_HOSPITAL_LOGOS.slice(midpoint),
     ] as const;
   }, []);
 
@@ -210,7 +216,7 @@ export default function HomeScreen() {
               <LogoMarqueeRow
                 logos={logoRows[0]}
                 direction="left"
-                durationMs={84000}
+                speedPxPerSecond={MARQUEE_SCROLL_SPEED_PX_PER_SECOND}
                 renderHospitalLogo={renderHospitalLogo}
                 startOffsetPx={24}
                 style={styles.marqueeRowTop}
@@ -218,7 +224,7 @@ export default function HomeScreen() {
               <LogoMarqueeRow
                 logos={logoRows[1]}
                 direction="right"
-                durationMs={92000}
+                speedPxPerSecond={MARQUEE_SCROLL_SPEED_PX_PER_SECOND}
                 renderHospitalLogo={renderHospitalLogo}
                 startOffsetPx={LOGO_TILE_WIDTH * 0.65}
               />

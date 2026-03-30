@@ -17,6 +17,24 @@ const LEGACY_SEED_METADATA_PATH = path.join(
 );
 const OUTPUT_ASSET_DIR = path.join(APP_ROOT, 'assets/hospital-logos/tx');
 const OUTPUT_CONSTANTS_PATH = path.join(APP_ROOT, 'constants/texasHospitalLogos.ts');
+const NON_PRESENTABLE_LOGO_IDS = new Set([
+  'ascension-seton-hays',
+  'baptist-health-system-san-antonio',
+  'chi-st-lukes-health',
+  'childrens-health',
+  'harris-health',
+  'hca-gulf-coast-division-hca-houston-healthcare',
+  'the-hospitals-of-providence',
+  'university-health',
+  'utmb-health',
+]);
+const NON_PRESENTABLE_SYSTEM_NAME_PATTERNS = [
+  /\bcompany profile\b/i,
+  /\bdata breach\b/i,
+  /\bpatient portal\b/i,
+  /\bultimate guide\b/i,
+  /\.\.\./,
+];
 
 function normalizeWhitespace(value) {
   return String(value || '')
@@ -119,6 +137,16 @@ function escapeForTs(value) {
   return JSON.stringify(String(value));
 }
 
+function isPresentableOutputEntry(entry) {
+  if (NON_PRESENTABLE_LOGO_IDS.has(entry.id)) {
+    return false;
+  }
+
+  return !NON_PRESENTABLE_SYSTEM_NAME_PATTERNS.some((pattern) =>
+    pattern.test(entry.systemName),
+  );
+}
+
 async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, 'utf8'));
 }
@@ -148,6 +176,9 @@ function buildStorageEntries(inventoryItems) {
 }
 
 function generateConstantsFile(entries) {
+  const presentableIds = entries
+    .filter((entry) => isPresentableOutputEntry(entry))
+    .map((entry) => entry.id);
   const entryBlocks = entries.map((entry) => {
     const domainLine = entry.domain
       ? `    domain: ${escapeForTs(entry.domain)},\n`
@@ -183,6 +214,13 @@ export interface TexasHospitalLogo {
 export const TEXAS_HOSPITAL_LOGOS: TexasHospitalLogo[] = [
 ${entryBlocks.join('\n')}
 ];
+
+const PRESENTABLE_TEXAS_HOSPITAL_LOGO_IDS = new Set<string>([
+${presentableIds.map((id) => `  ${escapeForTs(id)},`).join('\n')}
+]);
+
+export const PRESENTABLE_TEXAS_HOSPITAL_LOGOS: TexasHospitalLogo[] =
+  TEXAS_HOSPITAL_LOGOS.filter((logo) => PRESENTABLE_TEXAS_HOSPITAL_LOGO_IDS.has(logo.id));
 `;
 }
 

@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-03-27T19:29:39.789Z",
+  "generated_at": "2026-03-28T00:00:00.000Z",
   "state": "TX",
   "asset_dir": "storage/system-logos/tx/assets",
-  "inventory_count": 34,
+  "inventory_count": 50,
   "latest_fetch_count": 29,
   "legacy_import_count": 5,
   "items": [
@@ -18,6 +18,28 @@
       "fetched_at": "2026-03-27T04:16:33.065Z"
     },
     {
+      "system_name": "Acute Rehabilitation Hospital of Plano",
+      "domain": "acuterehabplano.com",
+      "asset_path": "storage/system-logos/tx/assets/acute-rehabilitation-hospital-of-plano.png",
+      "content_type": "image/png",
+      "size_bytes": 124694,
+      "source_url": "https://acuterehabplano.com/wp-content/uploads/2023/06/acute_logo_clearbackground.png",
+      "source_page_url": "https://acuterehabplano.com/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Ad Hospital East, LLC Company Profile",
+      "domain": "adhealthcare.com",
+      "asset_path": "storage/system-logos/tx/assets/ad-hospital-east-llc-company-profile.png",
+      "content_type": "image/png",
+      "size_bytes": 15793,
+      "source_url": "https://adhealthcare.com/assets/ADHS.png",
+      "source_page_url": "https://www.ehhc.care/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
       "system_name": "AdventHealth Central Texas",
       "domain": "adventhealth.com",
       "asset_path": "storage/system-logos/tx/assets/adventhealth-central-texas.svg",
@@ -27,6 +49,50 @@
       "source_page_url": "https://www.adventhealth.com/locations/hospitals/central-texas",
       "provenance": "storage_fetch_latest",
       "fetched_at": "2026-03-27T04:16:33.065Z"
+    },
+    {
+      "system_name": "AHS Sherman LLC dba AHS Sherman Medical Center Data Breach ...",
+      "domain": "ahssmc.org",
+      "asset_path": "storage/system-logos/tx/assets/ahs-sherman-llc-dba-ahs-sherman-medical-center-data-breach.png",
+      "content_type": "image/png",
+      "size_bytes": 11671,
+      "source_url": "https://ahssmc.org/wp-content/uploads/2024/09/Sherman-Medical-Main-Logo.png",
+      "source_page_url": "https://ahssmc.org/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Allegiance Behavioral Health Center Of Plainview, Llc in ...",
+      "domain": "freedombehavioral.com",
+      "asset_path": "storage/system-logos/tx/assets/allegiance-behavioral-health-center-of-plainview-llc-in.png",
+      "content_type": "image/png",
+      "size_bytes": 667266,
+      "source_url": "https://freedombehavioral.com/wp-content/uploads/2025/09/cropped-Freedom-Behavioral-TM-Logo-Corporate-Transparent.png",
+      "source_page_url": "https://freedombehavioral.com/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Altus Houston Hospital, Lp",
+      "domain": "altusemergency.com",
+      "asset_path": "storage/system-logos/tx/assets/altus-houston-hospital-lp.png",
+      "content_type": "image/png",
+      "size_bytes": 8765,
+      "source_url": "https://www.altusemergency.com/wp-content/uploads/2024/02/Altus-EC_Logo_Black.png",
+      "source_page_url": "https://altusemergency.com/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Anson General Hospital",
+      "domain": "ansongeneralhospital.com",
+      "asset_path": "storage/system-logos/tx/assets/anson-general-hospital.svg",
+      "content_type": "image/svg+xml",
+      "size_bytes": 22329,
+      "source_url": "https://ansongeneralhospital.com/wp-content/uploads/2024/04/AnsonLogo-Black-2.svg",
+      "source_page_url": "https://ansongeneralhospital.com/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
     },
     {
       "system_name": "Ascension Providence",
@@ -49,6 +115,83 @@
       "source_page_url": "https://healthcare.ascension.org/",
       "provenance": "storage_fetch_latest",
       "fetched_at": "2026-03-27T04:16:33.065Z"
+    },
+    {
+      "system_name": "ASCENSION SETON HAYS",
+      "domain": "healthcare.ascension.org",
+      "asset_path": "storage/system-logos/tx/assets/ascension-seton-hays.svg",
+      "content_type": "image/svg+xml",
+      "size_bytes": 72380,
+      "source_url": "https://healthcare.ascension.org/-/media/project/ascension/healthcare/defaults/home-page/sites-of-care-us-map.svg?iar=0&hash=DF652C30942F5A20B0B7F03811BD58C1",
+      "source_page_url": "https://healthcare.ascension.org/locations/texas/txaus/austin-ascension-seton-hays",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Aspire Hospital Behavioral Health Inpatient",
+      "domain": "aspirehealthcorp.com",
+      "asset_path": "storage/system-logos/tx/assets/aspire-hospital-behavioral-health-inpatient.png",
+      "content_type": "image/png",
+      "size_bytes": 64022,
+      "source_url": "https://www.aspirehealthcorp.com/wp-content/uploads/2022/09/aspire-hospital-logo.png",
+      "source_page_url": "https://www.aspirehealthcorp.com/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Atrium Medical Center",
+      "domain": "atriummedicalcenter.com",
+      "asset_path": "storage/system-logos/tx/assets/atrium-medical-center.png",
+      "content_type": "image/png",
+      "size_bytes": 139512,
+      "source_url": "https://www.atriummedicalcenter.com/wp-content/themes/atriummediel322/images/main-logo.png",
+      "source_page_url": "https://www.atriummedicalcenter.com/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Austin Oaks Hospital",
+      "domain": "austinoakshospital.com",
+      "asset_path": "storage/system-logos/tx/assets/austin-oaks-hospital.webp",
+      "content_type": "image/webp",
+      "size_bytes": 9184,
+      "source_url": "https://austinoakshospital.com/wp-content/uploads/2023/03/austin-oaks-hospital-logo.png",
+      "source_page_url": "https://austinoakshospital.com/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Austin State Hospital",
+      "domain": "hhs.texas.gov",
+      "asset_path": "storage/system-logos/tx/assets/austin-state-hospital.png",
+      "content_type": "image/png",
+      "size_bytes": 13652,
+      "source_url": "https://www.hhs.texas.gov/themes/custom/uswds_hhs/logo.png",
+      "source_page_url": "https://www.hhs.texas.gov/services/mental-health-substance-use/state-hospitals/austin-state-hospital",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Ballinger Memorial Hospital TX: Your Ultimate Guide!",
+      "domain": "ballingerhospital.org",
+      "asset_path": "storage/system-logos/tx/assets/ballinger-memorial-hospital-tx-your-ultimate-guide.webp",
+      "content_type": "image/webp",
+      "size_bytes": 31878,
+      "source_url": "https://cdn.prod.website-files.com/5adf6cdd38b7220028f13ac3/5ae0de0b562dfb17601076dc_BMH_LogoFlatWNoLine.webp",
+      "source_page_url": "https://www.ballingerhospital.org/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
+      "system_name": "Bandera Family Health Patient Portal",
+      "domain": "familyhospitalsystems.com",
+      "asset_path": "storage/system-logos/tx/assets/bandera-family-health-patient-portal.png",
+      "content_type": "image/png",
+      "size_bytes": 13858,
+      "source_url": "https://familyhospitalsystems.com/wp-content/uploads/2020/11/FHS-Logo-New.png",
+      "source_page_url": "https://familyhospitalsystems.com/locations/family-hospital-at-bandera/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
     },
     {
       "system_name": "Baptist Health System (San Antonio)",
@@ -82,6 +225,17 @@
       "source_page_url": "https://www.commonspirit.org/patient-resources/stlukes-health-medical-records",
       "provenance": "storage_fetch_latest",
       "fetched_at": "2026-03-27T04:16:33.065Z"
+    },
+    {
+      "system_name": "Children's Health",
+      "domain": "childrens.com",
+      "asset_path": "storage/system-logos/tx/assets/children-s-health.svg",
+      "content_type": "image/svg+xml",
+      "size_bytes": 19443,
+      "source_url": "https://www.childrens.com/",
+      "source_page_url": "https://www.childrens.com/",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
     },
     {
       "system_name": "CHRISTUS Health",
@@ -260,6 +414,17 @@
       "fetched_at": "2026-03-27T04:16:33.065Z"
     },
     {
+      "system_name": "Premier Killeen Hospital and ER",
+      "domain": "adventhealth.com",
+      "asset_path": "storage/system-logos/tx/assets/premier-killeen-hospital-and-er.svg",
+      "content_type": "image/svg+xml",
+      "size_bytes": 3876,
+      "source_url": "https://www.adventhealth.com/themes/custom/ahs_theme/logo.svg",
+      "source_page_url": "https://www.adventhealth.com/locations/hospitals/central-texas",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
+    },
+    {
       "system_name": "St. David's HealthCare",
       "domain": "stdavids.com",
       "asset_path": "storage/system-logos/tx/assets/st-david-s-healthcare.png",
@@ -280,6 +445,17 @@
       "source_page_url": "https://www.tenethealth.com/",
       "provenance": "legacy_seed_import",
       "imported_from": "seeds/texas-logos/09-tenet-healthcare.ico"
+    },
+    {
+      "system_name": "Texas Children's",
+      "domain": "texaschildrens.org",
+      "asset_path": "storage/system-logos/tx/assets/texas-children-s.png",
+      "content_type": "image/png",
+      "size_bytes": 11268,
+      "source_url": "https://www.texaschildrens.org/sites/tc/files/uploads/documents/logos/01_TxChildrens/TC-Horz/TC-4c-091223.png",
+      "source_page_url": "https://www.texaschildrens.org/texas-childrens-visual-identity/texas-childrens-logos",
+      "provenance": "manual_curation",
+      "fetched_at": "2026-03-28T00:00:00.000Z"
     },
     {
       "system_name": "Texas Health Resources",
@@ -380,5 +556,6 @@
       "provenance": "storage_fetch_latest",
       "fetched_at": "2026-03-27T04:16:33.065Z"
     }
-  ]
+  ],
+  "manual_curation_count": 16
 }
