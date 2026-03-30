@@ -1086,6 +1086,25 @@ export async function getFacilityById(facilityId) {
   return result.rows[0] || null;
 }
 
+async function listActiveFacilitiesForSystem(systemId) {
+  const result = await query(
+    `select
+       f.id,
+       f.facility_name,
+       f.city,
+       f.state
+     from facilities f
+     join hospital_systems hs on hs.id = f.hospital_system_id
+     where f.hospital_system_id = $1
+       and f.active = true
+       and hs.active = true
+     order by f.facility_name asc, f.created_at asc`,
+    [systemId]
+  );
+
+  return result.rows;
+}
+
 async function getWorkflowArtifacts(recordsWorkflowId) {
   if (!recordsWorkflowId) {
     return {
@@ -1749,49 +1768,94 @@ export async function getSystemRequestPacket(systemId) {
   const hospitalSystem = await getHospitalSystemById(systemId);
   if (!hospitalSystem) return null;
 
+  const facilities = await listActiveFacilitiesForSystem(systemId);
+  const singleFacilityId = facilities.length === 1 ? facilities[0].id : null;
+
   const [portalRes, workflowsRes] = await Promise.all([
     query(
-      `select *
-       from portal_profiles
-       where hospital_system_id = $1
-         and facility_id is null
-       order by updated_at desc
-       limit 1`,
-      [systemId]
+      singleFacilityId
+        ? `select *
+           from portal_profiles
+           where hospital_system_id = $1
+             and (facility_id = $2 or facility_id is null)
+           order by
+             case when facility_id = $2 then 0 else 1 end,
+             updated_at desc
+           limit 1`
+        : `select *
+           from portal_profiles
+           where hospital_system_id = $1
+             and facility_id is null
+           order by updated_at desc
+           limit 1`,
+      singleFacilityId ? [systemId, singleFacilityId] : [systemId]
     ),
     query(
-      `with ranked as (
-         select
-           rw.*,
-           row_number() over (
-             partition by workflow_type
-             order by
-               case
-                 when workflow_type = 'medical_records' and formal_request_required then 0
-                 when workflow_type = 'medical_records' then 1
-                 else 0
-               end,
-               case
-                 when workflow_type = 'medical_records'
-                      and request_scope in ('mixed', 'complete_chart') then 0
-                 when workflow_type = 'medical_records' then 1
-                 else 0
-               end,
-               case
-                 when workflow_type = 'medical_records'
-                      and official_page_url ~* '(medical-records|requesting-your-record|release|authorization)'
-                 then 0
-                 when workflow_type = 'medical_records' then 1
-                 else 0
-               end,
-               updated_at desc
-           ) as rn
-         from records_workflows rw
-         where rw.hospital_system_id = $1
-           and rw.facility_id is null
-       )
-       select * from ranked where rn = 1`,
-      [systemId]
+      singleFacilityId
+        ? `with ranked as (
+             select
+               rw.*,
+               row_number() over (
+                 partition by workflow_type
+                 order by
+                   case when rw.facility_id = $2 then 0 else 1 end,
+                   case
+                     when workflow_type = 'medical_records' and formal_request_required then 0
+                     when workflow_type = 'medical_records' then 1
+                     else 0
+                   end,
+                   case
+                     when workflow_type = 'medical_records'
+                          and request_scope in ('mixed', 'complete_chart') then 0
+                     when workflow_type = 'medical_records' then 1
+                     else 0
+                   end,
+                   case
+                     when workflow_type = 'medical_records'
+                          and official_page_url ~* '(medical-records|requesting-your-record|release|authorization)'
+                     then 0
+                     when workflow_type = 'medical_records' then 1
+                     else 0
+                   end,
+                   updated_at desc
+               ) as rn
+             from records_workflows rw
+             where rw.hospital_system_id = $1
+               and (rw.facility_id = $2 or rw.facility_id is null)
+           )
+           select * from ranked where rn = 1`
+        : `with ranked as (
+             select
+               rw.*,
+               row_number() over (
+                 partition by workflow_type
+                 order by
+                   case
+                     when workflow_type = 'medical_records' and formal_request_required then 0
+                     when workflow_type = 'medical_records' then 1
+                     else 0
+                   end,
+                   case
+                     when workflow_type = 'medical_records'
+                          and request_scope in ('mixed', 'complete_chart') then 0
+                     when workflow_type = 'medical_records' then 1
+                     else 0
+                   end,
+                   case
+                     when workflow_type = 'medical_records'
+                          and official_page_url ~* '(medical-records|requesting-your-record|release|authorization)'
+                     then 0
+                     when workflow_type = 'medical_records' then 1
+                     else 0
+                   end,
+                   updated_at desc
+               ) as rn
+             from records_workflows rw
+             where rw.hospital_system_id = $1
+               and rw.facility_id is null
+           )
+           select * from ranked where rn = 1`,
+      singleFacilityId ? [systemId, singleFacilityId] : [systemId]
     )
   ]);
 
@@ -1799,7 +1863,8 @@ export async function getSystemRequestPacket(systemId) {
   const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
   const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
   const forms = await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
-    hospitalSystemId: systemId
+    hospitalSystemId: systemId,
+    ...(singleFacilityId ? { facilityId: singleFacilityId } : {}),
   }));
   const portal = portalRes.rows[0] || null;
 
