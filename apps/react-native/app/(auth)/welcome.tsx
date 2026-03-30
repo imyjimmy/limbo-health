@@ -11,6 +11,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { ResizeMode, Video } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, {
@@ -37,6 +38,8 @@ type WelcomeSlide = {
 };
 
 type ThemePalette = ReturnType<typeof useTheme>['colors'];
+
+const PRODUCT_VIDEO = require('../../assets/product-video-276172.mp4');
 
 function OnboardingBackdrop({
   colors,
@@ -157,10 +160,12 @@ function OnboardingBackdrop({
 
 function OnboardingArt({
   color,
+  isActive,
   styles,
   style,
 }: {
   color: string;
+  isActive: boolean;
   styles: ReturnType<typeof createStyles>;
   style?: StyleProp<ViewStyle>;
 }) {
@@ -169,58 +174,17 @@ function OnboardingArt({
       <View style={[styles.artPanelLarge, { backgroundColor: color }]} />
       <View style={styles.artPanelSecondary} />
       <View style={styles.artOrbitRing} />
-
-      <View style={styles.artSheet}>
-        <Text style={styles.artSheetEyebrow}>Request packet</Text>
-        <Text style={styles.artSheetTitle}>Portal-ready workflow</Text>
-        <View style={styles.artSheetDivider} />
-        <View style={styles.artSheetRow}>
-          <View style={[styles.artTag, { backgroundColor: color }]} />
-          <View style={styles.artSheetLine} />
-        </View>
-        <View style={styles.artSheetRow}>
-          <View style={styles.artTagSecondary} />
-          <View style={[styles.artSheetLine, styles.artSheetLineShort]} />
-        </View>
-        <View style={styles.artSheetMetrics}>
-          <View style={styles.artMetricCard}>
-            <Text style={styles.artMetricLabel}>Identity</Text>
-            <Text style={styles.artMetricValue}>Matched</Text>
-          </View>
-          <View style={styles.artMetricCard}>
-            <Text style={styles.artMetricLabel}>Workflow</Text>
-            <Text style={styles.artMetricValue}>Guided</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.artFloatingCard}>
-        <View style={styles.artFloatingHeader}>
-          <View style={[styles.artFloatingDot, { backgroundColor: color }]} />
-          <Text style={styles.artFloatingLabel}>Record trail ready</Text>
-        </View>
-        <View style={styles.artFloatingPillRow}>
-          <View style={styles.artFloatingPill} />
-          <View style={[styles.artFloatingPill, styles.artFloatingPillWide]} />
-        </View>
-        <View style={styles.artFloatingStrip} />
-      </View>
-
-      <View style={styles.artTimeline}>
-        <View style={styles.artTimelineRailLine} />
-        {['Sign in', 'Verify', 'Collect'].map((label, index) => (
-          <View key={label} style={styles.artTimelineStop}>
-            <View
-              style={[
-                styles.artTimelineDot,
-                index === 1
-                  ? [styles.artTimelineDotActive, { borderColor: color, backgroundColor: color }]
-                  : styles.artTimelineDotMuted,
-              ]}
-            />
-            <Text style={styles.artTimelineLabel}>{label}</Text>
-          </View>
-        ))}
+      <View style={styles.artVideoShell}>
+        <Video
+          source={PRODUCT_VIDEO}
+          style={styles.artVideo}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay={isActive}
+          isLooping
+          isMuted
+          volume={0}
+          useNativeControls={false}
+        />
       </View>
     </View>
   );
@@ -366,6 +330,7 @@ export default function WelcomeScreen() {
               {index === 0 ? (
                 <OnboardingArt
                   color={slide.accent}
+                  isActive={currentSlide === index}
                   styles={styles}
                   style={styles.artFrameAfterCopy}
                 />
@@ -540,6 +505,18 @@ const createStyles = createThemedStyles((theme) => ({
   },
   artFrameAfterCopy: {
     marginTop: 26,
+  },
+  artVideoShell: {
+    flex: 1,
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceElevated,
+  },
+  artVideo: {
+    width: '100%',
+    height: '100%',
   },
   artSheet: {
     width: '74%',
