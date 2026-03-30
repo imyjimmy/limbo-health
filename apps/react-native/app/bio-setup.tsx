@@ -10,10 +10,10 @@ import {
   ScrollView,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 import { useBioProfile } from '../providers/BioProfileProvider';
@@ -58,6 +58,7 @@ function validateStep(step: number, profile: BioProfile): string | null {
 export default function BioSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
@@ -69,9 +70,12 @@ export default function BioSetupScreen() {
   const [saving, setSaving] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
-  const fieldLayoutsRef = useRef<Partial<Record<BioFieldKey, number>>>({});
+  const pagerRef = useRef<ScrollView>(null);
+  const stepScrollRefs = useRef<Array<ScrollView | null>>([]);
+  const inputRefs = useRef<Partial<Record<BioFieldKey, TextInput | null>>>({});
+  const fieldLayoutsRef = useRef<Partial<Record<number, Partial<Record<BioFieldKey, number>>>>>({});
   const focusedFieldRef = useRef<BioFieldKey | null>(null);
+  const focusedFieldStepRef = useRef<number | null>(null);
 
   const isEditingExistingProfile = useMemo(
     () => hasProfile || Boolean(returnTo),
@@ -113,11 +117,12 @@ export default function BioSetupScreen() {
 
     const showSub = Keyboard.addListener(showEvent, () => {
       setKeyboardVisible(true);
-      if (focusedFieldRef.current) {
+      if (focusedFieldRef.current && focusedFieldStepRef.current !== null) {
         requestAnimationFrame(() => {
-          const y = fieldLayoutsRef.current[focusedFieldRef.current!];
+          const stepIndex = focusedFieldStepRef.current!;
+          const y = fieldLayoutsRef.current[stepIndex]?.[focusedFieldRef.current!];
           if (typeof y === 'number') {
-            scrollRef.current?.scrollTo({
+            stepScrollRefs.current[stepIndex]?.scrollTo({
               y: Math.max(y - FIELD_SCROLL_KEYBOARD_PADDING, 0),
               animated: true,
             });
@@ -137,19 +142,30 @@ export default function BioSetupScreen() {
   }, []);
 
   const registerFieldLayout = useCallback(
-    (field: BioFieldKey) => (event: LayoutChangeEvent) => {
-      fieldLayoutsRef.current[field] = event.nativeEvent.layout.y;
+    (stepIndex: number, field: BioFieldKey) => (event: LayoutChangeEvent) => {
+      fieldLayoutsRef.current[stepIndex] = {
+        ...fieldLayoutsRef.current[stepIndex],
+        [field]: event.nativeEvent.layout.y,
+      };
     },
     [],
   );
 
-  const focusField = useCallback((field: BioFieldKey) => {
+  const registerInputRef = useCallback(
+    (field: BioFieldKey) => (node: TextInput | null) => {
+      inputRefs.current[field] = node;
+    },
+    [],
+  );
+
+  const focusField = useCallback((stepIndex: number, field: BioFieldKey) => {
     focusedFieldRef.current = field;
-    const y = fieldLayoutsRef.current[field];
+    focusedFieldStepRef.current = stepIndex;
+    const y = fieldLayoutsRef.current[stepIndex]?.[field];
     if (typeof y !== 'number') return;
 
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({
+      stepScrollRefs.current[stepIndex]?.scrollTo({
         y: Math.max(
           y - (keyboardVisible ? FIELD_SCROLL_KEYBOARD_PADDING : FIELD_SCROLL_TOP_PADDING),
           0,
@@ -162,13 +178,48 @@ export default function BioSetupScreen() {
   const blurField = useCallback((field: BioFieldKey) => {
     if (focusedFieldRef.current === field) {
       focusedFieldRef.current = null;
+      focusedFieldStepRef.current = null;
     }
   }, []);
 
   const dismissKeyboard = useCallback(() => {
     focusedFieldRef.current = null;
+    focusedFieldStepRef.current = null;
     Keyboard.dismiss();
   }, []);
+
+  const activateField = useCallback((field: BioFieldKey) => {
+    inputRefs.current[field]?.focus();
+  }, []);
+
+  const goToStep = useCallback(
+    (targetStep: number, animated = true) => {
+      setCurrentStep(targetStep);
+      pagerRef.current?.scrollTo({ x: width * targetStep, animated });
+    },
+    [width],
+  );
+
+  const transitionToStep = useCallback(
+    (targetStep: number, animated = true) => {
+      dismissKeyboard();
+      goToStep(targetStep, animated);
+    },
+    [dismissKeyboard, goToStep],
+  );
+
+  const validateStepBeforeAdvance = useCallback(
+    (stepIndex: number) => {
+      const validationError = validateStep(stepIndex, form);
+      if (validationError) {
+        Alert.alert('Incomplete Personal Info', validationError);
+        return false;
+      }
+
+      return true;
+    },
+    [form],
+  );
 
   const handleSave = async () => {
     const validationError = validateBioProfile(form);
@@ -200,7 +251,7 @@ export default function BioSetupScreen() {
 
   const handlePrevious = () => {
     if (currentStep > 0) {
-      setCurrentStep((prev) => prev - 1);
+      transitionToStep(currentStep - 1);
       return;
     }
     handleExit();
@@ -208,12 +259,10 @@ export default function BioSetupScreen() {
 
   const handleNext = async () => {
     if (currentStep < STEP_COUNT - 1) {
-      const validationError = validateStep(currentStep, form);
-      if (validationError) {
-        Alert.alert('Incomplete Personal Info', validationError);
+      if (!validateStepBeforeAdvance(currentStep)) {
         return;
       }
-      setCurrentStep((prev) => prev + 1);
+      transitionToStep(currentStep + 1);
       return;
     }
 
@@ -223,41 +272,20 @@ export default function BioSetupScreen() {
   const handleStepSelect = (targetStep: number) => {
     if (targetStep === currentStep) return;
     if (targetStep < currentStep) {
-      setCurrentStep(targetStep);
+      transitionToStep(targetStep);
       return;
     }
     if (targetStep !== currentStep + 1) return;
 
-    const validationError = validateStep(currentStep, form);
-    if (validationError) {
-      Alert.alert('Incomplete Personal Info', validationError);
+    if (!validateStepBeforeAdvance(currentStep)) {
       return;
     }
-    setCurrentStep(targetStep);
+    transitionToStep(targetStep);
   };
 
-  const stepSwipeGesture = useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(!keyboardVisible)
-        .activeOffsetX([-24, 24])
-        .failOffsetY([-16, 16])
-        .runOnJS(true)
-        .onEnd((event) => {
-          if ((event.translationX > 72 || event.velocityX > 650) && currentStep > 0) {
-            handlePrevious();
-            return;
-          }
-
-          if (
-            (event.translationX < -72 || event.velocityX < -650) &&
-            currentStep < STEP_COUNT - 1
-          ) {
-            void handleNext();
-          }
-        }),
-    [currentStep, handleNext, handlePrevious, keyboardVisible],
-  );
+  useEffect(() => {
+    pagerRef.current?.scrollTo({ x: width * currentStep, animated: false });
+  }, [width]);
 
   if (status === 'loading' && !didHydrate) {
     return (
@@ -267,9 +295,7 @@ export default function BioSetupScreen() {
     );
   }
 
-  const activeStep = steps[currentStep];
-  const topBarLabel =
-    currentStep > 0 ? 'Previous' : isEditingExistingProfile ? 'Back' : null;
+  const topBarLabel = currentStep === 0 && isEditingExistingProfile ? 'Back' : null;
 
   return (
     <KeyboardAvoidingView
@@ -289,47 +315,107 @@ export default function BioSetupScreen() {
         </View>
       </View>
 
-      <GestureDetector gesture={stepSwipeGesture}>
+      <ScrollView
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        bounces={false}
+        directionalLockEnabled
+        scrollEnabled={!keyboardVisible}
+        showsHorizontalScrollIndicator={false}
+        keyboardDismissMode="interactive"
+        scrollEventThrottle={16}
+        style={styles.scrollView}
+        onMomentumScrollEnd={(event) => {
+          const nextStep = Math.round(event.nativeEvent.contentOffset.x / width);
+          if (nextStep === currentStep) {
+            return;
+          }
+
+          dismissKeyboard();
+
+          if (nextStep < currentStep) {
+            setCurrentStep(nextStep);
+            return;
+          }
+
+          if (!validateStepBeforeAdvance(currentStep)) {
+            requestAnimationFrame(() => {
+              pagerRef.current?.scrollTo({ x: width * currentStep, animated: true });
+            });
+            return;
+          }
+
+          setCurrentStep(nextStep);
+        }}
+      >
         <ScrollView
-          ref={scrollRef}
-          style={styles.scrollView}
+          ref={(node) => {
+            stepScrollRefs.current[0] = node;
+          }}
+          style={[styles.page, { width }]}
           contentContainerStyle={styles.scrollContent}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           onScrollBeginDrag={dismissKeyboard}
           showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
         >
           <Pressable
             onPress={dismissKeyboard}
             disabled={!keyboardVisible}
-            style={[styles.hero, currentStep === 0 && styles.heroIntro]}
+            style={[styles.hero, styles.heroIntro]}
           >
-            <Text style={styles.eyebrow}>{activeStep.eyebrow}</Text>
-            <Text style={styles.title}>{activeStep.title}</Text>
-            <Text style={styles.subtitle}>{activeStep.body}</Text>
+            <Text style={styles.eyebrow}>{steps[0].eyebrow}</Text>
+            <Text style={styles.title}>{steps[0].title}</Text>
+            <Text style={styles.subtitle}>{steps[0].body}</Text>
           </Pressable>
 
-          {currentStep === 0 ? (
-            <View style={styles.introCard}>
-              <Text style={styles.introCardTitle}>What we will ask for</Text>
-              <Text style={styles.introCardBody}>Full name</Text>
-              <Text style={styles.introCardBody}>Date of birth</Text>
-              <Text style={styles.introCardBody}>Last 4 of Social Security number</Text>
-              <Text style={styles.introCardBody}>Phone number (optional)</Text>
-              <Text style={styles.introCardBody}>Email (optional)</Text>
-              <Text style={styles.introCardBody}>Mailing address</Text>
-              <Text style={styles.introCardFootnote}>Stored only on this device.</Text>
-            </View>
-          ) : null}
+          <View style={styles.introCard}>
+            <Text style={styles.introCardTitle}>What we will ask for</Text>
+            <Text style={styles.introCardBody}>Full name</Text>
+            <Text style={styles.introCardBody}>Date of birth</Text>
+            <Text style={styles.introCardBody}>Last 4 of Social Security number</Text>
+            <Text style={styles.introCardBody}>Phone number (optional)</Text>
+            <Text style={styles.introCardBody}>Email (optional)</Text>
+            <Text style={styles.introCardBody}>Mailing address</Text>
+            <Text style={styles.introCardFootnote}>Stored only on this device.</Text>
+          </View>
 
-          {currentStep === 1 ? (
-            <View style={styles.card}>
-              <View onLayout={registerFieldLayout('fullName')}>
-                <Text style={styles.fieldLabel}>Full name</Text>
+          <Pressable
+            onPress={dismissKeyboard}
+            disabled={!keyboardVisible}
+            style={styles.dismissArea}
+          />
+        </ScrollView>
+
+        <ScrollView
+          ref={(node) => {
+            stepScrollRefs.current[1] = node;
+          }}
+          style={[styles.page, { width }]}
+          contentContainerStyle={styles.scrollContent}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={dismissKeyboard}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
+          <Pressable onPress={dismissKeyboard} disabled={!keyboardVisible} style={styles.hero}>
+            <Text style={styles.eyebrow}>{steps[1].eyebrow}</Text>
+            <Text style={styles.title}>{steps[1].title}</Text>
+            <Text style={styles.subtitle}>{steps[1].body}</Text>
+          </Pressable>
+
+          <View style={styles.card}>
+            <View onLayout={registerFieldLayout(1, 'fullName')}>
+              <Text style={styles.fieldLabel}>Full name</Text>
+              <View style={styles.inputShell}>
                 <TextInput
+                  ref={registerInputRef('fullName')}
                   value={form.fullName}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
-                  onFocus={() => focusField('fullName')}
+                  onFocus={() => focusField(1, 'fullName')}
                   onBlur={() => blurField('fullName')}
                   placeholder="Jane Doe"
                   placeholderTextColor={theme.colors.inputPlaceholder}
@@ -338,11 +424,20 @@ export default function BioSetupScreen() {
                   textContentType="name"
                   returnKeyType="next"
                 />
+                {!keyboardVisible ? (
+                  <Pressable
+                    onPress={() => activateField('fullName')}
+                    style={styles.inputActivationOverlay}
+                  />
+                ) : null}
               </View>
+            </View>
 
-              <View onLayout={registerFieldLayout('dateOfBirth')}>
-                <Text style={styles.fieldLabel}>Date of birth</Text>
+            <View onLayout={registerFieldLayout(1, 'dateOfBirth')}>
+              <Text style={styles.fieldLabel}>Date of birth</Text>
+              <View style={styles.inputShell}>
                 <TextInput
+                  ref={registerInputRef('dateOfBirth')}
                   value={form.dateOfBirth}
                   onChangeText={(value) =>
                     setForm((prev) => ({
@@ -350,7 +445,7 @@ export default function BioSetupScreen() {
                       dateOfBirth: formatDateOfBirthInput(value),
                     }))
                   }
-                  onFocus={() => focusField('dateOfBirth')}
+                  onFocus={() => focusField(1, 'dateOfBirth')}
                   onBlur={() => blurField('dateOfBirth')}
                   onSubmitEditing={dismissKeyboard}
                   placeholder="MM/DD/YYYY"
@@ -359,11 +454,20 @@ export default function BioSetupScreen() {
                   keyboardType="number-pad"
                   textContentType="birthdate"
                 />
+                {!keyboardVisible ? (
+                  <Pressable
+                    onPress={() => activateField('dateOfBirth')}
+                    style={styles.inputActivationOverlay}
+                  />
+                ) : null}
               </View>
+            </View>
 
-              <View onLayout={registerFieldLayout('last4Ssn')}>
-                <Text style={styles.fieldLabel}>Last 4 of Social Security number</Text>
+            <View onLayout={registerFieldLayout(1, 'last4Ssn')}>
+              <Text style={styles.fieldLabel}>Last 4 of Social Security number</Text>
+              <View style={styles.inputShell}>
                 <TextInput
+                  ref={registerInputRef('last4Ssn')}
                   value={form.last4Ssn}
                   onChangeText={(value) =>
                     setForm((prev) => ({
@@ -371,7 +475,7 @@ export default function BioSetupScreen() {
                       last4Ssn: formatLast4SsnInput(value),
                     }))
                   }
-                  onFocus={() => focusField('last4Ssn')}
+                  onFocus={() => focusField(1, 'last4Ssn')}
                   onBlur={() => blurField('last4Ssn')}
                   placeholder="1234"
                   placeholderTextColor={theme.colors.inputPlaceholder}
@@ -379,14 +483,23 @@ export default function BioSetupScreen() {
                   keyboardType="number-pad"
                   maxLength={4}
                 />
+                {!keyboardVisible ? (
+                  <Pressable
+                    onPress={() => activateField('last4Ssn')}
+                    style={styles.inputActivationOverlay}
+                  />
+                ) : null}
               </View>
+            </View>
 
-              <View onLayout={registerFieldLayout('phoneNumber')}>
-                <Text style={styles.fieldLabel}>Phone number</Text>
+            <View onLayout={registerFieldLayout(1, 'phoneNumber')}>
+              <Text style={styles.fieldLabel}>Phone number</Text>
+              <View style={styles.inputShell}>
                 <TextInput
+                  ref={registerInputRef('phoneNumber')}
                   value={form.phoneNumber}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
-                  onFocus={() => focusField('phoneNumber')}
+                  onFocus={() => focusField(1, 'phoneNumber')}
                   onBlur={() => blurField('phoneNumber')}
                   placeholder="512 555 0123"
                   placeholderTextColor={theme.colors.inputPlaceholder}
@@ -396,14 +509,23 @@ export default function BioSetupScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
+                {!keyboardVisible ? (
+                  <Pressable
+                    onPress={() => activateField('phoneNumber')}
+                    style={styles.inputActivationOverlay}
+                  />
+                ) : null}
               </View>
+            </View>
 
-              <View onLayout={registerFieldLayout('email')}>
-                <Text style={styles.fieldLabel}>Email</Text>
+            <View onLayout={registerFieldLayout(1, 'email')}>
+              <Text style={styles.fieldLabel}>Email</Text>
+              <View style={styles.inputShell}>
                 <TextInput
+                  ref={registerInputRef('email')}
                   value={form.email}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
-                  onFocus={() => focusField('email')}
+                  onFocus={() => focusField(1, 'email')}
                   onBlur={() => blurField('email')}
                   placeholder="name@example.com"
                   placeholderTextColor={theme.colors.inputPlaceholder}
@@ -413,18 +535,50 @@ export default function BioSetupScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
+                {!keyboardVisible ? (
+                  <Pressable
+                    onPress={() => activateField('email')}
+                    style={styles.inputActivationOverlay}
+                  />
+                ) : null}
               </View>
             </View>
-          ) : null}
+          </View>
 
-          {currentStep === 2 ? (
-            <View style={styles.card}>
-              <View onLayout={registerFieldLayout('addressLine1')}>
-                <Text style={styles.fieldLabel}>Address line 1</Text>
+          <Pressable
+            onPress={dismissKeyboard}
+            disabled={!keyboardVisible}
+            style={styles.dismissArea}
+          />
+        </ScrollView>
+
+        <ScrollView
+          ref={(node) => {
+            stepScrollRefs.current[2] = node;
+          }}
+          style={[styles.page, { width }]}
+          contentContainerStyle={styles.scrollContent}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          onScrollBeginDrag={dismissKeyboard}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
+          <Pressable onPress={dismissKeyboard} disabled={!keyboardVisible} style={styles.hero}>
+            <Text style={styles.eyebrow}>{steps[2].eyebrow}</Text>
+            <Text style={styles.title}>{steps[2].title}</Text>
+            <Text style={styles.subtitle}>{steps[2].body}</Text>
+          </Pressable>
+
+          <View style={styles.card}>
+            <View onLayout={registerFieldLayout(2, 'addressLine1')}>
+              <Text style={styles.fieldLabel}>Address line 1</Text>
+              <View style={styles.inputShell}>
                 <TextInput
+                  ref={registerInputRef('addressLine1')}
                   value={form.addressLine1}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
-                  onFocus={() => focusField('addressLine1')}
+                  onFocus={() => focusField(2, 'addressLine1')}
                   onBlur={() => blurField('addressLine1')}
                   placeholder="123 Main St"
                   placeholderTextColor={theme.colors.inputPlaceholder}
@@ -432,14 +586,23 @@ export default function BioSetupScreen() {
                   autoCapitalize="words"
                   textContentType="streetAddressLine1"
                 />
+                {!keyboardVisible ? (
+                  <Pressable
+                    onPress={() => activateField('addressLine1')}
+                    style={styles.inputActivationOverlay}
+                  />
+                ) : null}
               </View>
+            </View>
 
-              <View onLayout={registerFieldLayout('addressLine2')}>
-                <Text style={styles.fieldLabel}>Address line 2</Text>
+            <View onLayout={registerFieldLayout(2, 'addressLine2')}>
+              <Text style={styles.fieldLabel}>Address line 2</Text>
+              <View style={styles.inputShell}>
                 <TextInput
+                  ref={registerInputRef('addressLine2')}
                   value={form.addressLine2}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
-                  onFocus={() => focusField('addressLine2')}
+                  onFocus={() => focusField(2, 'addressLine2')}
                   onBlur={() => blurField('addressLine2')}
                   placeholder="Apt 4B"
                   placeholderTextColor={theme.colors.inputPlaceholder}
@@ -447,15 +610,24 @@ export default function BioSetupScreen() {
                   autoCapitalize="words"
                   textContentType="streetAddressLine2"
                 />
+                {!keyboardVisible ? (
+                  <Pressable
+                    onPress={() => activateField('addressLine2')}
+                    style={styles.inputActivationOverlay}
+                  />
+                ) : null}
               </View>
+            </View>
 
-              <View style={styles.inlineRow}>
-                <View style={styles.inlineFieldWide} onLayout={registerFieldLayout('city')}>
-                  <Text style={styles.fieldLabel}>City</Text>
+            <View style={styles.inlineRow}>
+              <View style={styles.inlineFieldWide} onLayout={registerFieldLayout(2, 'city')}>
+                <Text style={styles.fieldLabel}>City</Text>
+                <View style={styles.inputShell}>
                   <TextInput
+                    ref={registerInputRef('city')}
                     value={form.city}
                     onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
-                    onFocus={() => focusField('city')}
+                    onFocus={() => focusField(2, 'city')}
                     onBlur={() => blurField('city')}
                     placeholder="Austin"
                     placeholderTextColor={theme.colors.inputPlaceholder}
@@ -463,14 +635,23 @@ export default function BioSetupScreen() {
                     autoCapitalize="words"
                     textContentType="addressCity"
                   />
+                  {!keyboardVisible ? (
+                    <Pressable
+                      onPress={() => activateField('city')}
+                      style={styles.inputActivationOverlay}
+                    />
+                  ) : null}
                 </View>
+              </View>
 
-                <View style={styles.inlineFieldNarrow} onLayout={registerFieldLayout('state')}>
-                  <Text style={styles.fieldLabel}>State</Text>
+              <View style={styles.inlineFieldNarrow} onLayout={registerFieldLayout(2, 'state')}>
+                <Text style={styles.fieldLabel}>State</Text>
+                <View style={styles.inputShell}>
                   <TextInput
+                    ref={registerInputRef('state')}
                     value={form.state}
                     onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
-                    onFocus={() => focusField('state')}
+                    onFocus={() => focusField(2, 'state')}
                     onBlur={() => blurField('state')}
                     placeholder="TX"
                     placeholderTextColor={theme.colors.inputPlaceholder}
@@ -479,12 +660,21 @@ export default function BioSetupScreen() {
                     textContentType="addressState"
                     maxLength={24}
                   />
+                  {!keyboardVisible ? (
+                    <Pressable
+                      onPress={() => activateField('state')}
+                      style={styles.inputActivationOverlay}
+                    />
+                  ) : null}
                 </View>
               </View>
+            </View>
 
-              <View onLayout={registerFieldLayout('postalCode')}>
-                <Text style={styles.fieldLabel}>Postal code</Text>
+            <View onLayout={registerFieldLayout(2, 'postalCode')}>
+              <Text style={styles.fieldLabel}>Postal code</Text>
+              <View style={styles.inputShell}>
                 <TextInput
+                  ref={registerInputRef('postalCode')}
                   value={form.postalCode}
                   onChangeText={(value) =>
                     setForm((prev) => ({
@@ -492,7 +682,7 @@ export default function BioSetupScreen() {
                       postalCode: value.replace(/[^\d-]/g, '').slice(0, 10),
                     }))
                   }
-                  onFocus={() => focusField('postalCode')}
+                  onFocus={() => focusField(2, 'postalCode')}
                   onBlur={() => blurField('postalCode')}
                   onSubmitEditing={dismissKeyboard}
                   placeholder="78701"
@@ -501,9 +691,15 @@ export default function BioSetupScreen() {
                   keyboardType="number-pad"
                   textContentType="postalCode"
                 />
+                {!keyboardVisible ? (
+                  <Pressable
+                    onPress={() => activateField('postalCode')}
+                    style={styles.inputActivationOverlay}
+                  />
+                ) : null}
               </View>
             </View>
-          ) : null}
+          </View>
 
           <Pressable
             onPress={dismissKeyboard}
@@ -511,7 +707,7 @@ export default function BioSetupScreen() {
             style={styles.dismissArea}
           />
         </ScrollView>
-      </GestureDetector>
+      </ScrollView>
 
       {!keyboardVisible ? (
         <View
@@ -612,6 +808,9 @@ const createStyles = createThemedStyles((theme) => ({
   scrollView: {
     flex: 1,
   },
+  page: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
@@ -691,6 +890,17 @@ const createStyles = createThemedStyles((theme) => ({
     paddingVertical: 13,
     color: theme.colors.text,
     fontSize: 16,
+  },
+  inputShell: {
+    position: 'relative',
+  },
+  inputActivationOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 16,
   },
   dismissArea: {
     flexGrow: 1,
