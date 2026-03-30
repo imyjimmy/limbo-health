@@ -19,12 +19,15 @@ import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 import { useBioProfile } from '../providers/BioProfileProvider';
 import { useAuthContext } from '../providers/AuthProvider';
 import {
+  shouldShowBioSetupDoneButton,
+  validateBioSetupStep,
+  type BioSetupDoneFieldKey,
+} from '../core/bio/setupValidation';
+import {
   emptyBioProfile,
   formatDateOfBirthInput,
   formatLast4SsnInput,
   validateBioProfile,
-  validateBioProfileAddress,
-  validateBioProfileBasicDetails,
   type BioProfile,
 } from '../types/bio';
 
@@ -47,12 +50,6 @@ type BioFieldKey =
 function readParam(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
-}
-
-function validateStep(step: number, profile: BioProfile): string | null {
-  if (step === 1) return validateBioProfileBasicDetails(profile);
-  if (step === 2) return validateBioProfileAddress(profile);
-  return null;
 }
 
 export default function BioSetupScreen() {
@@ -208,9 +205,21 @@ export default function BioSetupScreen() {
     [dismissKeyboard, goToStep],
   );
 
+  const getDoneKeyboardState = useCallback(
+    (field: BioSetupDoneFieldKey) => {
+      const shouldShowDone = shouldShowBioSetupDoneButton(field, form);
+      return {
+        returnKeyType: shouldShowDone ? 'done' : 'default',
+        inputAccessoryViewButtonLabel:
+          Platform.OS === 'ios' && shouldShowDone ? 'Done' : undefined,
+      } as const;
+    },
+    [form],
+  );
+
   const validateStepBeforeAdvance = useCallback(
     (stepIndex: number) => {
-      const validationError = validateStep(stepIndex, form);
+      const validationError = validateBioSetupStep(stepIndex, form);
       if (validationError) {
         Alert.alert('Incomplete Personal Info', validationError);
         return false;
@@ -282,6 +291,12 @@ export default function BioSetupScreen() {
     }
     transitionToStep(targetStep);
   };
+
+  const dateOfBirthDoneKeyboardState = getDoneKeyboardState('dateOfBirth');
+  const last4SsnDoneKeyboardState = getDoneKeyboardState('last4Ssn');
+  const phoneNumberDoneKeyboardState = getDoneKeyboardState('phoneNumber');
+  const emailDoneKeyboardState = getDoneKeyboardState('email');
+  const postalCodeDoneKeyboardState = getDoneKeyboardState('postalCode');
 
   useEffect(() => {
     pagerRef.current?.scrollTo({ x: width * currentStep, animated: false });
@@ -413,6 +428,7 @@ export default function BioSetupScreen() {
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('fullName')}
+                  testID="bio-setup-full-name-input"
                   value={form.fullName}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, fullName: value }))}
                   onFocus={() => focusField(1, 'fullName')}
@@ -438,6 +454,7 @@ export default function BioSetupScreen() {
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('dateOfBirth')}
+                  testID="bio-setup-date-of-birth-input"
                   value={form.dateOfBirth}
                   onChangeText={(value) =>
                     setForm((prev) => ({
@@ -452,6 +469,10 @@ export default function BioSetupScreen() {
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   keyboardType="number-pad"
+                  returnKeyType={dateOfBirthDoneKeyboardState.returnKeyType}
+                  inputAccessoryViewButtonLabel={
+                    dateOfBirthDoneKeyboardState.inputAccessoryViewButtonLabel
+                  }
                   textContentType="birthdate"
                 />
                 {!keyboardVisible ? (
@@ -468,6 +489,7 @@ export default function BioSetupScreen() {
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('last4Ssn')}
+                  testID="bio-setup-last4-ssn-input"
                   value={form.last4Ssn}
                   onChangeText={(value) =>
                     setForm((prev) => ({
@@ -477,10 +499,15 @@ export default function BioSetupScreen() {
                   }
                   onFocus={() => focusField(1, 'last4Ssn')}
                   onBlur={() => blurField('last4Ssn')}
+                  onSubmitEditing={dismissKeyboard}
                   placeholder="1234"
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   keyboardType="number-pad"
+                  returnKeyType={last4SsnDoneKeyboardState.returnKeyType}
+                  inputAccessoryViewButtonLabel={
+                    last4SsnDoneKeyboardState.inputAccessoryViewButtonLabel
+                  }
                   maxLength={4}
                 />
                 {!keyboardVisible ? (
@@ -497,14 +524,20 @@ export default function BioSetupScreen() {
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('phoneNumber')}
+                  testID="bio-setup-phone-number-input"
                   value={form.phoneNumber}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
                   onFocus={() => focusField(1, 'phoneNumber')}
                   onBlur={() => blurField('phoneNumber')}
+                  onSubmitEditing={dismissKeyboard}
                   placeholder="512 555 0123"
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   keyboardType="phone-pad"
+                  returnKeyType={phoneNumberDoneKeyboardState.returnKeyType}
+                  inputAccessoryViewButtonLabel={
+                    phoneNumberDoneKeyboardState.inputAccessoryViewButtonLabel
+                  }
                   textContentType="telephoneNumber"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -523,14 +556,17 @@ export default function BioSetupScreen() {
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('email')}
+                  testID="bio-setup-email-input"
                   value={form.email}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
                   onFocus={() => focusField(1, 'email')}
                   onBlur={() => blurField('email')}
+                  onSubmitEditing={dismissKeyboard}
                   placeholder="name@example.com"
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   keyboardType="email-address"
+                  returnKeyType={emailDoneKeyboardState.returnKeyType}
                   textContentType="emailAddress"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -576,6 +612,7 @@ export default function BioSetupScreen() {
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('addressLine1')}
+                  testID="bio-setup-address-line1-input"
                   value={form.addressLine1}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
                   onFocus={() => focusField(2, 'addressLine1')}
@@ -600,6 +637,7 @@ export default function BioSetupScreen() {
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('addressLine2')}
+                  testID="bio-setup-address-line2-input"
                   value={form.addressLine2}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
                   onFocus={() => focusField(2, 'addressLine2')}
@@ -625,6 +663,7 @@ export default function BioSetupScreen() {
                 <View style={styles.inputShell}>
                   <TextInput
                     ref={registerInputRef('city')}
+                    testID="bio-setup-city-input"
                     value={form.city}
                     onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
                     onFocus={() => focusField(2, 'city')}
@@ -649,6 +688,7 @@ export default function BioSetupScreen() {
                 <View style={styles.inputShell}>
                   <TextInput
                     ref={registerInputRef('state')}
+                    testID="bio-setup-state-input"
                     value={form.state}
                     onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
                     onFocus={() => focusField(2, 'state')}
@@ -675,6 +715,7 @@ export default function BioSetupScreen() {
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('postalCode')}
+                  testID="bio-setup-postal-code-input"
                   value={form.postalCode}
                   onChangeText={(value) =>
                     setForm((prev) => ({
@@ -689,6 +730,10 @@ export default function BioSetupScreen() {
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.input}
                   keyboardType="number-pad"
+                  returnKeyType={postalCodeDoneKeyboardState.returnKeyType}
+                  inputAccessoryViewButtonLabel={
+                    postalCodeDoneKeyboardState.inputAccessoryViewButtonLabel
+                  }
                   textContentType="postalCode"
                 />
                 {!keyboardVisible ? (
@@ -734,6 +779,7 @@ export default function BioSetupScreen() {
           <Text style={styles.paginationHint}>Swipe between steps or tap the dots.</Text>
 
           <Pressable
+            testID="bio-setup-primary-action"
             onPress={handleNext}
             disabled={saving}
             style={({ pressed }) => [

@@ -64,13 +64,24 @@ export function isValidLast4Ssn(value: string): boolean {
   return /^\d{4}$/.test(value.trim());
 }
 
+export function isValidPhoneNumber(value: string): boolean {
+  const digits = value.replace(/\D/g, '');
+  return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
+}
+
 export function validateBioProfileBasicDetails(profile: BioProfile): string | null {
   if (!profile.fullName.trim()) return 'Please enter your full name.';
   if (!isValidDateOfBirth(profile.dateOfBirth.trim())) return 'Please enter a valid date of birth.';
   if (!isValidLast4Ssn(profile.last4Ssn)) {
     return 'Please enter the last 4 digits of your Social Security number.';
   }
-  if (profile.email.trim() && !SIMPLE_EMAIL_PATTERN.test(profile.email.trim())) {
+  if (!isValidPhoneNumber(profile.phoneNumber)) {
+    return 'Please enter a valid phone number.';
+  }
+  if (!profile.email.trim()) {
+    return 'Please enter your email address.';
+  }
+  if (!SIMPLE_EMAIL_PATTERN.test(profile.email.trim())) {
     return 'Please enter a valid email address.';
   }
   return null;
@@ -95,6 +106,8 @@ export function isBioProfileComplete(profile: BioProfile | null | undefined): pr
     profile.fullName.trim().length > 0 &&
     isValidDateOfBirth(profile.dateOfBirth) &&
     isValidLast4Ssn(profile.last4Ssn) &&
+    isValidPhoneNumber(profile.phoneNumber) &&
+    SIMPLE_EMAIL_PATTERN.test(profile.email.trim()) &&
     profile.addressLine1.trim().length > 0 &&
     profile.city.trim().length > 0 &&
     profile.state.trim().length > 0 &&
