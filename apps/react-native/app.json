@@ -16,7 +16,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "2",
+      "buildNumber": "4",
       "bundleIdentifier": "com.limbohealth.mobile",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
