@@ -208,8 +208,8 @@ export default function RecordsRequestScreen() {
         if (!cancelled) {
           setSystems(
             [...results].sort((left, right) => {
-              const leftHasLogo = hasHospitalSystemLogo(left.name);
-              const rightHasLogo = hasHospitalSystemLogo(right.name);
+              const leftHasLogo = hasHospitalSystemLogo(left.name, left.domain);
+              const rightHasLogo = hasHospitalSystemLogo(right.name, right.domain);
 
               if (leftHasLogo !== rightHasLogo) {
                 return leftHasLogo ? -1 : 1;
@@ -866,7 +866,12 @@ export default function RecordsRequestScreen() {
                             pressed && styles.systemCardPressed,
                           ]}
                         >
-                          <HospitalSystemLogo systemName={system.name} width={92} height={44} />
+                          <HospitalSystemLogo
+                            systemName={system.name}
+                            systemDomain={system.domain}
+                            width={92}
+                            height={44}
+                          />
                           <View style={styles.systemTextWrap}>
                             <Text style={styles.systemName}>{system.name}</Text>
                             <Text style={styles.systemMeta}>
@@ -890,7 +895,12 @@ export default function RecordsRequestScreen() {
             {selectedSystem && (
               <View style={styles.selectionSummary}>
                 <View style={styles.selectionSystemPreview}>
-                  <HospitalSystemLogo systemName={selectedSystem.name} width={92} height={44} />
+                  <HospitalSystemLogo
+                    systemName={selectedSystem.name}
+                    systemDomain={selectedSystem.domain}
+                    width={92}
+                    height={44}
+                  />
                   <View style={styles.systemTextWrap}>
                     <Text style={styles.selectionSummaryName}>{selectedSystem.name}</Text>
                     <Text style={styles.systemMeta}>

@@ -18,6 +18,44 @@ const MONOGRAM_STOP_WORDS = new Set([
   'international',
 ]);
 
+function normalizeLookupName(value: string): string {
+  return String(value || '')
+    .trim()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .toLowerCase()
+    .trim();
+}
+
+function normalizeDomain(value?: string | null): string | null {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/.*$/, '');
+
+  return normalized || null;
+}
+
+const LOGOS_BY_NORMALIZED_NAME = new Map<string, TexasHospitalLogo>();
+const LOGOS_BY_NORMALIZED_DOMAIN = new Map<string, TexasHospitalLogo>();
+
+for (const logo of TEXAS_HOSPITAL_LOGOS) {
+  const normalizedName = normalizeLookupName(logo.systemName);
+  if (normalizedName && !LOGOS_BY_NORMALIZED_NAME.has(normalizedName)) {
+    LOGOS_BY_NORMALIZED_NAME.set(normalizedName, logo);
+  }
+
+  const normalizedDomain = normalizeDomain(logo.domain);
+  if (normalizedDomain && !LOGOS_BY_NORMALIZED_DOMAIN.has(normalizedDomain)) {
+    LOGOS_BY_NORMALIZED_DOMAIN.set(normalizedDomain, logo);
+  }
+}
+
 function getSystemMonogram(systemName: string): string {
   const parts = systemName
     .replace(/[()]/g, ' ')
@@ -31,30 +69,48 @@ function getSystemMonogram(systemName: string): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-export function findHospitalSystemLogo(systemName: string): TexasHospitalLogo | null {
-  const normalized = systemName.trim().toLowerCase();
-  return TEXAS_HOSPITAL_LOGOS.find(
-    (logo) => logo.systemName.trim().toLowerCase() === normalized,
-  ) || null;
+export function findHospitalSystemLogo(
+  systemName: string,
+  systemDomain?: string | null,
+): TexasHospitalLogo | null {
+  const normalizedName = normalizeLookupName(systemName);
+  if (normalizedName && LOGOS_BY_NORMALIZED_NAME.has(normalizedName)) {
+    return LOGOS_BY_NORMALIZED_NAME.get(normalizedName) || null;
+  }
+
+  const normalizedDomain = normalizeDomain(systemDomain);
+  if (normalizedDomain && LOGOS_BY_NORMALIZED_DOMAIN.has(normalizedDomain)) {
+    return LOGOS_BY_NORMALIZED_DOMAIN.get(normalizedDomain) || null;
+  }
+
+  return null;
 }
 
-export function hasHospitalSystemLogo(systemName: string): boolean {
-  return Boolean(findHospitalSystemLogo(systemName));
+export function hasHospitalSystemLogo(
+  systemName: string,
+  systemDomain?: string | null,
+): boolean {
+  return Boolean(findHospitalSystemLogo(systemName, systemDomain));
 }
 
 interface HospitalSystemLogoProps {
   systemName: string;
+  systemDomain?: string | null;
   width?: number;
   height?: number;
 }
 
 export function HospitalSystemLogo({
   systemName,
+  systemDomain,
   width = 120,
   height = 56,
 }: HospitalSystemLogoProps) {
   const [failed, setFailed] = useState(false);
-  const logo = useMemo(() => findHospitalSystemLogo(systemName), [systemName]);
+  const logo = useMemo(
+    () => findHospitalSystemLogo(systemName, systemDomain),
+    [systemDomain, systemName],
+  );
   const styles = useThemedStyles(createStyles);
 
   if (!logo || failed) {
