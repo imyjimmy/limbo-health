@@ -245,7 +245,7 @@ function mapAutofillBinding(binding: ApiAutofillBinding): RecordsWorkflowAutofil
 
 export async function fetchHospitalSystems(
   searchQuery = '',
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; stateCode?: string },
 ): Promise<HospitalSystemOption[]> {
   const trimmedQuery = normalizeHospitalSystemSearchQuery(searchQuery);
   const params = new URLSearchParams();
@@ -259,7 +259,11 @@ export async function fetchHospitalSystems(
     `/hospital-systems${suffix ? `?${suffix}` : ''}`,
     requestInit,
   );
-  return data.results.map(mapHospitalSystem);
+  const normalizedStateCode = options?.stateCode?.trim().toUpperCase() || null;
+
+  return data.results
+    .map(mapHospitalSystem)
+    .filter((system) => !normalizedStateCode || system.state.toUpperCase() === normalizedStateCode);
 }
 
 export async function fetchRecordsRequestPacket(systemId: string): Promise<RecordsRequestPacket> {

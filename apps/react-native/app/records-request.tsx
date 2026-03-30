@@ -67,6 +67,9 @@ import type {
 
 type RecordsRequestInstruction = RecordsRequestPacket['instructions'][number];
 
+const RECORDS_REQUEST_LAUNCH_STATE_CODE = 'TX';
+const RECORDS_REQUEST_LAUNCH_STATE_NAME = 'Texas';
+
 function buildFormKey(form: RecordsWorkflowForm): string {
   return form.cachedContentUrl || form.url;
 }
@@ -134,7 +137,7 @@ function getWorkflowStepDescription(
     case 'bio':
       return "We'll use your saved info, guide you through any extra form questions, add ID if needed, and prepare a PDF you can review or share.";
     case 'hospital':
-      return 'Search the hospital system you want to request records from.';
+      return `Search the ${RECORDS_REQUEST_LAUNCH_STATE_NAME} hospital system you want to request records from.`;
     case 'question':
       return step.question.helpText || '';
     case 'id':
@@ -204,6 +207,7 @@ export default function RecordsRequestScreen() {
       try {
         const results = await fetchHospitalSystems(debouncedSearchQuery, {
           signal: abortController.signal,
+          stateCode: RECORDS_REQUEST_LAUNCH_STATE_CODE,
         });
         if (!cancelled) {
           setSystems(
@@ -835,7 +839,7 @@ export default function RecordsRequestScreen() {
                 <TextInput
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  placeholder="Search supported hospital systems"
+                  placeholder={`Search supported ${RECORDS_REQUEST_LAUNCH_STATE_NAME} hospital systems`}
                   placeholderTextColor={theme.colors.inputPlaceholder}
                   style={styles.searchInput}
                   autoCapitalize="words"
@@ -884,7 +888,8 @@ export default function RecordsRequestScreen() {
 
                     {systems.length === 0 && (
                       <Text style={styles.emptyStateText}>
-                        No supported hospital systems matched that search yet.
+                        No supported {RECORDS_REQUEST_LAUNCH_STATE_NAME} hospital systems matched that
+                        search yet.
                       </Text>
                     )}
                   </View>
