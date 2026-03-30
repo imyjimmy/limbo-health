@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Alert,
   Pressable,
   ScrollView,
@@ -197,6 +198,7 @@ export default function WelcomeScreen() {
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const scrollRef = useRef<ScrollView>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
   const { loginWithGoogle, loginWithStoredNostr, hasStoredNostrKey } = useAuthContext();
   const { request, response, promptAsync } = useGoogleAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -251,16 +253,42 @@ export default function WelcomeScreen() {
     scrollRef.current?.scrollTo({ x: width * index, animated: true });
   };
 
-  const renderNostrEntryPoint = () => {
+  const finalSlideProgress = scrollX.interpolate({
+    inputRange: [width, width * 2],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+  const nextButtonOpacity = finalSlideProgress.interpolate({
+    inputRange: [0, 0.65, 1],
+    outputRange: [1, 0.24, 0],
+    extrapolate: 'clamp',
+  });
+  const nextButtonTranslateX = finalSlideProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -44],
+    extrapolate: 'clamp',
+  });
+  const finalSlideEntryOpacity = finalSlideProgress.interpolate({
+    inputRange: [0, 0.28, 1],
+    outputRange: [0, 0.18, 1],
+    extrapolate: 'clamp',
+  });
+  const finalSlideEntryTranslateX = finalSlideProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [40, 0],
+    extrapolate: 'clamp',
+  });
+
+  const renderNostrEntryPoint = (interactive: boolean) => {
     if (hasStoredNostrKey) {
       return (
         <Pressable
           style={[styles.nostrButton, nostrLoading && styles.authButtonDisabled]}
           onPress={handleNostrLogin}
-          disabled={nostrLoading}
+          disabled={!interactive || nostrLoading}
         >
           {nostrLoading ? (
-            <ActivityIndicator color={theme.colors.accentForeground} />
+            <ActivityIndicator color={theme.colors.accent} />
           ) : (
             <Text style={styles.nostrButtonText}>Sign in with Nostr</Text>
           )}
@@ -272,6 +300,7 @@ export default function WelcomeScreen() {
       <Pressable
         style={styles.nostrButton}
         onPress={() => router.push('/(auth)/import-key')}
+        disabled={!interactive}
       >
         <Text style={styles.nostrButtonText}>Sign in with Nostr</Text>
       </Pressable>
@@ -301,12 +330,16 @@ export default function WelcomeScreen() {
         </View>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: true },
+        )}
         onMomentumScrollEnd={(event) => {
           const nextSlide = Math.round(event.nativeEvent.contentOffset.x / width);
           setCurrentSlide(nextSlide);
@@ -351,7 +384,7 @@ export default function WelcomeScreen() {
                 have to fill out annoying forms? Take a picture and we'll fill it out for you.
               </Text>
               <Text style={styles.supportNote}>
-                Coverage will expand to all 50 States.
+                <Text style={styles.slideBodyEmphasis}>Texas First.</Text>{' '}Coverage will expand to all 50 States.
               </Text>
             </View>
 
@@ -375,11 +408,22 @@ export default function WelcomeScreen() {
             </Pressable>
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 18 }]}>
         <View style={styles.secondaryFooterSlot}>
-          {currentSlide === 2 ? renderNostrEntryPoint() : null}
+          <Animated.View
+            pointerEvents={currentSlide === 2 ? 'auto' : 'none'}
+            style={[
+              styles.secondaryFooterLayer,
+              {
+                opacity: finalSlideEntryOpacity,
+                transform: [{ translateX: finalSlideEntryTranslateX }],
+              },
+            ]}
+          >
+            {renderNostrEntryPoint(currentSlide === 2)}
+          </Animated.View>
         </View>
 
         <View style={styles.paginationRow}>
@@ -396,16 +440,36 @@ export default function WelcomeScreen() {
         </View>
 
         <View style={styles.footerActionSlot}>
-          {currentSlide < 2 ? (
+          <Animated.View
+            pointerEvents={currentSlide < 2 ? 'auto' : 'none'}
+            style={[
+              styles.footerActionLayer,
+              {
+                opacity: nextButtonOpacity,
+                transform: [{ translateX: nextButtonTranslateX }],
+              },
+            ]}
+          >
             <Pressable
               onPress={() => goToSlide(currentSlide + 1)}
               style={({ pressed }) => [styles.nextButton, pressed && styles.nextButtonPressed]}
             >
               <Text style={styles.nextButtonText}>Next</Text>
             </Pressable>
-          ) : (
+          </Animated.View>
+
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.footerActionLayer,
+              {
+                opacity: finalSlideEntryOpacity,
+                transform: [{ translateX: finalSlideEntryTranslateX }],
+              },
+            ]}
+          >
             <Text style={styles.footerNote}>Bio setup comes right after sign-in.</Text>
-          )}
+          </Animated.View>
         </View>
       </View>
     </View>
@@ -464,7 +528,6 @@ const createStyles = createThemedStyles((theme) => ({
     height: 292,
     borderRadius: 34,
     backgroundColor: theme.colors.surface,
-    padding: 18,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -507,11 +570,8 @@ const createStyles = createThemedStyles((theme) => ({
     marginTop: 26,
   },
   artVideoShell: {
-    flex: 1,
-    borderRadius: 28,
+    ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceElevated,
   },
   artVideo: {
@@ -767,7 +827,7 @@ const createStyles = createThemedStyles((theme) => ({
   },
   nostrButton: {
     alignSelf: 'center',
-    backgroundColor: theme.colors.accent,
+    backgroundColor: theme.colors.surface,
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 24,
@@ -777,7 +837,7 @@ const createStyles = createThemedStyles((theme) => ({
     borderColor: theme.colors.accent,
   },
   nostrButtonText: {
-    color: theme.colors.accentForeground,
+    color: theme.colors.accent,
     fontSize: 15,
     fontWeight: '600',
   },
@@ -787,11 +847,21 @@ const createStyles = createThemedStyles((theme) => ({
   },
   secondaryFooterSlot: {
     minHeight: 40,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryFooterLayer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   footerActionSlot: {
     minHeight: 56,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  footerActionLayer: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
   },
   paginationRow: {
