@@ -1628,11 +1628,6 @@ export default function PageScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroCard}>
-          <View style={styles.comingSoonCorner} pointerEvents="none">
-            <View style={styles.comingSoonRibbon}>
-              <Text style={styles.comingSoonRibbonText}>Coming Soon</Text>
-            </View>
-          </View>
           <Text style={styles.heroEyebrow}>Portal login helper</Text>
           <Text style={styles.heroTitle}>Your Medical Portals</Text>
           <Text style={styles.heroBody}>
@@ -1653,6 +1648,11 @@ export default function PageScreen() {
           >
             <Text style={styles.primaryButtonText}>Choose Hospital</Text>
           </Pressable>
+          <View style={styles.comingSoonCorner} pointerEvents="none">
+            <View style={styles.comingSoonRibbon}>
+              <Text style={styles.comingSoonRibbonText}>Coming Soon</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.sectionHeader}>
@@ -1698,6 +1698,7 @@ const createStyles = createThemedStyles((theme) => ({
     width: 110,
     height: 110,
     overflow: 'hidden',
+    zIndex: 3,
   },
   comingSoonRibbon: {
     position: 'absolute',
@@ -1711,6 +1712,7 @@ const createStyles = createThemedStyles((theme) => ({
     borderWidth: 1,
     borderColor: theme.colors.warning,
     transform: [{ rotate: '45deg' }],
+    zIndex: 4,
   },
   comingSoonRibbonText: {
     color: theme.colors.warning,
