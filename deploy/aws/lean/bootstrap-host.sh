@@ -71,10 +71,27 @@ mkdir -p \
   "$LIMBO_DATA_DIR/repos" \
   "$LIMBO_DATA_DIR/users" \
   "$LIMBO_DATA_DIR/uploads" \
-  "$LIMBO_DATA_DIR/records-raw" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/accepted-forms" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/captured-forms" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/data-intake" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/hospital-submission-requirements" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/internal/seed-scopes" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/internal/triage-decisions" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/parsed" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/published-templates" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/question-mappings" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/state-runs" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/system-logos" \
+  "$LIMBO_DATA_DIR/records-workflow-storage/targeted-pages" \
   "$LIMBO_DATA_DIR/caddy-data" \
   "$LIMBO_DATA_DIR/caddy-config" \
   "$LIMBO_DATA_DIR/backups"
+
+ln -sfn accepted-forms "$LIMBO_DATA_DIR/records-workflow-storage/raw"
+ln -sfn accepted-forms "$LIMBO_DATA_DIR/records-workflow-storage/source-documents"
+ln -sfn question-mappings "$LIMBO_DATA_DIR/records-workflow-storage/questions"
+ln -sfn hospital-submission-requirements "$LIMBO_DATA_DIR/records-workflow-storage/workflows"
+ln -sfn internal/triage-decisions "$LIMBO_DATA_DIR/records-workflow-storage/triage"
 
 sudo chown -R "$(id -u):$(id -g)" "$LIMBO_DATA_DIR"
 
@@ -119,6 +136,6 @@ Host bootstrap complete.
 Next steps:
 1. Verify Docker is running.
 2. Run the MySQL-to-Postgres import if you are migrating existing auth/scheduler data.
-3. Sync repos, uploads, and records raw storage into $LIMBO_DATA_DIR.
+3. Sync repos, users, uploads, and records-workflow storage into $LIMBO_DATA_DIR.
 4. Run ./deploy/aws/lean/deploy.sh
 EOF

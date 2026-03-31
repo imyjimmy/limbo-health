@@ -36,6 +36,7 @@ Persistent data resources live in the separate data stack at [infra/aws/lean/dat
 - persistent data volume ID
 - persistent backup/artifact S3 bucket name
 - application secrets already synced to SSM Parameter Store
+- current backend services are `edge`, `frontend`, `auth-api`, `mgit-api`, `scheduler-api`, `records-workflow-api`, and `records-workflow-postgres`
 
 ## Apply
 
@@ -82,13 +83,24 @@ cd /opt/limbo-health
 ./deploy/aws/lean/deploy.sh
 ```
 
-## Transitional Reality
+## Current Backend Shape
 
-The current application code still uses MySQL for `auth-api` and `scheduler-api`, so the host-side deployment currently runs both:
+The checked-in lean deployment is now aligned around one shared PostgreSQL container:
 
-- MySQL
-- PostgreSQL
+- `records-workflow-postgres`
+- `auth-api`
+- `mgit-api`
+- `scheduler-api`
+- `records-workflow-api`
+- `frontend`
+- `edge`
 
-That is the transitional lean deployment.
+The persistent EBS volume is expected to hold:
 
-Once the app is ported to PostgreSQL, you can shrink the host from `t4g.large` toward `t4g.medium` and remove MySQL from the Compose stack.
+- `records-workflow-postgres`
+- `repos`
+- `users`
+- `uploads`
+- `records-workflow-storage`
+
+The default host size in this Terraform stack therefore starts at `t4g.medium`. If traffic, PDF processing, or crawl workloads grow beyond that, resize upward.

@@ -1,6 +1,6 @@
 # Terraform: AWS Deployment for `records-workflow-api`
 
-This Terraform stack deploys a Phase-0-ready AWS environment for `apps/records-workflow-api`.
+This Terraform stack deploys a Phase-0-ready AWS environment for `apps/records-workflow-api` only. It does not model the full Limbo backend stack under `infra/aws/lean`.
 
 ## What it provisions
 
@@ -9,7 +9,7 @@ This Terraform stack deploys a Phase-0-ready AWS environment for `apps/records-w
 - ECS Cluster + Fargate Service for `records-workflow-api`
 - ECR repository for image publishing
 - RDS PostgreSQL in private subnets
-- EFS (mounted at `/app/storage/raw`) for persistent crawler raw snapshots
+- EFS (mounted at `/app/storage`) for persistent records-workflow artifacts
 - Secrets Manager secret for `DATABASE_URL`
 - CloudWatch Logs for API and crawler tasks
 - Optional EventBridge scheduled crawl task (`npm run crawl`)

@@ -22,8 +22,7 @@ That was the wrong emphasis for this project.
 The current repo does have multiple services and significant filesystem needs:
 - `mgit-api` needs writable repo storage
 - `scheduler-api` serves uploads
-- `records-workflow-api` serves cached PDFs and HTML from disk
-- the current production wiring uses both MySQL and PostgreSQL
+- `records-workflow-api` serves a broader on-disk storage tree of accepted forms, parsed artifacts, templates, and targeted pages
 
 But none of that automatically means Limbo Health should begin on:
 - ECS/Fargate
@@ -46,15 +45,15 @@ From the codebase today:
 - `records-workflow-api`
 - `frontend`
 - `gateway`
-- `mysql`
 - `records-workflow-postgres`
 
 The current production composition is visible in [docker-compose.production.yml](/Users/imyjimmy/dev/pleb-emr/limbo-health/docker-compose.production.yml).
 
 ### 3.2 Current database reality
-Today the repo is split across two database engines:
-- `auth-api` and `scheduler-api` use MySQL
-- `records-workflow-api` uses PostgreSQL
+Today the checked-in runtime is aligned on one shared PostgreSQL database:
+- `auth-api` uses PostgreSQL through the shared compat layer
+- `scheduler-api` uses PostgreSQL through the shared compat layer
+- `records-workflow-api` uses PostgreSQL natively
 
 Evidence:
 - [server.js](/Users/imyjimmy/dev/pleb-emr/limbo-health/apps/auth-api/server.js)
@@ -81,13 +80,15 @@ So this spec assumes a lean target state of:
 ### 3.4 Filesystem requirements we must preserve
 Limbo Health currently has real disk-backed needs:
 - MGit repositories
+- MGit user metadata
 - scheduler uploads
-- records-workflow raw crawler artifacts
+- records-workflow pipeline artifacts under `/app/storage`
 
 Relevant runtime paths:
 - `/repos`
+- `/app/users`
 - `/app/uploads`
-- `/app/storage/raw`
+- `/app/storage`
 
 These are currently easier and cheaper to keep on one EC2-attached EBS volume than to split across EFS or object storage on day 1.
 
@@ -144,17 +145,19 @@ Attach one gp3 EBS volume to the instance and mount it at a stable host path suc
 Suggested directory layout:
 
 ```text
-/srv/limbo-data/postgres
+/srv/limbo-data/records-workflow-postgres
 /srv/limbo-data/repos
+/srv/limbo-data/users
 /srv/limbo-data/uploads
-/srv/limbo-data/records-raw
+/srv/limbo-data/records-workflow-storage
 ```
 
 Container mounts:
-- Postgres data -> `/srv/limbo-data/postgres`
+- Postgres data -> `/srv/limbo-data/records-workflow-postgres`
 - MGit repos -> `/srv/limbo-data/repos`
+- MGit user metadata -> `/srv/limbo-data/users`
 - scheduler uploads -> `/srv/limbo-data/uploads`
-- records raw storage -> `/srv/limbo-data/records-raw`
+- records-workflow storage -> `/srv/limbo-data/records-workflow-storage`
 
 Why EBS and not EFS on day 1:
 - cheaper
@@ -166,18 +169,7 @@ Why EBS and not EFS on day 1:
 Target state:
 - one PostgreSQL instance running on the EC2 host as a container
 
-This implies a small application refactor:
-- migrate `auth-api` and `scheduler-api` off MySQL
-- unify the app onto PostgreSQL
-
 This is the cleanest way to reach the lowest ongoing AWS cost.
-
-If that refactor is not ready yet, use a transitional shape:
-- same EC2 architecture
-- run both MySQL and PostgreSQL on the same host temporarily
-- remove MySQL after the app is ported
-
-That transitional shape is acceptable, but it is not the cheapest final target.
 
 ### 4.6 Public ingress and TLS
 Day-1 lean ingress:
@@ -205,8 +197,9 @@ Minimum backup set:
 - nightly `pg_dump`
 - nightly compressed backup of:
   - `/srv/limbo-data/repos`
+  - `/srv/limbo-data/users`
   - `/srv/limbo-data/uploads`
-  - `/srv/limbo-data/records-raw`
+  - `/srv/limbo-data/records-workflow-storage`
 - regular EBS snapshots
 
 Backups should be encrypted and retained with a simple lifecycle policy.
@@ -450,15 +443,16 @@ AWS assets added:
 Trigger metrics:
 - app compute must run on more than one instance
 - the same writable data must be mounted by multiple instances
-- repos/uploads/raw data outgrow practical single-volume operations
+- repos/uploads/records-workflow data outgrow practical single-volume operations
 
 Action:
 - move shared writable paths to `EFS`
 
 Likely directories:
 - `/repos`
+- `/app/users`
 - `/app/uploads`
-- `/app/storage/raw`
+- `/app/storage`
 
 AWS assets added:
 - `EFS`
@@ -542,7 +536,7 @@ These thresholds are judgment calls based on standard AWS operations practice an
 ### 10.4 Storage
 - investigate at `70%` EBS usage
 - take action before `85%`
-- reevaluate EBS-only storage if repos/uploads/raw growth or multi-instance requirements become real
+- reevaluate EBS-only storage if repos/uploads/records-workflow growth or multi-instance requirements become real
 
 ## 11. Sources Used For Cost Framing
 - [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/)

@@ -7,9 +7,10 @@ This directory contains the host-side assets for the single-EC2 AWS deployment d
 - the EC2 instance and EBS volume already exist
 - the repo is available on the host at `/opt/limbo-health`
 - the host was bootstrapped with Docker and SSM
-- application data is still in the current transitional state:
-  - MySQL for `auth-api` and `scheduler-api`
-  - PostgreSQL for `records-workflow-api`
+- the application runtime is aligned around one shared PostgreSQL database plus persistent filesystem assets for:
+  - `mgit-api` repos and users
+  - `scheduler-api` uploads
+  - `records-workflow-api` storage artifacts
 
 ## Files
 
@@ -55,11 +56,11 @@ AWS_PROFILE=limbo-prod AWS_REGION=us-east-1 ./deploy/aws/lean/apply-infrastructu
 ```
 
 3. Import or sync the persistent application data separately:
-   - MySQL dump if still in transitional dual-DB mode
    - records-workflow PostgreSQL dump
    - repo storage
+   - `users` storage for `mgit-api`
    - scheduler uploads
-   - records raw artifacts
+   - records-workflow storage tree
 
 ## Delete Flow
 
@@ -87,20 +88,18 @@ Application secrets required for core app behavior:
 - `GOOGLE_CLIENT_SECRET`
 
 Database secrets:
-- MySQL root password
-- MySQL app username/password
 - records-workflow PostgreSQL username/password
 
 Migration inputs:
-- current MySQL dump
 - current records-workflow PostgreSQL dump
 - current repo storage directory
 - current `users` directory for `mgit-api`
 - current scheduler uploads directory
-- current records-workflow raw corpus directory
+- current records-workflow storage directory
 
 Optional:
 - repository read access token or deploy key if the EC2 host will pull directly from GitHub
 - alert email for CloudWatch alarms
 - `ALBY_CLIENT_ID`, `ALBY_CLIENT_SECRET`, `NWC_CONNECTION_STRING`, and `ADMIN_NOSTR_PRIVATE_KEY` only if you want billing/payment flows
 - `BACKUP_S3_BUCKET` only if you want to run the included S3 backup scripts
+- source MySQL credentials only if you still need the one-time import script
