@@ -66,14 +66,30 @@ if [[ -n "$${DATA_DEVICE}" ]]; then
 fi
 
 mkdir -p \
-  "${data_mount_point}/mysql" \
   "${data_mount_point}/records-workflow-postgres" \
   "${data_mount_point}/repos" \
   "${data_mount_point}/users" \
   "${data_mount_point}/uploads" \
-  "${data_mount_point}/records-raw" \
+  "${data_mount_point}/records-workflow-storage/accepted-forms" \
+  "${data_mount_point}/records-workflow-storage/captured-forms" \
+  "${data_mount_point}/records-workflow-storage/data-intake" \
+  "${data_mount_point}/records-workflow-storage/hospital-submission-requirements" \
+  "${data_mount_point}/records-workflow-storage/internal/seed-scopes" \
+  "${data_mount_point}/records-workflow-storage/internal/triage-decisions" \
+  "${data_mount_point}/records-workflow-storage/parsed" \
+  "${data_mount_point}/records-workflow-storage/published-templates" \
+  "${data_mount_point}/records-workflow-storage/question-mappings" \
+  "${data_mount_point}/records-workflow-storage/state-runs" \
+  "${data_mount_point}/records-workflow-storage/system-logos" \
+  "${data_mount_point}/records-workflow-storage/targeted-pages" \
   "${data_mount_point}/caddy-data" \
   "${data_mount_point}/caddy-config" \
   "${data_mount_point}/backups"
+
+ln -sfn accepted-forms "${data_mount_point}/records-workflow-storage/raw"
+ln -sfn accepted-forms "${data_mount_point}/records-workflow-storage/source-documents"
+ln -sfn question-mappings "${data_mount_point}/records-workflow-storage/questions"
+ln -sfn hospital-submission-requirements "${data_mount_point}/records-workflow-storage/workflows"
+ln -sfn internal/triage-decisions "${data_mount_point}/records-workflow-storage/triage"
 
 chown -R ec2-user:ec2-user "${data_mount_point}" "${host_project_root}"

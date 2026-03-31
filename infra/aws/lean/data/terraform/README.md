@@ -8,6 +8,14 @@ This stack provisions the persistent resources that survive app-stack deletes.
 - one S3 bucket for backups and deployment artifacts
 - bucket encryption, versioning, public-access blocking, and lifecycle retention
 
+The EBS volume is intended to hold the current backend asset layout:
+
+- `records-workflow-postgres`
+- `repos`
+- `users`
+- `uploads`
+- `records-workflow-storage`
+
 ## Why This Exists
 
 The main app stack at [infra/aws/lean/terraform/README.md](/Users/imyjimmy/dev/pleb-emr/limbo-health/infra/aws/lean/terraform/README.md) should be disposable.

@@ -19,7 +19,7 @@ git ls-files -z --cached --modified | perl -0ne '
   for (split /\0/) {
     next if $_ eq q{};
     next if /^\.env(?:\..*)?$/;
-    next if m{^apps/records-workflow-api/storage/raw/};
+    next if m{^apps/records-workflow-api/storage/};
     next if m{^apps/scheduler-api/uploads/};
     next if m{^users/};
     next if m{^apps/mgit-api/users/};

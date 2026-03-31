@@ -17,9 +17,9 @@ variable "environment" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type for the lean deployment. Use t4g.large until MySQL is removed."
+  description = "EC2 instance type for the lean deployment. Default assumes the current Postgres-only backend layout."
   type        = string
-  default     = "t4g.large"
+  default     = "t4g.medium"
 }
 
 variable "vpc_cidr" {
@@ -59,7 +59,7 @@ variable "data_device_name" {
 }
 
 variable "data_mount_point" {
-  description = "Mount point for the persistent data volume."
+  description = "Mount point for the persistent data volume that stores Postgres, repos, users, uploads, and records-workflow assets."
   type        = string
   default     = "/srv/limbo-data"
 }

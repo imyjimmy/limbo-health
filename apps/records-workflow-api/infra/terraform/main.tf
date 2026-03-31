@@ -551,7 +551,20 @@ resource "aws_ecs_task_definition" "api" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.container_port) },
+        { name = "TARGETED_PAGES_STORAGE_DIR", value = "/app/storage/targeted-pages" },
+        { name = "CAPTURED_FORMS_STORAGE_DIR", value = "/app/storage/captured-forms" },
+        { name = "ACCEPTED_FORMS_STORAGE_DIR", value = "/app/storage/accepted-forms" },
+        { name = "HOSPITAL_SUBMISSION_REQUIREMENTS_STORAGE_DIR", value = "/app/storage/hospital-submission-requirements" },
+        { name = "QUESTION_MAPPING_STORAGE_DIR", value = "/app/storage/question-mappings" },
+        { name = "PUBLISHED_TEMPLATE_STORAGE_DIR", value = "/app/storage/published-templates" },
+        { name = "PARSED_STORAGE_DIR", value = "/app/storage/parsed" },
+        { name = "DATA_INTAKE_STORAGE_DIR", value = "/app/storage/data-intake" },
+        { name = "SEED_SCOPE_STORAGE_DIR", value = "/app/storage/internal/seed-scopes" },
+        { name = "TRIAGE_STORAGE_DIR", value = "/app/storage/internal/triage-decisions" },
         { name = "RAW_STORAGE_DIR", value = "/app/storage/raw" },
+        { name = "LEGACY_RAW_STORAGE_DIR", value = "/app/storage/raw" },
+        { name = "SOURCE_DOCUMENT_STORAGE_DIR", value = "/app/storage/source-documents" },
+        { name = "LEGACY_SOURCE_DOCUMENT_STORAGE_DIR", value = "/app/storage/source-documents" },
         { name = "CRAWL_STATE", value = "TX" }
       ]
       secrets = [
@@ -564,7 +577,7 @@ resource "aws_ecs_task_definition" "api" {
       mountPoints = [
         {
           sourceVolume  = "raw-storage"
-          containerPath = "/app/storage/raw"
+          containerPath = "/app/storage"
           readOnly      = false
         }
       ]
@@ -655,7 +668,20 @@ resource "aws_ecs_task_definition" "crawler" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.container_port) },
+        { name = "TARGETED_PAGES_STORAGE_DIR", value = "/app/storage/targeted-pages" },
+        { name = "CAPTURED_FORMS_STORAGE_DIR", value = "/app/storage/captured-forms" },
+        { name = "ACCEPTED_FORMS_STORAGE_DIR", value = "/app/storage/accepted-forms" },
+        { name = "HOSPITAL_SUBMISSION_REQUIREMENTS_STORAGE_DIR", value = "/app/storage/hospital-submission-requirements" },
+        { name = "QUESTION_MAPPING_STORAGE_DIR", value = "/app/storage/question-mappings" },
+        { name = "PUBLISHED_TEMPLATE_STORAGE_DIR", value = "/app/storage/published-templates" },
+        { name = "PARSED_STORAGE_DIR", value = "/app/storage/parsed" },
+        { name = "DATA_INTAKE_STORAGE_DIR", value = "/app/storage/data-intake" },
+        { name = "SEED_SCOPE_STORAGE_DIR", value = "/app/storage/internal/seed-scopes" },
+        { name = "TRIAGE_STORAGE_DIR", value = "/app/storage/internal/triage-decisions" },
         { name = "RAW_STORAGE_DIR", value = "/app/storage/raw" },
+        { name = "LEGACY_RAW_STORAGE_DIR", value = "/app/storage/raw" },
+        { name = "SOURCE_DOCUMENT_STORAGE_DIR", value = "/app/storage/source-documents" },
+        { name = "LEGACY_SOURCE_DOCUMENT_STORAGE_DIR", value = "/app/storage/source-documents" },
         { name = "CRAWL_STATE", value = "TX" }
       ]
       secrets = [
@@ -668,7 +694,7 @@ resource "aws_ecs_task_definition" "crawler" {
       mountPoints = [
         {
           sourceVolume  = "raw-storage"
-          containerPath = "/app/storage/raw"
+          containerPath = "/app/storage"
           readOnly      = false
         }
       ]

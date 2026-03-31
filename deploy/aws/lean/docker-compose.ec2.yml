@@ -115,6 +115,19 @@ services:
       NODE_ENV: production
       PORT: 3020
       DATABASE_URL: postgres://${RECORDS_WORKFLOW_DB_USER}:${RECORDS_WORKFLOW_DB_PASSWORD}@records-workflow-postgres:5432/${RECORDS_WORKFLOW_DB_NAME}
+      TARGETED_PAGES_STORAGE_DIR: /app/storage/targeted-pages
+      CAPTURED_FORMS_STORAGE_DIR: /app/storage/captured-forms
+      ACCEPTED_FORMS_STORAGE_DIR: /app/storage/accepted-forms
+      HOSPITAL_SUBMISSION_REQUIREMENTS_STORAGE_DIR: /app/storage/hospital-submission-requirements
+      QUESTION_MAPPING_STORAGE_DIR: /app/storage/question-mappings
+      PUBLISHED_TEMPLATE_STORAGE_DIR: /app/storage/published-templates
+      PARSED_STORAGE_DIR: /app/storage/parsed
+      DATA_INTAKE_STORAGE_DIR: /app/storage/data-intake
+      SEED_SCOPE_STORAGE_DIR: /app/storage/internal/seed-scopes
+      TRIAGE_STORAGE_DIR: /app/storage/internal/triage-decisions
       RAW_STORAGE_DIR: /app/storage/raw
+      LEGACY_RAW_STORAGE_DIR: /app/storage/raw
+      SOURCE_DOCUMENT_STORAGE_DIR: /app/storage/source-documents
+      LEGACY_SOURCE_DOCUMENT_STORAGE_DIR: /app/storage/source-documents
     volumes:
-      - ${LIMBO_DATA_DIR}/records-raw:/app/storage/raw
+      - ${LIMBO_DATA_DIR}/records-workflow-storage:/app/storage
