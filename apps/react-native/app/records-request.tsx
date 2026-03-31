@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { IconPencil, IconUser } from '@tabler/icons-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -31,6 +32,7 @@ import {
   hasHospitalSystemLogo,
 } from '../components/records/HospitalSystemLogo';
 import { SignaturePad } from '../components/records/SignaturePad';
+import { TexasHospitalLogoMarquee } from '../components/records/TexasHospitalLogoMarquee';
 import { fetchHospitalSystems, fetchRecordsRequestPacket } from '../core/recordsWorkflow/api';
 import {
   buildRecordsRequestWorkflowSteps,
@@ -116,7 +118,7 @@ function extractEmailAddress(instruction: RecordsRequestInstruction | null): str
 function getWorkflowStepTitle(step: RecordsRequestWorkflowStep): string {
   switch (step.kind) {
     case 'bio':
-      return 'Build a ready-to-send request packet.';
+      return 'Build your request packet';
     case 'hospital':
       return 'Choose the hospital system';
     case 'question':
@@ -135,7 +137,7 @@ function getWorkflowStepDescription(
 ): string {
   switch (step.kind) {
     case 'bio':
-      return "We'll use your saved info, guide you through any extra form questions, add ID if needed, and prepare a PDF you can review or share.";
+      return "We'll prefill what we can, collect anything missing, and prepare a PDF you can review or share.";
     case 'hospital':
       return `Search the ${RECORDS_REQUEST_LAUNCH_STATE_NAME} hospital system you want to request records from.`;
     case 'question':
@@ -201,6 +203,13 @@ export default function RecordsRequestScreen() {
     const abortController = new AbortController();
 
     async function loadSystems() {
+      if (!debouncedSearchQuery) {
+        setSystems([]);
+        setSystemsError(null);
+        setSystemsLoading(false);
+        return;
+      }
+
       setSystemsLoading(true);
       setSystemsError(null);
 
@@ -392,6 +401,7 @@ export default function RecordsRequestScreen() {
     .filter(Boolean)
     .join(' • ');
   const useCompactProgressCard = currentWorkflowStep.kind === 'hospital' && Boolean(selectedSystem);
+  const showHospitalDiscoveryMarquee = normalizedSearchQuery.length === 0;
 
   useEffect(() => {
     if (rawCurrentStepIndex !== -1) return;
@@ -488,6 +498,7 @@ export default function RecordsRequestScreen() {
   const handleChangeSelectedSystem = () => {
     packetLoadRequestIdRef.current += 1;
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSearchQuery('');
     setSelectedSystem(null);
     setPacket(null);
     setPacketError(null);
@@ -500,6 +511,9 @@ export default function RecordsRequestScreen() {
     setSignatureFieldCount(0);
     setAutofillAnswers({});
     setSignature(null);
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
   };
 
   const searchIsPending = deferredSearchQuery !== debouncedSearchQuery;
@@ -632,6 +646,13 @@ export default function RecordsRequestScreen() {
     setSignature(null);
   };
 
+  const handleEditBio = () => {
+    router.push({
+      pathname: '/(tabs)/profile/medical-info',
+      params: { returnTo: '/records-request' },
+    });
+  };
+
   const goToStep = (nextStepId: string) => {
     startTransition(() => setCurrentStepId(nextStepId));
   };
@@ -655,6 +676,12 @@ export default function RecordsRequestScreen() {
       }
 
       goToStep('hospital');
+      return;
+    }
+
+    if (currentWorkflowStep.kind === 'hospital' && selectedSystem) {
+      handleChangeSelectedSystem();
+      goToStepByIndex(currentStepIndex - 1);
       return;
     }
 
@@ -792,43 +819,35 @@ export default function RecordsRequestScreen() {
 
         {currentWorkflowStep.kind === 'bio' && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Use your saved bio info</Text>
-            <Text style={styles.sectionBody}>
-              We&apos;ll use your saved profile to prefill the request packet on this device. If
-              anything changed, you can edit it before continuing.
-            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Edit your bio information"
+              hitSlop={8}
+              onPress={handleEditBio}
+              style={({ pressed }) => [styles.bioPill, pressed && styles.bioPillPressed]}
+            >
+              <View style={styles.bioPillContent}>
+                <View style={styles.bioPillIconWrap}>
+                  <IconUser size={18} color={theme.colors.approvalText} strokeWidth={2} />
+                </View>
+                <Text style={styles.bioPillText}>Your Bio</Text>
+              </View>
 
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryPlaceholderTitle}>My Bio Info</Text>
-              <Text style={styles.summaryPlaceholderBody}>
-                Ready to prefill your name, contact details, and mailing address without showing
-                them on this screen.
-              </Text>
-            </View>
+              <View style={styles.bioPillAction}>
+                <IconPencil size={18} color={theme.colors.approvalText} strokeWidth={2} />
+              </View>
+            </Pressable>
 
-            <View style={styles.actionRow}>
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: '/(tabs)/profile/medical-info',
-                    params: { returnTo: '/records-request' },
-                  })
-                }
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  pressed && styles.secondaryButtonPressed,
-                ]}
-              >
-                <Text style={styles.secondaryButtonText}>Edit Personal Info</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={goToNextStep}
-                style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-              >
-                <Text style={styles.primaryButtonText}>Continue</Text>
-              </Pressable>
-            </View>
+            <Pressable
+              onPress={goToNextStep}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                styles.fullWidthButton,
+                pressed && styles.primaryButtonPressed,
+              ]}
+            >
+              <Text style={styles.primaryButtonText}>Continue</Text>
+            </Pressable>
           </View>
         )}
 
@@ -846,7 +865,9 @@ export default function RecordsRequestScreen() {
                   returnKeyType="search"
                 />
 
-                {systemsLoading || searchIsPending ? (
+                {showHospitalDiscoveryMarquee ? (
+                  <TexasHospitalLogoMarquee />
+                ) : systemsLoading || searchIsPending ? (
                   <View style={styles.inlineLoading}>
                     <ActivityIndicator size="small" color={theme.colors.secondary} />
                     <Text style={styles.inlineLoadingText}>
@@ -1589,22 +1610,47 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 15,
     lineHeight: 22,
   },
-  summaryCard: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 20,
-    padding: 16,
-    gap: 8,
+  bioPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1.5,
+    borderColor: theme.colors.approvalBorder,
+    minHeight: 56,
   },
-  summaryPlaceholderTitle: {
-    color: theme.colors.text,
-    fontSize: 20,
+  bioPillPressed: {
+    opacity: 0.9,
+  },
+  bioPillContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bioPillIconWrap: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 16,
+    backgroundColor: 'transparent',
+  },
+  bioPillText: {
+    color: theme.colors.approvalText,
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: -0.3,
   },
-  summaryPlaceholderBody: {
-    color: theme.colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 22,
+  bioPillAction: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    flexShrink: 0,
   },
   actionRow: {
     flexDirection: 'row',

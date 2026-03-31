@@ -26,6 +26,9 @@ export interface ThemeColors {
   focusRing: string;
   success: string;
   successForeground: string;
+  approvalFill: string;
+  approvalBorder: string;
+  approvalText: string;
   warning: string;
   warningForeground: string;
   danger: string;
@@ -102,6 +105,9 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         focusRing: '#2563EB',
         success: '#16A34A',
         successForeground: '#FFFFFF',
+        approvalFill: '#DDF8C8',
+        approvalBorder: '#62B23E',
+        approvalText: '#1F4D1A',
         warning: '#D97706',
         warningForeground: '#FFFFFF',
         danger: '#E11D48',
@@ -162,6 +168,9 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         focusRing: '#6AA2FF',
         success: '#4ADE80',
         successForeground: '#081018',
+        approvalFill: '#1D4A1B',
+        approvalBorder: '#84D65D',
+        approvalText: '#E9F9DF',
         warning: '#FBBF24',
         warningForeground: '#081018',
         danger: '#FB7185',
@@ -226,6 +235,9 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         focusRing: '#ED654D',
         success: '#4D7A3D',
         successForeground: '#FFFFFF',
+        approvalFill: '#DDF8C8',
+        approvalBorder: '#62B23E',
+        approvalText: '#1F4D1A',
         warning: '#B97718',
         warningForeground: '#FFFFFF',
         danger: '#C14D39',
@@ -286,6 +298,9 @@ export const themeRegistry: Record<ThemeName, ThemeDefinition> = {
         focusRing: '#F28872',
         success: '#93C572',
         successForeground: '#242424',
+        approvalFill: '#1D4A1B',
+        approvalBorder: '#84D65D',
+        approvalText: '#E9F9DF',
         warning: '#F2C166',
         warningForeground: '#242424',
         danger: '#ED654D',
