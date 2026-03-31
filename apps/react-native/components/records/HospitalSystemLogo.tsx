@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Image, Text, View } from 'react-native';
 import { SvgUri } from 'react-native-svg';
 import {
-  PRESENTABLE_TEXAS_HOSPITAL_LOGOS,
+  TEXAS_HOSPITAL_LOGOS,
   type TexasHospitalLogo,
 } from '../../constants/texasHospitalLogos';
 import { createThemedStyles, useThemedStyles } from '../../theme';
@@ -44,7 +44,7 @@ function normalizeDomain(value?: string | null): string | null {
 const LOGOS_BY_NORMALIZED_NAME = new Map<string, TexasHospitalLogo>();
 const LOGOS_BY_NORMALIZED_DOMAIN = new Map<string, TexasHospitalLogo>();
 
-for (const logo of PRESENTABLE_TEXAS_HOSPITAL_LOGOS) {
+for (const logo of TEXAS_HOSPITAL_LOGOS) {
   const normalizedName = normalizeLookupName(logo.systemName);
   if (normalizedName && !LOGOS_BY_NORMALIZED_NAME.has(normalizedName)) {
     LOGOS_BY_NORMALIZED_NAME.set(normalizedName, logo);
