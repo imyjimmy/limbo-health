@@ -60,6 +60,7 @@ import type {
 
 const HERO_PILLS = ['Patient login', 'Records request'];
 const SESSION_RESUME_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+const PORTAL_WORKSPACE_COMING_SOON = true;
 
 type RouteParams = {
   systemName?: string | string[];
@@ -447,6 +448,7 @@ export default function PageScreen() {
     hasCredential: activeHasCredential,
     humanRequiredReason: sessionState?.humanRequiredReason ?? null,
   });
+  const handlePlaceholderPress = () => {};
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -610,6 +612,10 @@ export default function PageScreen() {
   }, [selectedSystem]);
 
   useEffect(() => {
+    if (PORTAL_WORKSPACE_COMING_SOON) {
+      return;
+    }
+
     if (!ownerKey || !bootstrapSelectionKey || !bootstrapSystemName || !bootstrapWorkspaceKind) {
       return;
     }
@@ -780,6 +786,10 @@ export default function PageScreen() {
   };
 
   const handleOpenPortal = async (portal: PortalProfile) => {
+    if (PORTAL_WORKSPACE_COMING_SOON) {
+      return;
+    }
+
     if (portal.kind === 'records_request_portal') {
       if (profileStore) {
         try {
@@ -810,6 +820,10 @@ export default function PageScreen() {
   };
 
   const handleAddPortal = async (nextPortal: PortalProfile | null) => {
+    if (PORTAL_WORKSPACE_COMING_SOON) {
+      return;
+    }
+
     if (!profileStore || !nextPortal) {
       return;
     }
@@ -840,6 +854,10 @@ export default function PageScreen() {
   };
 
   const handleDeletePortal = (portal: PortalProfile) => {
+    if (PORTAL_WORKSPACE_COMING_SOON) {
+      return;
+    }
+
     if (!profileStore) {
       return;
     }
@@ -1032,6 +1050,10 @@ export default function PageScreen() {
   };
 
   useEffect(() => {
+    if (PORTAL_WORKSPACE_COMING_SOON) {
+      return;
+    }
+
     if (
       !bootstrapOpenKey ||
       !bootstrapWorkspaceKind ||
@@ -1140,6 +1162,11 @@ export default function PageScreen() {
           <View style={styles.portalCardActions}>
             <Pressable
               onPress={() => {
+                if (PORTAL_WORKSPACE_COMING_SOON) {
+                  handlePlaceholderPress();
+                  return;
+                }
+
                 void handleOpenPortal(portal);
               }}
               style={({ pressed }) => [
@@ -1153,7 +1180,14 @@ export default function PageScreen() {
             </Pressable>
 
             <Pressable
-              onPress={() => handleDeletePortal(portal)}
+              onPress={() => {
+                if (PORTAL_WORKSPACE_COMING_SOON) {
+                  handlePlaceholderPress();
+                  return;
+                }
+
+                handleDeletePortal(portal);
+              }}
               style={({ pressed }) => [
                 styles.secondaryButton,
                 pressed && styles.secondaryButtonPressed,
@@ -1594,25 +1628,30 @@ export default function PageScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroCard}>
-          <Text style={styles.heroEyebrow}>Portal login</Text>
-          <Text style={styles.heroTitle}>Portal access</Text>
+          <View style={styles.comingSoonCorner} pointerEvents="none">
+            <View style={styles.comingSoonRibbon}>
+              <Text style={styles.comingSoonRibbonText}>Coming Soon</Text>
+            </View>
+          </View>
+          <Text style={styles.heroEyebrow}>Portal login helper</Text>
+          <Text style={styles.heroTitle}>Your Medical Portals</Text>
           <Text style={styles.heroBody}>
-            Save a login or open a records request.
+            All in one screen.
           </Text>
 
-          <View style={styles.heroPills}>
+          {/* <View style={styles.heroPills}>
             {HERO_PILLS.map((pill) => (
               <View key={pill} style={styles.heroPill}>
                 <Text style={styles.heroPillText}>{pill}</Text>
               </View>
             ))}
-          </View>
+          </View> */}
 
           <Pressable
-            onPress={() => setIsAddPanelOpen(true)}
+            onPress={PORTAL_WORKSPACE_COMING_SOON ? handlePlaceholderPress : () => setIsAddPanelOpen(true)}
             style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
           >
-            <Text style={styles.primaryButtonText}>Choose system</Text>
+            <Text style={styles.primaryButtonText}>Choose Hospital</Text>
           </Pressable>
         </View>
 
@@ -1622,7 +1661,7 @@ export default function PageScreen() {
 
         {renderSavedPortals()}
 
-        {isAddPanelOpen ? renderAddPortalPanel() : null}
+        {!PORTAL_WORKSPACE_COMING_SOON && isAddPanelOpen ? renderAddPortalPanel() : null}
       </ScrollView>
     </View>
   );
@@ -1643,12 +1682,43 @@ const createStyles = createThemedStyles((theme) => ({
     gap: 18,
   },
   heroCard: {
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: theme.colors.surface,
     borderRadius: 28,
     padding: 22,
     borderWidth: 1,
     borderColor: theme.colors.border,
     gap: 14,
+  },
+  comingSoonCorner: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 110,
+    height: 110,
+    overflow: 'hidden',
+  },
+  comingSoonRibbon: {
+    position: 'absolute',
+    top: 22,
+    right: -34,
+    width: 148,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    backgroundColor: theme.colors.warningSoft,
+    borderWidth: 1,
+    borderColor: theme.colors.warning,
+    transform: [{ rotate: '45deg' }],
+  },
+  comingSoonRibbonText: {
+    color: theme.colors.warning,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    transform: [{ translateX: 3 }],
   },
   heroEyebrow: {
     color: theme.colors.secondary,
