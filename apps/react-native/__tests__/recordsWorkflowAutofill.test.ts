@@ -164,6 +164,22 @@ const recipientOtherQuestion: RecordsWorkflowAutofillQuestion = {
   },
 };
 
+const recipientOtherQuestionWithoutVisibilityRule: RecordsWorkflowAutofillQuestion = {
+  id: 'recipient-other-name',
+  label: 'If Other selected, specify Individual/Organization Name',
+  kind: 'short_text',
+  required: false,
+  helpText: null,
+  confidence: 0.91,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'IndividualOrganization Name',
+    },
+  ],
+  options: [],
+};
+
 const deliveryMethodQuestion: RecordsWorkflowAutofillQuestion = {
   id: 'delivery-method',
   label: 'How should we deliver the records?',
@@ -428,6 +444,46 @@ describe('records workflow autofill helpers', () => {
       'delivery-method',
       'preferred-delivery-methods',
     ]);
+  });
+
+  it('infers missing visibility rules for follow-up questions tied to an Other option', () => {
+    const questions = [
+      releaseToQuestion,
+      recipientOtherQuestionWithoutVisibilityRule,
+      topLevelSelectableQuestion,
+    ];
+
+    expect(
+      isAutofillQuestionVisible(
+        recipientOtherQuestionWithoutVisibilityRule,
+        { 'release-to': ['patient-designee'] },
+        questions,
+      ),
+    ).toBe(false);
+    expect(
+      isAutofillQuestionVisible(
+        recipientOtherQuestionWithoutVisibilityRule,
+        { 'release-to': ['other'] },
+        questions,
+      ),
+    ).toBe(true);
+
+    expect(
+      getVisibleAutofillQuestions(questions, {
+        'release-to': ['patient-designee'],
+      }).map((question) => question.id),
+    ).toEqual(['release-to', 'preferred-delivery-methods']);
+
+    expect(
+      getNextAutofillQuestionId(questions, 'release-to', {
+        'release-to': ['patient-designee'],
+      }),
+    ).toBe('preferred-delivery-methods');
+    expect(
+      getNextAutofillQuestionId(questions, 'release-to', {
+        'release-to': ['other'],
+      }),
+    ).toBe('recipient-other-name');
   });
 
   it('uses schema-provided next and previous question links instead of inferring navigation', () => {

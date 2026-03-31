@@ -80,11 +80,188 @@ function getQuestionBindingFieldNames(question: RecordsWorkflowAutofillQuestion)
     .join(' ');
 }
 
+function getOptionBindingFieldNames(
+  option: RecordsWorkflowAutofillQuestion['options'][number],
+) {
+  return option.bindings
+    .filter((binding) => 'fieldName' in binding)
+    .map((binding) => binding.fieldName)
+    .filter(Boolean)
+    .join(' ');
+}
+
+const QUESTION_FLOW_FOLLOW_UP_HINT_PATTERN =
+  /\bif\b|\bother\b|\bspecify\b|\bdescribe\b|\bdetail\b|\bfill\b/i;
+const QUESTION_FLOW_OTHER_PATTERN =
+  /\bif\s*\(?other\)?\b|\bother\b|\bother\s*\(please specify\)|\bplease specify\b/i;
+const QUESTION_FLOW_TRAILING_HINT_PATTERN =
+  /\b(fill|field|text|value|answer|entry|details?|description)\b/g;
+const QUESTION_FLOW_STOP_WORDS = new Set([
+  'a',
+  'all',
+  'an',
+  'answer',
+  'and',
+  'applicable',
+  'apply',
+  'be',
+  'for',
+  'if',
+  'in',
+  'of',
+  'or',
+  'please',
+  'question',
+  'rest',
+  'selected',
+  'the',
+  'this',
+  'to',
+  'your',
+]);
+
+function normalizeQuestionFlowText(value: string) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function trimQuestionFlowHintTokens(value: string) {
+  return normalizeQuestionFlowText(value).replace(QUESTION_FLOW_TRAILING_HINT_PATTERN, ' ').trim();
+}
+
+function tokenizeQuestionFlowText(value: string) {
+  return trimQuestionFlowHintTokens(value)
+    .split(/\s+/)
+    .filter((token) => token.length > 1 && !QUESTION_FLOW_STOP_WORDS.has(token));
+}
+
+function buildQuestionFlowSignal(question: RecordsWorkflowAutofillQuestion) {
+  return [question.label, question.helpText, getQuestionBindingFieldNames(question)]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function buildOptionFlowSignal(option: RecordsWorkflowAutofillQuestion['options'][number]) {
+  return [option.label, option.id, getOptionBindingFieldNames(option)].filter(Boolean).join(' ');
+}
+
+function scoreQuestionVisibilityOptionMatch(
+  question: RecordsWorkflowAutofillQuestion,
+  option: RecordsWorkflowAutofillQuestion['options'][number],
+) {
+  const questionSignal = normalizeQuestionFlowText(buildQuestionFlowSignal(question));
+  const questionSignalTrimmed = trimQuestionFlowHintTokens(buildQuestionFlowSignal(question));
+  const optionSignal = normalizeQuestionFlowText(buildOptionFlowSignal(option));
+  const optionSignalTrimmed = trimQuestionFlowHintTokens(buildOptionFlowSignal(option));
+  const questionTokens = new Set(tokenizeQuestionFlowText(buildQuestionFlowSignal(question)));
+  const optionTokens = new Set(tokenizeQuestionFlowText(buildOptionFlowSignal(option)));
+
+  let score = 0;
+
+  if (QUESTION_FLOW_OTHER_PATTERN.test(questionSignal) && /\bother\b/.test(optionSignal)) {
+    score += 6;
+  }
+
+  if (
+    questionSignalTrimmed &&
+    optionSignalTrimmed &&
+    (questionSignalTrimmed.includes(optionSignalTrimmed) ||
+      optionSignalTrimmed.includes(questionSignalTrimmed))
+  ) {
+    score += 5;
+  }
+
+  for (const token of questionTokens) {
+    if (optionTokens.has(token)) {
+      score += token === 'other' ? 3 : 2;
+    }
+  }
+
+  return score;
+}
+
+function inferAutofillQuestionVisibilityRule(
+  question: RecordsWorkflowAutofillQuestion,
+  questions: RecordsWorkflowAutofillQuestion[],
+) {
+  if (question.kind !== 'short_text') return null;
+
+  const questionSignal = buildQuestionFlowSignal(question);
+  if (!QUESTION_FLOW_FOLLOW_UP_HINT_PATTERN.test(questionSignal)) {
+    return null;
+  }
+
+  const questionIndex = questions.findIndex((candidate) => candidate.id === question.id);
+  if (questionIndex === -1) return null;
+
+  let bestMatch:
+    | {
+        parentQuestionId: string;
+        parentOptionIds: string[];
+        score: number;
+        parentIndex: number;
+      }
+    | null = null;
+
+  for (let parentIndex = questionIndex - 1; parentIndex >= 0; parentIndex -= 1) {
+    const parentQuestion = questions[parentIndex];
+    if (!parentQuestion || parentQuestion.kind === 'short_text') continue;
+
+    const scoredOptions = parentQuestion.options
+      .map((option) => ({
+        optionId: option.id,
+        score: scoreQuestionVisibilityOptionMatch(question, option),
+      }))
+      .filter((entry) => entry.score > 0);
+
+    if (scoredOptions.length === 0) continue;
+
+    const topScore = Math.max(...scoredOptions.map((entry) => entry.score));
+    if (topScore < 4) continue;
+
+    const dependency = {
+      parentQuestionId: parentQuestion.id,
+      parentOptionIds: scoredOptions
+        .filter((entry) => entry.score === topScore)
+        .map((entry) => entry.optionId),
+      score: topScore,
+      parentIndex,
+    };
+
+    if (
+      !bestMatch ||
+      dependency.parentIndex > bestMatch.parentIndex ||
+      (dependency.parentIndex === bestMatch.parentIndex && dependency.score > bestMatch.score)
+    ) {
+      bestMatch = dependency;
+    }
+  }
+
+  if (!bestMatch) return null;
+
+  return {
+    parentQuestionId: bestMatch.parentQuestionId,
+    parentOptionIds: bestMatch.parentOptionIds,
+  };
+}
+
+function getAutofillQuestionVisibilityRule(
+  question: RecordsWorkflowAutofillQuestion,
+  questions: RecordsWorkflowAutofillQuestion[],
+) {
+  return question.visibilityRule || inferAutofillQuestionVisibilityRule(question, questions);
+}
+
 export function isAutofillQuestionVisible(
   question: RecordsWorkflowAutofillQuestion,
   answers: RecordsWorkflowAutofillAnswers,
+  questions: RecordsWorkflowAutofillQuestion[] = [],
 ) {
-  const dependency = question.visibilityRule;
+  const dependency = getAutofillQuestionVisibilityRule(question, questions);
   if (!dependency) return true;
 
   const parentAnswer = answers[dependency.parentQuestionId];
@@ -103,7 +280,7 @@ export function getVisibleAutofillQuestions(
   questions: RecordsWorkflowAutofillQuestion[],
   answers: RecordsWorkflowAutofillAnswers,
 ) {
-  return questions.filter((question) => isAutofillQuestionVisible(question, answers));
+  return questions.filter((question) => isAutofillQuestionVisible(question, answers, questions));
 }
 
 function findQuestionById(
@@ -143,7 +320,7 @@ export function getNextAutofillQuestionId(
     visitedQuestionIds.add(nextQuestionId);
     const nextQuestion = findQuestionById(questions, nextQuestionId);
     if (!nextQuestion) return null;
-    if (isAutofillQuestionVisible(nextQuestion, answers)) {
+    if (isAutofillQuestionVisible(nextQuestion, answers, questions)) {
       return nextQuestion.id;
     }
 
@@ -168,7 +345,7 @@ export function getPreviousAutofillQuestionId(
     visitedQuestionIds.add(previousQuestionId);
     const previousQuestion = findQuestionById(questions, previousQuestionId);
     if (!previousQuestion) return null;
-    if (isAutofillQuestionVisible(previousQuestion, answers)) {
+    if (isAutofillQuestionVisible(previousQuestion, answers, questions)) {
       return previousQuestion.id;
     }
 
