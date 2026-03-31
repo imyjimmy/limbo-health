@@ -24,6 +24,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="bio-setup" />
                 <Stack.Screen name="records-request" />
+                <Stack.Screen name="records-request-wizard" />
                 <Stack.Screen
                   name="camera"
                   options={{

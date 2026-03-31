@@ -12,16 +12,20 @@ const STORAGE_KEY_PREFIX = 'limbo.portal_profiles.v1';
 function normalizeProfile(profile: PortalProfile): PortalProfile {
   return {
     ...profile,
+    kind: profile.kind || 'patient_portal',
     healthSystemId: profile.healthSystemId.trim(),
     healthSystemName: profile.healthSystemName.trim(),
     displayName: profile.displayName.trim(),
     portalName: profile.portalName?.trim() || null,
     portalScope: profile.portalScope.trim(),
     baseUrl: profile.baseUrl.trim(),
+    launchUrl: (profile.launchUrl || profile.loginUrl).trim(),
     loginUrl: profile.loginUrl.trim(),
     registrationUrl: profile.registrationUrl?.trim() || null,
     usernameHint: profile.usernameHint.trim(),
     credentialKey: profile.credentialKey.trim(),
+    sessionResumeUrl: profile.sessionResumeUrl?.trim() || null,
+    sessionResumeCapturedAt: profile.sessionResumeCapturedAt?.trim() || null,
   };
 }
 

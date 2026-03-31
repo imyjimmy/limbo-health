@@ -22,6 +22,7 @@ class MemoryStore {
 function makeProfile(overrides: Partial<PortalProfile> = {}): PortalProfile {
   return {
     id: 'portal-1',
+    kind: 'patient_portal',
     healthSystemId: 'system-1',
     healthSystemName: 'Example Health',
     portalFamily: 'mychart',
@@ -29,10 +30,13 @@ function makeProfile(overrides: Partial<PortalProfile> = {}): PortalProfile {
     portalName: 'MyChart',
     portalScope: 'most_records',
     baseUrl: 'https://portal.example.org',
+    launchUrl: 'https://portal.example.org/login',
     loginUrl: 'https://portal.example.org/login',
     registrationUrl: 'https://portal.example.org/signup',
     usernameHint: 'Email or username',
     credentialKey: 'portal-1',
+    sessionResumeUrl: null,
+    sessionResumeCapturedAt: null,
     lastSuccessfulLoginAt: null,
     lastVerifiedAt: null,
     status: 'active',

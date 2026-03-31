@@ -1,9 +1,12 @@
 export type PortalFamilyId =
+  | 'ascension'
   | 'mychart'
   | 'athena'
   | 'nextgen'
   | 'eclinicalworks'
   | 'generic';
+
+export type PortalWorkspaceKind = 'patient_portal' | 'records_request_portal';
 
 export type PortalProfileStatus = 'active' | 'needs_attention' | 'unsupported';
 
@@ -32,6 +35,7 @@ export type PortalNavigationAction =
 
 export interface PortalProfile {
   id: string;
+  kind: PortalWorkspaceKind;
   healthSystemId: string;
   healthSystemName: string;
   portalFamily: PortalFamilyId;
@@ -39,10 +43,13 @@ export interface PortalProfile {
   portalName: string | null;
   portalScope: string;
   baseUrl: string;
+  launchUrl: string;
   loginUrl: string;
   registrationUrl: string | null;
   usernameHint: string;
   credentialKey: string;
+  sessionResumeUrl: string | null;
+  sessionResumeCapturedAt: string | null;
   lastSuccessfulLoginAt: string | null;
   lastVerifiedAt: string | null;
   status: PortalProfileStatus;
@@ -94,6 +101,12 @@ export type PortalBridgeMessage =
   | {
       type: 'portal.pageSnapshot';
       payload: PortalPageSnapshot;
+    }
+  | {
+      type: 'portal.launchResult';
+      payload: {
+        matched: boolean;
+      };
     }
   | {
       type: 'portal.fillResult';

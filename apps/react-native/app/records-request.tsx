@@ -660,7 +660,6 @@ export default function RecordsRequestScreen() {
       params: { returnTo: '/records-request' },
     });
   };
-
   const goToStep = (nextStepId: string) => {
     startTransition(() => setCurrentStepId(nextStepId));
   };
