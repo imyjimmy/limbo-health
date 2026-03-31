@@ -58,6 +58,7 @@ describe('workflowRepository request packet PDF hydration', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -174,6 +175,92 @@ describe('workflowRepository request packet PDF hydration', () => {
     ]);
   });
 
+  it('normalizes a cached matched form to pdf even when the extracted workflow format was other', async () => {
+    vi.mocked(query)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'system-1',
+            system_name: "St. David's HealthCare",
+            canonical_domain: 'stdavids.com',
+            state: 'TX',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            name: 'Authorization for Release of Medical Information',
+            url: 'https://www.hcadam.com/api/public/content/46695a9ba25e4b9aa6376f53cef033ac?v=b53c28b5',
+            format: 'other',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'doc-1',
+            facility_id: null,
+            source_url: 'https://www.hcadam.com/api/public/content/46695a9ba25e4b9aa6376f53cef033ac?v=b53c28b5',
+            title: 'Authorization for Release of Medical Information',
+            storage_path: '/tmp/storage/raw/tx/st-davids-authorization.pdf',
+            fetched_at: '2026-03-30T00:00:00.000Z',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            source_document_id: 'doc-1',
+            payload: {
+              supported: true,
+              mode: 'acroform',
+              template_id: 'st-davids-template',
+              confidence: 0.97,
+              questions: [
+                {
+                  id: 'records-to-release',
+                  label: 'Records to release',
+                  kind: 'multi_select',
+                  required: false,
+                  help_text: null,
+                  confidence: 0.97,
+                  bindings: [],
+                  options: [
+                    {
+                      id: 'other',
+                      label: 'Other',
+                      confidence: 0.97,
+                      bindings: [],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+    const packet = await getSystemRequestPacket('system-1');
+
+    expect(packet?.forms[0]).toMatchObject({
+      name: 'Authorization for Release of Medical Information',
+      format: 'pdf',
+      cached_source_document_id: 'doc-1',
+      cached_content_url: '/api/records-workflow/source-documents/doc-1/content',
+      autofill: {
+        supported: true,
+        mode: 'acroform',
+        template_id: 'st-davids-template',
+      },
+    });
+  });
+
   it('publishes explicit question flow metadata for legacy follow-up questions', async () => {
     vi.mocked(query)
       .mockResolvedValueOnce({
@@ -186,6 +273,7 @@ describe('workflowRepository request packet PDF hydration', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
@@ -334,6 +422,7 @@ describe('workflowRepository request packet PDF hydration', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
@@ -486,6 +575,7 @@ describe('workflowRepository request packet PDF hydration', () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -595,6 +685,7 @@ describe('workflowRepository request packet PDF hydration', () => {
           },
         ],
       })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })

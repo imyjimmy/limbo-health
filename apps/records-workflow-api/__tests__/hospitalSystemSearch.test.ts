@@ -13,6 +13,17 @@ describe('hospital-system search query builder', () => {
     vi.clearAllMocks();
   });
 
+  it('filters the default hospital-system list to systems with supported published schemas', async () => {
+    vi.mocked(query).mockResolvedValue({ rows: [] });
+
+    await expect(listHospitalSystems()).resolves.toEqual([]);
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("coalesce((latest_template.payload->>'supported')::boolean, false) = true"),
+      [50],
+    );
+  });
+
   it.each([
     [
       'Mass General Brigham',
@@ -62,7 +73,7 @@ describe('hospital-system search query builder', () => {
       await expect(listHospitalSystems(searchTerm)).resolves.toEqual([]);
 
       expect(query).toHaveBeenCalledWith(
-        expect.stringContaining('from hospital_systems'),
+        expect.stringContaining("coalesce((latest_template.payload->>'supported')::boolean, false) = true"),
         [
           expectedLike,
           expectedNormalizedLike,

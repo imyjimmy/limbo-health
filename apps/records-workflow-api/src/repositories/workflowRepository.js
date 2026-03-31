@@ -951,17 +951,35 @@ export async function searchFacilities(searchTerm, limit = 20) {
 
 export async function listHospitalSystems(searchTerm = '', limit = 50) {
   const trimmed = searchTerm.trim();
+  const supportedSchemaClause = `exists (
+    select 1
+    from source_documents sd
+    join lateral (
+      select pqtv.payload
+      from pdf_question_template_versions pqtv
+      where pqtv.source_document_id = sd.id
+        and pqtv.status in ('approved', 'unsupported')
+      order by pqtv.version_no desc, pqtv.published_at desc
+      limit 1
+    ) latest_template on true
+    where sd.hospital_system_id = hs.id
+      and sd.source_type = 'pdf'
+      and sd.storage_path is not null
+      and sd.storage_path <> ''
+      and coalesce((latest_template.payload->>'supported')::boolean, false) = true
+  )`;
 
   if (!trimmed) {
     const result = await query(
       `select
-         id,
-         system_name,
-         canonical_domain,
-         state
-       from hospital_systems
-       where active = true
-       order by system_name asc
+         hs.id,
+         hs.system_name,
+         hs.canonical_domain,
+         hs.state
+       from hospital_systems hs
+       where hs.active = true
+         and ${supportedSchemaClause}
+       order by hs.system_name asc
        limit $1`,
       [limit]
     );
@@ -986,20 +1004,21 @@ export async function listHospitalSystems(searchTerm = '', limit = 50) {
 
   const result = await query(
     `select
-       id,
-       system_name,
-       canonical_domain,
-       state
-     from hospital_systems
-     where active = true
+       hs.id,
+       hs.system_name,
+       hs.canonical_domain,
+       hs.state
+     from hospital_systems hs
+     where hs.active = true
+       and ${supportedSchemaClause}
        and (
-         system_name ilike $1
-         or coalesce(canonical_domain, '') ilike $1
-         or regexp_replace(lower(system_name), '[^a-z0-9]+', '', 'g') like $2
-         or regexp_replace(lower(coalesce(canonical_domain, '')), '[^a-z0-9]+', '', 'g') like $2
+         hs.system_name ilike $1
+         or coalesce(hs.canonical_domain, '') ilike $1
+         or regexp_replace(lower(hs.system_name), '[^a-z0-9]+', '', 'g') like $2
+         or regexp_replace(lower(coalesce(hs.canonical_domain, '')), '[^a-z0-9]+', '', 'g') like $2
          or regexp_replace(
            regexp_replace(
-             regexp_replace(lower(system_name), '&', ' and ', 'g'),
+             regexp_replace(lower(hs.system_name), '&', ' and ', 'g'),
              '(^|[^a-z0-9])and([^a-z0-9]|$)',
              '',
              'g'
@@ -1010,7 +1029,7 @@ export async function listHospitalSystems(searchTerm = '', limit = 50) {
          ) like $5
          or regexp_replace(
            regexp_replace(
-             regexp_replace(lower(coalesce(canonical_domain, '')), '&', ' and ', 'g'),
+             regexp_replace(lower(coalesce(hs.canonical_domain, '')), '&', ' and ', 'g'),
              '(^|[^a-z0-9])and([^a-z0-9]|$)',
              '',
              'g'
@@ -1022,11 +1041,11 @@ export async function listHospitalSystems(searchTerm = '', limit = 50) {
        )
      order by
        case
-         when system_name ilike $3 then 0
-         when regexp_replace(lower(system_name), '[^a-z0-9]+', '', 'g') like $4 then 1
+         when hs.system_name ilike $3 then 0
+         when regexp_replace(lower(hs.system_name), '[^a-z0-9]+', '', 'g') like $4 then 1
          when regexp_replace(
            regexp_replace(
-             regexp_replace(lower(system_name), '&', ' and ', 'g'),
+             regexp_replace(lower(hs.system_name), '&', ' and ', 'g'),
              '(^|[^a-z0-9])and([^a-z0-9]|$)',
              '',
              'g'
@@ -1037,7 +1056,7 @@ export async function listHospitalSystems(searchTerm = '', limit = 50) {
          ) like $6 then 2
          else 3
        end,
-       system_name asc
+       hs.system_name asc
      limit $7`,
     [
       q,
@@ -1291,6 +1310,7 @@ async function attachCachedDocumentsToForms(
 
     return {
       ...form,
+      format: cached ? 'pdf' : form?.format || null,
       cached_source_document_id: cached?.id || null,
       cached_content_url: cached ? toCachedContentUrl(cached.id) : null
     };
