@@ -362,6 +362,13 @@ export default function RecordsRequestScreen() {
   const canGeneratePdf = hasPdfForm && templatePrefetchState !== 'loading';
   const formFillButtonLabel =
     dynamicQuestions.length > 0 || hasSignatureStep ? 'Fill Out Form' : 'Apply Bio To PDF';
+  const hospitalContinueButtonLabel = !selectedSystem
+    ? 'Select a hospital system'
+    : packetLoading || templatePrefetchState === 'loading'
+      ? 'Preparing form...'
+      : dynamicQuestions.length > 0
+        ? 'Continue to questions'
+        : 'Continue to ID';
   const emailInstruction = packet ? getSubmissionInstruction(packet.instructions, 'email') : null;
   const faxInstruction = packet ? getSubmissionInstruction(packet.instructions, 'fax') : null;
   const emailDestination = extractEmailAddress(emailInstruction);
@@ -1012,7 +1019,7 @@ export default function RecordsRequestScreen() {
                   adjustsFontSizeToFit
                   minimumFontScale={0.92}
                 >
-                  {dynamicQuestions.length > 0 ? 'Continue to questions' : 'Continue to ID'}
+                  {hospitalContinueButtonLabel}
                 </Text>
               </Pressable>
             </View>
