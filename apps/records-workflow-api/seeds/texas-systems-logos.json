@@ -352,5 +352,19 @@
       "size_bytes": 7221,
       "file": "apps/records-workflow-api/seeds/texas-logos/25-united-surgical-partners-international-uspi.ico"
     }
+  },
+  {
+    "system_name": "24/7 ER Care in Lumberton",
+    "domain": "altusemergency.com",
+    "seed_urls": [
+      "https://altusemergency.com/locations/lumberton"
+    ],
+    "logo": {
+      "source_url": "https://altusemergency.com/wp-content/uploads/2025/09/Altus_Lumberton_Logo_Full-color.webp",
+      "fetched_url": "https://altusemergency.com/wp-content/uploads/2025/09/Altus_Lumberton_Logo_Full-color.webp",
+      "content_type": "image/png",
+      "size_bytes": 29369,
+      "file": "apps/records-workflow-api/seeds/texas-logos/26-24-7-er-care-in-lumberton.png"
+    }
   }
 ]

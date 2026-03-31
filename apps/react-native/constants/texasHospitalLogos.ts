@@ -191,6 +191,13 @@ export const TEXAS_HOSPITAL_LOGOS: TexasHospitalLogo[] = [
     format: "bitmap",
   },
   {
+    id: "24-7-er-care-in-lumberton",
+    systemName: "24/7 ER Care in Lumberton",
+    domain: "altusemergency.com",
+    asset: require('../assets/hospital-logos/tx/24-7-er-care-in-lumberton.png'),
+    format: "bitmap",
+  },
+  {
     id: "acute-rehabilitation-hospital-of-plano",
     systemName: "Acute Rehabilitation Hospital of Plano",
     domain: "acuterehabplano.com",
@@ -382,6 +389,7 @@ const PRESENTABLE_TEXAS_HOSPITAL_LOGO_IDS = new Set<string>([
   "ut-health-east-texas",
   "exceptional-community-hospitals",
   "united-surgical-partners-international-uspi",
+  "24-7-er-care-in-lumberton",
   "acute-rehabilitation-hospital-of-plano",
   "adventhealth-central-texas",
   "altus-houston-hospital-lp",
