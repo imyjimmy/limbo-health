@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy package files from apps/frontend
 COPY apps/frontend/package.json apps/frontend/package-lock.json* ./
 
-RUN npm install
+RUN npm ci
 
 # Copy source code from apps/frontend
 COPY apps/frontend/ ./
