@@ -10,6 +10,12 @@ export interface PortalAdapter {
   hostnamePatterns: RegExp[];
   namePatterns: RegExp[];
   usernameHint: string;
+  launch: {
+    selectors: string[];
+    labelIncludes: string[];
+    hrefIncludes: string[];
+    safeAutoLaunch: boolean;
+  };
   login: {
     usernameSelectors: string[];
     passwordSelectors: string[];
@@ -70,13 +76,67 @@ const ACTIONS: PortalAdapter['actions'] = {
   },
 };
 
+const GENERIC_LAUNCH: PortalAdapter['launch'] = {
+  selectors: [],
+  labelIncludes: ['sign in', 'log in', 'login'],
+  hrefIncludes: ['/login', '/signin', '/sign-in'],
+  safeAutoLaunch: false,
+};
+
 const ADAPTERS: Record<PortalFamilyId, PortalAdapter> = {
+  ascension: {
+    id: 'ascension',
+    displayName: 'Ascension',
+    hostnamePatterns: [/ascension/i, /iqhealth/i],
+    namePatterns: [/ascension/i],
+    usernameHint: 'Email address',
+    launch: {
+      selectors: [
+        'a[href*="id.ascension.org"]',
+        'a[href*="/one"]',
+        'a[href*="iqhealth.com"]',
+        'button[aria-label*="sign in" i]',
+        'button[aria-label*="log in" i]',
+        'a[aria-label*="sign in" i]',
+        'a[aria-label*="log in" i]',
+      ],
+      labelIncludes: [
+        'sign in',
+        'log in',
+        'login',
+        'ascension one',
+        'my account',
+        'hospital portal',
+      ],
+      hrefIncludes: ['id.ascension.org', '/one', 'iqhealth.com'],
+      safeAutoLaunch: true,
+    },
+    login: {
+      usernameSelectors: [
+        'input[type="email"]',
+        'input[name*="email" i]',
+        'input[name*="user" i]',
+        'input[name*="sign" i]',
+        'input[name*="login" i]',
+      ],
+      passwordSelectors: ['input[name*="password" i]', 'input[type="password"]'],
+      submitSelectors: [
+        'button[type="submit"]',
+        'input[type="submit"]',
+        'button[aria-label*="sign in" i]',
+        'button[aria-label*="log in" i]',
+      ],
+      safeAutoSubmit: true,
+    },
+    actions: ACTIONS,
+  },
   mychart: {
     id: 'mychart',
     displayName: 'MyChart',
     hostnamePatterns: [/mychart/i, /epic/i],
     namePatterns: [/mychart/i],
     usernameHint: 'Email or username',
+    launch: GENERIC_LAUNCH,
     login: {
       usernameSelectors: [
         'input#UserID',
@@ -108,6 +168,7 @@ const ADAPTERS: Record<PortalFamilyId, PortalAdapter> = {
     hostnamePatterns: [/athena/i],
     namePatterns: [/athena/i],
     usernameHint: 'Email or username',
+    launch: GENERIC_LAUNCH,
     login: {
       usernameSelectors: [
         'input[name="email"]',
@@ -126,6 +187,7 @@ const ADAPTERS: Record<PortalFamilyId, PortalAdapter> = {
     hostnamePatterns: [/nextmd/i, /nextgen/i],
     namePatterns: [/nextgen/i, /nextmd/i],
     usernameHint: 'Username or email',
+    launch: GENERIC_LAUNCH,
     login: {
       usernameSelectors: ['input[name="username"]', 'input[type="email"]', 'input[type="text"]'],
       passwordSelectors: ['input[name="password"]', 'input[type="password"]'],
@@ -140,6 +202,7 @@ const ADAPTERS: Record<PortalFamilyId, PortalAdapter> = {
     hostnamePatterns: [/healow/i, /eclinicalworks/i],
     namePatterns: [/healow/i, /eclinicalworks/i],
     usernameHint: 'Username or email',
+    launch: GENERIC_LAUNCH,
     login: {
       usernameSelectors: ['input[name="username"]', 'input[type="email"]', 'input[type="text"]'],
       passwordSelectors: ['input[name="password"]', 'input[type="password"]'],
@@ -154,6 +217,7 @@ const ADAPTERS: Record<PortalFamilyId, PortalAdapter> = {
     hostnamePatterns: [],
     namePatterns: [],
     usernameHint: 'Username, email, or member ID',
+    launch: GENERIC_LAUNCH,
     login: {
       usernameSelectors: [
         'input[type="email"]',
@@ -321,6 +385,85 @@ export function buildPortalCommandScript(
           }
         }));
       };
+      var labelMatches = function (value) {
+        if (!value) return false;
+        var normalized = value.toLowerCase();
+        return payload.labelIncludes.some(function (token) {
+          return normalized.indexOf(token) !== -1;
+        });
+      };
+      var hrefMatches = function (href) {
+        if (!href) return false;
+        return payload.hrefIncludes.some(function (token) {
+          return href.toLowerCase().indexOf(token) !== -1;
+        });
+      };
+      var clickIfPossible = function (element) {
+        if (element && typeof element.click === 'function') {
+          element.click();
+          matched = true;
+          return true;
+        }
+        return false;
+      };
+
+      for (var i = 0; i < payload.selectors.length; i += 1) {
+        var direct = document.querySelector(payload.selectors[i]);
+        if (clickIfPossible(direct)) {
+          post();
+          return true;
+        }
+      }
+
+      var targets = Array.prototype.slice.call(
+        document.querySelectorAll('a, button, [role="button"]')
+      );
+      for (var index = 0; index < targets.length; index += 1) {
+        var element = targets[index];
+        var label = (element.innerText || element.textContent || '').trim();
+        var href = element.getAttribute('href');
+        if (labelMatches(label) || hrefMatches(href)) {
+          if (clickIfPossible(element)) {
+            post();
+            return true;
+          }
+        }
+      }
+
+      post();
+      return true;
+    })();
+    true;
+  `;
+}
+
+export function buildPortalLaunchScript(adapter: PortalAdapter): string {
+  const payload = safeSerialize({
+    selectors: adapter.launch.selectors,
+    labelIncludes: adapter.launch.labelIncludes,
+    hrefIncludes: adapter.launch.hrefIncludes,
+  });
+
+  return `
+    (function () {
+      var payload = ${payload};
+      var matched = false;
+      var post = function () {
+        if (!window.ReactNativeWebView) return;
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'portal.launchResult',
+          payload: {
+            matched: matched
+          }
+        }));
+      };
+      var hasCredentialFields =
+        !!document.querySelector('input[type="password"]') ||
+        !!document.querySelector('input[type="email"], input[name*="email" i], input[name*="user" i]');
+      if (hasCredentialFields) {
+        post();
+        return true;
+      }
       var labelMatches = function (value) {
         if (!value) return false;
         var normalized = value.toLowerCase();

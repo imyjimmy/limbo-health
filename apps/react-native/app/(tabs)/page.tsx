@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +22,7 @@ import {
 import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent, type WebViewNavigation } from 'react-native-webview';
+import { getRecordsRequestWizardLaunchUrl } from '../../constants/recordsRequestWizards';
 import { fetchHospitalSystems, fetchRecordsRequestPacket } from '../../core/recordsWorkflow/api';
 import {
   HOSPITAL_SYSTEM_SEARCH_DEBOUNCE_MS,
@@ -29,6 +31,7 @@ import {
 import { PortalCredentialVault } from '../../core/portal/PortalCredentialVault';
 import { PortalProfileStore } from '../../core/portal/PortalProfileStore';
 import {
+  buildPortalLaunchScript,
   buildCredentialFillScript,
   buildPortalCommandScript,
   detectPortalFamily,
@@ -52,19 +55,45 @@ import type {
   PortalNavigationAction,
   PortalProfile,
   PortalSessionState,
+  PortalWorkspaceKind,
 } from '../../types/portal';
 
-const HERO_PILLS = ['Local credential vault', 'Human-required steps stay visible', 'Live portal browser'];
+const HERO_PILLS = ['Patient login', 'Records request'];
+const SESSION_RESUME_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
-function createPortalProfileId(systemId: string, loginUrl: string): string {
-  const normalizedUrl = loginUrl
+type RouteParams = {
+  systemName?: string | string[];
+  workspaceKind?: string | string[];
+  autoOpen?: string | string[];
+};
+
+function normalizeParam(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
+function normalizeWorkspaceKind(value: string | string[] | undefined): PortalWorkspaceKind | null {
+  const normalized = normalizeParam(value)?.toLowerCase();
+  if (normalized === 'patient_portal' || normalized === 'records_request_portal') {
+    return normalized;
+  }
+
+  return null;
+}
+
+function normalizeBooleanParam(value: string | string[] | undefined): boolean {
+  const normalized = normalizeParam(value)?.toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+function createPortalProfileId(kind: PortalWorkspaceKind, systemId: string, launchUrl: string): string {
+  const normalizedUrl = launchUrl
     .toLowerCase()
     .replace(/^https?:\/\//, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 64);
 
-  return `${systemId}-${normalizedUrl}`;
+  return `${kind}-${systemId}-${normalizedUrl}`;
 }
 
 function formatPortalScope(scope: string): string {
@@ -77,6 +106,8 @@ function formatPortalScope(scope: string): string {
 
 function formatPortalFamilyLabel(family: PortalProfile['portalFamily']): string {
   switch (family) {
+    case 'ascension':
+      return 'Ascension';
     case 'mychart':
       return 'MyChart';
     case 'athena':
@@ -88,6 +119,10 @@ function formatPortalFamilyLabel(family: PortalProfile['portalFamily']): string 
     default:
       return 'Generic portal';
   }
+}
+
+function formatWorkspaceKindLabel(kind: PortalWorkspaceKind): string {
+  return kind === 'records_request_portal' ? 'Records request portal' : 'Patient portal';
 }
 
 function formatTimestamp(value: string | null): string {
@@ -196,30 +231,48 @@ function getAssistCopy(input: {
   }
 }
 
-function buildPortalProfile(
+function resolvePatientPortalLaunchUrl(
+  system: HospitalSystemOption,
+  packet: RecordsRequestPacket,
+): string | null {
+  const packetUrl = packet.portal.url?.trim() || null;
+  if (!packetUrl) {
+    return null;
+  }
+
+  if (system.name.trim().toLowerCase() === 'ascension seton') {
+    return 'https://healthcare.ascension.org/one';
+  }
+
+  return packetUrl;
+}
+
+function buildPatientPortalProfile(
   system: HospitalSystemOption,
   packet: RecordsRequestPacket,
 ): PortalProfile | null {
-  if (!packet.portal.url) {
+  const launchUrl = resolvePatientPortalLaunchUrl(system, packet);
+  if (!launchUrl) {
     return null;
   }
 
   const portalFamily = detectPortalFamily({
-    url: packet.portal.url,
+    url: launchUrl,
     portalName: packet.portal.name,
     healthSystemName: system.name,
   });
   const adapter = getPortalAdapter(portalFamily);
-  const id = createPortalProfileId(system.id, packet.portal.url);
+  const id = createPortalProfileId('patient_portal', system.id, launchUrl);
   const lastVerifiedAt = packet.sources.find((source) => source.lastVerifiedAt)?.lastVerifiedAt ?? null;
-  let baseUrl = packet.portal.url;
+  let baseUrl = launchUrl;
 
   try {
-    baseUrl = new URL(packet.portal.url).origin;
+    baseUrl = new URL(launchUrl).origin;
   } catch (_error) {}
 
   return {
     id,
+    kind: 'patient_portal',
     healthSystemId: system.id,
     healthSystemName: system.name,
     portalFamily,
@@ -227,17 +280,87 @@ function buildPortalProfile(
     portalName: packet.portal.name,
     portalScope: packet.portal.scope,
     baseUrl,
-    loginUrl: packet.portal.url,
-    registrationUrl: packet.portal.url,
+    launchUrl,
+    loginUrl: launchUrl,
+    registrationUrl: launchUrl,
     usernameHint: adapter.usernameHint,
     credentialKey: `portal:${id}`,
+    sessionResumeUrl: null,
+    sessionResumeCapturedAt: null,
     lastSuccessfulLoginAt: null,
     lastVerifiedAt,
     status: 'active',
   };
 }
 
+function buildRecordsRequestPortalProfile(
+  system: HospitalSystemOption,
+  packet: RecordsRequestPacket | null = null,
+): PortalProfile | null {
+  const launchUrl = getRecordsRequestWizardLaunchUrl(system.name);
+  if (!launchUrl) {
+    return null;
+  }
+
+  let baseUrl = launchUrl;
+  try {
+    baseUrl = new URL(launchUrl).origin;
+  } catch (_error) {}
+
+  const id = createPortalProfileId('records_request_portal', system.id, launchUrl);
+  const lastVerifiedAt = packet?.sources.find((source) => source.lastVerifiedAt)?.lastVerifiedAt ?? null;
+
+  return {
+    id,
+    kind: 'records_request_portal',
+    healthSystemId: system.id,
+    healthSystemName: system.name,
+    portalFamily: 'generic',
+    displayName: `${system.name} records request`,
+    portalName: 'Official records request',
+    portalScope: 'official_copy_request',
+    baseUrl,
+    launchUrl,
+    loginUrl: launchUrl,
+    registrationUrl: null,
+    usernameHint: '',
+    credentialKey: `portal:${id}`,
+    sessionResumeUrl: null,
+    sessionResumeCapturedAt: null,
+    lastSuccessfulLoginAt: null,
+    lastVerifiedAt,
+    status: 'active',
+  };
+}
+
+function shouldUseSessionResumeUrl(profile: PortalProfile): boolean {
+  if (profile.kind !== 'patient_portal') {
+    return false;
+  }
+
+  if (!profile.sessionResumeUrl || !profile.sessionResumeCapturedAt) {
+    return false;
+  }
+
+  const capturedAt = Date.parse(profile.sessionResumeCapturedAt);
+  if (Number.isNaN(capturedAt)) {
+    return false;
+  }
+
+  return Date.now() - capturedAt <= SESSION_RESUME_MAX_AGE_MS;
+}
+
+function getPortalStartUrl(profile: PortalProfile): string {
+  if (shouldUseSessionResumeUrl(profile) && profile.sessionResumeUrl) {
+    return profile.sessionResumeUrl;
+  }
+
+  return profile.launchUrl || profile.loginUrl;
+}
+
 export default function PageScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<RouteParams>();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
   const insets = useSafeAreaInsets();
@@ -267,6 +390,8 @@ export default function PageScreen() {
   const credentialVault = useMemo(() => new PortalCredentialVault(SecureStore), []);
   const portalWebViewRef = useRef<WebView | null>(null);
   const lastAuthenticatedPortalIdRef = useRef<string | null>(null);
+  const lastBootstrapSelectionKeyRef = useRef<string | null>(null);
+  const lastBootstrapOpenKeyRef = useRef<string | null>(null);
   const [savedPortals, setSavedPortals] = useState<PortalProfile[]>([]);
   const [savedPortalsLoading, setSavedPortalsLoading] = useState(true);
   const [credentialAvailability, setCredentialAvailability] = useState<Record<string, boolean>>(
@@ -294,6 +419,15 @@ export default function PageScreen() {
   const [credentialPassword, setCredentialPassword] = useState('');
   const [credentialNotes, setCredentialNotes] = useState('');
   const [credentialSaving, setCredentialSaving] = useState(false);
+  const bootstrapSystemName = normalizeParam(params.systemName);
+  const bootstrapWorkspaceKind = normalizeWorkspaceKind(params.workspaceKind);
+  const bootstrapAutoOpen = normalizeBooleanParam(params.autoOpen);
+  const bootstrapSelectionKey =
+    bootstrapSystemName && bootstrapWorkspaceKind
+      ? `${bootstrapSystemName}::${bootstrapWorkspaceKind}`
+      : null;
+  const bootstrapOpenKey =
+    bootstrapSelectionKey && bootstrapAutoOpen ? `${bootstrapSelectionKey}::open` : null;
 
   const activePortal = useMemo(
     () => savedPortals.find((portal) => portal.id === activePortalId) ?? null,
@@ -304,6 +438,7 @@ export default function PageScreen() {
     [activePortal?.portalFamily],
   );
   const activeHasCredential = activePortal
+    && activePortal.kind === 'patient_portal'
     ? credentialAvailability[activePortal.id] ?? false
     : false;
   const assistCopy = getAssistCopy({
@@ -475,6 +610,62 @@ export default function PageScreen() {
   }, [selectedSystem]);
 
   useEffect(() => {
+    if (!ownerKey || !bootstrapSelectionKey || !bootstrapSystemName || !bootstrapWorkspaceKind) {
+      return;
+    }
+
+    if (lastBootstrapSelectionKeyRef.current === bootstrapSelectionKey) {
+      return;
+    }
+
+    lastBootstrapSelectionKeyRef.current = bootstrapSelectionKey;
+    setIsAddPanelOpen(true);
+    setSearchQuery(bootstrapSystemName);
+    setSystemsError(null);
+
+    let cancelled = false;
+
+    fetchHospitalSystems(bootstrapSystemName)
+      .then((results) => {
+        if (cancelled) {
+          return;
+        }
+
+        const normalizedTarget = bootstrapSystemName.toLowerCase();
+        const exactMatch =
+          results.find((candidate) => candidate.name.trim().toLowerCase() === normalizedTarget) || null;
+        const fallbackMatch =
+          exactMatch ||
+          results.find((candidate) =>
+            candidate.name.trim().toLowerCase().includes(normalizedTarget),
+          ) ||
+          null;
+
+        if (!fallbackMatch) {
+          setSystemsError(`Unable to find ${bootstrapSystemName} in the portal workspace.`);
+          return;
+        }
+
+        startTransition(() => {
+          setSelectedSystem(fallbackMatch);
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setSystemsError(
+            error instanceof Error
+              ? error.message
+              : 'Unable to bootstrap the requested portal preview.',
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bootstrapSelectionKey, bootstrapSystemName, bootstrapWorkspaceKind, ownerKey]);
+
+  useEffect(() => {
     if (!activePortal) {
       setSessionState(null);
       setBrowserError(null);
@@ -486,7 +677,7 @@ export default function PageScreen() {
     setSessionState({
       portalProfileId: activePortal.id,
       phase: 'loading',
-      currentUrl: activePortal.loginUrl,
+      currentUrl: getPortalStartUrl(activePortal),
       pageTitle: activePortal.displayName,
       isHumanRequired: false,
       humanRequiredReason: null,
@@ -499,7 +690,12 @@ export default function PageScreen() {
   }, [activePortal]);
 
   useEffect(() => {
-    if (!activePortal || !profileStore || sessionState?.phase !== 'authenticated') {
+    if (
+      !activePortal ||
+      activePortal.kind !== 'patient_portal' ||
+      !profileStore ||
+      sessionState?.phase !== 'authenticated'
+    ) {
       return;
     }
 
@@ -529,7 +725,7 @@ export default function PageScreen() {
   }, [activePortal, profileStore, sessionState?.phase]);
 
   const openCredentialModal = () => {
-    if (!activePortal) {
+    if (!activePortal || activePortal.kind !== 'patient_portal') {
       return;
     }
 
@@ -540,7 +736,7 @@ export default function PageScreen() {
   };
 
   const handleSaveCredential = async () => {
-    if (!activePortal) {
+    if (!activePortal || activePortal.kind !== 'patient_portal') {
       return;
     }
 
@@ -583,19 +779,47 @@ export default function PageScreen() {
     }
   };
 
-  const handleAddPortal = async () => {
-    if (!profileStore || !selectedSystem || !selectedPacket) {
+  const handleOpenPortal = async (portal: PortalProfile) => {
+    if (portal.kind === 'records_request_portal') {
+      if (profileStore) {
+        try {
+          const nextPortal: PortalProfile = {
+            ...portal,
+            lastSuccessfulLoginAt: new Date().toISOString(),
+          };
+          const profiles = await profileStore.upsertProfile(nextPortal);
+          startTransition(() => {
+            setSavedPortals(profiles);
+          });
+        } catch (error) {
+          console.warn('[PortalScreen] Failed to persist records-request portal open timestamp', error);
+        }
+      }
+
+      router.push({
+        pathname: '/records-request-wizard',
+        params: {
+          launchUrl: portal.launchUrl,
+          systemName: portal.healthSystemName,
+        },
+      });
       return;
     }
 
-    const nextPortal = buildPortalProfile(selectedSystem, selectedPacket);
-    if (!nextPortal) {
+    setActivePortalId(portal.id);
+  };
+
+  const handleAddPortal = async (nextPortal: PortalProfile | null) => {
+    if (!profileStore || !nextPortal) {
       return;
     }
 
     try {
       const profiles = await profileStore.upsertProfile(nextPortal);
-      const hasCredential = await credentialVault.hasCredential(nextPortal.credentialKey);
+      const hasCredential =
+        nextPortal.kind === 'patient_portal'
+          ? await credentialVault.hasCredential(nextPortal.credentialKey)
+          : false;
 
       startTransition(() => {
         setSavedPortals(profiles);
@@ -603,9 +827,10 @@ export default function PageScreen() {
           ...current,
           [nextPortal.id]: hasCredential,
         }));
-        setActivePortalId(nextPortal.id);
         setIsAddPanelOpen(false);
       });
+
+      await handleOpenPortal(nextPortal);
     } catch (error) {
       Alert.alert(
         'Add Portal',
@@ -661,8 +886,20 @@ export default function PageScreen() {
     );
   };
 
+  const requestPortalLaunch = () => {
+    if (!activePortal || activePortal.kind !== 'patient_portal') {
+      return;
+    }
+
+    if (!assistEnabled || !activeAdapter.launch.safeAutoLaunch) {
+      return;
+    }
+
+    portalWebViewRef.current?.injectJavaScript(buildPortalLaunchScript(activeAdapter));
+  };
+
   const handleUnlockAndFill = async () => {
-    if (!activePortal) {
+    if (!activePortal || activePortal.kind !== 'patient_portal') {
       return;
     }
 
@@ -709,6 +946,45 @@ export default function PageScreen() {
       });
       setBrowserError(null);
       setSessionState(nextSession);
+
+      if (
+        profileStore &&
+        activePortal.kind === 'patient_portal' &&
+        ['login', 'registration', 'challenge'].includes(nextSession.phase) &&
+        message.payload.url &&
+        message.payload.url !== activePortal.sessionResumeUrl
+      ) {
+        const nextPortal: PortalProfile = {
+          ...activePortal,
+          sessionResumeUrl: message.payload.url,
+          sessionResumeCapturedAt: message.payload.lastObservedAt,
+        };
+
+        profileStore
+          .upsertProfile(nextPortal)
+          .then((profiles) => {
+            startTransition(() => {
+              setSavedPortals(profiles);
+            });
+          })
+          .catch((error) => {
+            console.warn('[PortalScreen] Failed to persist portal resume URL', error);
+          });
+      }
+
+      return;
+    }
+
+    if (message.type === 'portal.launchResult') {
+      if (
+        assistEnabled &&
+        activePortal.kind === 'patient_portal' &&
+        activeAdapter.launch.safeAutoLaunch &&
+        !message.payload.matched
+      ) {
+        requestPortalSnapshot();
+      }
+
       return;
     }
 
@@ -755,6 +1031,40 @@ export default function PageScreen() {
     setBrowserReloadKey((current) => current + 1);
   };
 
+  useEffect(() => {
+    if (
+      !bootstrapOpenKey ||
+      !bootstrapWorkspaceKind ||
+      !selectedSystem ||
+      !selectedPacket ||
+      !profileStore
+    ) {
+      return;
+    }
+
+    if (lastBootstrapOpenKeyRef.current === bootstrapOpenKey) {
+      return;
+    }
+
+    const nextPortal =
+      bootstrapWorkspaceKind === 'patient_portal'
+        ? buildPatientPortalProfile(selectedSystem, selectedPacket)
+        : buildRecordsRequestPortalProfile(selectedSystem, selectedPacket);
+
+    if (!nextPortal) {
+      return;
+    }
+
+    lastBootstrapOpenKeyRef.current = bootstrapOpenKey;
+    void handleAddPortal(nextPortal);
+  }, [
+    bootstrapOpenKey,
+    bootstrapWorkspaceKind,
+    profileStore,
+    selectedPacket,
+    selectedSystem,
+  ]);
+
   const renderSavedPortals = () => {
     if (savedPortalsLoading) {
       return (
@@ -770,14 +1080,15 @@ export default function PageScreen() {
         <View style={styles.stateCard}>
           <Text style={styles.stateCardTitle}>No saved portals yet</Text>
           <Text style={styles.stateCardText}>
-            Search a health system, save a portal locally, and keep the login flow inside Limbo.
+            Choose a health system to get started.
           </Text>
         </View>
       );
     }
 
     return savedPortals.map((portal) => {
-      const hasCredential = credentialAvailability[portal.id] ?? false;
+      const isPatientPortal = portal.kind === 'patient_portal';
+      const hasCredential = isPatientPortal ? credentialAvailability[portal.id] ?? false : false;
 
       return (
         <View key={portal.id} style={styles.portalCard}>
@@ -785,40 +1096,60 @@ export default function PageScreen() {
             <View style={styles.portalCardHeaderCopy}>
               <Text style={styles.portalCardTitle}>{portal.displayName}</Text>
               <Text style={styles.portalCardSubtitle}>
-                {formatPortalFamilyLabel(portal.portalFamily)} • {formatPortalScope(portal.portalScope || 'unknown')}
+                {formatWorkspaceKindLabel(portal.kind)}
+                {isPatientPortal
+                  ? ` • ${formatPortalFamilyLabel(portal.portalFamily)}`
+                  : ''}
               </Text>
             </View>
             <View
               style={[
                 styles.credentialBadge,
-                hasCredential ? styles.credentialBadgeReady : styles.credentialBadgePending,
+                isPatientPortal && hasCredential
+                  ? styles.credentialBadgeReady
+                  : styles.credentialBadgePending,
               ]}
             >
               <Text
                 style={[
                   styles.credentialBadgeText,
-                  hasCredential
+                  isPatientPortal && hasCredential
                     ? styles.credentialBadgeTextReady
                     : styles.credentialBadgeTextPending,
                 ]}
               >
-                {hasCredential ? 'Face ID ready' : 'Needs saved login'}
+                {isPatientPortal
+                  ? hasCredential
+                    ? 'Face ID ready'
+                    : 'Needs saved login'
+                  : 'Guided wizard'}
               </Text>
             </View>
           </View>
 
-          <Text style={styles.portalMetaText}>Last login: {formatTimestamp(portal.lastSuccessfulLoginAt)}</Text>
+          <Text style={styles.portalMetaText}>
+            {isPatientPortal ? 'Last login' : 'Last opened'}: {formatTimestamp(portal.lastSuccessfulLoginAt)}
+          </Text>
           <Text style={styles.portalMetaText}>Last verified: {formatTimestamp(portal.lastVerifiedAt)}</Text>
+          {isPatientPortal && shouldUseSessionResumeUrl(portal) ? (
+            <Text style={styles.portalMetaText}>
+              Fresh login launch saved: {formatTimestamp(portal.sessionResumeCapturedAt)}
+            </Text>
+          ) : null}
 
           <View style={styles.portalCardActions}>
             <Pressable
-              onPress={() => setActivePortalId(portal.id)}
+              onPress={() => {
+                void handleOpenPortal(portal);
+              }}
               style={({ pressed }) => [
                 styles.primaryButton,
                 pressed && styles.primaryButtonPressed,
               ]}
             >
-              <Text style={styles.primaryButtonText}>Open</Text>
+              <Text style={styles.primaryButtonText}>
+                {isPatientPortal ? 'Open login' : 'Open request'}
+              </Text>
             </Pressable>
 
             <Pressable
@@ -837,8 +1168,10 @@ export default function PageScreen() {
   };
 
   const renderAddPortalPanel = () => {
-    const previewProfile =
-      selectedSystem && selectedPacket ? buildPortalProfile(selectedSystem, selectedPacket) : null;
+    const patientPortalPreview =
+      selectedSystem && selectedPacket ? buildPatientPortalProfile(selectedSystem, selectedPacket) : null;
+    const recordsRequestPreview =
+      selectedSystem ? buildRecordsRequestPortalProfile(selectedSystem, selectedPacket) : null;
 
     return (
       <View style={styles.addPanel}>
@@ -850,7 +1183,7 @@ export default function PageScreen() {
         </View>
 
         <Text style={styles.sectionBody}>
-          Search a health system and open the best-known portal URL we have for that organization.
+          Choose a patient portal or a records request flow.
         </Text>
 
         <TextInput
@@ -906,9 +1239,7 @@ export default function PageScreen() {
         {selectedSystem ? (
           <View style={styles.portalPreviewCard}>
             <Text style={styles.portalPreviewEyebrow}>{selectedSystem.name}</Text>
-            <Text style={styles.portalPreviewTitle}>
-              {selectedPacket?.portal.name || 'Portal details'}
-            </Text>
+            <Text style={styles.portalPreviewTitle}>Available workspace entries</Text>
             {packetLoading ? (
               <View style={styles.stateCard}>
                 <ActivityIndicator size="small" color={theme.colors.primary} />
@@ -923,50 +1254,93 @@ export default function PageScreen() {
               </View>
             ) : null}
 
-            {selectedPacket && !packetLoading ? (
+            {!packetLoading && (patientPortalPreview || recordsRequestPreview) ? (
               <>
-                {selectedPacket.portal.url ? (
-                  <>
+                {patientPortalPreview ? (
+                  <View style={styles.workspaceOptionCard}>
+                    <Text style={styles.workspaceOptionEyebrow}>Patient portal</Text>
+                    <Text style={styles.workspaceOptionTitle}>
+                      {patientPortalPreview.portalName || patientPortalPreview.displayName}
+                    </Text>
                     <Text style={styles.portalPreviewBody}>
-                      {previewProfile ? formatPortalFamilyLabel(previewProfile.portalFamily) : 'Portal'} •{' '}
-                      {formatPortalScope(selectedPacket.portal.scope || 'unknown')}
+                      {formatPortalFamilyLabel(patientPortalPreview.portalFamily)} •{' '}
+                      {formatPortalScope(patientPortalPreview.portalScope || 'unknown')}
                     </Text>
-                    <Text style={styles.portalPreviewLink}>{selectedPacket.portal.url}</Text>
+                    <Text style={styles.portalPreviewLink}>{patientPortalPreview.launchUrl}</Text>
                     <Text style={styles.portalPreviewBody}>
-                      Last verified: {formatTimestamp(previewProfile?.lastVerifiedAt ?? null)}
+                      Ascension-style SSO pages can mint a fresh signed login URL, so Limbo keeps the stable launch URL and can preserve a recent on-device resume URL when one is observed.
                     </Text>
-
-                    <View style={styles.portalCardActions}>
-                      <Pressable
-                        onPress={handleAddPortal}
-                        style={({ pressed }) => [
-                          styles.primaryButton,
-                          pressed && styles.primaryButtonPressed,
-                        ]}
-                      >
-                        <Text style={styles.primaryButtonText}>Add portal and open</Text>
-                      </Pressable>
-
-                      <Pressable
-                        onPress={() => setSelectedSystem(null)}
-                        style={({ pressed }) => [
-                          styles.secondaryButton,
-                          pressed && styles.secondaryButtonPressed,
-                        ]}
-                      >
-                        <Text style={styles.secondaryButtonText}>Choose another</Text>
-                      </Pressable>
-                    </View>
-                  </>
-                ) : (
-                  <View style={styles.errorCard}>
-                    <Text style={styles.errorCardTitle}>Portal URL not available yet</Text>
-                    <Text style={styles.errorCardText}>
-                      We found workflow data for this health system, but not a supported portal URL to open in the in-app browser yet.
-                    </Text>
+                    <Pressable
+                      onPress={() => {
+                        void handleAddPortal(patientPortalPreview);
+                      }}
+                      style={({ pressed }) => [
+                        styles.primaryButton,
+                        pressed && styles.primaryButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.primaryButtonText}>Add patient portal</Text>
+                    </Pressable>
                   </View>
-                )}
+                ) : null}
+
+                {recordsRequestPreview ? (
+                  <View style={styles.workspaceOptionCard}>
+                    <Text style={styles.workspaceOptionEyebrow}>Records request portal</Text>
+                    <Text style={styles.workspaceOptionTitle}>
+                      {recordsRequestPreview.portalName || recordsRequestPreview.displayName}
+                    </Text>
+                    <Text style={styles.portalPreviewBody}>
+                      Guided online request workflow inside Limbo
+                    </Text>
+                    <Text style={styles.portalPreviewLink}>{recordsRequestPreview.launchUrl}</Text>
+                    <Text style={styles.portalPreviewBody}>
+                      This is separate from the patient portal login and opens the hosted request wizard instead of a credential browser.
+                    </Text>
+                    <Pressable
+                      onPress={() => {
+                        void handleAddPortal(recordsRequestPreview);
+                      }}
+                      style={({ pressed }) => [
+                        styles.primaryButton,
+                        pressed && styles.primaryButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.primaryButtonText}>Add request portal</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                <View style={styles.portalCardActions}>
+                  <Pressable
+                    onPress={() => setSelectedSystem(null)}
+                    style={({ pressed }) => [
+                      styles.secondaryButton,
+                      pressed && styles.secondaryButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.secondaryButtonText}>Choose another</Text>
+                  </Pressable>
+                </View>
               </>
+            ) : null}
+
+            {selectedPacket && !packetLoading && !patientPortalPreview && !recordsRequestPreview ? (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorCardTitle}>No supported portal entry yet</Text>
+                <Text style={styles.errorCardText}>
+                  We found workflow data for this health system, but not a supported patient-portal launch or records-request wizard for this workspace yet.
+                </Text>
+              </View>
+            ) : null}
+
+            {!selectedPacket && !packetLoading && !packetError ? (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorCardTitle}>Portal data unavailable</Text>
+                <Text style={styles.errorCardText}>
+                  We could not load enough metadata to offer a patient portal or records-request workflow for this system yet.
+                </Text>
+              </View>
             ) : null}
           </View>
         ) : null}
@@ -1107,11 +1481,14 @@ export default function PageScreen() {
           <WebView
             key={`${activePortal.id}-${browserReloadKey}`}
             ref={portalWebViewRef}
-            source={{ uri: activePortal.loginUrl }}
+            source={{ uri: getPortalStartUrl(activePortal) }}
             style={styles.webView}
             onMessage={handlePortalMessage}
             onNavigationStateChange={handleNavigationStateChange}
-            onLoadEnd={requestPortalSnapshot}
+            onLoadEnd={() => {
+              requestPortalSnapshot();
+              requestPortalLaunch();
+            }}
             onError={(event) => {
               setBrowserError(event.nativeEvent.description || 'Unable to load the portal page.');
             }}
@@ -1217,10 +1594,10 @@ export default function PageScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroCard}>
-          <Text style={styles.heroEyebrow}>User-assisted portal login</Text>
-          <Text style={styles.heroTitle}>Keep portal access on device.</Text>
+          <Text style={styles.heroEyebrow}>Portal login</Text>
+          <Text style={styles.heroTitle}>Portal access</Text>
           <Text style={styles.heroBody}>
-            Save a supported hospital portal locally, use biometric unlock to fill your login, and keep the live browser session inside Limbo when human steps appear.
+            Save a login or open a records request.
           </Text>
 
           <View style={styles.heroPills}>
@@ -1235,15 +1612,12 @@ export default function PageScreen() {
             onPress={() => setIsAddPanelOpen(true)}
             style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
           >
-            <Text style={styles.primaryButtonText}>Add portal</Text>
+            <Text style={styles.primaryButtonText}>Choose system</Text>
           </Pressable>
         </View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Saved portals</Text>
-          <Text style={styles.sectionBody}>
-            The second tab is now the portal workspace, so this is where we reopen saved sessions and local logins.
-          </Text>
         </View>
 
         {renderSavedPortals()}
@@ -1517,6 +1891,26 @@ const createStyles = createThemedStyles((theme) => ({
     color: theme.colors.secondary,
     fontSize: 13,
     lineHeight: 19,
+  },
+  workspaceOptionCard: {
+    borderRadius: 18,
+    backgroundColor: theme.colors.surface,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 10,
+  },
+  workspaceOptionEyebrow: {
+    color: theme.colors.secondary,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+  },
+  workspaceOptionTitle: {
+    color: theme.colors.text,
+    fontSize: 17,
+    fontWeight: '800',
   },
   errorCard: {
     borderRadius: 20,
