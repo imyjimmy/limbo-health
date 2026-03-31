@@ -14,7 +14,6 @@ export interface RecordsWorkflowContact {
 export interface RecordsWorkflowForm {
   name: string;
   url: string;
-  format: string | null;
   cachedSourceDocumentId: string | null;
   cachedContentUrl: string | null;
   autofill: RecordsWorkflowFormAutofill;

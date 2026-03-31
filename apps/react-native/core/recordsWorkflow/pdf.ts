@@ -96,6 +96,10 @@ function normalizeFormDescriptor(form: RecordsWorkflowForm): string {
   return normalizeFieldName(`${form.name} ${form.url} ${form.cachedContentUrl || ''}`);
 }
 
+export function isPdfBackedWorkflowForm(form: RecordsWorkflowForm): boolean {
+  return Boolean(form.cachedContentUrl);
+}
+
 function getSemanticFormScore(form: RecordsWorkflowForm): number {
   const descriptor = normalizeFormDescriptor(form);
   let score = 0;
@@ -148,7 +152,7 @@ function sortPdfForms(
   },
 ): RecordsWorkflowForm[] {
   return [...forms]
-    .filter((form) => form.format === 'pdf')
+    .filter(isPdfBackedWorkflowForm)
     .sort((a, b) => {
       const score = (form: RecordsWorkflowForm) =>
         getSemanticFormScore(form) +
@@ -1053,6 +1057,7 @@ export const __testing__ = {
   getLanguagePreferenceScore,
   getPrimaryPdfForm,
   getSemanticFormScore,
+  isPdfBackedWorkflowForm,
   shouldFillPatientRecipientFields,
   sortPdfForms,
 };

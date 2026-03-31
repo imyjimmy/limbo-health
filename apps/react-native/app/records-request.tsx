@@ -50,6 +50,7 @@ import { hasSignatureStrokeInput } from '../core/recordsWorkflow/signature';
 import {
   generateRecordsRequestPdf,
   getPrimaryPdfForm,
+  isPdfBackedWorkflowForm,
   prefetchRecordsRequestPdfTemplate,
 } from '../core/recordsWorkflow/pdf';
 import {
@@ -258,7 +259,7 @@ export default function RecordsRequestScreen() {
   }, [debouncedSearchQuery]);
 
   useEffect(() => {
-    if (!packet || !packet.forms.some((form) => form.format === 'pdf')) {
+    if (!packet || !packet.forms.some(isPdfBackedWorkflowForm)) {
       setTemplatePrefetchState('idle');
       setSelectedFormKey(null);
       setPrefetchedFormName(null);
@@ -318,10 +319,10 @@ export default function RecordsRequestScreen() {
     setPdfPreviewFailed(false);
   }, [generatedPdfUri]);
 
-  const hasPdfForm = Boolean(packet?.forms.some((form) => form.format === 'pdf'));
+  const hasPdfForm = Boolean(packet?.forms.some(isPdfBackedWorkflowForm));
   const selectedPdfForm =
     packet?.forms.find(
-      (form) => form.format === 'pdf' && selectedFormKey && buildFormKey(form) === selectedFormKey,
+      (form) => isPdfBackedWorkflowForm(form) && selectedFormKey && buildFormKey(form) === selectedFormKey,
     ) || null;
   const primaryDisplayForm = packet
     ? selectedPdfForm ||
@@ -1255,9 +1256,7 @@ export default function RecordsRequestScreen() {
                 >
                   <Text style={styles.linkText}>{primaryDisplayForm.name}</Text>
                   <Text style={styles.linkMeta}>
-                    {primaryDisplayForm.cachedContentUrl
-                      ? 'CACHED PDF'
-                      : primaryDisplayForm.format?.toUpperCase() || 'LINK'}
+                    {primaryDisplayForm.cachedContentUrl ? 'CACHED PDF' : 'OFFICIAL LINK'}
                   </Text>
                 </Pressable>
               ) : packet.forms.length > 0 ? (
@@ -1269,9 +1268,7 @@ export default function RecordsRequestScreen() {
                   >
                     <Text style={styles.linkText}>{form.name}</Text>
                     <Text style={styles.linkMeta}>
-                      {form.cachedContentUrl
-                        ? 'CACHED PDF'
-                        : form.format?.toUpperCase() || 'LINK'}
+                      {form.cachedContentUrl ? 'CACHED PDF' : 'OFFICIAL LINK'}
                     </Text>
                   </Pressable>
                 ))

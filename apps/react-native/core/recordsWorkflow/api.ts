@@ -54,7 +54,6 @@ interface ApiRecordsRequestPacket {
   forms: {
     name: string;
     url: string;
-    format: string | null;
     cached_source_document_id: string | null;
     cached_content_url: string | null;
     autofill: {
@@ -300,7 +299,6 @@ export async function fetchRecordsRequestPacket(systemId: string): Promise<Recor
     forms: data.forms.map((form) => ({
       name: form.name,
       url: form.url,
-      format: form.format,
       cachedSourceDocumentId: form.cached_source_document_id,
       cachedContentUrl: form.cached_content_url
         ? `${WORKFLOW_API_HOST}${form.cached_content_url}`

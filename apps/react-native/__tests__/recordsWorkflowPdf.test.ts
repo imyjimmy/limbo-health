@@ -22,7 +22,6 @@ function createForm(
   return {
     name,
     url: `https://example.org/${name.replace(/\s+/g, '-').toLowerCase()}.pdf`,
-    format: 'pdf',
     cachedSourceDocumentId: null,
     cachedContentUrl: `https://cache.example.org/${name.replace(/\s+/g, '-').toLowerCase()}.pdf`,
     autofill: {
@@ -59,7 +58,6 @@ describe('records workflow pdf helpers', () => {
     expect(sorted.map((form) => form.name)).toEqual([
       'authorization for release of medical information from bswh',
       'authorization for release of medical information to bswh',
-      'authorization for release of medical information to bswh spanish',
     ]);
   });
 
@@ -77,6 +75,25 @@ describe('records workflow pdf helpers', () => {
     expect(primaryForm?.name).toBe(
       'authorization for release of medical information from bswh spanish',
     );
+  });
+
+  it('ignores forms that are not backed by a cached PDF even when they look like PDFs by URL', () => {
+    const primaryForm = __testing__.getPrimaryPdfForm([
+      createForm('cached authorization'),
+      createForm('uncached authorization', {
+        cachedContentUrl: null,
+      }),
+    ]);
+
+    expect(primaryForm?.name).toBe('cached authorization');
+    expect(__testing__.isPdfBackedWorkflowForm(createForm('cached authorization'))).toBe(true);
+    expect(
+      __testing__.isPdfBackedWorkflowForm(
+        createForm('uncached authorization', {
+          cachedContentUrl: null,
+        }),
+      ),
+    ).toBe(false);
   });
 
   it('fills separate street city state zip layouts instead of only the zip field', async () => {
