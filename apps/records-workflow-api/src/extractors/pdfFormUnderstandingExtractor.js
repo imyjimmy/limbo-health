@@ -112,21 +112,69 @@ const CHECKBOX_HEADING_MAX_DISTANCE = 80;
 const FOLLOW_UP_OPTION_PATTERN = /\bother\b|\bspecify\b|\bprovider\b|\blocation\b|\bdescribe\b|\bdetail\b/i;
 const FOLLOW_UP_PARENT_MAX_DISTANCE = 84;
 const TEXT_FIELD_TYPE_PATTERN = /^text$/i;
+const RADIO_FIELD_TYPE_PATTERN = /radio/i;
+const DELIVERY_OPTION_HINT_PATTERN =
+  /\b(paper copy|electronic media|encrypted email|unencrypted email|email|mail|fax|pickup|pick up|portal)\b/i;
+const RECORD_SELECTION_OPTION_HINT_PATTERN =
+  /\b(all pertinent records|consultation|medication list|discharge|operative report|labor and delivery|er report|pathology report|specialty test|ekg report|problem list|physician orders|history and physical|radiology report|progress notes|clinical|laboratory|billing|complete chart|immunization)\b/i;
+const RECIPIENT_OPTION_HINT_PATTERN =
+  /\b(patient\/designee|health care entity|insurance company|attorney|individual\/organization|individualorganization|recipient|other \(please specify\))\b/i;
+const PURPOSE_OPTION_HINT_PATTERN =
+  /\b(continuing care|legal|insurance|personal use|at the request of the individual|other \(please specify\)|other 3rd party recipient)\b/i;
+const RECIPIENT_CONTEXT_FIELD_PATTERN =
+  /\b(recipient|released to|individualorganization|individual\/organization|email for releases to email|fax number)\b/i;
+const PATIENT_CONTEXT_FIELD_PATTERN =
+  /\b(patient|dob|date of birth|birth|ssn|social security|mrn|acct)\b/i;
 const EXCLUDED_AUTOFILL_FIELD_PATTERNS = [
   /^patient name$/,
+  /^patient(?:[\s_-]+)first(?:[\s_-]+)name$/,
+  /^patient(?:[\s_-]+)last(?:[\s_-]+)name$/,
+  /^first(?:[\s_-]+)name$/,
+  /^last(?:[\s_-]+)name$/,
+  /^full(?:[\s_-]+)name$/,
+  /^middle(?:[\s_-]+)initial$/,
+  /^date(?:[\s_-]+)of(?:[\s_-]+)birth$/,
+  /^birth(?:[\s_-]+)date$/,
   /^last 4 of social security number$/,
+  /^social(?:[\s_-]+)security(?:[\s_-]+)number$/,
+  /^ssn$/,
   /^dob$/,
   /^acct$/,
   /^mrn$/,
+  /^patient(?:[\s_-]+)address$/,
   /^patient street address$/,
   /^patient city state$/,
   /^patient zip$/,
+  /^patient(?:[\s_-]+)city$/,
+  /^patient(?:[\s_-]+)state$/,
+  /^patient(?:[\s_-]+)postal(?:[\s_-]+)code$/,
+  /^patient(?:[\s_-]+)phone$/,
+  /^patient(?:[\s_-]+)telephone$/,
   /^patient telephone number$/,
   /^patient email$/,
+  /^nombre(?:[\s_-]+)del(?:[\s_-]+)paciente$/,
+  /^fecha(?:[\s_-]+)de(?:[\s_-]+)nacimiento$/,
+  /^telefono(?:[\s_-]+)del(?:[\s_-]+)paciente$/,
+  /^correo(?:[\s_-]+)electronico(?:[\s_-]+)del(?:[\s_-]+)paciente$/,
+  /^ultimos?(?:[\s_-]+)4(?:[\s_-]+)digitos/,
   /^printed name of patient or legal representative$/,
   /^relationship to patient$/,
   /^representatives authority to act for patient$/,
+  /^facility names? and addresses$/,
   /^date$/,
+];
+const EXCLUDED_AUTOFILL_QUESTION_LABEL_PATTERNS = [
+  /^name:?$/i,
+  /^first name:?$/i,
+  /^last name:?$/i,
+  /^birth:?$/i,
+  /^date of birth:?$/i,
+  /^birth date:?$/i,
+  /^dob:?$/i,
+  /^facility name\(s\) and addresses:?$/i,
+];
+const EXCLUDED_AUTOFILL_QUESTION_SIGNAL_PATTERNS = [
+  /\bfinancial remuneration\b/i,
 ];
 
 function slugifyQuestionId(value) {
@@ -162,9 +210,154 @@ function isTextWidget(widget) {
   return TEXT_FIELD_TYPE_PATTERN.test(normalizeFieldName(widget?.fieldType));
 }
 
+function isRadioWidget(widget) {
+  return RADIO_FIELD_TYPE_PATTERN.test(normalizeFieldName(widget?.fieldType));
+}
+
 function isExcludedAutofillFieldName(fieldName) {
   const normalizedFieldName = normalizeFieldName(fieldName);
   return EXCLUDED_AUTOFILL_FIELD_PATTERNS.some((pattern) => pattern.test(normalizedFieldName));
+}
+
+function isExcludedAutofillQuestion(question, parsedPages = []) {
+  const label = normalizeString(question?.label);
+  if (EXCLUDED_AUTOFILL_QUESTION_LABEL_PATTERNS.some((pattern) => pattern.test(label))) {
+    return true;
+  }
+
+  const bindingFieldNames = getBindingFieldNames(question, parsedPages);
+  if (bindingFieldNames.some((fieldName) => isExcludedAutofillFieldName(fieldName))) {
+    return true;
+  }
+
+  const questionSignal = normalizeFieldName(
+    [label, question?.help_text || question?.helpText || '', ...bindingFieldNames]
+      .filter(Boolean)
+      .join(' '),
+  );
+  return EXCLUDED_AUTOFILL_QUESTION_SIGNAL_PATTERNS.some((pattern) => pattern.test(questionSignal));
+}
+
+function filterExcludedAutofillQuestions(output, parsedPdf) {
+  const parsedPages = parsedPdf?.pages || [];
+  return {
+    ...output,
+    questions: (Array.isArray(output?.questions) ? output.questions : []).filter(
+      (question) => !isExcludedAutofillQuestion(question, parsedPages),
+    ),
+  };
+}
+
+function findQuestionVisibilityRuleByOptionPattern(
+  questions = [],
+  {
+    questionPattern = null,
+    optionPattern,
+  },
+) {
+  for (const question of questions) {
+    if (!question || question.kind === 'short_text') continue;
+
+    const questionSignal = normalizeFieldName(
+      [question?.id, question?.label, question?.help_text].filter(Boolean).join(' '),
+    );
+    if (questionPattern && !questionPattern.test(questionSignal)) {
+      continue;
+    }
+
+    const matchingOptionIds = (Array.isArray(question?.options) ? question.options : [])
+      .filter((option) =>
+        optionPattern.test(
+          normalizeFieldName(
+            [option?.id, option?.label, getOptionBindingFieldName(option)].filter(Boolean).join(' '),
+          ),
+        ),
+      )
+      .map((option) => option.id)
+      .filter(Boolean);
+
+    if (matchingOptionIds.length === 0) {
+      continue;
+    }
+
+    return {
+      parent_question_id: question.id,
+      parent_option_ids: Array.from(new Set(matchingOptionIds)),
+    };
+  }
+
+  return null;
+}
+
+function applyQuestionVisibilityHeuristics(output, parsedPdf) {
+  const questions = Array.isArray(output?.questions) ? output.questions : [];
+  if (questions.length === 0) {
+    return output;
+  }
+
+  const purposeOtherThirdPartyRule = findQuestionVisibilityRuleByOptionPattern(questions, {
+    questionPattern: /\bpurpose\b.*\bdisclosure\b/i,
+    optionPattern: /\bother 3rd party recipient\b/i,
+  });
+  const deliveryEmailRule = findQuestionVisibilityRuleByOptionPattern(questions, {
+    questionPattern: /\b(receive your records|delivery)\b/i,
+    optionPattern: /\b(encrypted email|unencrypted email)\b/i,
+  });
+
+  return {
+    ...output,
+    questions: questions.map((question) => {
+      if (!question) return question;
+
+      const hasExplicitVisibilityRule =
+        question?.visibility_rule && typeof question.visibility_rule === 'object';
+      const questionSignal = normalizeFieldName(
+        [
+          question?.id,
+          question?.label,
+          question?.help_text,
+          ...getBindingFieldNames(question, parsedPdf?.pages || []),
+        ]
+          .filter(Boolean)
+          .join(' '),
+      );
+
+      if (/\b(direct address|national provider identifier|npi)\b/i.test(questionSignal)) {
+        return hasExplicitVisibilityRule
+          ? {
+              ...question,
+              visibility_rule: null,
+            }
+          : question;
+      }
+
+      if (hasExplicitVisibilityRule) {
+        return question;
+      }
+
+      if (deliveryEmailRule && /\bemail address for delivery\b/i.test(questionSignal)) {
+        return {
+          ...question,
+          visibility_rule: deliveryEmailRule,
+        };
+      }
+
+      if (
+        purposeOtherThirdPartyRule &&
+        (
+          /^recipient\b/i.test(String(question?.label || '').trim()) ||
+          /\bif other 3rd party recipient selected\b/i.test(questionSignal)
+        )
+      ) {
+        return {
+          ...question,
+          visibility_rule: purposeOtherThirdPartyRule,
+        };
+      }
+
+      return question;
+    }),
+  };
 }
 
 function findParsedPageForBinding(binding, parsedPages = []) {
@@ -304,6 +497,31 @@ function buildRawMultiSelectQuestion({
   };
 }
 
+function buildRawSingleSelectQuestion({
+  id,
+  label,
+  options,
+  required = false,
+  helpText = null,
+  confidence = 0.97,
+}) {
+  return {
+    id,
+    label,
+    kind: 'single_select',
+    required,
+    help_text: helpText,
+    confidence,
+    bindings: [],
+    options: options.map((option) => ({
+      id: option.id,
+      label: option.label,
+      confidence,
+      bindings: option.bindings,
+    })),
+  };
+}
+
 function getBindingFieldNames(question, parsedPages = []) {
   return [
     ...(Array.isArray(question?.bindings) ? question.bindings : []),
@@ -314,6 +532,7 @@ function getBindingFieldNames(question, parsedPages = []) {
     .filter((binding) =>
       binding?.type === 'field_text' ||
       binding?.type === 'field_checkbox' ||
+      binding?.type === 'field_radio' ||
       binding?.type === 'overlay_text' ||
       binding?.type === 'overlay_mark',
     )
@@ -658,6 +877,89 @@ function buildCheckboxClusterQuestion(cluster, page) {
   });
 }
 
+function cleanRadioQuestionLabel(label) {
+  return normalizeString(label)
+    .replace(/^section\s+[a-z]:\s*/i, '')
+    .replace(/\s*:\s*$/i, '')
+    .trim();
+}
+
+function cleanRadioOptionLabel(label) {
+  const normalized = normalizeString(label).replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  if (/^yes\b/i.test(normalized)) return 'Yes';
+  if (/^no\b/i.test(normalized)) return 'No';
+  return normalized
+    .replace(/\s*;\s*or\s*$/i, '')
+    .replace(/\s*:\s*$/i, '')
+    .trim();
+}
+
+function buildRadioOption(widget, page, optionIndex) {
+  const sameRowWords = (page?.words || [])
+    .filter((word) => Math.abs(Number(word.y || 0) - Number(widget?.y || 0)) <= CHECKBOX_LABEL_WORD_TOLERANCE)
+    .filter((word) => Number(word.x || 0) >= Number(widget?.x || 0) + Math.max(Number(widget?.width || 0) - 3, 4))
+    .sort((left, right) => left.x - right.x);
+  const label = cleanRadioOptionLabel(
+    sameRowWords
+      .map((word) => normalizeRenderableWord(word.text || ''))
+      .filter(Boolean)
+      .join(' '),
+  );
+  if (!label) {
+    return null;
+  }
+
+  return {
+    id: slugifyQuestionId(label) || `radio-option-${optionIndex + 1}`,
+    label,
+    bindings: [
+      {
+        type: 'overlay_mark',
+        page_index: Number(page?.pageIndex || 0),
+        x: Number(widget?.x || 0) + Number(widget?.width || 0) / 2,
+        y: Number(widget?.y || 0) + Number(widget?.height || 0) / 2,
+        mark: 'x',
+        size: Math.max(Number(widget?.width || 0), Number(widget?.height || 0), 10),
+      },
+    ],
+  };
+}
+
+function buildRadioGroupQuestion(fieldName, widgets, page) {
+  const sortedWidgets = [...widgets].sort(
+    (left, right) =>
+      Number(right.y || 0) - Number(left.y || 0) || Number(left.x || 0) - Number(right.x || 0),
+  );
+  const questionLabel = cleanRadioQuestionLabel(
+    sortedWidgets[0]?.fieldLabel || humanizeFieldName(fieldName),
+  );
+  const options = sortedWidgets
+    .map((widget, index) => buildRadioOption(widget, page, index))
+    .filter(Boolean);
+  const uniqueOptions = [];
+  const seenOptionIds = new Set();
+
+  for (const option of options) {
+    if (!option?.id || seenOptionIds.has(option.id)) continue;
+    seenOptionIds.add(option.id);
+    uniqueOptions.push(option);
+  }
+
+  if (!questionLabel || uniqueOptions.length < 2) {
+    return null;
+  }
+
+  return buildRawSingleSelectQuestion({
+    id: slugifyQuestionId(questionLabel) || slugifyQuestionId(fieldName),
+    label: questionLabel,
+    required: false,
+    helpText: null,
+    confidence: 0.96,
+    options: uniqueOptions,
+  });
+}
+
 function buildQuestionOptionFieldNameMap(question, parsedPages = []) {
   const optionFieldNames = new Map();
   for (const option of question?.options || []) {
@@ -673,10 +975,103 @@ function getOptionBindingFieldName(option, parsedPages = []) {
   return resolveBindingFieldName(
     option?.bindings?.find(
       (binding) =>
-        binding?.type === 'field_checkbox' || binding?.type === 'overlay_mark',
+        binding?.type === 'field_checkbox' ||
+        binding?.type === 'field_radio' ||
+        binding?.type === 'overlay_mark',
     ),
     parsedPages,
   );
+}
+
+function isGenericBinaryOptionLabel(label) {
+  return /^(yes|no)$/i.test(normalizeString(label));
+}
+
+function shouldPreferSynthesizedCheckboxOptionLabel(existingOption, synthesizedOption, parsedPages = []) {
+  const existingLabel = normalizeString(existingOption?.label);
+  const synthesizedLabel = normalizeString(synthesizedOption?.label);
+  if (!synthesizedLabel) return false;
+  if (!existingLabel) return true;
+  if (isGenericBinaryOptionLabel(existingLabel) && !isGenericBinaryOptionLabel(synthesizedLabel)) {
+    return true;
+  }
+
+  const existingFieldName = getOptionBindingFieldName(existingOption, parsedPages);
+  if (
+    existingFieldName &&
+    normalizeFieldName(existingLabel) === normalizeFieldName(existingFieldName) &&
+    normalizeFieldName(synthesizedLabel) !== normalizeFieldName(existingFieldName)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function buildCheckboxOptionSignal(option, parsedPages = []) {
+  return normalizeFieldName(
+    [
+      option?.label,
+      option?.id,
+      getOptionBindingFieldName(option, parsedPages),
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+}
+
+function countMatchingCheckboxOptions(options, parsedPages = [], pattern) {
+  return (Array.isArray(options) ? options : []).reduce(
+    (count, option) => count + (pattern.test(buildCheckboxOptionSignal(option, parsedPages)) ? 1 : 0),
+    0,
+  );
+}
+
+function getCanonicalCheckboxQuestionPresentation(question, synthesizedQuestion, parsedPages = []) {
+  const options =
+    (Array.isArray(synthesizedQuestion?.options) && synthesizedQuestion.options.length > 0
+      ? synthesizedQuestion.options
+      : Array.isArray(question?.options)
+        ? question.options
+        : []) || [];
+  if (options.length === 0) {
+    return null;
+  }
+
+  const preservedHelpText =
+    normalizeString(question?.help_text || '') ||
+    normalizeString(synthesizedQuestion?.help_text || '') ||
+    'Select all that apply.';
+
+  if (countMatchingCheckboxOptions(options, parsedPages, DELIVERY_OPTION_HINT_PATTERN) >= 2) {
+    return {
+      label: 'How would you like to receive your records?',
+      helpText: preservedHelpText || null,
+    };
+  }
+
+  if (countMatchingCheckboxOptions(options, parsedPages, RECORD_SELECTION_OPTION_HINT_PATTERN) >= 4) {
+    return {
+      label: 'Select which parts of your record to release',
+      helpText: preservedHelpText || null,
+    };
+  }
+
+  if (countMatchingCheckboxOptions(options, parsedPages, RECIPIENT_OPTION_HINT_PATTERN) >= 2) {
+    return {
+      label: 'Who should receive the released information?',
+      helpText: preservedHelpText || null,
+    };
+  }
+
+  if (countMatchingCheckboxOptions(options, parsedPages, PURPOSE_OPTION_HINT_PATTERN) >= 2) {
+    return {
+      label: 'What is the purpose of the disclosure?',
+      helpText: preservedHelpText || null,
+    };
+  }
+
+  return null;
 }
 
 function buildTextWidgetPrintedLabel(widget, page) {
@@ -723,6 +1118,98 @@ function buildTextWidgetPrintedLabel(widget, page) {
   return nearestAboveLabel || humanizeFieldName(widget?.fieldName);
 }
 
+function scoreNearbyWidgetContext(originWidget, candidateWidget, pageWidth = 0) {
+  const originCenterX = Number(originWidget?.x || 0) + Number(originWidget?.width || 0) / 2;
+  const candidateCenterX =
+    Number(candidateWidget?.x || 0) + Number(candidateWidget?.width || 0) / 2;
+  const dx = Math.abs(originCenterX - candidateCenterX);
+  const dy = Math.abs(Number(originWidget?.y || 0) - Number(candidateWidget?.y || 0));
+  if (dy > 72 || dx > 280) {
+    return 0;
+  }
+
+  const pageMidX = Number(pageWidth || 0) / 2;
+  if (pageMidX > 0) {
+    const originOnRight = originCenterX >= pageMidX;
+    const candidateOnRight = candidateCenterX >= pageMidX;
+    if (originOnRight !== candidateOnRight && dx > 120) {
+      return 0;
+    }
+  }
+
+  return 1 / (1 + dx / 120 + dy / 18);
+}
+
+function inferTextWidgetContext(widget, page) {
+  let recipientScore = 0;
+  let patientScore = 0;
+
+  for (const candidate of page?.widgets || []) {
+    if (!candidate || candidate === widget) continue;
+    const signal = normalizeFieldName(
+      [candidate?.fieldName, candidate?.fieldLabel].filter(Boolean).join(' '),
+    );
+    if (!signal) continue;
+
+    const score = scoreNearbyWidgetContext(widget, candidate, Number(page?.width || 0));
+    if (score <= 0) continue;
+
+    if (RECIPIENT_CONTEXT_FIELD_PATTERN.test(signal)) {
+      recipientScore += score;
+    }
+    if (PATIENT_CONTEXT_FIELD_PATTERN.test(signal)) {
+      patientScore += score;
+    }
+  }
+
+  if (recipientScore >= 0.5 && recipientScore > patientScore) {
+    return 'recipient';
+  }
+  if (patientScore >= 0.5 && patientScore > recipientScore) {
+    return 'patient';
+  }
+
+  return null;
+}
+
+function buildContextualFieldQuestionDefinition(widget, page, confidence = 0.97) {
+  const normalizedFieldName = normalizeFieldName(widget?.fieldName);
+  if (!normalizedFieldName) {
+    return null;
+  }
+
+  const context = inferTextWidgetContext(widget, page);
+  if (context !== 'recipient') {
+    return null;
+  }
+
+  if (/^city$/.test(normalizedFieldName)) {
+    return {
+      id: 'recipient_city',
+      label: 'Recipient city',
+      required: false,
+      confidence,
+      attachParentContext: false,
+      fieldName: normalizeString(widget?.fieldName),
+      helpText: null,
+    };
+  }
+
+  if (/^zip$|^zip code$|^zipcode$|^codigo postal$/.test(normalizedFieldName)) {
+    return {
+      id: 'recipient_zip',
+      label: 'Recipient ZIP code',
+      required: false,
+      confidence,
+      attachParentContext: false,
+      fieldName: normalizeString(widget?.fieldName),
+      helpText: null,
+    };
+  }
+
+  return null;
+}
+
 function isFollowUpTriggerOption(option) {
   const signal = normalizeFieldName(
     [option?.label, option?.id, getOptionBindingFieldName(option)].filter(Boolean).join(' '),
@@ -730,24 +1217,53 @@ function isFollowUpTriggerOption(option) {
   return FOLLOW_UP_OPTION_PATTERN.test(signal);
 }
 
-function buildPageCheckboxQuestionEntries(questions, page) {
-  const widgetByFieldName = new Map(
-    (page?.widgets || [])
-      .map((widget) => [normalizeFieldName(widget?.fieldName), widget])
-      .filter(([fieldName]) => fieldName),
+function findQuestionOptionWidget(option, page) {
+  const optionBindings = Array.isArray(option?.bindings) ? option.bindings : [];
+  const directBinding = optionBindings.find(
+    (binding) =>
+      binding?.type === 'field_checkbox' ||
+      binding?.type === 'field_radio' ||
+      binding?.type === 'overlay_mark',
   );
+  const fieldName = getOptionBindingFieldName(option, [page]);
+  if (fieldName && directBinding?.type !== 'overlay_mark') {
+    const directWidget =
+      (page?.widgets || []).find(
+        (widget) => normalizeFieldName(widget?.fieldName) === fieldName,
+      ) || null;
+    if (directWidget) {
+      return directWidget;
+    }
+  }
+
+  const scoredMatches = (page?.widgets || [])
+    .map((widget) => ({
+      widget,
+      score: optionBindings.reduce((bestScore, binding) => {
+        const score = scoreBindingWidgetMatch(binding, widget);
+        if (score == null) return bestScore;
+        return bestScore == null ? score : Math.min(bestScore, score);
+      }, null),
+    }))
+    .filter((entry) => entry.score != null)
+    .sort((left, right) => left.score - right.score);
+
+  return scoredMatches[0]?.widget || null;
+}
+
+function buildPageSelectableQuestionEntries(questions, page) {
 
   return questions
     .map((question, questionIndex) => {
       const optionEntries = (question?.options || [])
         .map((option) => {
           const fieldName = getOptionBindingFieldName(option, [page]);
-          const widget = fieldName ? widgetByFieldName.get(fieldName) || null : null;
-          if (!fieldName || !widget) return null;
+          const widget = findQuestionOptionWidget(option, page);
+          if (!widget) return null;
           return {
             option,
             widget,
-            fieldName,
+            fieldName: fieldName || normalizeFieldName(widget?.fieldName),
           };
         })
         .filter(Boolean);
@@ -816,7 +1332,7 @@ function selectFollowUpTriggerOption(widget, optionEntries, page) {
 }
 
 function findFollowUpParentForTextWidget(widget, questions, page) {
-  const pageQuestionEntries = buildPageCheckboxQuestionEntries(questions, page);
+  const pageQuestionEntries = buildPageSelectableQuestionEntries(questions, page);
   const widgetY = Number(widget?.y || 0);
   let bestMatch = null;
   let bestScore = -Infinity;
@@ -916,6 +1432,10 @@ function shouldAttachParentContextToDirectDefinition(fieldName, definition, widg
     return false;
   }
 
+  if (typeof definition?.attachParentContext === 'boolean') {
+    return definition.attachParentContext;
+  }
+
   const followUpSignal = normalizeFieldName(
     [
       fieldName,
@@ -937,7 +1457,9 @@ function buildCanonicalTextWidgetQuestionEntry(widget, questions, page) {
   if (isExcludedAutofillFieldName(normalizedFieldName)) return null;
 
   const parentContext = findFollowUpParentForTextWidget(widget, questions, page);
-  const definition = buildFieldQuestionDefinition(fieldName, widget?.fieldLabel || '');
+  const definition =
+    buildFieldQuestionDefinition(fieldName, widget?.fieldLabel || '') ||
+    buildContextualFieldQuestionDefinition(widget, page);
 
   let question = null;
   if (definition) {
@@ -1145,6 +1667,97 @@ function reconcileTextWidgetQuestions(output, parsedPdf) {
   };
 }
 
+function buildSelectQuestionOptionEntries(question, parsedPages = []) {
+  return (Array.isArray(question?.options) ? question.options : [])
+    .map((option) => ({
+      option,
+      fieldName: getOptionBindingFieldName(option, parsedPages),
+    }))
+    .filter((entry) => entry.fieldName);
+}
+
+function collapseRedundantSelectQuestions(output, parsedPdf) {
+  const questions = Array.isArray(output?.questions) ? output.questions : [];
+  const parsedPages = parsedPdf?.pages || [];
+  const selectEntries = questions
+    .map((question, index) => ({
+      question,
+      index,
+      optionEntries: buildSelectQuestionOptionEntries(question, parsedPages),
+    }))
+    .filter((entry) => entry.optionEntries.length > 0);
+
+  const redundantQuestionRemaps = new Map();
+
+  for (const candidate of selectEntries) {
+    if (normalizeString(candidate.question?.visibility_rule?.parent_question_id)) {
+      continue;
+    }
+    if (candidate.optionEntries.length !== 1) {
+      continue;
+    }
+
+    const candidateFieldName = candidate.optionEntries[0].fieldName;
+    let bestParent = null;
+
+    for (const parent of selectEntries) {
+      if (parent.index === candidate.index) continue;
+      if (parent.optionEntries.length <= candidate.optionEntries.length) continue;
+
+      const matchingParentOption = parent.optionEntries.find(
+        (entry) => entry.fieldName === candidateFieldName,
+      );
+      if (!matchingParentOption) continue;
+
+      const score = parent.optionEntries.length * 10 - Math.abs(parent.index - candidate.index);
+      if (!bestParent || score > bestParent.score) {
+        bestParent = {
+          score,
+          parentQuestionId: parent.question.id,
+          parentOptionId: matchingParentOption.option.id,
+        };
+      }
+    }
+
+    if (!bestParent?.parentQuestionId || !bestParent?.parentOptionId) {
+      continue;
+    }
+
+    redundantQuestionRemaps.set(slugifyQuestionId(candidate.question?.id || ''), {
+      parentQuestionId: bestParent.parentQuestionId,
+      parentOptionId: bestParent.parentOptionId,
+    });
+  }
+
+  if (redundantQuestionRemaps.size === 0) {
+    return output;
+  }
+
+  return {
+    ...output,
+    questions: questions
+      .filter((question) => !redundantQuestionRemaps.has(slugifyQuestionId(question?.id || '')))
+      .map((question) => {
+        const currentVisibilityRule = question?.visibility_rule || null;
+        const remappedParent = currentVisibilityRule?.parent_question_id
+          ? redundantQuestionRemaps.get(slugifyQuestionId(currentVisibilityRule.parent_question_id))
+          : null;
+        if (!remappedParent) {
+          return question;
+        }
+
+        return {
+          ...question,
+          visibility_rule: {
+            ...currentVisibilityRule,
+            parent_question_id: remappedParent.parentQuestionId,
+            parent_option_ids: [remappedParent.parentOptionId],
+          },
+        };
+      }),
+  };
+}
+
 function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
   const synthesizedQuestion = buildCheckboxClusterQuestion(cluster, page);
   if (!synthesizedQuestion) return question;
@@ -1166,7 +1779,9 @@ function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
       existingOption
         ? {
             ...existingOption,
-            label: normalizeString(existingOption.label) || option.label,
+            label: shouldPreferSynthesizedCheckboxOptionLabel(existingOption, option, [page])
+              ? option.label
+              : normalizeString(existingOption.label) || option.label,
             bindings:
               Array.isArray(existingOption.bindings) && existingOption.bindings.length > 0
                 ? existingOption.bindings
@@ -1193,19 +1808,26 @@ function mergeCheckboxClusterIntoQuestion(question, cluster, page) {
     questionIdLooksLikeOption || !normalizedQuestionId
       ? synthesizedQuestion.id
       : question.id;
+  const canonicalPresentation = getCanonicalCheckboxQuestionPresentation(
+    question,
+    synthesizedQuestion,
+    [page],
+  );
 
   return {
     ...question,
     id: nextQuestionId,
     kind: 'multi_select',
     label:
-      coveredClusterFieldCount < (synthesizedQuestion.options || []).length
+      canonicalPresentation?.label ||
+      (coveredClusterFieldCount < (synthesizedQuestion.options || []).length
         ? synthesizedQuestion.label
-        : normalizeString(question?.label) || synthesizedQuestion.label,
+        : normalizeString(question?.label) || synthesizedQuestion.label),
     help_text:
-      coveredClusterFieldCount < (synthesizedQuestion.options || []).length
+      canonicalPresentation?.helpText ||
+      (coveredClusterFieldCount < (synthesizedQuestion.options || []).length
         ? synthesizedQuestion.help_text || null
-        : normalizeString(question?.help_text || '') || synthesizedQuestion.help_text || null,
+        : normalizeString(question?.help_text || '') || synthesizedQuestion.help_text || null),
     confidence: question?.confidence || synthesizedQuestion.confidence || 0.97,
     bindings: mergedOptions.flatMap((option) => option.bindings || []),
     options: mergedOptions,
@@ -1362,6 +1984,14 @@ function buildFieldQuestionDefinition(fieldName, fieldLabel = '', confidence = 0
       },
     },
     {
+      pattern: /^other records other specify$/,
+      question: {
+        id: 'release_other_details',
+        label: 'If Other selected, specify which other records to release',
+        attachParentContext: true,
+      },
+    },
+    {
       pattern: /^fill_4$/,
       question: {
         id: 'purpose_other_details',
@@ -1417,6 +2047,113 @@ function buildFieldQuestionDefinition(fieldName, fieldLabel = '', confidence = 0
       question: {
         id: 'expiration_date_or_event',
         label: 'Enter the expiration date or event for this authorization',
+      },
+    },
+    {
+      pattern: /^recipients? name$/,
+      question: {
+        id: 'recipient_name',
+        label: 'Recipient name',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern: /^recipient address$/,
+      question: {
+        id: 'recipient_address',
+        label: 'Recipient address',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern: /^recipients? phone$/,
+      question: {
+        id: 'recipient_phone',
+        label: 'Recipient phone number',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern: /^recipients? fax$/,
+      question: {
+        id: 'recipient_fax',
+        label: 'Recipient fax number',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern: /^email for releases to email$/,
+      question: {
+        id: 'delivery_email_address',
+        label: 'Email address for delivery',
+        attachParentContext: true,
+      },
+    },
+    {
+      pattern: /^request dates of service$/,
+      question: {
+        id: 'request_dates_of_service',
+        label: 'Request dates of service',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern: /^facility names and addresses$/,
+      question: {
+        id: 'facility_names_and_addresses',
+        label: 'Facility name(s) and addresses',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern: /^purpose of disclosure other 3rd party recipient please specify purpose$/,
+      question: {
+        id: 'purpose_other_3rd_party_details',
+        label: 'If Other 3rd party recipient selected, specify purpose',
+        attachParentContext: true,
+      },
+    },
+    {
+      pattern: /^expiration date$/,
+      question: {
+        id: 'expiration_date',
+        label: 'Expiration date',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern: /^expiration event$/,
+      question: {
+        id: 'expiration_event',
+        label: 'Expiration event',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern: /^direct address or national provider identifier$/,
+      question: {
+        id: 'uscdi_direct_address_or_npi',
+        label: 'Direct address or National Provider Identifier',
+        helpText: 'Only needed for USCDI release requests.',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern:
+        /^all types of information found in the records selected above will be provided specify any information you want to exclude$/,
+      question: {
+        id: 'exclude_information_details',
+        label: 'Specify any information you want to exclude',
+        attachParentContext: false,
+      },
+    },
+    {
+      pattern:
+        /^will the provider receive financial remuneration in exchange for using or disclosing this information if yes describe$/,
+      question: {
+        id: 'financial_remuneration_details',
+        label: 'If yes, describe the financial remuneration',
+        attachParentContext: false,
       },
     },
   ];
@@ -1513,6 +2250,33 @@ function addMissingWidgetQuestions(output, parsedPdf) {
   }
 
   for (const page of parsedPdf?.pages || []) {
+    const radioGroups = new Map();
+    for (const widget of page?.widgets || []) {
+      if (!isRadioWidget(widget) || !normalizeFieldName(widget?.fieldName)) continue;
+      const groupKey = normalizeFieldName(widget.fieldName);
+      const group = radioGroups.get(groupKey) || [];
+      group.push(widget);
+      radioGroups.set(groupKey, group);
+    }
+
+    for (const [fieldName, groupWidgets] of radioGroups.entries()) {
+      if (groupWidgets.length < 2) continue;
+      const synthesizedQuestion = buildRadioGroupQuestion(fieldName, groupWidgets, page);
+      if (!synthesizedQuestion) continue;
+
+      const alreadyPresent = questions.some(
+        (question) =>
+          normalizeFieldName(question?.label) === normalizeFieldName(synthesizedQuestion.label),
+      );
+      if (alreadyPresent) {
+        continue;
+      }
+
+      questions.push(synthesizedQuestion);
+    }
+  }
+
+  for (const page of parsedPdf?.pages || []) {
     const textWidgets = [...(page.widgets || [])]
       .filter((widget) => isTextWidget(widget))
       .sort((left, right) => Number(right.y || 0) - Number(left.y || 0) || Number(left.x || 0) - Number(right.x || 0));
@@ -1523,7 +2287,9 @@ function addMissingWidgetQuestions(output, parsedPdf) {
       if (!fieldName || existingFieldNames.has(normalizedFieldName)) continue;
       if (isExcludedAutofillFieldName(normalizedFieldName)) continue;
 
-      const definition = buildFieldQuestionDefinition(fieldName, widget?.fieldLabel || '');
+      const definition =
+        buildFieldQuestionDefinition(fieldName, widget?.fieldLabel || '') ||
+        buildContextualFieldQuestionDefinition(widget, page);
       if (definition) {
         questions.push(
           buildRawShortTextQuestion({
@@ -1577,8 +2343,10 @@ export function repairPdfFormUnderstandingOutput(output, parsedPdf) {
     parsedPdf,
   );
   const checkboxReconciledOutput = reconcileCheckboxQuestionIds(widgetCompletedOutput, parsedPdf);
-
-  return reconcileTextWidgetQuestions(checkboxReconciledOutput, parsedPdf);
+  const textReconciledOutput = reconcileTextWidgetQuestions(checkboxReconciledOutput, parsedPdf);
+  const collapsedOutput = collapseRedundantSelectQuestions(textReconciledOutput, parsedPdf);
+  const visibilityHeuristicOutput = applyQuestionVisibilityHeuristics(collapsedOutput, parsedPdf);
+  return filterExcludedAutofillQuestions(visibilityHeuristicOutput, parsedPdf);
 }
 
 export function preparePdfFormUnderstandingExtraction(options) {

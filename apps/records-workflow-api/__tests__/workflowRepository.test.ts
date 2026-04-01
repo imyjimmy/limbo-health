@@ -673,6 +673,215 @@ describe('workflowRepository request packet PDF hydration', () => {
     ]);
   });
 
+  it('suppresses facility-bound questions and gates St David recipient details behind the third-party purpose branch', async () => {
+    vi.mocked(query)
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'system-1',
+            system_name: "St. David's HealthCare",
+            canonical_domain: 'stdavids.com',
+            state: 'TX',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            name: 'Authorization for Release of Medical Information',
+            url: 'https://hospital.example/st-david.pdf',
+            format: 'pdf',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            id: 'doc-1',
+            facility_id: 'facility-1',
+            facility_name: "St. David's Medical Center",
+            facility_city: 'Austin',
+            facility_state: 'TX',
+            source_url: 'https://hospital.example/st-david.pdf',
+            title: 'Authorization for Release of Medical Information',
+            storage_path: '/tmp/storage/raw/tx/st-david.pdf',
+            fetched_at: '2026-03-30T00:00:00.000Z',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            source_document_id: 'doc-1',
+            payload: {
+              supported: true,
+              mode: 'acroform',
+              template_id: 'st-david-template',
+              confidence: 0.97,
+              questions: [
+                {
+                  id: 'purpose-of-disclosure',
+                  label: 'Purpose of Disclosure',
+                  kind: 'single_select',
+                  required: false,
+                  help_text: null,
+                  confidence: 0.96,
+                  bindings: [],
+                  options: [
+                    {
+                      id: 'at-the-request-of-the-individual',
+                      label: 'At the request of the individual',
+                      confidence: 0.99,
+                      bindings: [],
+                    },
+                    {
+                      id: 'other-3rd-party-recipient',
+                      label: 'Other 3rd party recipient',
+                      confidence: 0.99,
+                      bindings: [],
+                    },
+                  ],
+                },
+                {
+                  id: 'recipient-name',
+                  label: 'Recipient name',
+                  kind: 'short_text',
+                  required: false,
+                  help_text: null,
+                  confidence: 0.97,
+                  bindings: [
+                    {
+                      type: 'field_text',
+                      field_name: 'Recipients Name',
+                    },
+                  ],
+                  options: [],
+                },
+                {
+                  id: 'delivery-format',
+                  label: 'How would you like to receive your records?',
+                  kind: 'multi_select',
+                  required: false,
+                  help_text: null,
+                  confidence: 0.97,
+                  bindings: [],
+                  options: [
+                    {
+                      id: 'paper-copy',
+                      label: 'Paper Copy',
+                      confidence: 0.99,
+                      bindings: [],
+                    },
+                    {
+                      id: 'encrypted-email',
+                      label: 'Encrypted Email',
+                      confidence: 0.99,
+                      bindings: [],
+                    },
+                  ],
+                },
+                {
+                  id: 'delivery-email-address',
+                  label: 'Email address for delivery',
+                  kind: 'short_text',
+                  required: false,
+                  help_text: null,
+                  confidence: 0.97,
+                  bindings: [
+                    {
+                      type: 'field_text',
+                      field_name: 'Email for releases to email',
+                    },
+                  ],
+                  options: [],
+                },
+                {
+                  id: 'facility-names-and-addresses',
+                  label: 'Facility name(s) and addresses',
+                  kind: 'short_text',
+                  required: false,
+                  help_text: null,
+                  confidence: 0.97,
+                  bindings: [
+                    {
+                      type: 'field_text',
+                      field_name: 'Facility Names and Addresses',
+                    },
+                  ],
+                  options: [],
+                },
+                {
+                  id: 'uscdi-direct-address-or-npi',
+                  label: 'Direct address or National Provider Identifier',
+                  kind: 'short_text',
+                  required: false,
+                  help_text: null,
+                  confidence: 0.97,
+                  visibility_rule: {
+                    parent_question_id: 'records-to-release',
+                    parent_option_ids: ['other'],
+                  },
+                  bindings: [
+                    {
+                      type: 'field_text',
+                      field_name: 'Direct Address or National Provider Identifier',
+                    },
+                  ],
+                  options: [],
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+    const packet = await getSystemRequestPacket('system-1');
+    const form = packet?.forms[0];
+    const questions = form?.autofill.questions || [];
+
+    expect(form).toMatchObject({
+      cached_facility_name: "St. David's Medical Center",
+      cached_facility_city: 'Austin',
+      cached_facility_state: 'TX',
+    });
+    expect(questions.map((question) => ({
+      id: question.id,
+      visibility_rule: question.visibility_rule,
+    }))).toEqual([
+      {
+        id: 'purpose-of-disclosure',
+        visibility_rule: null,
+      },
+      {
+        id: 'recipient-name',
+        visibility_rule: {
+          parent_question_id: 'purpose-of-disclosure',
+          parent_option_ids: ['other-3rd-party-recipient'],
+        },
+      },
+      {
+        id: 'delivery-format',
+        visibility_rule: null,
+      },
+      {
+        id: 'delivery-email-address',
+        visibility_rule: {
+          parent_question_id: 'delivery-format',
+          parent_option_ids: ['encrypted-email'],
+        },
+      },
+      {
+        id: 'uscdi-direct-address-or-npi',
+        visibility_rule: null,
+      },
+    ]);
+  });
+
   it('adds cached PDFs to the packet even when no workflow forms were extracted', async () => {
     vi.mocked(query)
       .mockResolvedValueOnce({

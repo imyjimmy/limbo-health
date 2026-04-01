@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizePdfFormUnderstanding } from '../src/utils/pdfFormUnderstanding.js';
 
 describe('normalizePdfFormUnderstanding', () => {
-  it('drops malformed and low-confidence questions instead of surfacing them', () => {
+  it('drops malformed and low-confidence questions without discarding valid mixed-family questions', () => {
     const result = normalizePdfFormUnderstanding({
       mode: 'overlay',
       confidence: 0.9,
@@ -122,8 +122,84 @@ describe('normalizePdfFormUnderstanding', () => {
             },
           ],
         },
+        {
+          id: 'mixed-bindings',
+          label: 'Mixed bindings',
+          kind: 'single_select',
+          required: false,
+          help_text: null,
+          confidence: 0.95,
+          visibility_rule: null,
+          bindings: [],
+          options: [
+            {
+              id: 'field-choice',
+              label: 'Field choice',
+              confidence: 0.95,
+              bindings: [
+                {
+                  type: 'field_checkbox',
+                  field_name: 'ChoiceA',
+                  checked: true,
+                },
+              ],
+            },
+          ],
+        },
       ],
     });
+  });
+
+  it('falls back to acroform mode when valid questions span both binding families', () => {
+    const result = normalizePdfFormUnderstanding({
+      confidence: 0.96,
+      questions: [
+        {
+          id: 'recipient-name',
+          label: 'Recipient name',
+          kind: 'short_text',
+          required: false,
+          confidence: 0.95,
+          bindings: [
+            {
+              type: 'field_text',
+              field_name: 'RecipientName',
+            },
+          ],
+        },
+        {
+          id: 'purpose',
+          label: 'Purpose of disclosure',
+          kind: 'single_select',
+          required: false,
+          confidence: 0.97,
+          options: [
+            {
+              id: 'continuing-care',
+              label: 'Continuing care',
+              confidence: 0.97,
+              bindings: [
+                {
+                  type: 'overlay_mark',
+                  page_index: 0,
+                  x: 120,
+                  y: 340,
+                  mark: 'x',
+                  size: 12,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.supported).toBe(true);
+    expect(result.mode).toBe('acroform');
+    expect(result.questions.map((question) => question.id)).toEqual([
+      'recipient-name',
+      'purpose',
+    ]);
   });
 
   it('returns an unsupported payload when no valid questions survive validation', () => {

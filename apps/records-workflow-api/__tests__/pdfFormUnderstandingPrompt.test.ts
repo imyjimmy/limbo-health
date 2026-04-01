@@ -103,8 +103,11 @@ describe('pdfFormUnderstandingPrompt', () => {
               { fieldName: 'EMAIL', fieldType: 'Button', x: 320, y: 760, width: 60, height: 23 },
               { fieldName: 'RESET', fieldType: 'Button', x: 390, y: 760, width: 60, height: 23 },
               { fieldName: 'Patient Name', fieldType: 'Text', x: 55, y: 546, width: 203, height: 18 },
+              { fieldName: 'first_name', fieldType: 'Text', x: 55, y: 538, width: 96, height: 18 },
+              { fieldName: 'last_name', fieldType: 'Text', x: 160, y: 538, width: 96, height: 18 },
               { fieldName: 'Last 4 of Social Security Number', fieldType: 'Text', x: 261, y: 546, width: 98, height: 18 },
               { fieldName: 'DOB', fieldType: 'Text', x: 360, y: 553, width: 74, height: 12 },
+              { fieldName: 'date_of_birth', fieldType: 'Text', x: 360, y: 538, width: 74, height: 12 },
               { fieldName: 'Acct', fieldType: 'Text', x: 437, y: 546, width: 78, height: 18 },
               { fieldName: 'MRN', fieldType: 'Text', x: 516, y: 546, width: 78, height: 18 },
               { fieldName: 'Patient Street Address', fieldType: 'Text', x: 55, y: 519, width: 254, height: 16 },
@@ -144,6 +147,9 @@ describe('pdfFormUnderstandingPrompt', () => {
 
     expect(prepared.userPrompt).not.toContain('"field_name": "PRINT"');
     expect(prepared.userPrompt).not.toContain('"field_name": "Patient Street Address"');
+    expect(prepared.userPrompt).not.toContain('"field_name": "first_name"');
+    expect(prepared.userPrompt).not.toContain('"field_name": "last_name"');
+    expect(prepared.userPrompt).not.toContain('"field_name": "date_of_birth"');
     expect(prepared.userPrompt).toContain('"field_name": "continuedcare"');
     expect(prepared.userPrompt).toContain('"field_name": "summaryabstractonly"');
     expect(prepared.userPrompt).toContain('"field_name": "treatment date from"');

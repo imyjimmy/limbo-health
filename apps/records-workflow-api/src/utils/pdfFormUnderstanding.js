@@ -393,28 +393,23 @@ export function normalizePdfFormUnderstanding(rawValue, minimumConfidence = MIN_
 
   const explicitMode = normalizeMode(rawValue.mode);
   const inferredMode = families.size === 1 ? Array.from(families)[0] : null;
-  const mode = explicitMode || inferredMode;
+  const fallbackMode = families.has('acroform')
+    ? 'acroform'
+    : families.has('overlay')
+      ? 'overlay'
+      : null;
+  const mode = explicitMode || inferredMode || fallbackMode;
   if (!mode) {
     return buildUnsupportedAutofillPayload({
       signature_areas: signatureAreas,
     });
   }
 
-  const expectedFamily = mode;
-  const questions = normalizedQuestions.filter((question) => {
-    const bindings =
-      question.kind === 'short_text'
-        ? question.bindings
-        : question.options.flatMap((option) => option.bindings);
-
-    return bindings.every((binding) => inferBindingFamily(binding.type) === expectedFamily);
-  });
-
   const confidence =
     clampConfidence(rawValue.confidence) ??
-    Math.max(...questions.map((question) => question.confidence), 0);
+    Math.max(...normalizedQuestions.map((question) => question.confidence), 0);
 
-  if (!questions.length || confidence < minimumConfidence) {
+  if (!normalizedQuestions.length || confidence < minimumConfidence) {
     return buildUnsupportedAutofillPayload({
       mode,
       confidence,
@@ -427,7 +422,7 @@ export function normalizePdfFormUnderstanding(rawValue, minimumConfidence = MIN_
     mode,
     template_id: normalizeString(rawValue.template_id) || null,
     confidence,
-    questions,
+    questions: normalizedQuestions,
     signature_areas: signatureAreas,
   };
 }

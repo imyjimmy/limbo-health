@@ -52,7 +52,14 @@ const REGION_KEYWORDS = [
 
 const BIO_WIDGET_PATTERNS = [
   /\bpatient name\b/,
+  /\bpatient first name\b/,
+  /\bpatient last name\b/,
+  /\bfirst[\s_-]*name\b/,
+  /\blast[\s_-]*name\b/,
+  /\bfull[\s_-]*name\b/,
+  /\bmiddle[\s_-]*initial\b/,
   /\bdate of birth\b/,
+  /\bbirth[\s_-]*date\b/,
   /\bdob\b/,
   /\bsocial security\b/,
   /\bssn\b/,
@@ -62,6 +69,10 @@ const BIO_WIDGET_PATTERNS = [
   /\bpatient zip\b/,
   /\bpatient telephone\b/,
   /\bpatient email\b/,
+  /\bnombre del paciente\b/,
+  /\bfecha de nacimiento\b/,
+  /\btelefono del paciente\b/,
+  /\bcorreo electronico del paciente\b/,
   /\bacct\b/,
   /\bmrn\b/,
 ];
@@ -210,7 +221,9 @@ function truncate(value, maxChars) {
 }
 
 function normalizeWidgetText(widget) {
-  return compactWhitespace(`${widget?.fieldName || ''} ${widget?.fieldLabel || ''}`).toLowerCase();
+  return compactWhitespace(`${widget?.fieldName || ''} ${widget?.fieldLabel || ''}`)
+    .replace(/[_-]+/g, ' ')
+    .toLowerCase();
 }
 
 function sortWords(words) {
@@ -424,11 +437,11 @@ function scoreWidget(page, widget) {
   }
 
   if (matchesAnyPattern(semanticText, BIO_WIDGET_PATTERNS)) {
-    score -= 45;
+    score -= 120;
   }
 
   if (matchesAnyPattern(normalizedText, BIO_WIDGET_PATTERNS)) {
-    score -= 10;
+    score -= 40;
   }
 
   if (matchesAnyPattern(semanticText, SIGNATURE_WIDGET_PATTERNS)) {
@@ -442,6 +455,14 @@ function scoreWidget(page, widget) {
   score += keywordHits * 24;
   score += Math.round(relativeHeight * 25);
   return score;
+}
+
+function isExplicitlyExcludedWidget(widget) {
+  const normalizedText = normalizeWidgetText(widget);
+  return (
+    matchesAnyPattern(normalizedText, BIO_WIDGET_PATTERNS) ||
+    matchesAnyPattern(normalizedText, SIGNATURE_WIDGET_PATTERNS)
+  );
 }
 
 function scoreCandidate(page, candidate, profile) {
@@ -503,7 +524,7 @@ function selectWidgets(page, profile) {
       index,
       score: scoreWidget(page, widget),
     }))
-    .filter((entry) => entry.score > 0)
+    .filter((entry) => entry.score > 0 && !isExplicitlyExcludedWidget(entry.widget))
     .sort((left, right) => {
       if (right.score !== left.score) return right.score - left.score;
       return left.index - right.index;
@@ -682,7 +703,7 @@ function buildUserPrompt({
       task: 'Extract only additional, user-answerable questions from fillable regions of this medical-records request PDF.',
       rules: [
         'Only return questions that the user must answer beyond already-collected bio fields.',
-        'Exclude name, date of birth, mailing address, signatures, photo-ID upload, and pure instructions.',
+        'Exclude first name, last name, name, date of birth, mailing address, signatures, photo-ID upload, and pure instructions.',
         'Supported question kinds: single_select, multi_select, short_text.',
         'Do not merge separate answer slots into one short_text question. If the PDF has separate boxes for from/to dates, provider details, or separate initials for sensitive categories, return one question per field.',
         'When a text field is a follow-up to an "Other" or "Specify ..." option, return it as its own optional short_text question with a label that makes that dependency explicit.',

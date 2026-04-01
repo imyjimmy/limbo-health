@@ -153,6 +153,7 @@ describe('pdfFormUnderstandingExtractor', () => {
           help_text: 'Select all that apply.',
           confidence: 0.9,
           bindings: [],
+          visibility_rule: null,
           options: [
             {
               id: 'xrays',
@@ -532,7 +533,7 @@ describe('pdfFormUnderstandingExtractor', () => {
 
     const labels = result.structuredOutput.form_understanding.questions.map((question) => question.label);
     const recipientQuestionIndex = labels.findIndex((label) =>
-      /released to/i.test(label),
+      /receive the released information/i.test(label),
     );
 
     expect(recipientQuestionIndex).toBeGreaterThanOrEqual(0);
@@ -662,13 +663,99 @@ describe('pdfFormUnderstandingExtractor', () => {
 
     expect(labels.filter((label) => /receive the released information/i.test(label))).toHaveLength(1);
     expect(labels).toEqual([
-      'Select who will receive the released information',
+      'Who should receive the released information?',
       'If Other selected, specify Individual/Organization Name',
       'If Other selected, specify Telephone Number',
       'If Other selected, specify Street Address',
       'If Other selected, specify City, State, Zip',
       'If Other selected, specify Fax Number',
     ]);
+  });
+
+  it('filters Bio-owned identity fields and legal remuneration prompts from repaired output', () => {
+    const repaired = repairPdfFormUnderstandingOutput(
+      {
+        supported: true,
+        mode: 'acroform',
+        template_id: null,
+        confidence: 0.99,
+        questions: [
+          {
+            id: 'patient-name',
+            kind: 'short_text',
+            label: 'Name:',
+            required: true,
+            help_text: null,
+            confidence: 0.99,
+            bindings: [
+              {
+                type: 'field_text',
+                field_name: 'first_name',
+              },
+            ],
+            options: [],
+          },
+          {
+            id: 'patient-birth',
+            kind: 'short_text',
+            label: 'Birth:',
+            required: true,
+            help_text: null,
+            confidence: 0.99,
+            bindings: [
+              {
+                type: 'field_text',
+                field_name: 'date_of_birth',
+              },
+            ],
+            options: [],
+          },
+          {
+            id: 'financial-remuneration',
+            kind: 'single_select',
+            label: 'May the recipient of the PHI further exchange the information for financial remuneration?',
+            required: false,
+            help_text: null,
+            confidence: 0.99,
+            bindings: [],
+            options: [
+              {
+                id: 'yes',
+                label: 'Yes',
+                confidence: 0.99,
+                bindings: [],
+              },
+              {
+                id: 'no',
+                label: 'No',
+                confidence: 0.99,
+                bindings: [],
+              },
+            ],
+          },
+          {
+            id: 'treatment-date-from',
+            kind: 'short_text',
+            label: 'Treatment date from',
+            required: false,
+            help_text: null,
+            confidence: 0.95,
+            bindings: [
+              {
+                type: 'field_text',
+                field_name: 'treatment date from',
+              },
+            ],
+            options: [],
+          },
+        ],
+      },
+      {
+        pages: [],
+      },
+    );
+
+    expect(repaired.questions.map((question) => question.id)).toEqual(['treatment-date-from']);
   });
 
   it('returns a partial payload instead of calling OpenAI when the prompt stays over budget', async () => {

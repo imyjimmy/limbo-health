@@ -1225,35 +1225,56 @@ async function listCachedPdfSourceDocuments({ hospitalSystemId, facilityId = und
   if (!hospitalSystemId) return [];
 
   const params = [hospitalSystemId];
-  let facilityClause = 'and facility_id is null';
-  let orderBy = 'order by fetched_at desc, source_url asc';
+  const selectClause = `select
+       sd.id,
+       sd.facility_id,
+       sd.source_url,
+       sd.title,
+       sd.storage_path,
+       sd.fetched_at,
+       f.facility_name,
+       f.city as facility_city,
+       f.state as facility_state
+     from source_documents sd
+     left join facilities f on f.id = sd.facility_id
+     where sd.hospital_system_id = $1
+       and sd.source_type = 'pdf'
+       and sd.storage_path is not null
+       and sd.storage_path <> ''`;
 
   if (typeof facilityId === 'string' && facilityId) {
     params.push(facilityId);
-    facilityClause = 'and (facility_id = $2 or facility_id is null)';
-    orderBy =
-      'order by case when facility_id = $2 then 0 else 1 end, fetched_at desc, source_url asc';
+    const result = await query(
+      `${selectClause}
+       and (facility_id = $2 or facility_id is null)
+       order by case when facility_id = $2 then 0 else 1 end, fetched_at desc, source_url asc`,
+      params
+    );
+
+    return uniqueBy(result.rows, (row) => normalizeComparableUrl(row.source_url) || row.id);
   }
 
-  const result = await query(
-    `select
-       id,
-       facility_id,
-       source_url,
-       title,
-       storage_path,
-       fetched_at
-     from source_documents
-     where hospital_system_id = $1
-       ${facilityClause}
-       and source_type = 'pdf'
-       and storage_path is not null
-       and storage_path <> ''
-     ${orderBy}`,
+  const systemLevelResult = await query(
+    `${selectClause}
+     and facility_id is null
+     order by fetched_at desc, source_url asc`,
     params
   );
 
-  return uniqueBy(result.rows, (row) => normalizeComparableUrl(row.source_url) || row.id);
+  if (systemLevelResult.rows.length > 0) {
+    return uniqueBy(systemLevelResult.rows, (row) => normalizeComparableUrl(row.source_url) || row.id);
+  }
+
+  const facilityFallbackResult = await query(
+    `${selectClause}
+     order by fetched_at desc, source_url asc`,
+    params
+  );
+
+  return uniqueBy(
+    facilityFallbackResult.rows,
+    (row) => normalizeComparableUrl(row.source_url) || row.id,
+  );
 }
 
 async function attachCachedDocumentsToForms(
@@ -1312,7 +1333,16 @@ async function attachCachedDocumentsToForms(
       ...form,
       format: cached ? 'pdf' : form?.format || null,
       cached_source_document_id: cached?.id || null,
-      cached_content_url: cached ? toCachedContentUrl(cached.id) : null
+      cached_content_url: cached ? toCachedContentUrl(cached.id) : null,
+      ...(
+        cached?.facility_name
+          ? {
+              cached_facility_name: cached.facility_name,
+              cached_facility_city: cached.facility_city || null,
+              cached_facility_state: cached.facility_state || null,
+            }
+          : {}
+      ),
     };
   });
 
@@ -1327,7 +1357,16 @@ async function attachCachedDocumentsToForms(
       url: document.source_url,
       format: 'pdf',
       cached_source_document_id: document.id,
-      cached_content_url: toCachedContentUrl(document.id)
+      cached_content_url: toCachedContentUrl(document.id),
+      ...(
+        document.facility_name
+          ? {
+              cached_facility_name: document.facility_name,
+              cached_facility_city: document.facility_city || null,
+              cached_facility_state: document.facility_state || null,
+            }
+          : {}
+      ),
     }));
 
   return [...hydratedForms, ...fallbackForms];
@@ -1358,7 +1397,8 @@ async function listLatestPublishedQuestionTemplatePayloads(sourceDocumentIds = [
   );
 }
 
-const QUESTION_FLOW_FOLLOW_UP_HINT_PATTERN = /\bif\b|\bother\b|\bspecify\b|\bdescribe\b|\bdetail\b|\bfill\b/i;
+const QUESTION_FLOW_FOLLOW_UP_HINT_PATTERN =
+  /\bif\b|\bother\b|\bspecify\b|\bdescribe\b|\bdetail\b|\bfill\b|\bemail\b/i;
 const QUESTION_FLOW_OTHER_PATTERN =
   /\bif\s*\(?other\)?\b|\bother\b|\bother\s*\(please specify\)|\bplease specify\b/i;
 const QUESTION_FLOW_TRAILING_HINT_PATTERN =
@@ -1457,6 +1497,10 @@ function scoreQuestionVisibilityOptionMatch(question, option) {
     score += 5;
   }
 
+  if (/\bemail\b/.test(questionSignal) && /\bemail\b/.test(optionSignal)) {
+    score += 4;
+  }
+
   for (const token of questionTokens) {
     if (optionTokens.has(token)) {
       score += token === 'other' ? 3 : 2;
@@ -1491,18 +1535,55 @@ function normalizeVisibilityRule(rule) {
   };
 }
 
+function findQuestionVisibilityRuleByOptionPattern(
+  questions = [],
+  {
+    questionPattern = null,
+    optionPattern,
+  },
+) {
+  for (const question of questions) {
+    if (!question || question.kind === 'short_text') continue;
+
+    const questionSignal = normalizeQuestionFlowText(buildQuestionFlowSignal(question));
+    if (questionPattern && !questionPattern.test(questionSignal)) {
+      continue;
+    }
+
+    const matchingOptionIds = (Array.isArray(question?.options) ? question.options : [])
+      .filter((option) => optionPattern.test(normalizeQuestionFlowText(buildOptionFlowSignal(option))))
+      .map((option) => option.id)
+      .filter(Boolean);
+
+    if (matchingOptionIds.length === 0) {
+      continue;
+    }
+
+    return {
+      parent_question_id: question.id,
+      parent_option_ids: Array.from(new Set(matchingOptionIds)),
+    };
+  }
+
+  return null;
+}
+
 function inferLegacyVisibilityRule(questions = [], questionIndex = 0) {
   const question = questions[questionIndex];
   if (!question || question.kind !== 'short_text') return null;
 
   const questionSignal = buildQuestionFlowSignal(question);
+  if (/\b(direct address|national provider identifier|npi)\b/i.test(questionSignal)) {
+    return null;
+  }
   if (!QUESTION_FLOW_FOLLOW_UP_HINT_PATTERN.test(questionSignal)) {
     return null;
   }
 
   let bestMatch = null;
 
-  for (let parentIndex = questionIndex - 1; parentIndex >= 0; parentIndex -= 1) {
+  for (let parentIndex = 0; parentIndex < questions.length; parentIndex += 1) {
+    if (parentIndex === questionIndex) continue;
     const parentQuestion = questions[parentIndex];
     if (!parentQuestion || parentQuestion.kind === 'short_text') continue;
 
@@ -1527,10 +1608,27 @@ function inferLegacyVisibilityRule(questions = [], questionIndex = 0) {
       parentIndex,
     };
 
+    const currentDistance = Math.abs(questionIndex - dependency.parentIndex);
+    const bestDistance = bestMatch == null ? Number.POSITIVE_INFINITY : Math.abs(questionIndex - bestMatch.parentIndex);
+    const currentIsPrevious = dependency.parentIndex < questionIndex;
+    const bestIsPrevious = bestMatch ? bestMatch.parentIndex < questionIndex : false;
+
     if (
       !bestMatch ||
-      dependency.parentIndex > bestMatch.parentIndex ||
-      (dependency.parentIndex === bestMatch.parentIndex && dependency.score > bestMatch.score)
+      dependency.score > bestMatch.score ||
+      (dependency.score === bestMatch.score && currentDistance < bestDistance) ||
+      (
+        dependency.score === bestMatch.score &&
+        currentDistance === bestDistance &&
+        currentIsPrevious &&
+        !bestIsPrevious
+      ) ||
+      (
+        dependency.score === bestMatch.score &&
+        currentDistance === bestDistance &&
+        currentIsPrevious === bestIsPrevious &&
+        dependency.parentIndex > bestMatch.parentIndex
+      )
     ) {
       bestMatch = dependency;
     }
@@ -1544,6 +1642,51 @@ function inferLegacyVisibilityRule(questions = [], questionIndex = 0) {
   };
 }
 
+function reorderQuestionsByVisibility(questions = []) {
+  const pendingByParentQuestionId = new Map();
+  const rootQuestions = [];
+
+  questions.forEach((question, index) => {
+    const parentQuestionId = normalizeQuestionFlowLinkId(question?.visibility_rule?.parent_question_id);
+    if (!parentQuestionId) {
+      rootQuestions.push({ question, index });
+      return;
+    }
+
+    const pending = pendingByParentQuestionId.get(parentQuestionId) || [];
+    pending.push({ question, index });
+    pendingByParentQuestionId.set(parentQuestionId, pending);
+  });
+
+  const orderedQuestions = [];
+  const emittedQuestionIds = new Set();
+
+  for (const rootEntry of rootQuestions) {
+    orderedQuestions.push(rootEntry.question);
+    emittedQuestionIds.add(rootEntry.question.id);
+    const pending = pendingByParentQuestionId.get(rootEntry.question.id) || [];
+    pending
+      .sort((left, right) => left.index - right.index)
+      .forEach((entry) => {
+        orderedQuestions.push(entry.question);
+        emittedQuestionIds.add(entry.question.id);
+      });
+    pendingByParentQuestionId.delete(rootEntry.question.id);
+  }
+
+  for (const pending of pendingByParentQuestionId.values()) {
+    pending
+      .sort((left, right) => left.index - right.index)
+      .forEach((entry) => {
+        if (emittedQuestionIds.has(entry.question.id)) return;
+        orderedQuestions.push(entry.question);
+        emittedQuestionIds.add(entry.question.id);
+      });
+  }
+
+  return orderedQuestions;
+}
+
 function normalizeQuestionFlowLinkId(questionId) {
   const normalizedQuestionId = String(questionId || '').trim();
   return normalizedQuestionId || null;
@@ -1554,13 +1697,54 @@ function attachQuestionFlowMetadataToAutofillPayload(autofill = buildUnsupported
     return autofill;
   }
 
-  const questions = autofill.questions.map((question, questionIndex, allQuestions) => {
-    const hasExplicitVisibilityRule =
-      Object.prototype.hasOwnProperty.call(question || {}, 'visibility_rule') ||
-      Object.prototype.hasOwnProperty.call(question || {}, 'visibilityRule');
-    const visibilityRule = hasExplicitVisibilityRule
-      ? normalizeVisibilityRule(question.visibility_rule || question.visibilityRule)
-      : inferLegacyVisibilityRule(allQuestions, questionIndex);
+  const purposeOtherThirdPartyRule = findQuestionVisibilityRuleByOptionPattern(autofill.questions, {
+    questionPattern: /\bpurpose\b.*\bdisclosure\b/i,
+    optionPattern: /\bother 3rd party recipient\b/i,
+  });
+  const deliveryEmailRule = findQuestionVisibilityRuleByOptionPattern(autofill.questions, {
+    questionPattern: /\b(receive your records|delivery)\b/i,
+    optionPattern: /\b(encrypted email|unencrypted email)\b/i,
+  });
+
+  const normalizedQuestions = autofill.questions.map((question, questionIndex, allQuestions) => {
+    const questionSignal = buildQuestionFlowSignal(question);
+    const shouldSuppressVisibilityInference =
+      /\b(direct address|national provider identifier|npi)\b/i.test(questionSignal);
+    const explicitVisibilityRule = shouldSuppressVisibilityInference
+      ? null
+      : normalizeVisibilityRule(question.visibility_rule || question.visibilityRule);
+
+    let visibilityRule = explicitVisibilityRule;
+
+    if (shouldSuppressVisibilityInference) {
+      visibilityRule = null;
+    } else if (!explicitVisibilityRule) {
+      if (
+        deliveryEmailRule &&
+        /\bemail address for delivery\b/i.test(questionSignal)
+      ) {
+        visibilityRule = deliveryEmailRule;
+      } else if (
+        purposeOtherThirdPartyRule &&
+        (
+          /^recipient\b/i.test(String(question?.label || '').trim()) ||
+          /\bif other 3rd party recipient selected\b/i.test(questionSignal)
+        )
+      ) {
+        visibilityRule = purposeOtherThirdPartyRule;
+      } else {
+        visibilityRule = inferLegacyVisibilityRule(allQuestions, questionIndex);
+      }
+    }
+
+    return {
+      ...question,
+      visibility_rule: visibilityRule,
+    };
+  });
+
+  const orderedQuestions = reorderQuestionsByVisibility(normalizedQuestions);
+  const questions = orderedQuestions.map((question, questionIndex, allQuestions) => {
     const previousQuestionId =
       normalizeQuestionFlowLinkId(question.previous_question_id || question.previousQuestionId) ||
       allQuestions[questionIndex - 1]?.id ||
@@ -1572,7 +1756,6 @@ function attachQuestionFlowMetadataToAutofillPayload(autofill = buildUnsupported
 
     return {
       ...question,
-      visibility_rule: visibilityRule,
       previous_question_id: previousQuestionId,
       next_question_id: nextQuestionId,
     };
@@ -1581,6 +1764,27 @@ function attachQuestionFlowMetadataToAutofillPayload(autofill = buildUnsupported
   return {
     ...autofill,
     questions,
+  };
+}
+
+function suppressFormContextOwnedQuestions(
+  autofill = buildUnsupportedAutofillPayload(),
+  form = {},
+) {
+  if (!autofill?.supported || !Array.isArray(autofill.questions) || autofill.questions.length === 0) {
+    return autofill;
+  }
+
+  if (!form?.cached_facility_name) {
+    return autofill;
+  }
+
+  return {
+    ...autofill,
+    questions: autofill.questions.filter((question) => {
+      const signal = normalizeQuestionFlowText(buildQuestionFlowSignal(question));
+      return !/\bfacility names? and addresses\b/i.test(signal);
+    }),
   };
 }
 
@@ -1593,9 +1797,12 @@ async function attachAutofillMetadataToForms(forms = []) {
   return forms.map((form) => ({
     ...form,
     autofill: attachQuestionFlowMetadataToAutofillPayload(
-      form?.cached_source_document_id
-        ? bySourceDocumentId.get(form.cached_source_document_id) || buildUnsupportedAutofillPayload()
-        : buildUnsupportedAutofillPayload(),
+      suppressFormContextOwnedQuestions(
+        form?.cached_source_document_id
+          ? bySourceDocumentId.get(form.cached_source_document_id) || buildUnsupportedAutofillPayload()
+          : buildUnsupportedAutofillPayload(),
+        form,
+      ),
     ),
   }));
 }
