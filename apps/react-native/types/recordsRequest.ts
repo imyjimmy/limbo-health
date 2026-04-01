@@ -16,6 +16,9 @@ export interface RecordsWorkflowForm {
   url: string;
   cachedSourceDocumentId: string | null;
   cachedContentUrl: string | null;
+  cachedFacilityName?: string | null;
+  cachedFacilityCity?: string | null;
+  cachedFacilityState?: string | null;
   autofill: RecordsWorkflowFormAutofill;
 }
 

@@ -71,6 +71,21 @@ const DATE_QUESTION_HINT_PATTERN = /\bdate\b|\bdob\b|\bbirth\b/i;
 const DATE_FIELD_NAME_HINT_PATTERN =
   /\b(date|dob|birth|service|visit|appointment|admission|admit|discharge|release|effective|expiration|expiry)\b/i;
 const DATE_EXCLUSION_PATTERN = /\bor event\b|\bor occurrence\b|\bor condition\b/i;
+const BIO_OWNED_FIELD_HINT_PATTERN =
+  /\b(patient name|patient first name|patient last name|first name|last name|full name|middle initial|date of birth|birth date|dob|social security|ssn|last 4|patient street address|patient address|patient city|patient state|patient zip|patient postal|patient telephone|patient phone|patient email|nombre del paciente|fecha de nacimiento|telefono del paciente|correo electronico del paciente|ultimos 4 digitos)\b/i;
+const BIO_OWNED_LABEL_PATTERN =
+  /^(name|first name|last name|birth|date of birth|birth date|dob|social security(?: number)?|ssn|last 4(?: of social security number)?):?$/i;
+const FORM_CONTEXT_QUESTION_PATTERN = /\bfacility names? and addresses\b/i;
+const PURPOSE_DISCLOSURE_QUESTION_PATTERN = /\bpurpose\b.*\bdisclosure\b/i;
+const PURPOSE_DISCLOSURE_OTHER_RECIPIENT_OPTION_PATTERN = /\bother 3rd party recipient\b/i;
+const DELIVERY_FORMAT_QUESTION_PATTERN = /\b(receive your records|delivery)\b/i;
+const DELIVERY_EMAIL_OPTION_PATTERN = /\b(encrypted email|unencrypted email)\b/i;
+const DELIVERY_EMAIL_FIELD_PATTERN =
+  /\b(email address for delivery|email for releases to email)\b/i;
+const RECIPIENT_QUESTION_PATTERN = /^recipient\b/i;
+const RECIPIENT_QUESTION_ID_PATTERN = /^recipient/i;
+const RECIPIENT_FIELD_PATTERN = /\brecipient(s)?\b/i;
+const DIRECT_ADDRESS_OR_NPI_PATTERN = /\b(direct address|national provider identifier|npi)\b/i;
 
 function getQuestionBindingFieldNames(question: RecordsWorkflowAutofillQuestion) {
   return question.bindings
@@ -147,6 +162,78 @@ function buildQuestionFlowSignal(question: RecordsWorkflowAutofillQuestion) {
 
 function buildOptionFlowSignal(option: RecordsWorkflowAutofillQuestion['options'][number]) {
   return [option.label, option.id, getOptionBindingFieldNames(option)].filter(Boolean).join(' ');
+}
+
+function findQuestionVisibilityRuleByOptionPattern(
+  questions: RecordsWorkflowAutofillQuestion[],
+  patterns: {
+    questionPattern: RegExp;
+    optionPattern: RegExp;
+  },
+) {
+  for (const question of questions) {
+    const questionSignal = normalizeQuestionFlowText(buildQuestionFlowSignal(question));
+    if (!patterns.questionPattern.test(questionSignal)) continue;
+
+    const matchingOptionIds = question.options
+      .filter((option) =>
+        patterns.optionPattern.test(normalizeQuestionFlowText(buildOptionFlowSignal(option))),
+      )
+      .map((option) => option.id);
+
+    if (matchingOptionIds.length === 0) continue;
+
+    return {
+      parentQuestionId: question.id,
+      parentOptionIds: matchingOptionIds,
+    };
+  }
+
+  return null;
+}
+
+function applyQuestionFlowVisibilityHeuristics(
+  questions: RecordsWorkflowAutofillQuestion[],
+) {
+  const purposeOtherThirdPartyRule = findQuestionVisibilityRuleByOptionPattern(questions, {
+    questionPattern: PURPOSE_DISCLOSURE_QUESTION_PATTERN,
+    optionPattern: PURPOSE_DISCLOSURE_OTHER_RECIPIENT_OPTION_PATTERN,
+  });
+  const deliveryEmailRule = findQuestionVisibilityRuleByOptionPattern(questions, {
+    questionPattern: DELIVERY_FORMAT_QUESTION_PATTERN,
+    optionPattern: DELIVERY_EMAIL_OPTION_PATTERN,
+  });
+
+  return questions.map((question) => {
+    const questionSignal = normalizeQuestionFlowText(buildQuestionFlowSignal(question));
+    const bindingSignal = normalizeQuestionFlowText(getQuestionBindingFieldNames(question));
+    const currentLabel = String(question.label || '').trim();
+    let visibilityRule = question.visibilityRule || null;
+
+    if (DIRECT_ADDRESS_OR_NPI_PATTERN.test(questionSignal)) {
+      visibilityRule = null;
+    } else if (!visibilityRule) {
+      if (deliveryEmailRule && DELIVERY_EMAIL_FIELD_PATTERN.test(questionSignal)) {
+        visibilityRule = deliveryEmailRule;
+      } else if (
+        purposeOtherThirdPartyRule &&
+        (
+          RECIPIENT_QUESTION_PATTERN.test(currentLabel) ||
+          RECIPIENT_QUESTION_ID_PATTERN.test(question.id) ||
+          RECIPIENT_FIELD_PATTERN.test(bindingSignal)
+        )
+      ) {
+        visibilityRule = purposeOtherThirdPartyRule;
+      }
+    }
+
+    return visibilityRule === question.visibilityRule
+      ? question
+      : {
+          ...question,
+          visibilityRule,
+        };
+  });
 }
 
 function scoreQuestionVisibilityOptionMatch(
@@ -281,6 +368,49 @@ export function getVisibleAutofillQuestions(
   answers: RecordsWorkflowAutofillAnswers,
 ) {
   return questions.filter((question) => isAutofillQuestionVisible(question, answers, questions));
+}
+
+export function isQuestionOwnedByBio(question: RecordsWorkflowAutofillQuestion) {
+  const label = String(question.label || '').trim();
+  if (!question.visibilityRule && BIO_OWNED_LABEL_PATTERN.test(label)) {
+    return true;
+  }
+
+  const signal = normalizeQuestionFlowText(
+    [question.label, question.helpText, getQuestionBindingFieldNames(question)].filter(Boolean).join(' '),
+  );
+  return BIO_OWNED_FIELD_HINT_PATTERN.test(signal);
+}
+
+function isQuestionOwnedByFormContext(
+  question: RecordsWorkflowAutofillQuestion,
+  _options?: {
+    cachedFacilityName?: string | null;
+  },
+) {
+  const signal = normalizeQuestionFlowText(buildQuestionFlowSignal(question));
+  return FORM_CONTEXT_QUESTION_PATTERN.test(signal);
+}
+
+export function normalizeQuestionsForQuestionFlow(
+  questions: RecordsWorkflowAutofillQuestion[],
+  options?: {
+    cachedFacilityName?: string | null;
+  },
+) {
+  return applyQuestionFlowVisibilityHeuristics(questions).filter(
+    (question) =>
+      !isQuestionOwnedByBio(question) && !isQuestionOwnedByFormContext(question, options),
+  );
+}
+
+export function filterQuestionsForQuestionFlow(
+  questions: RecordsWorkflowAutofillQuestion[],
+  options?: {
+    cachedFacilityName?: string | null;
+  },
+) {
+  return normalizeQuestionsForQuestionFlow(questions, options);
 }
 
 function findQuestionById(

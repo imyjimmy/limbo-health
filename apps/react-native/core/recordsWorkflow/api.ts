@@ -14,9 +14,32 @@ import type {
 } from '../../types/wizard';
 import { normalizeHospitalSystemSearchQuery } from './search';
 
-const WORKFLOW_API_HOST = (
-  process.env.EXPO_PUBLIC_RECORDS_WORKFLOW_API_BASE_URL || API_BASE_URL
-).replace(/\/+$/, '');
+const LOCAL_WORKFLOW_API_HOST_PATTERN =
+  /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0)(?::\d+)?$/i;
+const IS_DEV_ENVIRONMENT = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
+
+export function resolveWorkflowApiHost(
+  envHost = process.env.EXPO_PUBLIC_RECORDS_WORKFLOW_API_BASE_URL,
+  apiBaseUrl = API_BASE_URL,
+  isDev = IS_DEV_ENVIRONMENT,
+): string {
+  const normalizedApiBaseUrl = apiBaseUrl.replace(/\/+$/, '');
+  const normalizedEnvHost = envHost?.trim().replace(/\/+$/, '');
+
+  if (!normalizedEnvHost) {
+    return normalizedApiBaseUrl;
+  }
+
+  // Local overrides are useful in dev, but a standalone release build on a phone
+  // cannot reach the Mac's localhost. Fall back to production there.
+  if (!isDev && LOCAL_WORKFLOW_API_HOST_PATTERN.test(normalizedEnvHost)) {
+    return normalizedApiBaseUrl;
+  }
+
+  return normalizedEnvHost;
+}
+
+const WORKFLOW_API_HOST = resolveWorkflowApiHost();
 const WORKFLOW_API_PREFIX = '/api/records-workflow';
 
 interface ApiHospitalSystem {
@@ -64,6 +87,9 @@ interface ApiRecordsRequestPacket {
     url: string;
     cached_source_document_id: string | null;
     cached_content_url: string | null;
+    cached_facility_name?: string | null;
+    cached_facility_city?: string | null;
+    cached_facility_state?: string | null;
     autofill: {
       supported: boolean;
       mode: 'acroform' | 'overlay' | null;
@@ -228,9 +254,19 @@ function buildNonJsonError(path: string, response: Response, bodyText: string): 
 }
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = init
-    ? await fetch(buildWorkflowUrl(path), init)
-    : await fetch(buildWorkflowUrl(path));
+  const headers = new Headers(init?.headers);
+  if (!headers.has('Cache-Control')) {
+    headers.set('Cache-Control', 'no-cache, no-store, max-age=0');
+  }
+  if (!headers.has('Pragma')) {
+    headers.set('Pragma', 'no-cache');
+  }
+
+  const response = await fetch(buildWorkflowUrl(path), {
+    ...init,
+    cache: 'no-store',
+    headers,
+  });
   const contentType = response.headers.get('content-type')?.toLowerCase() || '';
 
   if (!response.ok) {
@@ -433,6 +469,9 @@ export async function fetchRecordsRequestPacket(systemId: string): Promise<Recor
       cachedContentUrl: form.cached_content_url
         ? `${WORKFLOW_API_HOST}${form.cached_content_url}`
         : null,
+      cachedFacilityName: form.cached_facility_name || null,
+      cachedFacilityCity: form.cached_facility_city || null,
+      cachedFacilityState: form.cached_facility_state || null,
       autofill: {
         supported: Boolean(form.autofill?.supported),
         mode: form.autofill?.mode || null,

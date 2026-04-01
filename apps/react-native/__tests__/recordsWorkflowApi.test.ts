@@ -2,11 +2,34 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchHospitalSystems,
   fetchRecordsRequestPacket,
+  resolveWorkflowApiHost,
 } from '../core/recordsWorkflow/api';
+
+function getHeaderValue(headers: HeadersInit | undefined, name: string) {
+  return new Headers(headers).get(name);
+}
 
 describe('records workflow API client', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('uses localhost workflow overrides in development', () => {
+    expect(
+      resolveWorkflowApiHost('http://127.0.0.1:3021/', 'https://limbo.health/', true),
+    ).toBe('http://127.0.0.1:3021');
+  });
+
+  it('falls back to the production API base for release builds when the workflow host is localhost', () => {
+    expect(
+      resolveWorkflowApiHost('http://127.0.0.1:3021/', 'https://limbo.health/', false),
+    ).toBe('https://limbo.health');
+  });
+
+  it('keeps an explicit remote workflow host for release builds', () => {
+    expect(
+      resolveWorkflowApiHost('https://workflow.limbo.health/', 'https://limbo.health/', false),
+    ).toBe('https://workflow.limbo.health');
   });
 
   it.each([
@@ -37,7 +60,17 @@ describe('records workflow API client', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(fetchHospitalSystems(searchTerm)).resolves.toEqual([]);
-    expect(fetchMock).toHaveBeenCalledWith(expectedUrl);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expectedUrl,
+      expect.objectContaining({
+        cache: 'no-store',
+      }),
+    );
+    const [, requestInit] = fetchMock.mock.calls[0] || [];
+    expect(getHeaderValue(requestInit?.headers, 'Cache-Control')).toBe(
+      'no-cache, no-store, max-age=0',
+    );
+    expect(getHeaderValue(requestInit?.headers, 'Pragma')).toBe('no-cache');
   });
 
   it('maps cached document URLs onto the API host', async () => {
@@ -134,10 +167,19 @@ describe('records workflow API client', () => {
     const packet = await fetchRecordsRequestPacket('system-1');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [calledUrl] = fetchMock.mock.calls[0] || [];
+    const [calledUrl, requestInit] = fetchMock.mock.calls[0] || [];
     expect(String(calledUrl)).toMatch(
       /^https:\/\/limbo\.health\/api\/records-workflow\/hospital-systems\/system-1\/records-request-packet\?_ts=\d+$/,
     );
+    expect(requestInit).toEqual(
+      expect.objectContaining({
+        cache: 'no-store',
+      }),
+    );
+    expect(getHeaderValue(requestInit?.headers, 'Cache-Control')).toBe(
+      'no-cache, no-store, max-age=0',
+    );
+    expect(getHeaderValue(requestInit?.headers, 'Pragma')).toBe('no-cache');
     expect(packet.forms[0]?.cachedContentUrl).toBe(
       'https://limbo.health/api/records-workflow/source-documents/doc-1/content',
     );

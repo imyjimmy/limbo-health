@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRecordsRequestWorkflowSteps,
+  filterQuestionsForQuestionFlow,
   formatDateAutofillAnswerInput,
   getNextAutofillQuestionId,
   getPreviousAutofillQuestionId,
@@ -356,6 +357,176 @@ const treatmentDateQuestion: RecordsWorkflowAutofillQuestion = {
   options: [],
 };
 
+const bioNameQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'patient-name',
+  label: 'Name:',
+  kind: 'short_text',
+  required: true,
+  helpText: null,
+  confidence: 0.99,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'first_name',
+    },
+  ],
+  options: [],
+};
+
+const bioBirthQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'patient-birth',
+  label: 'Birth:',
+  kind: 'short_text',
+  required: true,
+  helpText: null,
+  confidence: 0.99,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'date_of_birth',
+    },
+  ],
+  options: [],
+};
+
+const staleStDavidFacilityQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'facility-names-and-addresses',
+  label: 'Facility name(s) and addresses',
+  kind: 'short_text',
+  required: false,
+  helpText: null,
+  confidence: 0.99,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'Facility Names and Addresses',
+    },
+  ],
+  options: [],
+};
+
+const staleStDavidDeliveryQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'delivery-format',
+  label: 'How would you like to receive your records?',
+  kind: 'multi_select',
+  required: false,
+  helpText: null,
+  confidence: 0.98,
+  bindings: [],
+  options: [
+    {
+      id: 'paper-copy',
+      label: 'Paper Copy',
+      confidence: 0.99,
+      bindings: [],
+    },
+    {
+      id: 'encrypted-email',
+      label: 'Encrypted Email',
+      confidence: 0.99,
+      bindings: [],
+    },
+    {
+      id: 'unencrypted-email',
+      label: 'Unencrypted Email',
+      confidence: 0.99,
+      bindings: [],
+    },
+  ],
+};
+
+const staleStDavidDeliveryEmailQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'email-for-releases-to-email',
+  label: 'email):',
+  kind: 'short_text',
+  required: false,
+  helpText: null,
+  confidence: 0.95,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'Email for releases to email',
+    },
+  ],
+  options: [],
+};
+
+const staleStDavidPurposeQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'purpose-of-disclosure',
+  label: 'Purpose of Disclosure',
+  kind: 'single_select',
+  required: false,
+  helpText: null,
+  confidence: 0.96,
+  bindings: [],
+  options: [
+    {
+      id: 'at-request-of-individual',
+      label: 'At the request of the individual',
+      confidence: 0.96,
+      bindings: [],
+    },
+    {
+      id: 'other-3rd-party-recipient',
+      label: 'Other 3rd party recipient (please specify purpose)',
+      confidence: 0.96,
+      bindings: [],
+    },
+  ],
+};
+
+const staleStDavidRecipientPhoneQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'recipient-phone',
+  label: 'Recipient phone number',
+  kind: 'short_text',
+  required: false,
+  helpText: null,
+  confidence: 0.99,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'Recipients Phone',
+    },
+  ],
+  options: [],
+};
+
+const staleStDavidRecipientCityQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'recipient-city',
+  label: 'City:',
+  kind: 'short_text',
+  required: false,
+  helpText: null,
+  confidence: 0.95,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'City',
+    },
+  ],
+  options: [],
+};
+
+const staleStDavidDirectNpiQuestion: RecordsWorkflowAutofillQuestion = {
+  id: 'uscdi-direct-address-or-npi',
+  label: 'Direct address or National Provider Identifier',
+  kind: 'short_text',
+  required: false,
+  helpText: 'Only needed for USCDI release requests.',
+  confidence: 0.99,
+  bindings: [
+    {
+      type: 'field_text',
+      fieldName: 'Direct Address or National Provider Identifier',
+    },
+  ],
+  options: [],
+  visibilityRule: {
+    parentQuestionId: 'records-to-release',
+    parentOptionIds: ['other'],
+  },
+};
+
 describe('records workflow autofill helpers', () => {
   it('creates one workflow step per fetched question between hospital and id', () => {
     expect(buildRecordsRequestWorkflowSteps([]).map((step) => step.id)).toEqual([
@@ -382,6 +553,64 @@ describe('records workflow autofill helpers', () => {
       getRecordsRequestQuestionStepId('delivery-notes'),
       'id',
       'submit',
+    ]);
+  });
+
+  it('keeps Bio-owned identity fields out of the custom question flow', () => {
+    expect(
+      filterQuestionsForQuestionFlow([
+        bioNameQuestion,
+        bioBirthQuestion,
+        recipientOtherQuestion,
+        specifyProviderQuestion,
+      ]).map((question) => question.id),
+    ).toEqual(['recipient-other-name', 'provider-or-location']);
+  });
+
+  it('sanitizes stale St David packet questions before they reach the question flow', () => {
+    const filteredQuestions = filterQuestionsForQuestionFlow(
+      [
+        staleStDavidFacilityQuestion,
+        staleStDavidDeliveryQuestion,
+        staleStDavidDeliveryEmailQuestion,
+        staleStDavidPurposeQuestion,
+        staleStDavidRecipientPhoneQuestion,
+        staleStDavidRecipientCityQuestion,
+        staleStDavidDirectNpiQuestion,
+        bioBirthQuestion,
+      ],
+      {
+        cachedFacilityName: "St. David's Medical Center",
+      },
+    );
+
+    expect(filteredQuestions.map((question) => question.id)).toEqual([
+      'delivery-format',
+      'email-for-releases-to-email',
+      'purpose-of-disclosure',
+      'recipient-phone',
+      'recipient-city',
+      'uscdi-direct-address-or-npi',
+    ]);
+
+    expect(getVisibleAutofillQuestions(filteredQuestions, {}).map((question) => question.id)).toEqual([
+      'delivery-format',
+      'purpose-of-disclosure',
+      'uscdi-direct-address-or-npi',
+    ]);
+
+    expect(
+      getVisibleAutofillQuestions(filteredQuestions, {
+        'delivery-format': ['encrypted-email'],
+        'purpose-of-disclosure': 'other-3rd-party-recipient',
+      }).map((question) => question.id),
+    ).toEqual([
+      'delivery-format',
+      'email-for-releases-to-email',
+      'purpose-of-disclosure',
+      'recipient-phone',
+      'recipient-city',
+      'uscdi-direct-address-or-npi',
     ]);
   });
 

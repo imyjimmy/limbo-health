@@ -48,24 +48,24 @@ describe('records workflow pdf helpers', () => {
 
   it('prefers release-from hospital forms over release-to hospital intake forms', () => {
     const sorted = __testing__.sortPdfForms([
-      createForm('authorization for release of medical information to bswh'),
-      createForm('authorization for release of medical information from bswh'),
-      createForm('authorization for release of medical information to bswh spanish', {
+      createForm('authorization for release of medical information to example health'),
+      createForm('authorization for release of medical information from example health'),
+      createForm('authorization for release of medical information to example health spanish', {
         cachedContentUrl: null,
       }),
     ]);
 
     expect(sorted.map((form) => form.name)).toEqual([
-      'authorization for release of medical information from bswh',
-      'authorization for release of medical information to bswh',
+      'authorization for release of medical information from example health',
+      'authorization for release of medical information to example health',
     ]);
   });
 
   it('prefers the target language when equivalent form variants exist', () => {
     const primaryForm = __testing__.getPrimaryPdfForm(
       [
-        createForm('authorization for release of medical information from bswh'),
-        createForm('authorization for release of medical information from bswh spanish'),
+        createForm('authorization for release of medical information from example health'),
+        createForm('authorization for release of medical information from example health spanish'),
       ],
       {
         preferredLanguage: 'es',
@@ -73,7 +73,29 @@ describe('records workflow pdf helpers', () => {
     );
 
     expect(primaryForm?.name).toBe(
-      'authorization for release of medical information from bswh spanish',
+      'authorization for release of medical information from example health spanish',
+    );
+  });
+
+  it('does not change semantic scoring based on a specific provider name', () => {
+    expect(
+      __testing__.getSemanticFormScore(
+        createForm('authorization for release of medical information from bswh'),
+      ),
+    ).toBe(
+      __testing__.getSemanticFormScore(
+        createForm("authorization for release of medical information from st davids"),
+      ),
+    );
+
+    expect(
+      __testing__.getSemanticFormScore(
+        createForm('authorization for release of medical information to bswh'),
+      ),
+    ).toBe(
+      __testing__.getSemanticFormScore(
+        createForm("authorization for release of medical information to st davids"),
+      ),
     );
   });
 
@@ -233,6 +255,114 @@ describe('records workflow pdf helpers', () => {
     );
     expect((form.getField('Telephone Number_2') as PDFTextField).getText()).toBe(
       '512 555 0123',
+    );
+  });
+
+  it('treats the self-request purpose branch as a patient recipient fallback for St David style forms', async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([612, 792]);
+    const form = pdf.getForm();
+
+    const addTextField = (name: string) => {
+      const field = form.createTextField(name);
+      field.addToPage(page, { x: 24, y: 24, width: 200, height: 20 });
+      return field;
+    };
+
+    addTextField('Recipients Name');
+    addTextField('Recipient Address');
+    addTextField('Recipients Phone');
+    addTextField('City');
+    addTextField('State');
+    addTextField('Zip');
+
+    const bioProfile: BioProfile = {
+      fullName: 'Jimmy Zhang',
+      dateOfBirth: '03/20/1990',
+      last4Ssn: '6789',
+      phoneNumber: '512 555 0123',
+      email: 'jimmy@example.com',
+      addressLine1: '123 Main St',
+      addressLine2: 'Apt 4B',
+      city: 'Austin',
+      state: 'TX',
+      postalCode: '78701',
+    };
+
+    const allowPatientRecipientFallback = __testing__.shouldFillPatientRecipientFields(
+      createForm("authorization for release of medical information from st david's", {
+        autofill: {
+          supported: true,
+          mode: 'acroform',
+          templateId: null,
+          confidence: 0.95,
+          signatureAreas: [],
+          questions: [
+            {
+              id: 'purpose-of-disclosure',
+              label: 'Purpose of Disclosure',
+              kind: 'single_select',
+              required: false,
+              helpText: null,
+              confidence: 0.98,
+              bindings: [],
+              options: [
+                {
+                  id: 'at-the-request-of-the-individual',
+                  label: 'At the request of the individual',
+                  confidence: 0.99,
+                  bindings: [],
+                },
+                {
+                  id: 'other-3rd-party-recipient',
+                  label: 'Other 3rd party recipient',
+                  confidence: 0.99,
+                  bindings: [],
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      {
+        'purpose-of-disclosure': 'at-the-request-of-the-individual',
+      },
+    );
+
+    const result = __testing__.fillBioFields(pdf, bioProfile, {
+      allowPatientRecipientFallback,
+    });
+
+    expect(result.filledCount).toBeGreaterThanOrEqual(6);
+    expect((form.getField('Recipients Name') as PDFTextField).getText()).toBe('Jimmy Zhang');
+    expect((form.getField('Recipient Address') as PDFTextField).getText()).toBe(
+      '123 Main St Apt 4B',
+    );
+    expect((form.getField('Recipients Phone') as PDFTextField).getText()).toBe('512 555 0123');
+    expect((form.getField('City') as PDFTextField).getText()).toBe('Austin');
+    expect((form.getField('State') as PDFTextField).getText()).toBe('TX');
+    expect((form.getField('Zip') as PDFTextField).getText()).toBe('78701');
+  });
+
+  it('fills facility context fields from the cached source document metadata', async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([612, 792]);
+    const form = pdf.getForm();
+    const field = form.createTextField('Facility Names and Addresses');
+    field.addToPage(page, { x: 24, y: 24, width: 260, height: 20 });
+
+    const filledCount = __testing__.fillFormContextFields(
+      pdf,
+      createForm("authorization for release of medical information from st david's", {
+        cachedFacilityName: "St. David's Medical Center",
+        cachedFacilityCity: 'Austin',
+        cachedFacilityState: 'TX',
+      }),
+    );
+
+    expect(filledCount).toBe(1);
+    expect((form.getField('Facility Names and Addresses') as PDFTextField).getText()).toBe(
+      "St. David's Medical Center, Austin, TX",
     );
   });
 

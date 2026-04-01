@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import { Redirect, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import {
@@ -36,6 +36,7 @@ import { TexasHospitalLogoMarquee } from '../components/records/TexasHospitalLog
 import { fetchHospitalSystems, fetchRecordsRequestPacket } from '../core/recordsWorkflow/api';
 import {
   buildRecordsRequestWorkflowSteps,
+  filterQuestionsForQuestionFlow,
   formatDateAutofillAnswerInput,
   getNextAutofillQuestionId,
   getPreviousAutofillQuestionId,
@@ -57,7 +58,6 @@ import {
   HOSPITAL_SYSTEM_SEARCH_DEBOUNCE_MS,
   normalizeHospitalSystemSearchQuery,
 } from '../core/recordsWorkflow/search';
-import { useCamera } from '../hooks/useCamera';
 import { useBioProfile } from '../providers/BioProfileProvider';
 import { createThemedStyles, useTheme, useThemedStyles } from '../theme';
 import type {
@@ -154,10 +154,13 @@ function getWorkflowStepDescription(
 
 export default function RecordsRequestScreen() {
   const router = useRouter();
+  const routeParams = useLocalSearchParams<{
+    systemId?: string;
+    advanceTo?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useThemedStyles(createStyles);
-  const { capture } = useCamera();
   const { status: bioStatus, profile, hasProfile } = useBioProfile();
   const [currentStepId, setCurrentStepId] = useState('bio');
   const [searchQuery, setSearchQuery] = useState('');
@@ -186,8 +189,14 @@ export default function RecordsRequestScreen() {
   const [signaturePadActive, setSignaturePadActive] = useState(false);
   const [pdfPreviewFailed, setPdfPreviewFailed] = useState(false);
   const packetLoadRequestIdRef = useRef(0);
+  const autoLoadedSystemIdRef = useRef<string | null>(null);
+  const autoAdvancedWorkflowKeyRef = useRef<string | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const autofillAnswersRef = useRef<RecordsWorkflowAutofillAnswers>({});
+  const requestedSystemId =
+    typeof routeParams.systemId === 'string' ? routeParams.systemId.trim() : '';
+  const requestedAdvanceTo =
+    typeof routeParams.advanceTo === 'string' ? routeParams.advanceTo.trim().toLowerCase() : '';
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -333,7 +342,9 @@ export default function RecordsRequestScreen() {
   const activeAutofillForm = selectedPdfForm || primaryDisplayForm;
   const allDynamicQuestions =
     activeAutofillForm?.autofill.supported && activeAutofillForm.autofill.questions.length > 0
-      ? activeAutofillForm.autofill.questions
+      ? filterQuestionsForQuestionFlow(activeAutofillForm.autofill.questions, {
+          cachedFacilityName: activeAutofillForm.cachedFacilityName,
+        })
       : [];
   const dynamicQuestions = getVisibleAutofillQuestions(allDynamicQuestions, autofillAnswers);
   const hasSignatureStep = signatureFieldCount > 0;
@@ -412,6 +423,55 @@ export default function RecordsRequestScreen() {
   const showHospitalDiscoveryMarquee = normalizedSearchQuery.length === 0;
 
   useEffect(() => {
+    if (!requestedSystemId || !hasProfile || !profile) return;
+    if (autoLoadedSystemIdRef.current === requestedSystemId) return;
+
+    autoLoadedSystemIdRef.current = requestedSystemId;
+    const requestId = packetLoadRequestIdRef.current + 1;
+    packetLoadRequestIdRef.current = requestId;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCurrentStepId('hospital');
+    setSearchQuery('');
+    setSelectedSystem(null);
+    setPacket(null);
+    setPacketError(null);
+    setGeneratedPdfUri(null);
+    setPacketLoading(true);
+    setSelectedFormKey(null);
+    setTemplatePrefetchState('idle');
+    setPrefetchedFormName(null);
+    setTemplatePrefetchError(null);
+    setSignatureFieldCount(0);
+    setAutofillAnswers({});
+    setSignature(null);
+
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
+
+    async function loadRequestedSystem() {
+      try {
+        const nextPacket = await fetchRecordsRequestPacket(requestedSystemId);
+        if (packetLoadRequestIdRef.current !== requestId) return;
+        setSelectedSystem(nextPacket.hospitalSystem);
+        setPacket(nextPacket);
+      } catch (error) {
+        if (packetLoadRequestIdRef.current !== requestId) return;
+        autoLoadedSystemIdRef.current = null;
+        const message =
+          error instanceof Error ? error.message : 'Unable to load that hospital workflow.';
+        setPacketError(message);
+        Alert.alert('Workflow Unavailable', message);
+      } finally {
+        if (packetLoadRequestIdRef.current !== requestId) return;
+        setPacketLoading(false);
+      }
+    }
+
+    loadRequestedSystem();
+  }, [hasProfile, profile, requestedSystemId]);
+
+  useEffect(() => {
     if (rawCurrentStepIndex !== -1) return;
 
     const fallbackStepId = currentStepId.startsWith('question:')
@@ -422,6 +482,19 @@ export default function RecordsRequestScreen() {
       setCurrentStepId(fallbackStepId);
     });
   }, [currentStepId, firstQuestionStepId, firstWorkflowStepId, rawCurrentStepIndex]);
+
+  useEffect(() => {
+    if (requestedAdvanceTo !== 'questions' || !requestedSystemId) return;
+    if (!packetReadyForContinue) return;
+
+    const autoAdvanceKey = `${requestedSystemId}:questions`;
+    if (autoAdvancedWorkflowKeyRef.current === autoAdvanceKey) return;
+    autoAdvancedWorkflowKeyRef.current = autoAdvanceKey;
+
+    startTransition(() => {
+      setCurrentStepId(firstQuestionStepId || 'id');
+    });
+  }, [firstQuestionStepId, packetReadyForContinue, requestedAdvanceTo, requestedSystemId]);
 
   useEffect(() => {
     if (currentStepId.startsWith('question:') && dynamicQuestions.length === 0) {
@@ -528,13 +601,30 @@ export default function RecordsRequestScreen() {
 
   const handleCaptureId = async () => {
     try {
-      const result = await capture();
-      if (!result) return;
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Camera Access', 'Camera permission is required to attach a photo ID.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        quality: 0.7,
+        base64: true,
+      });
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      if (!asset?.uri || !asset.base64) {
+        Alert.alert('Image Unavailable', 'Please retake the photo so it can be attached.');
+        return;
+      }
 
       setIdAttachment({
-        uri: result.uri,
-        base64Data: result.base64Data,
-        mimeType: 'image/jpeg',
+        uri: asset.uri,
+        base64Data: asset.base64,
+        mimeType: asset.mimeType || 'image/jpeg',
         source: 'camera',
       });
     } catch (error) {
@@ -892,7 +982,9 @@ export default function RecordsRequestScreen() {
                       return (
                         <Pressable
                           key={system.id}
+                          accessibilityRole="button"
                           onPress={() => handleSelectSystem(system)}
+                          testID={`records-request-system-${system.id}`}
                           style={({ pressed }) => [
                             styles.systemCard,
                             pressed && styles.systemCardPressed,
@@ -1004,6 +1096,7 @@ export default function RecordsRequestScreen() {
 
               <Pressable
                 onPress={handleContinueFromHospital}
+                testID="records-request-hospital-continue"
                 disabled={!packetReadyForContinue}
                 style={({ pressed }) => [
                   styles.primaryButton,

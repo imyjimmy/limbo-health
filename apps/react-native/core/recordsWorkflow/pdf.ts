@@ -118,14 +118,6 @@ function getSemanticFormScore(form: RecordsWorkflowForm): number {
     score -= 120;
   }
 
-  if (descriptor.includes(' from bswh') || descriptor.includes(' from bswhealth')) {
-    score += 60;
-  }
-
-  if (descriptor.includes(' to bswh') || descriptor.includes(' to bswhealth')) {
-    score -= 60;
-  }
-
   return score;
 }
 
@@ -217,14 +209,6 @@ function shouldFillPatientRecipientFields(
       return false;
     }
 
-    if (
-      !/\b(released to|receive the records|receive the released information|medical information be released to|recipients?)\b/i.test(
-        question.label,
-      )
-    ) {
-      return false;
-    }
-
     const selectedOptionLabels =
       question.kind === 'single_select'
         ? question.options
@@ -236,8 +220,51 @@ function shouldFillPatientRecipientFields(
               .map((option) => option.label)
           : [];
 
+    if (
+      /\bpurpose of disclosure\b/i.test(question.label) &&
+      selectedOptionLabels.some((label) => /\bat the request of the individual\b/i.test(label))
+    ) {
+      return true;
+    }
+
+    if (
+      !/\b(released to|receive the records|receive the released information|medical information be released to|recipients?)\b/i.test(
+        question.label,
+      )
+    ) {
+      return false;
+    }
+
     return selectedOptionLabels.some((label) => /\b(patient|designee|self)\b/i.test(label));
   });
+}
+
+function buildFacilityContextValue(form: RecordsWorkflowForm) {
+  const facilityName = form.cachedFacilityName?.trim() || '';
+  const cityState = [form.cachedFacilityCity?.trim(), form.cachedFacilityState?.trim()]
+    .filter(Boolean)
+    .join(', ');
+
+  return [facilityName, cityState].filter(Boolean).join(', ');
+}
+
+function fillFormContextFields(pdf: PDFDocument, form: RecordsWorkflowForm) {
+  const facilityValue = buildFacilityContextValue(form);
+  if (!facilityValue) {
+    return 0;
+  }
+
+  const fields = pdf.getForm().getFields();
+  let filledCount = 0;
+
+  for (const field of fields) {
+    const normalized = normalizeFieldName(field.getName());
+    if (matchesAny(normalized, [/\bfacility names? and addresses\b/])) {
+      filledCount += setTextFieldValue(field, facilityValue) ? 1 : 0;
+    }
+  }
+
+  return filledCount;
 }
 
 function fillBioFields(
@@ -313,6 +340,33 @@ function fillBioFields(
       ])
     ) {
       filledCount += setTextFieldValue(field, email) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      allowPatientRecipientFallback &&
+      fullName &&
+      matchesAny(normalized, [/\brecipients? name\b/])
+    ) {
+      filledCount += setTextFieldValue(field, fullName) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      allowPatientRecipientFallback &&
+      addressLine &&
+      matchesAny(normalized, [/\brecipient address\b/])
+    ) {
+      filledCount += setTextFieldValue(field, addressLine) ? 1 : 0;
+      continue;
+    }
+
+    if (
+      allowPatientRecipientFallback &&
+      phoneNumber &&
+      matchesAny(normalized, [/\brecipients? phone\b/])
+    ) {
+      filledCount += setTextFieldValue(field, phoneNumber) ? 1 : 0;
       continue;
     }
 
@@ -978,6 +1032,7 @@ export async function generateRecordsRequestPdf(input: GenerateRecordsRequestPdf
     });
     filledCount += bioResult.filledCount;
     usedAcroForm ||= bioResult.filledCount > 0;
+    filledCount += fillFormContextFields(pdf, selectedForm);
   } else if (preparedTemplate.flatTemplateId) {
     const flatTemplate = findFlatPdfTemplate({
       packet: input.packet,
@@ -1054,6 +1109,7 @@ export const __testing__ = {
   resolveSignatureOverlayPlacement,
   extractSignatureFields,
   fillBioFields,
+  fillFormContextFields,
   getLanguagePreferenceScore,
   getPrimaryPdfForm,
   getSemanticFormScore,
