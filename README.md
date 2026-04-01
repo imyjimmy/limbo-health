@@ -230,7 +230,7 @@ Critical variables:
 ## Development Workflow
 ```bash
 # Install dependencies
-npm install
+npm ci
 
 # Start development environment
 docker-compose -f docker-compose.yml -f docker-compose.development.yml up
