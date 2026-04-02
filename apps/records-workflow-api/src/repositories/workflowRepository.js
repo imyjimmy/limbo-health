@@ -1170,6 +1170,238 @@ async function getWorkflowArtifacts(recordsWorkflowId) {
   };
 }
 
+function workflowSourceLooksLikePdf(workflow) {
+  return /\.pdf($|\?)/i.test(workflow?.official_page_url || '');
+}
+
+function scoreWorkflowSource(workflow) {
+  let score = workflowSourceLooksLikePdf(workflow) ? 0 : 100;
+
+  if (
+    /medical-records|requesting-your-record|release|authorization|roi|healthmark/i.test(
+      workflow?.official_page_url || ''
+    )
+  ) {
+    score += 25;
+  }
+
+  if (workflow?.formal_request_required) {
+    score += 15;
+  }
+
+  if (['mixed', 'complete_chart'].includes(workflow?.request_scope || '')) {
+    score += 10;
+  }
+
+  return score;
+}
+
+function isGarbageDeliveryText(value) {
+  const normalized = collapseWhitespace(value || '');
+  if (!normalized) return true;
+
+  return (
+    normalized.length > 240 ||
+    /\b(print|save as|reset|signature of patient|purpose of the use and\/or disclosure|the information will be released to)\b/i.test(
+      normalized
+    )
+  );
+}
+
+function looksLikeEmailValue(value) {
+  return /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(collapseWhitespace(value || ''));
+}
+
+function looksLikePhoneLikeValue(value) {
+  return /(?:\+?[\dA-Z][\dA-Z().\-\s]{6,})/.test(collapseWhitespace(value || ''));
+}
+
+function looksLikeMailValue(value) {
+  return /\bc\/o\b|p\.?o\.?\s*box\b|\d{1,6}\s+[A-Za-z0-9.#-]+/i.test(collapseWhitespace(value || ''));
+}
+
+function scoreInstructionCandidate({ workflow, instruction }) {
+  const normalizedValue = collapseWhitespace(instruction?.value || instruction?.details || '');
+  if (!normalizedValue) return Number.NEGATIVE_INFINITY;
+
+  let score = scoreWorkflowSource(workflow);
+
+  if (instruction?.kind === 'submission_channel') {
+    if (instruction.channel === 'email') {
+      score += looksLikeEmailValue(normalizedValue) ? 120 : -150;
+    } else if (instruction.channel === 'fax') {
+      score += looksLikePhoneLikeValue(normalizedValue) ? 100 : -120;
+    } else if (instruction.channel === 'mail') {
+      score += looksLikeMailValue(normalizedValue) ? 100 : -120;
+    } else {
+      score += 25;
+    }
+  }
+
+  if (instruction?.kind === 'support_contact') {
+    score += /question|status|help|assistance/i.test(instruction.details || '') ? 40 : 0;
+    if (instruction.channel === 'email') {
+      score += looksLikeEmailValue(normalizedValue) ? 100 : -120;
+    } else if (instruction.channel === 'phone') {
+      score += looksLikePhoneLikeValue(normalizedValue) ? 100 : -120;
+    } else {
+      score += 20;
+    }
+  }
+
+  if (instruction?.kind === 'turnaround') {
+    score += /\b\d+\s+(business\s+)?days?\b|turnaround|processing time/i.test(normalizedValue) ? 50 : 0;
+  }
+
+  if (isGarbageDeliveryText(normalizedValue)) {
+    score -= 200;
+  }
+
+  return score;
+}
+
+function scoreContactCandidate({ workflow, contact }) {
+  const normalizedValue = collapseWhitespace(contact?.value || '');
+  if (!normalizedValue) return Number.NEGATIVE_INFINITY;
+
+  let score = scoreWorkflowSource(workflow);
+
+  if (contact?.type === 'email') {
+    score += looksLikeEmailValue(normalizedValue) ? 90 : -120;
+  } else if (contact?.type === 'fax' || contact?.type === 'phone') {
+    score += looksLikePhoneLikeValue(normalizedValue) ? 70 : -100;
+  } else if (contact?.type === 'mailing_address') {
+    score += looksLikeMailValue(normalizedValue) ? 80 : -100;
+  } else if (contact?.type === 'portal_url' || contact?.type === 'online_request_url') {
+    score += /^https?:\/\//i.test(normalizedValue) ? 30 : 0;
+  }
+
+  if (isGarbageDeliveryText(normalizedValue)) {
+    score -= 200;
+  }
+
+  return score;
+}
+
+function buildInstructionMergeKey(instruction) {
+  if (!instruction) return null;
+
+  if (instruction.kind === 'submission_channel') {
+    return `submission_channel:${instruction.channel || 'other'}`;
+  }
+
+  if (instruction.kind === 'support_contact') {
+    return 'support_contact';
+  }
+
+  if (instruction.kind === 'turnaround') {
+    return 'turnaround';
+  }
+
+  const normalizedLabel = normalizeComparableLabel(instruction.label || instruction.details || '');
+  return `${instruction.kind || 'other'}:${instruction.channel || 'other'}:${normalizedLabel}`;
+}
+
+function instructionDisplayRank(instruction) {
+  if (instruction.kind === 'submission_channel') {
+    const channelRanks = {
+      email: 0,
+      fax: 1,
+      mail: 2,
+      portal: 3,
+      online_request: 4,
+      phone: 5,
+      in_person: 6,
+      other: 7,
+    };
+
+    return channelRanks[instruction.channel || 'other'] ?? 7;
+  }
+
+  if (instruction.kind === 'support_contact') return 8;
+  if (instruction.kind === 'turnaround') return 20;
+  if (instruction.kind === 'requirement') return 30;
+  if (instruction.kind === 'step') return 40;
+  if (instruction.kind === 'special_case') return 50;
+  if (instruction.kind === 'note') return 60;
+  return 70;
+}
+
+async function getSourceAwareWorkflowArtifactsForPacket(sourceWorkflows = []) {
+  const eligibleWorkflows = sourceWorkflows.filter((workflow) => workflow?.id);
+  if (eligibleWorkflows.length === 0) {
+    return {
+      contacts: [],
+      forms: [],
+      instructions: [],
+    };
+  }
+
+  const artifactSets = await Promise.all(
+    eligibleWorkflows.map(async (workflow) => ({
+      workflow,
+      artifacts: await getWorkflowArtifacts(workflow.id),
+    }))
+  );
+
+  const bestInstructionsByKey = new Map();
+  for (const artifactSet of artifactSets) {
+    for (const instruction of artifactSet.artifacts.instructions || []) {
+      const key = buildInstructionMergeKey(instruction);
+      if (!key) continue;
+
+      const candidate = {
+        instruction,
+        score: scoreInstructionCandidate({ workflow: artifactSet.workflow, instruction }),
+      };
+      const existing = bestInstructionsByKey.get(key);
+      if (!existing || candidate.score > existing.score) {
+        bestInstructionsByKey.set(key, candidate);
+      }
+    }
+  }
+
+  const bestContactsByKey = new Map();
+  for (const artifactSet of artifactSets) {
+    for (const contact of artifactSet.artifacts.contacts || []) {
+      const contactKey = `${contact.type || 'other'}:${normalizeComparableLabel(contact.value || '')}`;
+      const candidate = {
+        contact,
+        score: scoreContactCandidate({ workflow: artifactSet.workflow, contact }),
+      };
+      const existing = bestContactsByKey.get(contactKey);
+      if (!existing || candidate.score > existing.score) {
+        bestContactsByKey.set(contactKey, candidate);
+      }
+    }
+  }
+
+  const instructions = Array.from(bestInstructionsByKey.values())
+    .sort((left, right) => {
+      const rankDelta =
+        instructionDisplayRank(left.instruction) - instructionDisplayRank(right.instruction);
+      if (rankDelta !== 0) return rankDelta;
+      return right.score - left.score;
+    })
+    .map(({ instruction }, index) => ({
+      ...instruction,
+      sequence_no: index + 1,
+    }));
+
+  const contacts = Array.from(bestContactsByKey.values())
+    .sort((left, right) => right.score - left.score)
+    .map(({ contact }) => contact);
+
+  return {
+    contacts,
+    instructions,
+    forms: uniqueBy(
+      artifactSets.flatMap(({ artifacts }) => artifacts.forms || []),
+      (form) => `${collapseWhitespace(form.url || '')}:${collapseWhitespace(form.name || '')}:${form.format || ''}`
+    ),
+  };
+}
+
 function normalizeComparableUrl(value) {
   if (!value) return '';
 
@@ -1924,57 +2156,75 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
   const facility = await getFacilityById(facilityId);
   if (!facility) return null;
 
-  const portalRes = await query(
-    `select *
-     from portal_profiles
-     where hospital_system_id = $1
-       and (facility_id = $2 or facility_id is null)
-     order by
-       case when facility_id = $2 then 0 else 1 end,
-       updated_at desc
-     limit 1`,
-    [facility.hospital_system_id, facility.id]
-  );
-
-  const workflowsRes = await query(
-    `with ranked as (
-       select
-         rw.*,
-         row_number() over (
-           partition by workflow_type
-           order by
-             case when facility_id = $2 then 0 else 1 end,
-             case
-               when workflow_type = 'medical_records' and formal_request_required then 0
-               when workflow_type = 'medical_records' then 1
-               else 0
-             end,
-             case
-               when workflow_type = 'medical_records'
-                    and request_scope in ('mixed', 'complete_chart') then 0
-               when workflow_type = 'medical_records' then 1
-               else 0
-             end,
-             case
-               when workflow_type = 'medical_records'
-                    and official_page_url ~* '(medical-records|requesting-your-record|release|authorization)'
-               then 0
-               when workflow_type = 'medical_records' then 1
-               else 0
-             end,
-             updated_at desc
-         ) as rn
+  const [portalRes, workflowsRes, artifactSourceWorkflowsRes] = await Promise.all([
+    query(
+      `select *
+       from portal_profiles
+       where hospital_system_id = $1
+         and (facility_id = $2 or facility_id is null)
+       order by
+         case when facility_id = $2 then 0 else 1 end,
+         updated_at desc
+       limit 1`,
+      [facility.hospital_system_id, facility.id]
+    ),
+    query(
+      `with ranked as (
+         select
+           rw.*,
+           row_number() over (
+             partition by workflow_type
+             order by
+               case when facility_id = $2 then 0 else 1 end,
+               case
+                 when workflow_type = 'medical_records' and formal_request_required then 0
+                 when workflow_type = 'medical_records' then 1
+                 else 0
+               end,
+               case
+                 when workflow_type = 'medical_records'
+                      and request_scope in ('mixed', 'complete_chart') then 0
+                 when workflow_type = 'medical_records' then 1
+                 else 0
+               end,
+               case
+                 when workflow_type = 'medical_records'
+                      and official_page_url !~* '\\.pdf($|\\?)' then 0
+                 when workflow_type = 'medical_records' then 1
+                 else 0
+               end,
+               case
+                 when workflow_type = 'medical_records'
+                      and official_page_url ~* '(medical-records|requesting-your-record|release|authorization)'
+                 then 0
+                 when workflow_type = 'medical_records' then 1
+                 else 0
+               end,
+               updated_at desc
+           ) as rn
+         from records_workflows rw
+         where rw.hospital_system_id = $1
+           and (rw.facility_id = $2 or rw.facility_id is null)
+       )
+       select * from ranked where rn = 1`,
+      [facility.hospital_system_id, facility.id]
+    ),
+    query(
+      `select rw.*
        from records_workflows rw
        where rw.hospital_system_id = $1
+         and rw.workflow_type = 'medical_records'
          and (rw.facility_id = $2 or rw.facility_id is null)
-     )
-     select * from ranked where rn = 1`,
-    [facility.hospital_system_id, facility.id]
-  );
+       order by
+         case when rw.facility_id = $2 then 0 else 1 end,
+         case when rw.official_page_url !~* '\\.pdf($|\\?)' then 0 else 1 end,
+         rw.updated_at desc`,
+      [facility.hospital_system_id, facility.id]
+    ),
+  ]);
 
   const workflows = workflowsRes.rows;
-  const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
-  const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
+  const artifacts = await getSourceAwareWorkflowArtifactsForPacket(artifactSourceWorkflowsRes.rows);
   const forms = await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
     hospitalSystemId: facility.hospital_system_id,
     facilityId: facility.id
@@ -1998,7 +2248,7 @@ export async function getSystemRequestPacket(systemId) {
   const facilities = await listActiveFacilitiesForSystem(systemId);
   const singleFacilityId = facilities.length === 1 ? facilities[0].id : null;
 
-  const [portalRes, workflowsRes] = await Promise.all([
+  const [portalRes, workflowsRes, artifactSourceWorkflowsRes] = await Promise.all([
     query(
       singleFacilityId
         ? `select *
@@ -2034,6 +2284,12 @@ export async function getSystemRequestPacket(systemId) {
                    case
                      when workflow_type = 'medical_records'
                           and request_scope in ('mixed', 'complete_chart') then 0
+                     when workflow_type = 'medical_records' then 1
+                     else 0
+                   end,
+                   case
+                     when workflow_type = 'medical_records'
+                          and official_page_url !~* '\\.pdf($|\\?)' then 0
                      when workflow_type = 'medical_records' then 1
                      else 0
                    end,
@@ -2083,12 +2339,32 @@ export async function getSystemRequestPacket(systemId) {
            )
            select * from ranked where rn = 1`,
       singleFacilityId ? [systemId, singleFacilityId] : [systemId]
-    )
+    ),
+    query(
+      singleFacilityId
+        ? `select rw.*
+           from records_workflows rw
+           where rw.hospital_system_id = $1
+             and rw.workflow_type = 'medical_records'
+             and (rw.facility_id = $2 or rw.facility_id is null)
+           order by
+             case when rw.facility_id = $2 then 0 else 1 end,
+             case when rw.official_page_url !~* '\\.pdf($|\\?)' then 0 else 1 end,
+             rw.updated_at desc`
+        : `select rw.*
+           from records_workflows rw
+           where rw.hospital_system_id = $1
+             and rw.workflow_type = 'medical_records'
+             and rw.facility_id is null
+           order by
+             case when rw.official_page_url !~* '\\.pdf($|\\?)' then 0 else 1 end,
+             rw.updated_at desc`,
+      singleFacilityId ? [systemId, singleFacilityId] : [systemId]
+    ),
   ]);
 
   const workflows = workflowsRes.rows;
-  const medicalWorkflow = workflows.find((workflow) => workflow.workflow_type === 'medical_records') || null;
-  const artifacts = await getWorkflowArtifacts(medicalWorkflow?.id || null);
+  const artifacts = await getSourceAwareWorkflowArtifactsForPacket(artifactSourceWorkflowsRes.rows);
   const forms = await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
     hospitalSystemId: systemId,
     ...(singleFacilityId ? { facilityId: singleFacilityId } : {}),

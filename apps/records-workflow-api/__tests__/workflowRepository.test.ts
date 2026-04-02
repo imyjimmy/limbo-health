@@ -60,6 +60,7 @@ describe('workflowRepository request packet PDF hydration', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
@@ -190,6 +191,7 @@ describe('workflowRepository request packet PDF hydration', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
@@ -275,6 +277,7 @@ describe('workflowRepository request packet PDF hydration', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -424,6 +427,7 @@ describe('workflowRepository request packet PDF hydration', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -577,6 +581,7 @@ describe('workflowRepository request packet PDF hydration', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
@@ -687,6 +692,7 @@ describe('workflowRepository request packet PDF hydration', () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
@@ -897,6 +903,7 @@ describe('workflowRepository request packet PDF hydration', () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
+      .mockResolvedValueOnce({ rows: [buildMedicalWorkflowRow()] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
@@ -941,6 +948,183 @@ describe('workflowRepository request packet PDF hydration', () => {
         format: 'pdf',
         cached_source_document_id: 'doc-2',
         cached_content_url: '/api/records-workflow/source-documents/doc-2/content',
+        autofill: buildUnsupportedAutofill(),
+      },
+    ]);
+  });
+
+  it('keeps page-derived sending instructions while still pulling forms from a separate PDF workflow source', async () => {
+    const pageWorkflow = buildMedicalWorkflowRow({
+      id: 'workflow-page',
+      official_page_url: 'https://hospital.example/medical-records',
+      updated_at: '2026-03-30T00:00:00.000Z',
+    });
+    const pdfWorkflow = buildMedicalWorkflowRow({
+      id: 'workflow-pdf',
+      official_page_url: 'https://hospital.example/forms/authorization.pdf?download=1',
+      updated_at: '2026-04-01T00:00:00.000Z',
+    });
+
+    vi.mocked(query).mockImplementation(async (text, params = []) => {
+      const sql = String(text);
+
+      if (/from hospital_systems/i.test(sql) && /where id = \$1/i.test(sql)) {
+        return {
+          rows: [
+            {
+              id: 'system-1',
+              system_name: 'Example Health',
+              canonical_domain: 'hospital.example',
+              state: 'TX',
+            },
+          ],
+        };
+      }
+
+      if (/from facilities/i.test(sql) && /hospital_system_id = \$1/i.test(sql)) {
+        return { rows: [] };
+      }
+
+      if (/from portal_profiles/i.test(sql)) {
+        return { rows: [] };
+      }
+
+      if (/with ranked as/i.test(sql)) {
+        return { rows: [pageWorkflow] };
+      }
+
+      if (/from records_workflows rw/i.test(sql) && /rw\.workflow_type = 'medical_records'/i.test(sql)) {
+        return { rows: [pageWorkflow, pdfWorkflow] };
+      }
+
+      if (/from workflow_contacts/i.test(sql)) {
+        if (params[0] === 'workflow-page') {
+          return {
+            rows: [
+              {
+                type: 'email',
+                label: null,
+                value: 'records@hospital.example',
+              },
+            ],
+          };
+        }
+
+        return { rows: [] };
+      }
+
+      if (/from workflow_forms/i.test(sql)) {
+        if (params[0] === 'workflow-pdf') {
+          return {
+            rows: [
+              {
+                name: 'Authorization to Release Information',
+                url: 'https://hospital.example/forms/authorization.pdf?download=1',
+                format: 'pdf',
+              },
+            ],
+          };
+        }
+
+        return { rows: [] };
+      }
+
+      if (/from workflow_instructions/i.test(sql)) {
+        if (params[0] === 'workflow-page') {
+          return {
+            rows: [
+              {
+                kind: 'submission_channel',
+                sequence_no: 1,
+                label: 'Email Submission',
+                channel: 'email',
+                value: 'records@hospital.example',
+                details: 'Submit by email: records@hospital.example',
+              },
+              {
+                kind: 'submission_channel',
+                sequence_no: 2,
+                label: 'Fax Submission',
+                channel: 'fax',
+                value: '555-555-1212',
+                details: 'Submit by fax: 555-555-1212',
+              },
+              {
+                kind: 'submission_channel',
+                sequence_no: 3,
+                label: 'Mail Submission',
+                channel: 'mail',
+                value: '123 Main St Austin, TX 78701',
+                details: 'Submit by mail: 123 Main St Austin, TX 78701',
+              },
+            ],
+          };
+        }
+
+        return {
+          rows: [
+            {
+              kind: 'submission_channel',
+              sequence_no: 1,
+              label: 'Email Submission',
+              channel: 'email',
+              value: 'The information will be released to: Patient/Designee ... PRINT SAVE AS EMAIL RESET SIGN',
+              details:
+                'Submit by email: The information will be released to: Patient/Designee ... PRINT SAVE AS EMAIL RESET SIGN',
+            },
+          ],
+        };
+      }
+
+      if (/from source_documents sd/i.test(sql) && /sd\.source_type = 'pdf'/i.test(sql)) {
+        return { rows: [] };
+      }
+
+      throw new Error(`Unexpected query in test: ${sql}`);
+    });
+
+    const packet = await getSystemRequestPacket('system-1');
+
+    expect(packet?.instructions).toEqual([
+      {
+        kind: 'submission_channel',
+        sequence_no: 1,
+        label: 'Email Submission',
+        channel: 'email',
+        value: 'records@hospital.example',
+        details: 'Submit by email: records@hospital.example',
+      },
+      {
+        kind: 'submission_channel',
+        sequence_no: 2,
+        label: 'Fax Submission',
+        channel: 'fax',
+        value: '555-555-1212',
+        details: 'Submit by fax: 555-555-1212',
+      },
+      {
+        kind: 'submission_channel',
+        sequence_no: 3,
+        label: 'Mail Submission',
+        channel: 'mail',
+        value: '123 Main St Austin, TX 78701',
+        details: 'Submit by mail: 123 Main St Austin, TX 78701',
+      },
+    ]);
+    expect(packet?.contacts).toEqual([
+      {
+        type: 'email',
+        label: null,
+        value: 'records@hospital.example',
+      },
+    ]);
+    expect(packet?.forms).toEqual([
+      {
+        name: 'Authorization to Release Information',
+        url: 'https://hospital.example/forms/authorization.pdf?download=1',
+        format: 'pdf',
+        cached_source_document_id: null,
+        cached_content_url: null,
         autofill: buildUnsupportedAutofill(),
       },
     ]);

@@ -36,6 +36,10 @@ const METHOD_PATTERNS = {
 const IMAGING_PATTERNS = [/imaging records/i, /radiology images?/i, /request imaging/i, /CD of images/i];
 const BILLING_PATTERNS = [/billing records?/i, /billing statements?/i, /itemized bill/i];
 const AMENDMENT_PATTERNS = [/amend(ment| your record)/i, /correct(ion)? of (your )?record/i];
+const SUPPORT_CONTEXT_PATTERN = /\b(question|status|help|assistance)\b/i;
+const SUPPORT_ACTION_PATTERN = /\b(call|contact|email|fax|phone)\b/i;
+const SUPPORT_TOPIC_PATTERN = /\b(medical records?|record request|release of information|request)\b/i;
+const INLINE_EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
 
 function hasAny(text, patterns) {
   return patterns.some((pattern) => pattern.test(text));
@@ -189,6 +193,68 @@ function extractLabeledValue(text, label, nextLabels = []) {
   return value || null;
 }
 
+function normalizePhoneDigits(value) {
+  const digitsOnly = String(value || '').replace(/\D/g, '');
+  if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+    return digitsOnly.slice(1);
+  }
+
+  return digitsOnly;
+}
+
+function extractSupportContact(document) {
+  const segments = uniqueBy(
+    [...(document.paragraphs || []), ...(document.headings || [])]
+      .map((segment) => collapseWhitespace(segment))
+      .filter(Boolean),
+    (segment) => segment.toLowerCase()
+  );
+
+  for (const segment of segments) {
+    if (!SUPPORT_CONTEXT_PATTERN.test(segment)) continue;
+    if (!SUPPORT_ACTION_PATTERN.test(segment)) continue;
+    if (!SUPPORT_TOPIC_PATTERN.test(segment) && !/\bstatus\b/i.test(segment)) continue;
+
+    const segmentDigits = normalizePhoneDigits(segment);
+    const phoneContact = (document.contacts || []).find(
+      (contact) =>
+        contact.type === 'phone' &&
+        segmentDigits &&
+        normalizePhoneDigits(contact.value).endsWith(segmentDigits)
+    );
+    if (phoneContact?.value) {
+      return {
+        channel: 'phone',
+        value: collapseWhitespace(phoneContact.value),
+        details: segment,
+      };
+    }
+
+    const emailContact = (document.contacts || []).find(
+      (contact) =>
+        contact.type === 'email' && segment.toLowerCase().includes(String(contact.value || '').toLowerCase())
+    );
+    if (emailContact?.value) {
+      return {
+        channel: 'email',
+        value: collapseWhitespace(emailContact.value),
+        details: segment,
+      };
+    }
+
+    const inlineEmail = INLINE_EMAIL_PATTERN.exec(segment)?.[0];
+    if (inlineEmail) {
+      return {
+        channel: 'email',
+        value: inlineEmail,
+        details: segment,
+      };
+    }
+  }
+
+  return null;
+}
+
 function detectForms(links) {
   const forms = links
     .filter((link) => {
@@ -217,7 +283,7 @@ function detectForms(links) {
   return uniqueBy(forms, (form) => form.url);
 }
 
-function buildStructuredInstructions(text, portalScope) {
+function buildStructuredInstructions(text, portalScope, document) {
   const instructions = [];
   let sequence = 1;
 
@@ -282,7 +348,7 @@ function buildStructuredInstructions(text, portalScope) {
     });
   }
 
-  const emailValue = extractLabeledValue(text, 'Email', ['Mail']);
+  const emailValue = extractLabeledValue(text, 'Email', ['Fax', 'Mail']);
   if (emailValue) {
     pushInstruction({
       instructionKind: 'submission_channel',
@@ -301,6 +367,17 @@ function buildStructuredInstructions(text, portalScope) {
       channel: 'mail',
       value: mailValue,
       details: `Submit by mail: ${mailValue}`
+    });
+  }
+
+  const supportContact = extractSupportContact(document);
+  if (supportContact?.details) {
+    pushInstruction({
+      instructionKind: 'support_contact',
+      label: 'Questions Or Status',
+      channel: supportContact.channel,
+      value: supportContact.value || null,
+      details: supportContact.details,
     });
   }
 
@@ -498,7 +575,7 @@ export function extractWorkflowBundle(document, context) {
 
   const forms = detectForms(document.links || []);
   const contacts = normalizeContacts(document.contacts || [], document.links || [], portalDetected);
-  const structuredInstructions = buildStructuredInstructions(text, portalScope);
+  const structuredInstructions = buildStructuredInstructions(text, portalScope, document);
 
   const types = inferWorkflowTypes(text);
   const notes = pickNotes(text);

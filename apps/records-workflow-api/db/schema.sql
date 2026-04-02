@@ -111,7 +111,15 @@ create table if not exists workflow_instructions (
   id uuid primary key default gen_random_uuid(),
   records_workflow_id uuid not null references records_workflows(id) on delete cascade,
   instruction_kind text not null check (
-    instruction_kind in ('step', 'requirement', 'submission_channel', 'special_case', 'turnaround', 'note')
+    instruction_kind in (
+      'step',
+      'requirement',
+      'submission_channel',
+      'support_contact',
+      'special_case',
+      'turnaround',
+      'note'
+    )
   ),
   sequence_no int not null default 0,
   label text,
@@ -125,6 +133,23 @@ create table if not exists workflow_instructions (
 
 create index if not exists workflow_instructions_lookup
   on workflow_instructions (records_workflow_id, sequence_no);
+
+alter table workflow_instructions
+  drop constraint if exists workflow_instructions_instruction_kind_check;
+
+alter table workflow_instructions
+  add constraint workflow_instructions_instruction_kind_check
+  check (
+    instruction_kind in (
+      'step',
+      'requirement',
+      'submission_channel',
+      'support_contact',
+      'special_case',
+      'turnaround',
+      'note'
+    )
+  );
 
 create table if not exists source_documents (
   id uuid primary key default gen_random_uuid(),

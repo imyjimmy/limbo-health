@@ -18,6 +18,14 @@ import { loadParsedArtifactPayload } from './parseStageService.js';
 const WORKFLOW_STAGE_KEY = 'workflow_extraction_stage';
 const WORKFLOW_STAGE_LABEL = 'Workflow Extraction Stage';
 
+function resolveWorkflowOfficialPageUrl(parsedArtifact) {
+  if (parsedArtifact?.source_type === 'pdf') {
+    return parsedArtifact.source_url;
+  }
+
+  return parsedArtifact?.source_page_url || parsedArtifact?.source_url || null;
+}
+
 function buildStageStatus({ totalDocuments, successfulDocuments, failedDocuments, partialDocuments }) {
   if (totalDocuments === 0) return 'no_documents';
   if (failedDocuments === 0 && partialDocuments === 0) return 'ok';
@@ -135,7 +143,7 @@ export async function runWorkflowExtractionStage({
       await upsertWorkflowBundle({
         hospitalSystemId: parsedArtifact.hospital_system_id,
         facilityId: parsedArtifact.facility_id || null,
-        officialPageUrl: parsedArtifact.source_page_url || parsedArtifact.source_url,
+        officialPageUrl: resolveWorkflowOfficialPageUrl(parsedArtifact),
         contentHash: parsedArtifact.content_hash,
         verifiedAt: parsedArtifact.fetched_at,
         workflows: bundle.workflows,

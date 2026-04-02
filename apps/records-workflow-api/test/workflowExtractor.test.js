@@ -33,6 +33,76 @@ test('Baylor fixture resolves HealthMark plus authorization forms', () => {
   );
 });
 
+test('Baylor submission instructions capture clean email, fax, and mail channels', () => {
+  const bundle = extractWorkflowBundle(fixture('baylor-submission-instructions.json'), {
+    isOfficialDomain: true,
+  });
+  const workflow = medicalWorkflow(bundle);
+
+  assert.ok(workflow);
+  assert.deepEqual(
+    workflow.instructions
+      .filter((item) => item.instructionKind === 'submission_channel')
+      .map((item) => ({
+        instructionKind: item.instructionKind,
+        channel: item.channel,
+        value: item.value,
+      })),
+    [
+      {
+        instructionKind: 'submission_channel',
+        channel: 'fax',
+        value: '855.563.BSWH (2794)',
+      },
+      {
+        instructionKind: 'submission_channel',
+        channel: 'email',
+        value: 'BSWH@Healthmark-Group.com',
+      },
+      {
+        instructionKind: 'submission_channel',
+        channel: 'mail',
+        value: 'Baylor Scott & White Health c/o HealthMark Group 16750 Westgrove Dr #600 Addison, TX 75001',
+      },
+    ],
+  );
+});
+
+test('Baylor submission instructions capture generic support contact from the page paragraph', () => {
+  const source = fixture('baylor-submission-instructions.json');
+  const bundle = extractWorkflowBundle(
+    {
+      ...source,
+      paragraphs: [
+        'Completed request forms may be submitted in the following ways: Email: BSWH@Healthmark-Group.com Fax: 855.563.BSWH (2794) Mail: Baylor Scott & White Health c/o HealthMark Group 16750 Westgrove Dr #600 Addison, TX 75001',
+        'For questions regarding medical records or to obtain the status of your request call us at 844.848.BSWH (2794)',
+      ],
+      contacts: [
+        {
+          type: 'phone',
+          value: '+18448482794',
+        },
+      ],
+    },
+    { isOfficialDomain: true },
+  );
+  const workflow = medicalWorkflow(bundle);
+
+  assert.ok(workflow);
+  assert.deepEqual(
+    workflow.instructions.find((item) => item.instructionKind === 'support_contact'),
+    {
+      instructionKind: 'support_contact',
+      sequenceNo: 4,
+      label: 'Questions Or Status',
+      channel: 'phone',
+      value: '+18448482794',
+      details:
+        'For questions regarding medical records or to obtain the status of your request call us at 844.848.BSWH (2794)',
+    },
+  );
+});
+
 test("St. David's fixture resolves MyHealthONE plus multi-channel requests", () => {
   const bundle = extractWorkflowBundle(fixture('stdavids.json'), { isOfficialDomain: true });
   const workflow = medicalWorkflow(bundle);
