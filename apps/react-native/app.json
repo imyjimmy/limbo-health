@@ -56,7 +56,8 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to record audio for medical notes."
         }
       ],
-      "./plugins/withCrashDiagnostics"
+      "./plugins/withCrashDiagnostics",
+      "expo-mail-composer"
     ],
     "extra": {
       "eas": {

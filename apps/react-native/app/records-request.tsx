@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { IconPencil, IconUser } from '@tabler/icons-react-native';
+import { IconPencil, IconSignature, IconUser } from '@tabler/icons-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -17,13 +17,13 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Share,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
+import * as MailComposer from 'expo-mail-composer';
+import * as Sharing from 'expo-sharing';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -69,29 +69,78 @@ import type {
 } from '../types/recordsRequest';
 
 type RecordsRequestInstruction = RecordsRequestPacket['instructions'][number];
+type RecordsRequestContact = RecordsRequestPacket['contacts'][number];
 
 const RECORDS_REQUEST_LAUNCH_STATE_CODE = 'TX';
 const RECORDS_REQUEST_LAUNCH_STATE_NAME = 'Texas';
+const EMAIL_ADDRESS_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
 function buildFormKey(form: RecordsWorkflowForm): string {
   return form.cachedContentUrl || form.url;
 }
 
+function normalizeInlineText(value: string | null | undefined): string {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getInstructionText(instruction: RecordsRequestInstruction | null): string {
+  if (!instruction) return '';
+
+  return normalizeInlineText(
+    [instruction.value, instruction.details]
+      .filter((value) => typeof value === 'string' && value.trim().length > 0)
+      .join(' '),
+  );
+}
+
+function looksLikeSubmissionDestination(
+  channel: 'email' | 'fax' | 'mail',
+  instruction: RecordsRequestInstruction,
+): boolean {
+  const explicitValue = normalizeInlineText(instruction.value);
+  const details = normalizeInlineText(instruction.details);
+  const haystack = `${explicitValue} ${details}`.trim();
+
+  if (!haystack) return false;
+
+  switch (channel) {
+    case 'email':
+      return EMAIL_ADDRESS_PATTERN.test(haystack);
+    case 'fax':
+      return /\bfax\b/i.test(details) || /(?:\+?[\dA-Z][\dA-Z().\-\s]{6,})/.test(explicitValue);
+    case 'mail':
+      return /\bc\/o\b|p\.?o\.?\s*box\b|\d{1,6}\s+[A-Za-z0-9.#-]/i.test(haystack);
+  }
+}
+
 function getSubmissionInstruction(
   instructions: RecordsRequestInstruction[],
-  channel: 'email' | 'fax',
+  channel: 'email' | 'fax' | 'mail',
 ): RecordsRequestInstruction | null {
   return (
     instructions.find(
       (instruction) =>
         instruction.kind === 'submission_channel' &&
         instruction.channel === channel &&
-        Boolean(instruction.value?.trim() || instruction.details.trim()),
+        looksLikeSubmissionDestination(channel, instruction),
     ) ||
     instructions.find(
       (instruction) =>
         instruction.channel === channel &&
-        Boolean(instruction.value?.trim() || instruction.details.trim()),
+        looksLikeSubmissionDestination(channel, instruction),
+    ) ||
+    instructions.find(
+      (instruction) =>
+        instruction.kind === 'submission_channel' &&
+        instruction.channel === channel &&
+        Boolean(normalizeInlineText(instruction.value) || normalizeInlineText(instruction.details)),
+    ) ||
+    instructions.find(
+      (instruction) =>
+        instruction.channel === channel &&
+        Boolean(normalizeInlineText(instruction.value) || normalizeInlineText(instruction.details)),
     ) ||
     null
   );
@@ -105,15 +154,91 @@ function getSubmissionInstructionValue(instruction: RecordsRequestInstruction | 
     return explicitValue;
   }
 
-  return instruction.details.replace(/^submit by (email|fax):\s*/i, '').trim();
+  return instruction.details.replace(/^submit by (email|fax|mail):\s*/i, '').trim();
 }
 
 function extractEmailAddress(instruction: RecordsRequestInstruction | null): string | null {
-  const match = getSubmissionInstructionValue(instruction).match(
-    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
-  );
+  const match = getSubmissionInstructionValue(instruction).match(EMAIL_ADDRESS_PATTERN);
 
   return match?.[0] || null;
+}
+
+function getSupportInstruction(
+  instructions: RecordsRequestInstruction[],
+): RecordsRequestInstruction | null {
+  return (
+    instructions.find(
+      (instruction) =>
+        instruction.kind === 'support_contact' &&
+        /questions|status|call us/i.test(getInstructionText(instruction)),
+    ) ||
+    instructions.find(
+      (instruction) =>
+        instruction.channel === 'phone' &&
+        /questions|status|call us/i.test(getInstructionText(instruction)),
+    ) ||
+    null
+  );
+}
+
+function getSupportInstructionValue(instruction: RecordsRequestInstruction | null): string {
+  if (!instruction) return '';
+
+  const explicitValue = normalizeInlineText(instruction.value);
+  if (explicitValue) {
+    return explicitValue;
+  }
+
+  return normalizeInlineText(instruction.details).replace(/^.*call us at\s*/i, '').trim();
+}
+
+function getPrimaryContactValue(
+  contacts: RecordsRequestContact[],
+  type: string,
+  preferredPatterns: RegExp[] = [],
+): string | null {
+  const values = contacts
+    .filter((contact) => contact.type === type)
+    .map((contact) => normalizeInlineText(contact.value))
+    .filter(Boolean);
+
+  for (const pattern of preferredPatterns) {
+    const matched = values.find((value) => pattern.test(value));
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return values[0] || null;
+}
+
+function formatMailingAddress(value: string | null): string | null {
+  if (!value) return null;
+
+  return normalizeInlineText(value)
+    .replace(/\s+(?=c\/o\b)/i, '\n')
+    .replace(/\s+(?=\d{1,6}\s+[A-Za-z0-9.#-])/, '\n')
+    .replace(/\s+(?=[A-Za-z .'-]+,\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?\b)/, '\n');
+}
+
+function formatPhoneDisplay(value: string | null): string | null {
+  if (!value) return null;
+
+  const trimmed = normalizeInlineText(value);
+  if (!trimmed) return null;
+  if (/[A-Za-z]/.test(trimmed) || /[().-]/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  const normalizedDigits =
+    digitsOnly.length === 11 && digitsOnly.startsWith('1') ? digitsOnly.slice(1) : digitsOnly;
+
+  if (normalizedDigits.length !== 10) {
+    return trimmed;
+  }
+
+  return `(${normalizedDigits.slice(0, 3)}) ${normalizedDigits.slice(3, 6)}-${normalizedDigits.slice(6)}`;
 }
 
 function getWorkflowStepTitle(step: RecordsRequestWorkflowStep): string {
@@ -382,26 +507,55 @@ export default function RecordsRequestScreen() {
         : 'Continue to ID';
   const emailInstruction = packet ? getSubmissionInstruction(packet.instructions, 'email') : null;
   const faxInstruction = packet ? getSubmissionInstruction(packet.instructions, 'fax') : null;
+  const mailInstruction = packet ? getSubmissionInstruction(packet.instructions, 'mail') : null;
+  const supportInstruction = packet ? getSupportInstruction(packet.instructions) : null;
   const emailDestination = extractEmailAddress(emailInstruction);
-  const faxDestination = getSubmissionInstructionValue(faxInstruction);
+  const packetEmailDestination =
+    emailDestination ||
+    (packet ? getPrimaryContactValue(packet.contacts, 'email', [/healthmark-group\.com/i]) : null) ||
+    null;
+  const packetFaxDestination =
+    normalizeInlineText(getSubmissionInstructionValue(faxInstruction)) || null;
+  const packetMailDestination =
+    formatMailingAddress(getSubmissionInstructionValue(mailInstruction)) ||
+    (packet
+      ? formatMailingAddress(
+          getPrimaryContactValue(packet.contacts, 'mailing_address', [
+            /\bc\/o healthmark group\b/i,
+            /westgrove/i,
+          ]),
+        )
+      : null);
+  const packetSupportPhone =
+    formatPhoneDisplay(getSupportInstructionValue(supportInstruction)) ||
+    (packet
+      ? formatPhoneDisplay(
+          getPrimaryContactValue(packet.contacts, 'phone', [/8448482794/, /844\.848\.BSWH/i]),
+        )
+      : null);
   const displayedEmailDestination =
-    emailDestination || getSubmissionInstructionValue(emailInstruction) || '';
-  const displayedFaxDestination = faxDestination || '';
-  const filledPdfTitle =
-    activeAutofillForm?.name ||
-    prefetchedFormName ||
-    primaryDisplayForm?.name ||
-    'Filled hospital form';
+    packetEmailDestination || normalizeInlineText(getSubmissionInstructionValue(emailInstruction)) || null;
+  const displayedFaxDestination =
+    packetFaxDestination || normalizeInlineText(getSubmissionInstructionValue(faxInstruction)) || null;
+  const displayedMailDestination = packetMailDestination;
+  const displayedSupportPhone = packetSupportPhone;
+  const hasDeliveryInstructions = Boolean(
+    displayedEmailDestination ||
+      displayedFaxDestination ||
+      displayedMailDestination ||
+      displayedSupportPhone,
+  );
+  const isGeneratedSubmitStep = currentWorkflowStep.kind === 'submit' && Boolean(generatedPdfUri);
   const currentStepTitle =
-    currentWorkflowStep.kind === 'submit' && generatedPdfUri
-      ? 'Ready to send'
+    isGeneratedSubmitStep
+      ? ''
       : currentWorkflowStep.kind === 'hospital' && selectedSystem
         ? selectedSystem.name
         : getWorkflowStepTitle(currentWorkflowStep);
   const currentStepDescription =
     currentWorkflowStep.kind === 'submit'
-      ? generatedPdfUri
-        ? 'Review the completed PDF and send it using the hospital instructions below.'
+      ? isGeneratedSubmitStep
+        ? ''
         : 'Generate the completed PDF, then send it exactly the way this hospital asks.'
       : currentWorkflowStep.kind === 'hospital' && selectedSystem
         ? ''
@@ -419,8 +573,34 @@ export default function RecordsRequestScreen() {
   const compactHospitalStatus = [compactHospitalSummary, compactHospitalDetail]
     .filter(Boolean)
     .join(' • ');
-  const useCompactProgressCard = currentWorkflowStep.kind === 'hospital' && Boolean(selectedSystem);
+  const useCompactProgressCard =
+    (currentWorkflowStep.kind === 'hospital' && Boolean(selectedSystem)) || isGeneratedSubmitStep;
   const showHospitalDiscoveryMarquee = normalizedSearchQuery.length === 0;
+
+  const generatePdf = async () => {
+    if (!packet || !profile) return false;
+
+    setSubmitting(true);
+    try {
+      const result = await generateRecordsRequestPdf({
+        bioProfile: profile,
+        packet,
+        idAttachment,
+        selectedFormKey,
+        autofillAnswers,
+        signature,
+      });
+
+      setGeneratedPdfUri(result.uri);
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to generate the PDF.';
+      Alert.alert('Generation Failed', message);
+      return false;
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (!requestedSystemId || !hasProfile || !profile) return;
@@ -663,25 +843,18 @@ export default function RecordsRequestScreen() {
   };
 
   const handleGeneratePdf = async () => {
-    if (!packet) return;
+    await generatePdf();
+  };
 
-    setSubmitting(true);
-    try {
-      const result = await generateRecordsRequestPdf({
-        bioProfile: profile,
-        packet,
-        idAttachment,
-        selectedFormKey,
-        autofillAnswers,
-        signature,
-      });
+  const handleContinueToSubmit = async () => {
+    if (generatedPdfUri || !canGeneratePdf) {
+      goToNextStep();
+      return;
+    }
 
-      setGeneratedPdfUri(result.uri);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to generate the PDF.';
-      Alert.alert('Generation Failed', message);
-    } finally {
-      setSubmitting(false);
+    const didGeneratePdf = await generatePdf();
+    if (didGeneratePdf) {
+      goToNextStep();
     }
   };
 
@@ -696,45 +869,55 @@ export default function RecordsRequestScreen() {
     }
   };
 
+  const handleSharePdf = async () => {
+    if (!generatedPdfUri || !packet) return;
+
+    try {
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      if (!sharingAvailable) {
+        throw new Error('Sharing is unavailable on this device.');
+      }
+
+      await Sharing.shareAsync(generatedPdfUri, {
+        dialogTitle: `${packet.hospitalSystem.name} records request`,
+        UTI: 'com.adobe.pdf',
+        mimeType: 'application/pdf',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to open the share sheet.';
+      Alert.alert('Share Failed', message);
+    }
+  };
+
   const handleEmailPdf = async () => {
     if (!generatedPdfUri || !packet) return;
 
-    if (!emailDestination) {
+    if (!packetEmailDestination) {
       Alert.alert('Email Unavailable', 'No hospital email destination was extracted for this form.');
       return;
     }
 
     try {
-      await Clipboard.setStringAsync(emailDestination);
-      await Share.share({
-        title: `${packet.hospitalSystem.name} records request`,
-        message: `Email this completed records request PDF to ${emailDestination}.`,
-        url: generatedPdfUri,
+      const emailSubject = `${packet.hospitalSystem.name} medical records request`;
+      const emailBody = 'Attached is the completed records request PDF.';
+      const composerAvailable = await MailComposer.isAvailableAsync();
+      if (!composerAvailable) {
+        Alert.alert(
+          'Email Unavailable',
+          'Email compose with the PDF attached requires Apple Mail to be set up on this iPhone. Use Share to send the PDF with Gmail, Outlook, or another mail app.',
+        );
+        return;
+      }
+
+      await MailComposer.composeAsync({
+        recipients: [packetEmailDestination],
+        subject: emailSubject,
+        body: emailBody,
+        attachments: [generatedPdfUri],
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to prepare the email share.';
+      const message = error instanceof Error ? error.message : 'Unable to open the email composer.';
       Alert.alert('Email Failed', message);
-    }
-  };
-
-  const handleFaxPdf = async () => {
-    if (!generatedPdfUri || !packet) return;
-
-    if (!faxDestination) {
-      Alert.alert('Fax Unavailable', 'No hospital fax destination was extracted for this form.');
-      return;
-    }
-
-    try {
-      await Clipboard.setStringAsync(faxDestination);
-      await Share.share({
-        title: `${packet.hospitalSystem.name} records request`,
-        message: `Fax this completed records request PDF to ${faxDestination}.`,
-        url: generatedPdfUri,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to prepare the fax share.';
-      Alert.alert('Fax Failed', message);
     }
   };
 
@@ -821,6 +1004,17 @@ export default function RecordsRequestScreen() {
       return;
     }
 
+    void handleContinueToSubmit();
+  };
+
+  const handleContinueFromId = () => {
+    if (!idStepCanContinue) return;
+
+    if (nextWorkflowStep?.kind === 'submit') {
+      void handleContinueToSubmit();
+      return;
+    }
+
     goToNextStep();
   };
 
@@ -880,8 +1074,14 @@ export default function RecordsRequestScreen() {
         keyboardDismissMode="interactive"
       >
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Back</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={8}
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.headerBackButton, pressed && styles.headerBackButtonPressed]}
+          >
+            <Ionicons name="chevron-back" size={26} color={theme.colors.secondary} />
           </Pressable>
           <Text style={styles.headerTitle}>New Records Request</Text>
           <View style={styles.backButtonSpacer} />
@@ -893,16 +1093,39 @@ export default function RecordsRequestScreen() {
             <Text style={styles.heroTitle}>{currentStepTitle}</Text>
             <Text style={styles.heroSubtitle}>{currentStepDescription}</Text>
           </View>
+        ) : isGeneratedSubmitStep ? (
+          <View style={[styles.progressCard, styles.progressCardCompact]}>
+            <View style={styles.generatedProgressCardHeader}>
+              <View style={styles.generatedProgressCopy}>
+                <Text style={styles.progressEyebrow}>
+                  Step {currentStepIndex + 1} of {workflowSteps.length}
+                </Text>
+                <Text style={styles.progressTitle}>Filled PDF</Text>
+                <Text style={styles.progressSubtitle}>Share or email the filled PDF.</Text>
+              </View>
+              <Pressable
+                onPress={handleOpenGeneratedPdf}
+                style={({ pressed }) => [
+                  styles.pdfOpenButton,
+                  pressed && styles.secondaryButtonPressed,
+                ]}
+              >
+                <Text style={styles.pdfOpenButtonText}>Open</Text>
+              </Pressable>
+            </View>
+          </View>
         ) : (
           <View style={[styles.progressCard, useCompactProgressCard && styles.progressCardCompact]}>
             <Text style={styles.progressEyebrow}>
               Step {currentStepIndex + 1} of {workflowSteps.length}
             </Text>
-            <Text
-              style={[styles.progressTitle, useCompactProgressCard && styles.progressTitleCompact]}
-            >
-              {currentStepTitle}
-            </Text>
+            {currentStepTitle ? (
+              <Text
+                style={[styles.progressTitle, useCompactProgressCard && styles.progressTitleCompact]}
+              >
+                {currentStepTitle}
+              </Text>
+            ) : null}
             {currentStepDescription ? (
               <Text style={styles.progressSubtitle}>{currentStepDescription}</Text>
             ) : null}
@@ -1178,24 +1401,31 @@ export default function RecordsRequestScreen() {
               <Pressable
                 onPress={goToPreviousStep}
                 style={({ pressed }) => [
-                  styles.secondaryButton,
+                  styles.secondaryIconButton,
                   pressed && styles.secondaryButtonPressed,
                 ]}
               >
-                <Text style={styles.secondaryButtonText}>Back</Text>
+                <Ionicons name="chevron-back" size={24} color={theme.colors.secondary} />
               </Pressable>
 
               <Pressable
                 onPress={handleContinueFromQuestion}
                 style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
               >
-                <Text style={styles.primaryButtonText}>
-                  {nextWorkflowStep?.kind === 'id'
-                    ? 'Continue to ID'
-                    : nextWorkflowStep?.kind === 'signature'
-                      ? 'Continue to Signature'
-                      : 'Next Question'}
-                </Text>
+                {nextWorkflowStep?.kind === 'signature' ? (
+                  <View style={styles.primaryButtonContent}>
+                    <IconSignature
+                      size={18}
+                      color={theme.colors.primaryForeground}
+                      strokeWidth={2.2}
+                    />
+                    <Text style={styles.primaryButtonText}>Continue to Signature</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {nextWorkflowStep?.kind === 'id' ? 'Continue to ID' : 'Next Question'}
+                  </Text>
+                )}
               </Pressable>
             </View>
           </View>
@@ -1225,27 +1455,31 @@ export default function RecordsRequestScreen() {
                 ))}
             </View>
 
-            <View style={styles.actionColumn}>
+            <View style={styles.utilityActionRow}>
               <Pressable
                 onPress={handleCaptureId}
                 style={({ pressed }) => [
-                  styles.secondaryButton,
-                  styles.fullWidthButton,
-                  pressed && styles.secondaryButtonPressed,
+                  styles.utilityActionButton,
+                  pressed && styles.deliveryActionButtonPressed,
                 ]}
               >
-                <Text style={styles.secondaryButtonText}>Take Photo</Text>
+                <View style={styles.utilityActionIconWrap}>
+                  <Ionicons name="camera-outline" size={22} color={theme.colors.secondary} />
+                </View>
+                <Text style={styles.utilityActionLabel}>Take Photo</Text>
               </Pressable>
 
               <Pressable
                 onPress={handlePickIdFromLibrary}
                 style={({ pressed }) => [
-                  styles.secondaryButton,
-                  styles.fullWidthButton,
-                  pressed && styles.secondaryButtonPressed,
+                  styles.utilityActionButton,
+                  pressed && styles.deliveryActionButtonPressed,
                 ]}
               >
-                <Text style={styles.secondaryButtonText}>Choose From Photos</Text>
+                <View style={styles.utilityActionIconWrap}>
+                  <Ionicons name="images-outline" size={22} color={theme.colors.secondary} />
+                </View>
+                <Text style={styles.utilityActionLabel}>Choose Photos</Text>
               </Pressable>
             </View>
 
@@ -1263,29 +1497,44 @@ export default function RecordsRequestScreen() {
               <Pressable
                 onPress={goToPreviousStep}
                 style={({ pressed }) => [
-                  styles.secondaryButton,
+                  styles.secondaryIconButton,
                   pressed && styles.secondaryButtonPressed,
                 ]}
               >
-                <Text style={styles.secondaryButtonText}>Back</Text>
+                <Ionicons name="chevron-back" size={24} color={theme.colors.secondary} />
               </Pressable>
 
               <Pressable
-                onPress={goToNextStep}
-                disabled={!idStepCanContinue}
+                accessibilityLabel={
+                  nextWorkflowStep?.kind === 'signature'
+                    ? 'Continue to signature'
+                    : undefined
+                }
+                onPress={handleContinueFromId}
+                disabled={!idStepCanContinue || submitting}
                 style={({ pressed }) => [
                   styles.primaryButton,
-                  (!idStepCanContinue || pressed) && styles.primaryButtonPressed,
-                  !idStepCanContinue && styles.disabledButton,
+                  (!idStepCanContinue || submitting || pressed) && styles.primaryButtonPressed,
+                  (!idStepCanContinue || submitting) && styles.disabledButton,
                 ]}
               >
-                <Text style={styles.primaryButtonText}>
-                  {nextWorkflowStep?.kind === 'signature'
-                    ? 'Continue to Signature'
-                    : packet.requiresPhotoId
-                      ? 'Continue to Review'
-                      : 'Review Packet'}
-                </Text>
+                {nextWorkflowStep?.kind === 'signature' ? (
+                  <View style={styles.primaryIconOnlyButtonContent}>
+                    <IconSignature
+                      size={24}
+                      color={theme.colors.primaryForeground}
+                      strokeWidth={2}
+                    />
+                  </View>
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {submitting
+                      ? 'Preparing PDF...'
+                      : packet.requiresPhotoId
+                        ? 'Continue to Review'
+                        : 'Review Packet'}
+                  </Text>
+                )}
               </Pressable>
             </View>
           </View>
@@ -1312,138 +1561,43 @@ export default function RecordsRequestScreen() {
               <Pressable
                 onPress={goToPreviousStep}
                 style={({ pressed }) => [
-                  styles.secondaryButton,
+                  styles.secondaryIconButton,
                   pressed && styles.secondaryButtonPressed,
                 ]}
               >
-                <Text style={styles.secondaryButtonText}>Back</Text>
+                <Ionicons name="chevron-back" size={24} color={theme.colors.secondary} />
               </Pressable>
 
               <Pressable
                 onPress={handleContinueFromSignature}
-                disabled={!signatureStepCanContinue}
+                disabled={!signatureStepCanContinue || submitting}
                 style={({ pressed }) => [
                   styles.primaryButton,
-                  (!signatureStepCanContinue || pressed) && styles.primaryButtonPressed,
-                  !signatureStepCanContinue && styles.disabledButton,
+                  (!signatureStepCanContinue || submitting || pressed) && styles.primaryButtonPressed,
+                  (!signatureStepCanContinue || submitting) && styles.disabledButton,
                 ]}
               >
-                <Text style={styles.primaryButtonText}>Review Packet</Text>
+                <Text style={styles.primaryButtonText}>
+                  {submitting ? 'Preparing PDF...' : 'Review Packet'}
+                </Text>
               </Pressable>
             </View>
           </View>
         )}
 
         {currentWorkflowStep.kind === 'submit' && packet && (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>
-              {generatedPdfUri ? 'Filled PDF ready' : 'Create the filled PDF'}
-            </Text>
-            <Text style={styles.sectionBody}>
-              {generatedPdfUri
-                ? 'Review the completed form below, then send it by email or fax using the hospital instructions we recovered.'
-                : 'Generate the completed PDF, then send it exactly the way this hospital asks.'}
-            </Text>
-
-            <View style={styles.reviewSection}>
-              <Text style={styles.reviewHeader}>Official form</Text>
-              {primaryDisplayForm ? (
-                <Pressable
-                  key={`${primaryDisplayForm.name}:${primaryDisplayForm.url}`}
-                  onPress={() => Linking.openURL(primaryDisplayForm.cachedContentUrl || primaryDisplayForm.url)}
-                  style={({ pressed }) => [styles.linkRow, pressed && styles.systemCardPressed]}
-                >
-                  <Text style={styles.linkText}>{primaryDisplayForm.name}</Text>
-                  <Text style={styles.linkMeta}>
-                    {primaryDisplayForm.cachedContentUrl ? 'CACHED PDF' : 'OFFICIAL LINK'}
-                  </Text>
-                </Pressable>
-              ) : packet.forms.length > 0 ? (
-                packet.forms.slice(0, 1).map((form) => (
-                  <Pressable
-                    key={`${form.name}:${form.url}`}
-                    onPress={() => Linking.openURL(form.cachedContentUrl || form.url)}
-                    style={({ pressed }) => [styles.linkRow, pressed && styles.systemCardPressed]}
-                  >
-                    <Text style={styles.linkText}>{form.name}</Text>
-                    <Text style={styles.linkMeta}>
-                      {form.cachedContentUrl ? 'CACHED PDF' : 'OFFICIAL LINK'}
-                    </Text>
-                  </Pressable>
-                ))
-              ) : (
-                <Text style={styles.reviewMuted}>No official form URLs were attached to this system.</Text>
-              )}
-            </View>
-
-            {!hasPdfForm && (
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewHeader}>Form filling</Text>
-                <Text style={styles.reviewMuted}>
-                  No fillable hospital PDF is available for this system yet. You can still review the
-                  workflow details above and open any official links manually.
+          <View style={generatedPdfUri ? styles.generatedSubmitSection : styles.sectionCard}>
+            {!generatedPdfUri ? (
+              <>
+                <Text style={styles.sectionTitle}>Create the filled PDF</Text>
+                <Text style={styles.sectionBody}>
+                  Generate the completed PDF, then send it exactly the way this hospital asks.
                 </Text>
-              </View>
-            )}
-
-            {hasPdfForm && templatePrefetchState === 'loading' && (
-              <View style={styles.reviewSection}>
-                <Text style={styles.reviewHeader}>Preparing form</Text>
-                <Text style={styles.reviewMuted}>
-                  Fetching the selected hospital PDF now so it&apos;s ready for one-tap filling.
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.deliveryCard}>
-              <Text style={styles.deliveryEyebrow}>Hospital Instructions</Text>
-              <View style={styles.deliveryRow}>
-                <View style={styles.deliveryIcon}>
-                  <Ionicons name="mail-outline" size={18} color={theme.colors.secondary} />
-                </View>
-                <View style={styles.deliveryTextWrap}>
-                  <Text style={styles.deliveryLabel}>Email</Text>
-                  <Text style={styles.deliveryValue}>
-                    {displayedEmailDestination || 'No email destination recovered'}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.deliveryRow}>
-                <View style={styles.deliveryIcon}>
-                  <Ionicons name="print-outline" size={18} color={theme.colors.secondary} />
-                </View>
-                <View style={styles.deliveryTextWrap}>
-                  <Text style={styles.deliveryLabel}>Fax</Text>
-                  <Text style={styles.deliveryValue}>
-                    {displayedFaxDestination || 'No fax destination recovered'}
-                  </Text>
-                </View>
-              </View>
-              {generatedPdfUri ? (
-                <Text style={styles.deliveryHint}>
-                  Tapping Email or Fax copies the destination and opens your device share sheet with the filled PDF.
-                </Text>
-              ) : null}
-            </View>
+              </>
+            ) : null}
 
             {generatedPdfUri && (
-              <View style={styles.pdfCard}>
-                <View style={styles.pdfCardHeader}>
-                  <View style={styles.deliveryTextWrap}>
-                    <Text style={styles.deliveryEyebrow}>Filled PDF</Text>
-                    <Text style={styles.pdfCardTitle}>{filledPdfTitle}</Text>
-                  </View>
-                  <Pressable
-                    onPress={handleOpenGeneratedPdf}
-                    style={({ pressed }) => [
-                      styles.pdfOpenButton,
-                      pressed && styles.secondaryButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.pdfOpenButtonText}>Open</Text>
-                  </Pressable>
-                </View>
-
+              <View style={styles.pdfPreviewCard}>
                 {Platform.OS === 'ios' && !pdfPreviewFailed ? (
                   <View style={styles.pdfFrame}>
                     <WebView
@@ -1480,6 +1634,165 @@ export default function RecordsRequestScreen() {
               </View>
             )}
 
+            {!generatedPdfUri && (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewHeader}>Official form</Text>
+                {primaryDisplayForm ? (
+                  <Pressable
+                    key={`${primaryDisplayForm.name}:${primaryDisplayForm.url}`}
+                    onPress={() =>
+                      Linking.openURL(primaryDisplayForm.cachedContentUrl || primaryDisplayForm.url)
+                    }
+                    style={({ pressed }) => [styles.linkRow, pressed && styles.systemCardPressed]}
+                  >
+                    <Text style={styles.linkText}>{primaryDisplayForm.name}</Text>
+                    <Text style={styles.linkMeta}>
+                      {primaryDisplayForm.cachedContentUrl ? 'CACHED PDF' : 'OFFICIAL LINK'}
+                    </Text>
+                  </Pressable>
+                ) : packet.forms.length > 0 ? (
+                  packet.forms.slice(0, 1).map((form) => (
+                    <Pressable
+                      key={`${form.name}:${form.url}`}
+                      onPress={() => Linking.openURL(form.cachedContentUrl || form.url)}
+                      style={({ pressed }) => [styles.linkRow, pressed && styles.systemCardPressed]}
+                    >
+                      <Text style={styles.linkText}>{form.name}</Text>
+                      <Text style={styles.linkMeta}>
+                        {form.cachedContentUrl ? 'CACHED PDF' : 'OFFICIAL LINK'}
+                      </Text>
+                    </Pressable>
+                  ))
+                ) : (
+                  <Text style={styles.reviewMuted}>
+                    No official form URLs were attached to this system.
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {!hasPdfForm && (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewHeader}>Form filling</Text>
+                <Text style={styles.reviewMuted}>
+                  No fillable hospital PDF is available for this system yet. You can still review the
+                  workflow details above and open any official links manually.
+                </Text>
+              </View>
+            )}
+
+            {hasPdfForm && templatePrefetchState === 'loading' && (
+              <View style={styles.reviewSection}>
+                <Text style={styles.reviewHeader}>Preparing form</Text>
+                <Text style={styles.reviewMuted}>
+                  Fetching the selected hospital PDF now so it&apos;s ready for one-tap filling.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.deliveryCard}>
+              <Text style={styles.deliveryEyebrow}>Sending Instructions</Text>
+              {displayedEmailDestination ? (
+                <View style={styles.deliveryRow}>
+                  <View style={styles.deliveryIcon}>
+                    <Ionicons name="mail-outline" size={18} color={theme.colors.secondary} />
+                  </View>
+                  <View style={styles.deliveryTextWrap}>
+                    <Text style={styles.deliveryLabel}>Email</Text>
+                    <Text style={styles.deliveryValue}>{displayedEmailDestination}</Text>
+                  </View>
+                </View>
+              ) : null}
+              {displayedFaxDestination ? (
+                <View style={styles.deliveryRow}>
+                  <View style={styles.deliveryIcon}>
+                    <Ionicons name="print-outline" size={18} color={theme.colors.secondary} />
+                  </View>
+                  <View style={styles.deliveryTextWrap}>
+                    <Text style={styles.deliveryLabel}>Fax</Text>
+                    <Text style={styles.deliveryValue}>{displayedFaxDestination}</Text>
+                  </View>
+                </View>
+              ) : null}
+              {displayedMailDestination ? (
+                <View style={styles.deliveryRow}>
+                  <View style={styles.deliveryIcon}>
+                    <Ionicons name="business-outline" size={18} color={theme.colors.secondary} />
+                  </View>
+                  <View style={styles.deliveryTextWrap}>
+                    <Text style={styles.deliveryLabel}>Mail</Text>
+                    <Text style={styles.deliveryValue}>{displayedMailDestination}</Text>
+                  </View>
+                </View>
+              ) : null}
+              {displayedSupportPhone ? (
+                <View style={styles.deliveryRow}>
+                  <View style={styles.deliveryIcon}>
+                    <Ionicons name="call-outline" size={18} color={theme.colors.secondary} />
+                  </View>
+                  <View style={styles.deliveryTextWrap}>
+                    <Text style={styles.deliveryLabel}>Questions / status</Text>
+                    <Text style={styles.deliveryValue}>{displayedSupportPhone}</Text>
+                  </View>
+                </View>
+              ) : null}
+              {!hasDeliveryInstructions ? (
+                <Text style={styles.deliveryHint}>No clear send instructions were recovered yet.</Text>
+              ) : null}
+            </View>
+
+            {generatedPdfUri && (
+              <View style={styles.deliveryActionRow}>
+                <Pressable
+                  onPress={handleSharePdf}
+                  style={({ pressed }) => [
+                    styles.deliveryActionButton,
+                    pressed && styles.deliveryActionButtonPressed,
+                  ]}
+                >
+                  <View style={styles.deliveryActionIconWrap}>
+                    <Ionicons
+                      name="share-social-outline"
+                      size={20}
+                      color={theme.colors.secondary}
+                    />
+                  </View>
+                  <Text style={styles.deliveryActionLabel}>Share</Text>
+                </Pressable>
+
+              <Pressable
+                onPress={handleEmailPdf}
+                disabled={!packetEmailDestination}
+                style={({ pressed }) => [
+                  styles.deliveryActionButton,
+                  (!packetEmailDestination || pressed) && styles.deliveryActionButtonPressed,
+                  !packetEmailDestination && styles.deliveryActionButtonDisabled,
+                ]}
+              >
+                  <View style={styles.deliveryActionIconWrap}>
+                    <Ionicons name="mail-outline" size={20} color={theme.colors.secondary} />
+                  </View>
+                  <Text
+                    style={[
+                      styles.deliveryActionLabel,
+                      !packetEmailDestination && styles.deliveryActionLabelDisabled,
+                    ]}
+                  >
+                    Email
+                  </Text>
+                </Pressable>
+
+                <View style={[styles.deliveryActionButton, styles.deliveryActionButtonDisabled]}>
+                  <View style={styles.deliveryActionIconWrap}>
+                    <Ionicons name="print-outline" size={20} color={theme.colors.textMuted} />
+                  </View>
+                  <Text style={[styles.deliveryActionLabel, styles.deliveryActionLabelDisabled]}>
+                    Fax
+                  </Text>
+                </View>
+              </View>
+            )}
+
             <View style={styles.actionColumn}>
               {!generatedPdfUri ? (
                 <Pressable
@@ -1505,51 +1818,27 @@ export default function RecordsRequestScreen() {
                   </Text>
                 </Pressable>
               ) : (
-                <>
+                <View style={styles.generatedFooterRow}>
                   <Pressable
                     onPress={goToPreviousStep}
                     style={({ pressed }) => [
-                      styles.inlineTextButton,
-                      pressed && styles.changeSelectionButtonPressed,
+                      styles.secondaryIconButton,
+                      pressed && styles.secondaryButtonPressed,
                     ]}
                   >
-                    <Text style={styles.inlineTextButtonText}>Back</Text>
+                    <Ionicons name="chevron-back" size={24} color={theme.colors.secondary} />
                   </Pressable>
                   <Pressable
                     onPress={handleStartOver}
                     style={({ pressed }) => [
-                      styles.inlineTextButton,
-                      pressed && styles.changeSelectionButtonPressed,
+                      styles.secondaryButton,
+                      styles.generatedSecondaryButton,
+                      pressed && styles.secondaryButtonPressed,
                     ]}
                   >
-                    <Text style={styles.inlineTextButtonText}>Start Over</Text>
+                    <Text style={styles.secondaryButtonText}>Start Over</Text>
                   </Pressable>
-                  <View style={styles.actionRow}>
-                    <Pressable
-                      onPress={handleEmailPdf}
-                      disabled={!emailDestination}
-                      style={({ pressed }) => [
-                        styles.primaryButton,
-                        (!emailDestination || pressed) && styles.primaryButtonPressed,
-                        !emailDestination && styles.disabledButton,
-                      ]}
-                    >
-                      <Text style={styles.primaryButtonText}>Email</Text>
-                    </Pressable>
-
-                    <Pressable
-                      onPress={handleFaxPdf}
-                      disabled={!faxDestination}
-                      style={({ pressed }) => [
-                        styles.secondaryButton,
-                        (!faxDestination || pressed) && styles.secondaryButtonPressed,
-                        !faxDestination && styles.disabledButton,
-                      ]}
-                    >
-                      <Text style={styles.secondaryButtonText}>Fax</Text>
-                    </Pressable>
-                  </View>
-                </>
+                </View>
               )}
             </View>
 
@@ -1558,11 +1847,11 @@ export default function RecordsRequestScreen() {
                 <Pressable
                   onPress={goToPreviousStep}
                   style={({ pressed }) => [
-                    styles.secondaryButton,
+                    styles.secondaryIconButton,
                     pressed && styles.secondaryButtonPressed,
                   ]}
                 >
-                  <Text style={styles.secondaryButtonText}>Back</Text>
+                  <Ionicons name="chevron-back" size={24} color={theme.colors.secondary} />
                 </Pressable>
 
                 <Pressable
@@ -1603,17 +1892,18 @@ const createStyles = createThemedStyles((theme) => ({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  backButton: {
-    minWidth: 56,
-    paddingVertical: 8,
+  headerBackButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  backButtonText: {
-    color: theme.colors.secondary,
-    fontSize: 15,
-    fontWeight: '600',
+  headerBackButtonPressed: {
+    opacity: 0.72,
   },
   backButtonSpacer: {
-    minWidth: 56,
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     color: theme.colors.text,
@@ -1695,6 +1985,9 @@ const createStyles = createThemedStyles((theme) => ({
     borderColor: theme.colors.border,
     gap: 16,
   },
+  generatedSubmitSection: {
+    gap: 16,
+  },
   sectionTitle: {
     color: theme.colors.text,
     fontSize: 22,
@@ -1757,8 +2050,26 @@ const createStyles = createThemedStyles((theme) => ({
     alignItems: 'stretch',
     gap: 12,
   },
+  utilityActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   actionColumn: {
     gap: 12,
+  },
+  generatedFooterRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  generatedProgressCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  generatedProgressCopy: {
+    flex: 1,
+    gap: 8,
   },
   inlineTextButton: {
     alignSelf: 'flex-start',
@@ -1781,8 +2092,23 @@ const createStyles = createThemedStyles((theme) => ({
   hospitalPrimaryButton: {
     minWidth: 0,
   },
+  generatedSecondaryButton: {
+    flex: 1,
+  },
   primaryButtonPressed: {
     opacity: 0.86,
+  },
+  primaryButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  primaryIconOnlyButtonContent: {
+    width: '100%',
+    minHeight: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   primaryButtonText: {
     color: theme.colors.primaryForeground,
@@ -1935,15 +2261,44 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 14,
   },
   secondaryIconButton: {
-    width: 52,
+    width: 96,
+    minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.secondarySoft,
-    borderRadius: 18,
+    borderRadius: 20,
     paddingVertical: 14,
     borderWidth: 1,
     borderColor: theme.colors.secondary,
     flexShrink: 0,
+  },
+  utilityActionButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingVertical: 18,
+    paddingHorizontal: 10,
+  },
+  utilityActionIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.secondarySoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  utilityActionLabel: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   requirementCard: {
     backgroundColor: theme.colors.warningSoft,
@@ -2108,24 +2463,48 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 13,
     lineHeight: 18,
   },
-  pdfCard: {
-    backgroundColor: theme.colors.surfaceSubtle,
-    borderRadius: 22,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    gap: 14,
-  },
-  pdfCardHeader: {
+  deliveryActionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
   },
-  pdfCardTitle: {
+  deliveryActionButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: theme.colors.surfaceSubtle,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+  },
+  deliveryActionButtonPressed: {
+    opacity: 0.86,
+  },
+  deliveryActionButtonDisabled: {
+    opacity: 0.48,
+  },
+  deliveryActionIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.secondarySoft,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  deliveryActionLabel: {
     color: theme.colors.text,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
-    lineHeight: 23,
+  },
+  deliveryActionLabelDisabled: {
+    color: theme.colors.textMuted,
+  },
+  pdfPreviewCard: {
+    marginHorizontal: -20,
   },
   pdfOpenButton: {
     backgroundColor: theme.colors.secondarySoft,
@@ -2142,22 +2521,19 @@ const createStyles = createThemedStyles((theme) => ({
   },
   pdfFrame: {
     overflow: 'hidden',
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    minHeight: 440,
+    backgroundColor: theme.colors.backgroundSubtle,
+    aspectRatio: 8.5 / 11,
   },
   pdfWebView: {
     flex: 1,
-    minHeight: 440,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.backgroundSubtle,
   },
   pdfFallback: {
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.surface,
-    borderRadius: 18,
+    marginHorizontal: 20,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: theme.colors.border,
     padding: 22,
