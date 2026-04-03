@@ -2039,6 +2039,34 @@ async function attachAutofillMetadataToForms(forms = []) {
   }));
 }
 
+function filterSupportedPacketForms(forms = []) {
+  return uniqueBy(
+    forms.filter((form) => {
+      const questionCount = Array.isArray(form?.autofill?.questions) ? form.autofill.questions.length : 0;
+      return (
+        form?.format === 'pdf' &&
+        typeof form?.cached_source_document_id === 'string' &&
+        form.cached_source_document_id &&
+        typeof form?.cached_content_url === 'string' &&
+        form.cached_content_url &&
+        form?.autofill?.supported === true &&
+        questionCount > 0
+      );
+    }),
+    (form) => {
+      const sourceDocumentId =
+        typeof form?.cached_source_document_id === 'string' ? form.cached_source_document_id.trim() : '';
+      if (sourceDocumentId) {
+        return `source-document:${sourceDocumentId}`;
+      }
+
+      const normalizedUrl =
+        normalizeComparableUrl(form?.url) || normalizeComparableUrl(form?.cached_content_url);
+      return normalizedUrl || JSON.stringify([form?.name || '', form?.url || '', form?.cached_content_url || '']);
+    },
+  );
+}
+
 function buildFormalMethods(medicalWorkflow) {
   const formalMethods = [];
   if (medicalWorkflow?.online_request_available) formalMethods.push('online_request');
@@ -2225,10 +2253,12 @@ export async function getEffectiveWorkflowForFacility(facilityId) {
 
   const workflows = workflowsRes.rows;
   const artifacts = await getSourceAwareWorkflowArtifactsForPacket(artifactSourceWorkflowsRes.rows);
-  const forms = await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
-    hospitalSystemId: facility.hospital_system_id,
-    facilityId: facility.id
-  }));
+  const forms = filterSupportedPacketForms(
+    await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
+      hospitalSystemId: facility.hospital_system_id,
+      facilityId: facility.id
+    }))
+  );
   const portal = portalRes.rows[0] || null;
 
   return buildRequestPacket({
@@ -2365,10 +2395,12 @@ export async function getSystemRequestPacket(systemId) {
 
   const workflows = workflowsRes.rows;
   const artifacts = await getSourceAwareWorkflowArtifactsForPacket(artifactSourceWorkflowsRes.rows);
-  const forms = await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
-    hospitalSystemId: systemId,
-    ...(singleFacilityId ? { facilityId: singleFacilityId } : {}),
-  }));
+  const forms = filterSupportedPacketForms(
+    await attachAutofillMetadataToForms(await attachCachedDocumentsToForms(artifacts.forms, {
+      hospitalSystemId: systemId,
+      ...(singleFacilityId ? { facilityId: singleFacilityId } : {}),
+    }))
+  );
   const portal = portalRes.rows[0] || null;
 
   return buildRequestPacket({
