@@ -11,9 +11,12 @@ import { createPostgresCompatPool } from '../../packages/core-db/postgresCompat.
 import reposRouter from './routes/repos.js';
 import scanRouter from './routes/scan.js';
 import { NostrAuthService } from './services/NostrAuthService.js';
+import { AppleAuthService } from './services/AppleAuthService.js';
 import { GoogleAuthService } from './services/GoogleAuthService.js';
 import {
+  backfillUserNameFromOAuth,
   backfillUserNameFromGoogle,
+  resolveOAuthNameParts,
   resolveGoogleNameParts,
 } from './services/googleProfileBackfill.js';
 import { repairLinkedAccountArtifacts } from './services/accountLinking.js';
@@ -30,7 +33,168 @@ app.use(cors());
 app.use(express.json());
 
 const nostrAuth = new NostrAuthService();
+const appleAuth = new AppleAuthService();
 const googleAuth = new GoogleAuthService();
+
+function oauthTokenExpiry() {
+  return Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7);
+}
+
+function buildOAuthJwtPayload({
+  userId,
+  pubkey = null,
+  provider,
+  providerUserId,
+  email = null,
+  role,
+}) {
+  return {
+    userId,
+    pubkey,
+    oauthProvider: provider,
+    oauthProviderUserId: providerUserId,
+    email,
+    role,
+    authMethod: provider,
+    ...(provider === 'google' ? { googleId: providerUserId } : {}),
+    ...(provider === 'apple' ? { appleUserId: providerUserId } : {}),
+    iat: Math.floor(Date.now() / 1000),
+    exp: oauthTokenExpiry(),
+  };
+}
+
+function buildOAuthUserResponse(profile, provider, picture = null) {
+  return {
+    provider,
+    providerUserId: profile.providerUserId,
+    email: profile.email || null,
+    name: profile.name || null,
+    firstName: profile.firstName || null,
+    lastName: profile.lastName || null,
+    picture: picture || null,
+    ...(provider === 'google' ? { googleId: profile.providerUserId } : {}),
+    ...(provider === 'apple' ? { appleUserId: profile.providerUserId } : {}),
+  };
+}
+
+async function completeOAuthMobileLogin({
+  provider,
+  profile,
+  accessToken = null,
+  userType = 'patient',
+  picture = null,
+}) {
+  const { firstName, lastName } = resolveOAuthNameParts(profile);
+
+  const [connections] = await db.query(
+    `SELECT oc.id AS oauth_connection_id,
+            oc.user_id,
+            u.id AS resolved_user_id,
+            u.id_roles,
+            u.nostr_pubkey
+       FROM oauth_connections oc
+       LEFT JOIN users u ON u.id = oc.user_id
+      WHERE oc.provider = ? AND oc.provider_user_id = ?
+      ORDER BY CASE WHEN u.id IS NULL THEN 1 ELSE 0 END, oc.id`,
+    [provider, profile.providerUserId]
+  );
+
+  let userId;
+  let userRole;
+  let nostrPubkey = null;
+
+  const roleId = userType === 'patient' ? 3 : 2;
+  const liveConnection = connections.find((connection) => connection.resolved_user_id);
+
+  if (liveConnection) {
+    userId = liveConnection.user_id;
+    userRole = liveConnection.id_roles;
+    nostrPubkey = liveConnection.nostr_pubkey || null;
+
+    await db.query(
+      `UPDATE oauth_connections
+          SET access_token = COALESCE(?, access_token),
+              provider_email = COALESCE(NULLIF(?, ''), provider_email),
+              updated_at = NOW()
+        WHERE provider = ? AND provider_user_id = ?`,
+      [accessToken, profile.email, provider, profile.providerUserId]
+    );
+
+    await backfillUserNameFromOAuth(db, userId, profile);
+  } else if (connections.length > 0) {
+    const [insertResult] = await db.query(
+      `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
+       VALUES (?, ?, ?, ?, NOW())
+       RETURNING id`,
+      [profile.email, firstName, lastName, roleId]
+    );
+    userId = insertResult.insertId;
+    userRole = roleId;
+
+    await db.query(
+      `UPDATE oauth_connections
+          SET user_id = ?,
+              provider_email = COALESCE(NULLIF(?, ''), provider_email),
+              access_token = COALESCE(?, access_token),
+              updated_at = NOW()
+        WHERE provider = ? AND provider_user_id = ?`,
+      [userId, profile.email, accessToken, provider, profile.providerUserId]
+    );
+  } else {
+    const [insertResult] = await db.query(
+      `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
+       VALUES (?, ?, ?, ?, NOW())
+       RETURNING id`,
+      [profile.email, firstName, lastName, roleId]
+    );
+    userId = insertResult.insertId;
+    userRole = roleId;
+
+    await db.query(
+      `INSERT INTO oauth_connections (user_id, provider, provider_user_id, provider_email, access_token)
+       VALUES (?, ?, ?, ?, ?)`,
+      [userId, provider, profile.providerUserId, profile.email, accessToken]
+    );
+  }
+
+  const repairConn = await db.getConnection();
+  try {
+    await repairConn.beginTransaction();
+    const repairResult = await repairLinkedAccountArtifacts(repairConn, {
+      currentUserId: userId,
+      oauthProvider: provider,
+      oauthProviderUserId: profile.providerUserId,
+      email: profile.email,
+      desiredPubkey: nostrPubkey,
+    });
+    nostrPubkey = repairResult.currentPubkey;
+    await repairConn.commit();
+  } catch (repairError) {
+    await repairConn.rollback();
+    throw repairError;
+  } finally {
+    repairConn.release();
+  }
+
+  const token = jwt.sign(
+    buildOAuthJwtPayload({
+      userId,
+      pubkey: nostrPubkey,
+      provider,
+      providerUserId: profile.providerUserId,
+      email: profile.email,
+      role: userRole,
+    }),
+    JWT_SECRET
+  );
+
+  return {
+    token,
+    user: buildOAuthUserResponse(profile, provider, picture),
+    nostrPubkey,
+    userId,
+  };
+}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -202,7 +366,8 @@ app.post('/api/auth/google/callback', async (req, res) => {
       await repairConn.beginTransaction();
       await repairLinkedAccountArtifacts(repairConn, {
         currentUserId: userId,
-        googleId: userInfo.googleId,
+        oauthProvider: 'google',
+        oauthProviderUserId: userInfo.googleId,
         email: userInfo.email,
       });
       await repairConn.commit();
@@ -213,17 +378,16 @@ app.post('/api/auth/google/callback', async (req, res) => {
       repairConn.release();
     }
 
-    // Generate JWT with DB userId (integer), not googleId
-    const token = jwt.sign({
-      userId,
-      oauthProvider: 'google',
-      googleId: userInfo.googleId,
-      email: userInfo.email,
-      role: userRole,
-      authMethod: 'google',
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
-    }, JWT_SECRET);
+    const token = jwt.sign(
+      buildOAuthJwtPayload({
+        userId,
+        provider: 'google',
+        providerUserId: userInfo.googleId,
+        email: userInfo.email,
+        role: userRole,
+      }),
+      JWT_SECRET
+    );
 
     console.log('Google login verified for:', userInfo.email);
 
@@ -253,114 +417,27 @@ app.post('/api/auth/google/token', async (req, res) => {
 
   try {
     const userInfo = await googleAuth.getUserInfo(accessToken);
-    const { firstName, lastName } = resolveGoogleNameParts(userInfo);
-
-    // Look up existing oauth_connection for this Google account
-    const [connections] = await db.query(
-      `SELECT oc.id AS oauth_connection_id,
-              oc.user_id,
-              u.id AS resolved_user_id,
-              u.id_roles,
-              u.nostr_pubkey
-       FROM oauth_connections oc
-       LEFT JOIN users u ON u.id = oc.user_id
-       WHERE oc.provider = 'google' AND oc.provider_user_id = ?
-       ORDER BY CASE WHEN u.id IS NULL THEN 1 ELSE 0 END, oc.id`,
-      [userInfo.googleId]
-    );
-
-    let userId;
-    let userRole;
-    let nostrPubkey = null;
-
-    const roleId = userType === 'patient' ? 3 : 2;
-
-    const liveConnection = connections.find((connection) => connection.resolved_user_id);
-
-    if (liveConnection) {
-      userId = liveConnection.user_id;
-      userRole = liveConnection.id_roles;
-      nostrPubkey = liveConnection.nostr_pubkey || null;
-
-      // Update access token
-      await db.query(
-        `UPDATE oauth_connections SET access_token = ?, updated_at = NOW()
-         WHERE provider = 'google' AND provider_user_id = ?`,
-        [accessToken, userInfo.googleId]
-      );
-
-      await backfillUserNameFromGoogle(db, userId, userInfo);
-    } else if (connections.length > 0) {
-      const [insertResult] = await db.query(
-        `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
-         VALUES (?, ?, ?, ?, NOW())
-         RETURNING id`,
-        [userInfo.email, firstName, lastName, roleId]
-      );
-      userId = insertResult.insertId;
-      userRole = roleId;
-
-      await db.query(
-        `UPDATE oauth_connections
-            SET user_id = ?, provider_email = ?, access_token = ?, updated_at = NOW()
-          WHERE provider = 'google' AND provider_user_id = ?`,
-        [userId, userInfo.email, accessToken, userInfo.googleId]
-      );
-    } else {
-      // New Google user — create user + oauth_connection
-      const [insertResult] = await db.query(
-        `INSERT INTO users (email, first_name, last_name, id_roles, create_datetime)
-         VALUES (?, ?, ?, ?, NOW())
-         RETURNING id`,
-        [userInfo.email, firstName, lastName, roleId]
-      );
-      userId = insertResult.insertId;
-      userRole = roleId;
-
-      await db.query(
-        `INSERT INTO oauth_connections (user_id, provider, provider_user_id, provider_email, access_token)
-         VALUES (?, 'google', ?, ?, ?)`,
-        [userId, userInfo.googleId, userInfo.email, accessToken]
-      );
-    }
-
-    const repairConn = await db.getConnection();
-    try {
-      await repairConn.beginTransaction();
-      const repairResult = await repairLinkedAccountArtifacts(repairConn, {
-        currentUserId: userId,
-        googleId: userInfo.googleId,
+    const loginResult = await completeOAuthMobileLogin({
+      provider: 'google',
+      userType,
+      accessToken,
+      picture: userInfo.picture,
+      profile: {
+        providerUserId: userInfo.googleId,
         email: userInfo.email,
-        desiredPubkey: nostrPubkey,
-      });
-      nostrPubkey = repairResult.currentPubkey;
-      await repairConn.commit();
-    } catch (repairError) {
-      await repairConn.rollback();
-      throw repairError;
-    } finally {
-      repairConn.release();
-    }
-
-    const token = jwt.sign({
-      userId,
-      pubkey: nostrPubkey,
-      oauthProvider: 'google',
-      googleId: userInfo.googleId,
-      email: userInfo.email,
-      role: userRole,
-      authMethod: 'google',
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7 days
-    }, JWT_SECRET);
+        name: userInfo.name,
+        givenName: userInfo.givenName,
+        familyName: userInfo.familyName,
+      },
+    });
 
     console.log('Google mobile login verified for:', userInfo.email);
 
     res.json({
       status: 'OK',
-      token,
-      user: userInfo,
-      nostrPubkey
+      token: loginResult.token,
+      user: loginResult.user,
+      nostrPubkey: loginResult.nostrPubkey,
     });
   } catch (error) {
     console.error('Google token auth error:', error);
@@ -368,8 +445,55 @@ app.post('/api/auth/google/token', async (req, res) => {
   }
 });
 
-// ========== LINK NOSTR KEY TO GOOGLE ACCOUNT ==========
-// Google-authenticated user proves ownership of a Nostr key.
+// ========== APPLE AUTH (MOBILE TOKEN EXCHANGE) ==========
+// Mobile app sends an Apple identity token obtained via expo-apple-authentication.
+// We verify it against Apple's JWKS, then issue a Limbo JWT.
+
+app.post('/api/auth/apple/token', async (req, res) => {
+  const {
+    identityToken,
+    user = null,
+    email = null,
+    firstName = null,
+    lastName = null,
+    name = null,
+    userType = 'patient',
+  } = req.body;
+
+  if (!identityToken) {
+    return res.status(400).json({ status: 'error', reason: 'Missing identityToken' });
+  }
+
+  try {
+    const userInfo = await appleAuth.verifyIdentityToken(identityToken, {
+      user,
+      email,
+      firstName,
+      lastName,
+      name,
+    });
+    const loginResult = await completeOAuthMobileLogin({
+      provider: 'apple',
+      userType,
+      profile: userInfo,
+    });
+
+    console.log('Apple mobile login verified for:', userInfo.appleUserId);
+
+    res.json({
+      status: 'OK',
+      token: loginResult.token,
+      user: loginResult.user,
+      nostrPubkey: loginResult.nostrPubkey,
+    });
+  } catch (error) {
+    console.error('Apple token auth error:', error);
+    res.status(500).json({ status: 'error', reason: error.message });
+  }
+});
+
+// ========== LINK NOSTR KEY TO OAUTH ACCOUNT ==========
+// OAuth-authenticated user proves ownership of a Nostr key.
 // If an old Nostr-only user exists with that pubkey, merge accounts.
 
 app.post('/api/auth/link-nostr', async (req, res) => {
@@ -386,11 +510,19 @@ app.post('/api/auth/link-nostr', async (req, res) => {
     return res.status(401).json({ status: 'error', reason: 'Invalid or expired token' });
   }
 
-  if (decoded.authMethod !== 'google') {
-    return res.status(400).json({ status: 'error', reason: 'Only Google-authenticated users can link a Nostr key' });
+  const oauthProvider =
+    decoded.oauthProvider ||
+    (decoded.authMethod === 'google' || decoded.authMethod === 'apple' ? decoded.authMethod : null);
+  const oauthProviderUserId = decoded.oauthProviderUserId || decoded.googleId || decoded.appleUserId || null;
+
+  if (!oauthProvider || decoded.authMethod === 'nostr') {
+    return res.status(400).json({ status: 'error', reason: 'Only OAuth-authenticated users can link a Nostr key' });
+  }
+  if (!oauthProviderUserId) {
+    return res.status(400).json({ status: 'error', reason: 'Token missing oauthProviderUserId' });
   }
 
-  const googleUserId = decoded.userId;
+  const oauthUserId = decoded.userId;
   const { signedEvent } = req.body;
 
   if (!signedEvent) {
@@ -411,10 +543,10 @@ app.post('/api/auth/link-nostr', async (req, res) => {
     try {
       await conn.beginTransaction();
 
-      // Check if Google user already has a nostr_pubkey
+      // Check if the OAuth user already has a nostr_pubkey
       const [currentUser] = await conn.query(
         'SELECT nostr_pubkey FROM users WHERE id = ?',
-        [googleUserId]
+        [oauthUserId]
       );
 
       if (currentUser.length === 0) {
@@ -427,13 +559,14 @@ app.post('/api/auth/link-nostr', async (req, res) => {
         // User is switching from a placeholder/old key to the proven key.
         await conn.query(
           'UPDATE users SET nostr_pubkey = NULL WHERE id = ?',
-          [googleUserId]
+          [oauthUserId]
         );
       }
 
       const repairResult = await repairLinkedAccountArtifacts(conn, {
-        currentUserId: googleUserId,
-        googleId: decoded.googleId,
+        currentUserId: oauthUserId,
+        oauthProvider,
+        oauthProviderUserId,
         email: decoded.email,
         desiredPubkey: pubkey,
       });
@@ -443,19 +576,19 @@ app.post('/api/auth/link-nostr', async (req, res) => {
       await conn.commit();
 
       // Issue fresh JWT with pubkey claim
-      const token = jwt.sign({
-        userId: googleUserId,
-        pubkey,
-        oauthProvider: 'google',
-        googleId: decoded.googleId,
-        email: decoded.email,
-        role: decoded.role,
-        authMethod: 'google',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7)
-      }, JWT_SECRET);
+      const token = jwt.sign(
+        buildOAuthJwtPayload({
+          userId: oauthUserId,
+          pubkey,
+          provider: oauthProvider,
+          providerUserId: oauthProviderUserId,
+          email: decoded.email,
+          role: decoded.role,
+        }),
+        JWT_SECRET
+      );
 
-      console.log(`Nostr key linked for Google user ${googleUserId}, pubkey: ${pubkey}, merged: ${merged}`);
+      console.log(`Nostr key linked for ${oauthProvider} user ${oauthUserId}, pubkey: ${pubkey}, merged: ${merged}`);
 
       res.json({
         status: 'OK',

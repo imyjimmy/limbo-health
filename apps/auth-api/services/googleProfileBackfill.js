@@ -20,16 +20,29 @@ export function splitHumanName(fullName) {
 }
 
 export function resolveGoogleNameParts(userInfo) {
+  return resolveOAuthNameParts(userInfo);
+}
+
+export function resolveOAuthNameParts(userInfo) {
   const givenName = asCleanString(userInfo?.givenName);
   const familyName = asCleanString(userInfo?.familyName);
   if (givenName || familyName) {
     return { firstName: givenName, lastName: familyName };
   }
+  const firstName = asCleanString(userInfo?.firstName);
+  const lastName = asCleanString(userInfo?.lastName);
+  if (firstName || lastName) {
+    return { firstName, lastName };
+  }
   return splitHumanName(userInfo?.name);
 }
 
 export async function backfillUserNameFromGoogle(db, userId, userInfo) {
-  const { firstName, lastName } = resolveGoogleNameParts(userInfo);
+  return backfillUserNameFromOAuth(db, userId, userInfo);
+}
+
+export async function backfillUserNameFromOAuth(db, userId, userInfo) {
+  const { firstName, lastName } = resolveOAuthNameParts(userInfo);
   const email = asCleanString(userInfo?.email);
 
   await db.query(

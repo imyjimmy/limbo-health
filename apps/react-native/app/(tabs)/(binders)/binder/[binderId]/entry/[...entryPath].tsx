@@ -51,13 +51,13 @@ export default function EntryDetailScreen() {
         repoDir: `binders/${binderId}`,
         auth: { type: 'jwt' as const, token: jwt },
         author: {
-          name: authState.metadata?.name || authState.googleProfile?.name || 'Limbo Health',
-          email: authState.googleProfile?.email || 'app@limbo.health',
+          name: authState.metadata?.name || authState.oauthProfile?.name || 'Limbo Health',
+          email: authState.oauthProfile?.email || 'app@limbo.health',
         },
       },
       masterConversationKey,
     );
-  }, [binderId, masterConversationKey, jwt, authState.metadata?.name, authState.googleProfile?.name, authState.googleProfile?.email]);
+  }, [binderId, masterConversationKey, jwt, authState.metadata?.name, authState.oauthProfile?.name, authState.oauthProfile?.email]);
 
   const router = useRouter();
 

@@ -34,8 +34,8 @@ function TabLayoutInner() {
     dirPath: string;
   } | null>(null);
 
-  const profileImageUrl = state.metadata?.picture ?? state.googleProfile?.picture ?? null;
-  const profileName = state.metadata?.name ?? state.googleProfile?.name;
+  const profileImageUrl = state.metadata?.picture ?? state.oauthProfile?.picture ?? null;
+  const profileName = state.metadata?.name ?? state.oauthProfile?.name;
   const profileInitials = profileName
     ? profileName
         .split(' ')
@@ -145,8 +145,8 @@ function TabLayoutInner() {
         repoDir: `binders/${activeAudioContext.binderId}`,
         auth: { type: 'jwt' as const, token: jwt },
         author: {
-          name: state.metadata?.name || state.googleProfile?.name || 'Limbo Health',
-          email: state.googleProfile?.email || 'app@limbo.health',
+          name: state.metadata?.name || state.oauthProfile?.name || 'Limbo Health',
+          email: state.oauthProfile?.email || 'app@limbo.health',
         },
       },
       masterConversationKey,
@@ -157,8 +157,8 @@ function TabLayoutInner() {
     state.status,
     state.jwt,
     state.metadata?.name,
-    state.googleProfile?.name,
-    state.googleProfile?.email,
+    state.oauthProfile?.name,
+    state.oauthProfile?.email,
   ]);
 
   const handleInlineAudioComplete = async (result: AudioRecordingResult) => {
@@ -208,7 +208,7 @@ function TabLayoutInner() {
     return <Redirect href="/" withAnchor />;
   }
 
-  if (state.status === 'expired' && state.loginMethod === 'google') {
+  if (state.status === 'expired' && state.loginMethod && state.loginMethod !== 'nostr') {
     return <Redirect href="/" withAnchor />;
   }
 

@@ -2,8 +2,8 @@ export function resolvePortalOwnerKey(input: {
   status: string;
   pubkey: string | null;
   loginMethod: string | null;
-  googleId?: string | null;
-  googleEmail?: string | null;
+  oauthProviderUserId?: string | null;
+  oauthEmail?: string | null;
 }): string | null {
   if (input.status !== 'authenticated' && input.status !== 'expired') {
     return null;
@@ -13,12 +13,12 @@ export function resolvePortalOwnerKey(input: {
     return `nostr:${input.pubkey}`;
   }
 
-  if (input.loginMethod === 'google' && input.googleId) {
-    return `google-id:${input.googleId}`;
+  if (input.loginMethod && input.loginMethod !== 'nostr' && input.oauthProviderUserId) {
+    return `${input.loginMethod}-id:${input.oauthProviderUserId}`;
   }
 
-  if (input.loginMethod === 'google' && input.googleEmail) {
-    return `google-email:${input.googleEmail}`;
+  if (input.loginMethod && input.loginMethod !== 'nostr' && input.oauthEmail) {
+    return `${input.loginMethod}-email:${input.oauthEmail}`;
   }
 
   return null;

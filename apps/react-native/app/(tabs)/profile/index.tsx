@@ -33,13 +33,13 @@ export default function ProfileScreen() {
   const router = useRouter();
   const styles = useThemedStyles(createStyles);
 
-  const isGoogle = state.loginMethod === 'google';
+  const isOAuth = state.loginMethod !== 'nostr' && !!state.oauthProfile;
 
   const displayName = state.metadata?.name
-    || (isGoogle ? (state.googleProfile?.name ?? state.googleProfile?.email ?? 'Google User') : 'User');
+    || (isOAuth ? (state.oauthProfile?.name ?? state.oauthProfile?.email ?? 'User') : 'User');
 
-  const avatarUrl = isGoogle
-    ? (state.googleProfile?.picture ?? null)
+  const avatarUrl = isOAuth
+    ? (state.oauthProfile?.picture ?? null)
     : (state.metadata?.picture ?? null);
 
   const initials = displayName
@@ -92,8 +92,8 @@ export default function ProfileScreen() {
           hasNotification={false}
         />
         <Text style={styles.displayName}>{displayName}</Text>
-        {isGoogle && state.googleProfile?.email && (
-          <Text style={styles.emailText}>{state.googleProfile.email}</Text>
+        {isOAuth && state.oauthProfile?.email && (
+          <Text style={styles.emailText}>{state.oauthProfile.email}</Text>
         )}
       </View>
 

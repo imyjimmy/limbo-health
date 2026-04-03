@@ -11,6 +11,7 @@ export const ENDPOINTS = {
   scanSessionRevoke: `${API_BASE_URL}/api/auth/scan/revoke`,
   userRepositories: `${API_BASE_URL}/api/mgit/user/repositories`,
   googleToken: `${API_BASE_URL}/api/auth/google/token`,
+  appleToken: `${API_BASE_URL}/api/auth/apple/token`,
   linkNostr: `${API_BASE_URL}/api/auth/link-nostr`,
   deleteAccount: `${API_BASE_URL}/api/auth/account`,
   me: `${API_BASE_URL}/api/auth/me`,

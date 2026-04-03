@@ -78,7 +78,7 @@ export default function AccountScreen() {
   const styles = useThemedStyles(createStyles);
   const chrome = getProfileChrome(theme);
 
-  const fallbackName = state.googleProfile?.name || '';
+  const fallbackName = state.oauthProfile?.name || '';
   const [firstName, setFirstName] = useState(
     state.metadata?.first_name ?? fallbackName.split(' ')[0] ?? '',
   );

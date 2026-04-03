@@ -20,7 +20,7 @@ import { useAuthContext } from './AuthProvider';
 
 interface CryptoContextValue {
   ready: boolean;
-  /** True when user is authenticated but has no Nostr key (Google-only users). */
+  /** True when user is authenticated but has no Nostr key (OAuth-only users). */
   needsEncryptionKey: boolean;
   masterPubkey: string | null;
   createEncryptedIO: (repoDir: string) => EncryptedIO;

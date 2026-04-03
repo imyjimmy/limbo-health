@@ -7,21 +7,22 @@ function pushOwnerKey(target: string[], ownerKey: string | null): void {
   target.push(ownerKey);
 }
 
-function googleOwnerKeysFromConnections(connections: OAuthConnection[]): string[] {
+function oauthOwnerKeysFromConnections(connections: OAuthConnection[]): string[] {
   const ownerKeys: string[] = [];
 
   for (const connection of connections) {
-    if (connection.provider.trim().toLowerCase() !== 'google') continue;
+    const provider = connection.provider.trim().toLowerCase();
+    if (!provider) continue;
 
-    pushOwnerKey(ownerKeys, connection.providerId ? `google-id:${connection.providerId}` : null);
-    pushOwnerKey(ownerKeys, connection.email ? `google-email:${connection.email}` : null);
+    pushOwnerKey(ownerKeys, connection.providerId ? `${provider}-id:${connection.providerId}` : null);
+    pushOwnerKey(ownerKeys, connection.email ? `${provider}-email:${connection.email}` : null);
   }
 
   return ownerKeys;
 }
 
 export function resolveBioProfileOwnerKeys(
-  auth: Pick<AuthState, 'status' | 'pubkey' | 'googleProfile' | 'connections'>,
+  auth: Pick<AuthState, 'status' | 'pubkey' | 'oauthProfile' | 'connections'>,
 ): string[] {
   if (auth.status !== 'authenticated' && auth.status !== 'expired') return [];
 
@@ -30,14 +31,16 @@ export function resolveBioProfileOwnerKeys(
   pushOwnerKey(ownerKeys, auth.pubkey ? `nostr:${auth.pubkey}` : null);
   pushOwnerKey(
     ownerKeys,
-    auth.googleProfile?.googleId ? `google-id:${auth.googleProfile.googleId}` : null,
+    auth.oauthProfile?.providerUserId
+      ? `${auth.oauthProfile.provider}-id:${auth.oauthProfile.providerUserId}`
+      : null,
   );
   pushOwnerKey(
     ownerKeys,
-    auth.googleProfile?.email ? `google-email:${auth.googleProfile.email}` : null,
+    auth.oauthProfile?.email ? `${auth.oauthProfile.provider}-email:${auth.oauthProfile.email}` : null,
   );
 
-  for (const connectionOwnerKey of googleOwnerKeysFromConnections(auth.connections)) {
+  for (const connectionOwnerKey of oauthOwnerKeysFromConnections(auth.connections)) {
     pushOwnerKey(ownerKeys, connectionOwnerKey);
   }
 

@@ -20,8 +20,8 @@ export default function Index() {
   }
 
   if (state.status === 'expired') {
-    // Google users need to re-login (no refresh token in v1)
-    if (state.loginMethod === 'google') {
+    // OAuth users need to re-login (no refresh token in v1)
+    if (state.loginMethod && state.loginMethod !== 'nostr') {
       return <Redirect href="/(auth)/welcome" withAnchor />;
     }
     // Nostr users: go to tabs and let refreshAuth handle it

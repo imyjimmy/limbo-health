@@ -10,9 +10,10 @@ describe('bio profile owner key resolution', () => {
       resolveBioProfileOwnerKeys({
         status: 'authenticated',
         pubkey: null,
-        googleProfile: {
+        oauthProfile: {
+          provider: 'google',
           email: 'person@example.com',
-          googleId: 'google-123',
+          providerUserId: 'google-123',
           name: 'Person Example',
         },
         connections: [],
@@ -25,9 +26,10 @@ describe('bio profile owner key resolution', () => {
       resolveBioProfileOwnerKeys({
         status: 'authenticated',
         pubkey: 'npub-linked',
-        googleProfile: {
+        oauthProfile: {
+          provider: 'google',
           email: 'person@example.com',
-          googleId: 'google-123',
+          providerUserId: 'google-123',
           name: 'Person Example',
         },
         connections: [],
@@ -39,12 +41,12 @@ describe('bio profile owner key resolution', () => {
     ]);
   });
 
-  it('uses linked Google connections during a Nostr session', () => {
+  it('uses linked OAuth connections during a Nostr session', () => {
     expect(
       resolveBioProfileOwnerKeys({
         status: 'authenticated',
         pubkey: 'npub-linked',
-        googleProfile: null,
+        oauthProfile: null,
         connections: [
           { provider: 'google', providerId: 'google-123', email: 'person@example.com' },
           { provider: 'github', providerId: 'gh-1', email: 'person@example.com' },
@@ -54,6 +56,8 @@ describe('bio profile owner key resolution', () => {
       'nostr:npub-linked',
       'google-id:google-123',
       'google-email:person@example.com',
+      'github-id:gh-1',
+      'github-email:person@example.com',
     ]);
   });
 
@@ -62,9 +66,10 @@ describe('bio profile owner key resolution', () => {
       resolveBioProfileOwnerKeys({
         status: 'authenticated',
         pubkey: 'npub-linked',
-        googleProfile: {
+        oauthProfile: {
+          provider: 'google',
           email: 'person@example.com',
-          googleId: 'google-123',
+          providerUserId: 'google-123',
           name: 'Person Example',
         },
         connections: [
@@ -75,6 +80,25 @@ describe('bio profile owner key resolution', () => {
       'nostr:npub-linked',
       'google-id:google-123',
       'google-email:person@example.com',
+    ]);
+  });
+
+  it('scopes Apple sessions with Apple identifiers', () => {
+    expect(
+      resolveBioProfileOwnerKeys({
+        status: 'authenticated',
+        pubkey: null,
+        oauthProfile: {
+          provider: 'apple',
+          email: 'relay@privaterelay.appleid.com',
+          providerUserId: 'apple-123',
+          name: 'Person Example',
+        },
+        connections: [],
+      }),
+    ).toEqual([
+      'apple-id:apple-123',
+      'apple-email:relay@privaterelay.appleid.com',
     ]);
   });
 });

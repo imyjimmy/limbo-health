@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleProp,
@@ -12,6 +13,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { ResizeMode, Video } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +28,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 import { GoogleLogo } from '../../components/branding/GoogleLogo';
+import { useAppleAuth } from '../../core/auth/appleAuth';
 import { useGoogleAuth } from '../../core/auth/googleAuth';
 import { useAuthContext } from '../../providers/AuthProvider';
 import { createThemedStyles, useTheme, useThemedStyles } from '../../theme';
@@ -199,11 +202,16 @@ export default function WelcomeScreen() {
   const styles = useThemedStyles(createStyles);
   const scrollRef = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
-  const { loginWithGoogle, loginWithStoredNostr, hasStoredNostrKey } = useAuthContext();
+  const { loginWithApple, loginWithGoogle, loginWithStoredNostr, hasStoredNostrKey } = useAuthContext();
+  const { isAvailable: isAppleAvailable, signInAsync: signInWithApple } = useAppleAuth();
   const { request, response, promptAsync } = useGoogleAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [activeOAuthProvider, setActiveOAuthProvider] = useState<'google' | 'apple' | null>(null);
   const [nostrLoading, setNostrLoading] = useState(false);
+  const appleLoading = activeOAuthProvider === 'apple';
+  const googleLoading = activeOAuthProvider === 'google';
+  const showAppleAuth = Platform.OS === 'ios' && isAppleAvailable;
+  const oauthBusy = activeOAuthProvider !== null;
   const slides: WelcomeSlide[] = [
     {
       // eyebrow: 'Self Sovereign Tech',
@@ -224,16 +232,62 @@ export default function WelcomeScreen() {
 
   useEffect(() => {
     if (response?.type === 'success' && response.authentication?.accessToken) {
-      setGoogleLoading(true);
+      setActiveOAuthProvider('google');
       loginWithGoogle(response.authentication.accessToken)
         .then(() => router.replace('/'))
         .catch((err) => {
           const message = err instanceof Error ? err.message : 'Unable to continue with Google.';
           Alert.alert('Google Login Failed', message);
         })
-        .finally(() => setGoogleLoading(false));
+        .finally(() => setActiveOAuthProvider(null));
+      return;
+    }
+
+    if (response && response.type !== 'success') {
+      setActiveOAuthProvider(null);
     }
   }, [response, loginWithGoogle, router]);
+
+  const handleGooglePress = async () => {
+    if (!request || oauthBusy) return;
+
+    setActiveOAuthProvider('google');
+
+    try {
+      const result = await promptAsync();
+      if (result.type !== 'success') {
+        setActiveOAuthProvider(null);
+      }
+    } catch (err) {
+      setActiveOAuthProvider(null);
+      const message = err instanceof Error ? err.message : 'Unable to continue with Google.';
+      Alert.alert('Google Login Failed', message);
+    }
+  };
+
+  const handleApplePress = async () => {
+    if (!showAppleAuth || oauthBusy) return;
+
+    setActiveOAuthProvider('apple');
+
+    try {
+      const payload = await signInWithApple();
+      await loginWithApple(payload);
+      router.replace('/');
+    } catch (err: unknown) {
+      const code =
+        err && typeof err === 'object' && 'code' in err && typeof err.code === 'string'
+          ? err.code
+          : null;
+
+      if (code !== 'ERR_REQUEST_CANCELED') {
+        const message = err instanceof Error ? err.message : 'Unable to continue with Apple.';
+        Alert.alert('Apple Login Failed', message);
+      }
+    } finally {
+      setActiveOAuthProvider(null);
+    }
+  };
 
   const handleNostrLogin = async () => {
     setNostrLoading(true);
@@ -388,24 +442,46 @@ export default function WelcomeScreen() {
               </Text>
             </View>
 
-            <Pressable
-              style={[
-                styles.authButton,
-                styles.finalPrimaryButton,
-                (!request || googleLoading) && styles.authButtonDisabled,
-              ]}
-              onPress={() => promptAsync()}
-              disabled={!request || googleLoading}
-            >
-              {googleLoading ? (
-                <ActivityIndicator color={theme.colors.text} />
-              ) : (
-                <View style={styles.authButtonContent}>
-                  <GoogleLogo size={20} />
-                  <Text style={styles.authButtonText}>Continue with Google</Text>
+            <View style={styles.oauthStack}>
+              {showAppleAuth ? (
+                <View
+                  pointerEvents={oauthBusy ? 'none' : 'auto'}
+                  style={[styles.appleButtonWrap, appleLoading && styles.authButtonDisabled]}
+                >
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                    cornerRadius={18}
+                    onPress={handleApplePress}
+                    style={styles.appleButton}
+                  />
+                  {appleLoading ? (
+                    <View pointerEvents="none" style={styles.appleButtonLoadingOverlay}>
+                      <ActivityIndicator color="#FFFFFF" />
+                    </View>
+                  ) : null}
                 </View>
-              )}
-            </Pressable>
+              ) : null}
+
+              <Pressable
+                style={[
+                  styles.authButton,
+                  styles.finalPrimaryButton,
+                  (!request || oauthBusy) && styles.authButtonDisabled,
+                ]}
+                onPress={handleGooglePress}
+                disabled={!request || oauthBusy}
+              >
+                {googleLoading ? (
+                  <ActivityIndicator color={theme.colors.text} />
+                ) : (
+                  <View style={styles.authButtonContent}>
+                    <GoogleLogo size={20} />
+                    <Text style={styles.authButtonText}>Continue with Google</Text>
+                  </View>
+                )}
+              </Pressable>
+            </View>
           </View>
         </View>
       </Animated.ScrollView>
@@ -799,6 +875,26 @@ const createStyles = createThemedStyles((theme) => ({
     fontSize: 14,
     lineHeight: 20,
     marginTop: 12,
+  },
+  oauthStack: {
+    gap: 12,
+  },
+  appleButtonWrap: {
+    width: '100%',
+    height: 56,
+    borderRadius: 18,
+    overflow: 'hidden',
+    justifyContent: 'center',
+  },
+  appleButton: {
+    width: '100%',
+    height: '100%',
+  },
+  appleButtonLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.18)',
   },
   authButton: {
     backgroundColor: theme.colors.surfaceSubtle,

@@ -405,8 +405,8 @@ export default function BinderListScreen() {
             repoDir: repoDir(repo.id),
             auth: authConfig(),
             author: {
-              name: authState.metadata?.name || authState.googleProfile?.name || 'Limbo Health',
-              email: authState.googleProfile?.email || 'app@limbo.health',
+              name: authState.metadata?.name || authState.oauthProfile?.name || 'Limbo Health',
+              email: authState.oauthProfile?.email || 'app@limbo.health',
             },
           },
           masterConversationKey,
@@ -458,8 +458,8 @@ export default function BinderListScreen() {
       jwt,
       masterConversationKey,
       authState.metadata?.name,
-      authState.googleProfile?.name,
-      authState.googleProfile?.email,
+      authState.oauthProfile?.name,
+      authState.oauthProfile?.email,
     ],
   );
 
@@ -607,8 +607,8 @@ export default function BinderListScreen() {
                 binderName,
                 undefined,
                 {
-                  name: authState.metadata?.name || authState.googleProfile?.name || 'Limbo Health',
-                  email: authState.googleProfile?.email || 'app@limbo.health',
+                  name: authState.metadata?.name || authState.oauthProfile?.name || 'Limbo Health',
+                  email: authState.oauthProfile?.email || 'app@limbo.health',
                 },
               );
 
@@ -625,8 +625,8 @@ export default function BinderListScreen() {
     );
   }, [
     authState.metadata?.name,
-    authState.googleProfile?.email,
-    authState.googleProfile?.name,
+    authState.oauthProfile?.email,
+    authState.oauthProfile?.name,
     fetchRepos,
     handleMissingEncryptionAccess,
     jwt,

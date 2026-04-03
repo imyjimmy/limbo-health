@@ -48,9 +48,18 @@ describe('portal storage scoping', () => {
         status: 'authenticated',
         pubkey: null,
         loginMethod: 'google',
-        googleId: 'google-user-1',
+        oauthProviderUserId: 'google-user-1',
       }),
     ).toBe('google-id:google-user-1');
+
+    expect(
+      resolvePortalOwnerKey({
+        status: 'authenticated',
+        pubkey: null,
+        loginMethod: 'apple',
+        oauthProviderUserId: 'apple-user-1',
+      }),
+    ).toBe('apple-id:apple-user-1');
 
     expect(
       resolvePortalOwnerKey({

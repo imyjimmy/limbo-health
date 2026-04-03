@@ -373,15 +373,15 @@ export default function PageScreen() {
         status: state.status,
         pubkey: state.pubkey,
         loginMethod: state.loginMethod,
-        googleId: state.googleProfile?.googleId ?? null,
-        googleEmail: state.googleProfile?.email ?? null,
+        oauthProviderUserId: state.oauthProfile?.providerUserId ?? null,
+        oauthEmail: state.oauthProfile?.email ?? null,
       }),
     [
       state.status,
       state.pubkey,
       state.loginMethod,
-      state.googleProfile?.googleId,
-      state.googleProfile?.email,
+      state.oauthProfile?.providerUserId,
+      state.oauthProfile?.email,
     ],
   );
   const profileStore = useMemo(

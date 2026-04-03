@@ -2,7 +2,16 @@ function uniqueUserIds(values) {
   return [...new Set(values.map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0))];
 }
 
-async function findLegacyLinkedUserIds(conn, { currentUserId, pubkey, googleId, email }) {
+async function findLegacyLinkedUserIds(
+  conn,
+  {
+    currentUserId,
+    pubkey,
+    oauthProvider,
+    oauthProviderUserId,
+    email,
+  },
+) {
   const legacyIds = [];
 
   if (pubkey) {
@@ -13,26 +22,26 @@ async function findLegacyLinkedUserIds(conn, { currentUserId, pubkey, googleId, 
     legacyIds.push(...rows.map((row) => row.id));
   }
 
-  if (googleId) {
+  if (oauthProvider && oauthProviderUserId) {
     const [rows] = await conn.query(
       `SELECT user_id
          FROM oauth_connections
-        WHERE provider = 'google'
+        WHERE provider = ?
           AND provider_user_id = ?
           AND user_id <> ?`,
-      [googleId, currentUserId],
+      [oauthProvider, oauthProviderUserId, currentUserId],
     );
     legacyIds.push(...rows.map((row) => row.user_id));
   }
 
-  if (email) {
+  if (oauthProvider && email) {
     const [rows] = await conn.query(
       `SELECT user_id
          FROM oauth_connections
-        WHERE provider = 'google'
+        WHERE provider = ?
           AND provider_email = ?
           AND user_id <> ?`,
-      [email, currentUserId],
+      [oauthProvider, email, currentUserId],
     );
     legacyIds.push(...rows.map((row) => row.user_id));
   }
@@ -138,7 +147,8 @@ export async function repairLinkedAccountArtifacts(
   conn,
   {
     currentUserId,
-    googleId = null,
+    oauthProvider = null,
+    oauthProviderUserId = null,
     email = null,
     desiredPubkey = null,
   },
@@ -146,7 +156,8 @@ export async function repairLinkedAccountArtifacts(
   const legacyUserIds = await findLegacyLinkedUserIds(conn, {
     currentUserId,
     pubkey: desiredPubkey,
-    googleId,
+    oauthProvider,
+    oauthProviderUserId,
     email,
   });
 

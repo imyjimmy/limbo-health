@@ -35,19 +35,19 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
   const suggestedFullName = useMemo(() => {
     return (
       state.metadata?.name ||
-      state.googleProfile?.name ||
+      state.oauthProfile?.name ||
       [state.metadata?.first_name, state.metadata?.last_name].filter(Boolean).join(' ').trim()
     );
   }, [
     state.metadata?.name,
     state.metadata?.first_name,
     state.metadata?.last_name,
-    state.googleProfile?.name,
+    state.oauthProfile?.name,
   ]);
 
   const suggestedEmail = useMemo(
-    () => state.googleProfile?.email?.trim() || '',
-    [state.googleProfile?.email],
+    () => state.oauthProfile?.email?.trim() || '',
+    [state.oauthProfile?.email],
   );
 
   const defaultProfile = useMemo(
@@ -68,10 +68,10 @@ export function BioProfileProvider({ children }: { children: React.ReactNode }) 
       resolveBioProfileOwnerKeys({
         status: state.status,
         pubkey: state.pubkey,
-        googleProfile: state.googleProfile,
+        oauthProfile: state.oauthProfile,
         connections: state.connections,
       }),
-    [state.status, state.pubkey, state.googleProfile, state.connections],
+    [state.status, state.pubkey, state.oauthProfile, state.connections],
   );
   const ownerKey = ownerKeys[0] ?? null;
 
