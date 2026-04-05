@@ -8,6 +8,7 @@ This directory keeps planning docs, specs, diagrams, and working notes out of th
 - `specs/` product requirements and technical specifications
 - `diagrams/` Mermaid diagrams and sequence-flow documentation
 - `notes/` ad hoc research, reports, TODOs, and copy drafts
+- `legal/` working drafts for privacy, terms, and support documents
 
 ## Index
 
@@ -46,3 +47,9 @@ This directory keeps planning docs, specs, diagrams, and working notes out of th
 - [Expo Router limitations](notes/expo-router-limitations.md)
 - [Ad hoc test commands](notes/test.txt)
 - [Landing page wording variations](notes/wording-variations.txt)
+
+### Legal
+
+- [Privacy policy draft](legal/privacy-policy.md)
+- [Terms of service draft](legal/terms-of-service.md)
+- [Support page draft](legal/support.md)
