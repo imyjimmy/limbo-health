@@ -1,11 +1,12 @@
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
-import { createThemedStyles, useTheme, useThemedStyles } from '../../../theme';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { createThemedStyles, useThemedStyles } from '../../../theme';
 import { getProfileChrome } from './profileChrome';
 
 export default function AboutScreen() {
-  const theme = useTheme();
   const styles = useThemedStyles(createStyles);
+  const router = useRouter();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -24,6 +25,25 @@ export default function AboutScreen() {
           The goal is to make records portable, understandable, and usable on the patient&apos;s
           terms.
         </Text>
+      </View>
+
+      <Text style={styles.sectionLabel}>LEGAL</Text>
+      <View style={styles.linkCard}>
+        <Pressable
+          onPress={() => router.push('/privacy-policy')}
+          style={({ pressed }) => [styles.linkRow, pressed && styles.linkRowPressed]}
+        >
+          <Text style={styles.linkLabel}>Privacy Policy</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </Pressable>
+        <View style={styles.rowSeparator} />
+        <Pressable
+          onPress={() => router.push('/terms-of-service')}
+          style={({ pressed }) => [styles.linkRow, pressed && styles.linkRowPressed]}
+        >
+          <Text style={styles.linkLabel}>Terms of Service</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -57,6 +77,11 @@ const createStyles = createThemedStyles((theme) => {
       paddingHorizontal: 16,
       paddingVertical: 18,
     },
+    linkCard: {
+      backgroundColor: chrome.cardBackground,
+      borderRadius: 12,
+      overflow: 'hidden',
+    },
     title: {
       color: chrome.primaryText,
       fontSize: 22,
@@ -67,6 +92,30 @@ const createStyles = createThemedStyles((theme) => {
       color: chrome.secondaryText,
       fontSize: 16,
       lineHeight: 24,
+    },
+    linkRow: {
+      alignItems: 'center',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      minHeight: 56,
+      paddingHorizontal: 16,
+    },
+    linkRowPressed: {
+      backgroundColor: chrome.cardPressed,
+    },
+    linkLabel: {
+      color: chrome.primaryText,
+      fontSize: 15,
+    },
+    linkChevron: {
+      color: chrome.secondaryText,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    rowSeparator: {
+      backgroundColor: chrome.divider,
+      height: 1,
+      marginHorizontal: 16,
     },
   };
 });

@@ -302,6 +302,10 @@ export default function WelcomeScreen() {
     }
   };
 
+  const openLegalDocument = (href: '/privacy-policy' | '/terms-of-service') => {
+    router.push(href);
+  };
+
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
     scrollRef.current?.scrollTo({ x: width * index, animated: true });
@@ -482,6 +486,24 @@ export default function WelcomeScreen() {
                 )}
               </Pressable>
             </View>
+
+            <Text style={styles.legalNotice}>
+              By continuing, you agree to our{' '}
+              <Text
+                style={styles.legalNoticeLink}
+                onPress={() => openLegalDocument('/terms-of-service')}
+              >
+                Terms of Service
+              </Text>
+              {' '}and acknowledge our{' '}
+              <Text
+                style={styles.legalNoticeLink}
+                onPress={() => openLegalDocument('/privacy-policy')}
+              >
+                Privacy Policy
+              </Text>
+              .
+            </Text>
           </View>
         </View>
       </Animated.ScrollView>
@@ -878,6 +900,18 @@ const createStyles = createThemedStyles((theme) => ({
   },
   oauthStack: {
     gap: 12,
+  },
+  legalNotice: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  legalNoticeLink: {
+    color: theme.colors.primary,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   appleButtonWrap: {
     width: '100%',

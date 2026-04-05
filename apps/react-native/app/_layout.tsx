@@ -21,6 +21,7 @@ export default function RootLayout() {
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" options={{ headerShown: false }} />
                 <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(legal)" />
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="bio-setup" />
                 <Stack.Screen name="records-request" />
