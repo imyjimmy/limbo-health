@@ -77,6 +77,8 @@ export default function ProfileScreen() {
     if (key === 'settings') router.push('/(tabs)/profile/settings');
     if (key === 'medical-info') router.push('/(tabs)/profile/medical-info');
     if (key === 'encryption-keys') router.push('/(tabs)/profile/encryption-keys');
+    if (key === 'notifications') router.push('/(tabs)/profile/notifications');
+    if (key === 'about') router.push('/(tabs)/profile/about');
   };
 
   return (

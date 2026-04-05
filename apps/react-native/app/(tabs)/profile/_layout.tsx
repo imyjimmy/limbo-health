@@ -52,6 +52,28 @@ export default function ProfileLayout() {
           headerTitleStyle: { color: chrome.primaryText },
         }}
       />
+      <Stack.Screen
+        name="notifications"
+        options={{
+          headerShown: true,
+          title: 'Notifications',
+          headerBackButtonDisplayMode: 'default',
+          headerStyle: { backgroundColor: chrome.headerBackground },
+          headerTintColor: chrome.primaryText,
+          headerTitleStyle: { color: chrome.primaryText },
+        }}
+      />
+      <Stack.Screen
+        name="about"
+        options={{
+          headerShown: true,
+          title: 'About',
+          headerBackButtonDisplayMode: 'default',
+          headerStyle: { backgroundColor: chrome.headerBackground },
+          headerTintColor: chrome.primaryText,
+          headerTitleStyle: { color: chrome.primaryText },
+        }}
+      />
     </Stack>
   );
 }
