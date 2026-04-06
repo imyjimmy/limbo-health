@@ -199,7 +199,7 @@ function TabLayoutInner() {
   if (state.status === 'loading') {
     return (
       <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#FFFFFF" />
       </View>
     );
   }
@@ -231,6 +231,7 @@ function TabLayoutInner() {
         )}
         screenOptions={{
           headerShown: false,
+          sceneStyle: { backgroundColor: '#000000' },
         }}
       >
         <Tabs.Screen name="home" options={{ title: 'Home' }} />
@@ -255,15 +256,13 @@ function TabLayoutInner() {
 const createStyles = createThemedStyles((theme) => ({
   screen: {
     flex: 1,
+    backgroundColor: '#000000',
   },
   loadingScreen: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.backgroundSubtle,
-  },
-  loadingIndicator: {
-    color: theme.colors.secondary,
+    backgroundColor: '#000000',
   },
   inlineRecorderWrap: {
     position: 'absolute',

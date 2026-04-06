@@ -5,6 +5,7 @@
     "version": "1.2.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "backgroundColor": "#000000",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "jsEngine": "hermes",
@@ -12,7 +13,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": false,
@@ -59,7 +60,19 @@
         }
       ],
       "./plugins/withCrashDiagnostics",
-      "expo-mail-composer"
+      "expo-mail-composer",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "dark": {
+            "backgroundColor": "#000000",
+            "image": "./assets/splash-icon.png"
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {

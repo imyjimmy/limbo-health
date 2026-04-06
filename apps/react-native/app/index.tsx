@@ -9,8 +9,8 @@ export default function Index() {
   const { state, needsOnboarding } = useAuthContext();
   if (state.status === 'loading') {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000000' }}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
       </View>
     );
   }
