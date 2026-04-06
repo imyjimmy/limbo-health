@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Pressable, StyleSheet, Modal, Text } from 'react-native';
 import {
   IconBook2,
+  IconClipboardHeart,
   IconHome,
   IconHomeFilled,
   IconPlus,
@@ -10,7 +11,6 @@ import {
   IconMicrophone,
   IconCamera,
   IconLogs,
-  IconReportMedical,
 } from '@tabler/icons-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { ProfileAvatar } from './ProfileAvatar';
@@ -223,7 +223,7 @@ function renderTabIcon(
       return <IconBook2 size={ICON_SIZE} color={color} strokeWidth={2} />;
 
     case 'page':
-      return <IconReportMedical size={ICON_SIZE} color={color} strokeWidth={2} />;
+      return <IconClipboardHeart size={ICON_SIZE} color={color} strokeWidth={2} />;
 
     case 'create':
       return (

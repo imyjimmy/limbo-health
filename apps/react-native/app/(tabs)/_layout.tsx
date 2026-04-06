@@ -235,7 +235,7 @@ function TabLayoutInner() {
         }}
       >
         <Tabs.Screen name="home" options={{ title: 'Home' }} />
-        <Tabs.Screen name="page" options={{ title: 'Requests' }} />
+        <Tabs.Screen name="page" options={{ title: 'Pending Requests' }} />
         <Tabs.Screen name="create" options={{ title: 'Create' }} />
         <Tabs.Screen name="(binders)" options={{ title: 'Digital Binders' }} />
         <Tabs.Screen name="profile" options={{ title: 'Profile' }} />

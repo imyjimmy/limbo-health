@@ -5,6 +5,8 @@ const path = require('path');
 
 const appJsonPath = path.resolve(__dirname, '..', 'app.json');
 const dryRun = process.argv.includes('--dry-run');
+const partArg = process.argv.find((arg) => arg.startsWith('--part='));
+const part = partArg ? partArg.slice('--part='.length) : 'patch';
 
 function parseSemver(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
@@ -36,7 +38,15 @@ function main() {
   }
 
   const currentVersion = appConfig.expo.version;
-  const next = `${current.major}.${current.minor}.${current.patch + 1}`;
+  let next;
+
+  if (part === 'minor') {
+    next = `${current.major}.${current.minor + 1}.0`;
+  } else if (part === 'patch') {
+    next = `${current.major}.${current.minor}.${current.patch + 1}`;
+  } else {
+    throw new Error(`Unsupported part "${part}". Use --part=patch or --part=minor`);
+  }
 
   if (!dryRun) {
     appConfig.expo.version = next;
@@ -44,7 +54,7 @@ function main() {
   }
 
   const mode = dryRun ? 'Dry run' : 'Updated';
-  console.log(`${mode} expo.version: ${currentVersion} -> ${next}`);
+  console.log(`${mode} expo.version (${part}): ${currentVersion} -> ${next}`);
 }
 
 main();

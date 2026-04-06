@@ -46,13 +46,6 @@ export default function HomeScreen() {
             </View>
 
             <TexasHospitalLogoMarquee style={styles.hospitalLogoPanel} />
-
-            <View style={styles.pendingSection}>
-              <Text style={styles.pendingSectionTitle}>Pending Requests</Text>
-              <View style={styles.pendingEmptyState}>
-                <Text style={styles.pendingEmptyText}>No Pending Requests</Text>
-              </View>
-            </View>
           </View>
 
           <View style={styles.bottomSection}>
@@ -160,28 +153,6 @@ const createStyles = createThemedStyles((theme) => ({
     color: theme.colors.secondary,
     fontSize: 12,
     fontWeight: '700',
-  },
-  pendingSection: {
-    flex: 1,
-    marginTop: 2,
-  },
-  pendingEmptyState: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  pendingSectionTitle: {
-    color: theme.colors.text,
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  pendingEmptyText: {
-    color: theme.colors.textMuted,
-    fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 20,
-    opacity: 0.9,
-    textAlign: 'center',
   },
   ctaButton: {
     alignItems: 'center',
