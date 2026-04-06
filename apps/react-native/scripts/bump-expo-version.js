@@ -4,6 +4,13 @@ const fs = require('fs');
 const path = require('path');
 
 const appJsonPath = path.resolve(__dirname, '..', 'app.json');
+const xcodeProjectPath = path.resolve(
+  __dirname,
+  '..',
+  'ios',
+  'LimboHealth.xcodeproj',
+  'project.pbxproj',
+);
 const dryRun = process.argv.includes('--dry-run');
 const partArg = process.argv.find((arg) => arg.startsWith('--part='));
 const part = partArg ? partArg.slice('--part='.length) : 'patch';
@@ -16,6 +23,24 @@ function parseSemver(version) {
     minor: Number(match[2]),
     patch: Number(match[3]),
   };
+}
+
+function updateXcodeMarketingVersion(nextVersion) {
+  if (!fs.existsSync(xcodeProjectPath)) {
+    return false;
+  }
+
+  const raw = fs.readFileSync(xcodeProjectPath, 'utf8');
+  const updated = raw.replace(
+    /MARKETING_VERSION = \d+\.\d+\.\d+;/g,
+    `MARKETING_VERSION = ${nextVersion};`,
+  );
+
+  if (!dryRun && updated !== raw) {
+    fs.writeFileSync(xcodeProjectPath, updated);
+  }
+
+  return updated !== raw;
 }
 
 function main() {
@@ -53,8 +78,13 @@ function main() {
     fs.writeFileSync(appJsonPath, `${JSON.stringify(appConfig, null, 2)}\n`);
   }
 
+  const updatedXcodeProject = updateXcodeMarketingVersion(next);
+
   const mode = dryRun ? 'Dry run' : 'Updated';
   console.log(`${mode} expo.version (${part}): ${currentVersion} -> ${next}`);
+  if (updatedXcodeProject) {
+    console.log(`${mode} Xcode MARKETING_VERSION: ${currentVersion} -> ${next}`);
+  }
 }
 
 main();
