@@ -1,4 +1,4 @@
-export type LegalDocumentId = 'privacy-policy' | 'terms-of-service';
+export type LegalDocumentId = 'privacy-policy' | 'terms-of-service' | 'support';
 
 export type LegalDocument = {
   id: LegalDocumentId;
@@ -13,9 +13,7 @@ const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: 'Privacy Policy',
     markdown: `# Limbo Health Privacy Policy
 
-Last updated: April 5, 2026
-
-> Working draft for publication. This document should be reviewed by counsel before it is published or linked from App Store Connect.
+Last updated: April 6, 2026
 
 This Privacy Policy explains how Limbo Health collects, uses, stores, and shares information when you use the Limbo Health mobile app, website, and related services.
 
@@ -166,16 +164,14 @@ If you have questions about this Privacy Policy, contact:
 
 - Email: [support@limbo.health](mailto:support@limbo.health)
 - Website: [limbohealth.com](https://limbohealth.com)
-- Support: [Support](mailto:support@limbo.health)`,
+- Support: [Support](/support)`,
   },
   'terms-of-service': {
     id: 'terms-of-service',
     title: 'Terms of Service',
     markdown: `# Limbo Health Terms of Service
 
-Last updated: April 5, 2026
-
-> Working draft for publication. This document should be reviewed by counsel before it is published or used as a custom end-user agreement.
+Last updated: April 6, 2026
 
 These Terms of Service govern your access to and use of the Limbo Health mobile app, website, and related services.
 
@@ -307,7 +303,61 @@ If you have questions about these Terms, contact:
 - Email: [support@limbo.health](mailto:support@limbo.health)
 - Website: [limbohealth.com](https://limbohealth.com)
 - Privacy Policy: [Privacy Policy](/privacy-policy)
-- Support: [Support](mailto:support@limbo.health)`,
+- Support: [Support](/support)`,
+  },
+  support: {
+    id: 'support',
+    title: 'Support',
+    markdown: `# Limbo Health Support
+
+Last updated: April 6, 2026
+
+## Contact
+
+- Email: [support@limbo.health](mailto:support@limbo.health)
+- Website: [limbohealth.com](https://limbohealth.com)
+- Privacy Policy: [Privacy Policy](/privacy-policy)
+- Terms of Service: [Terms of Service](/terms-of-service)
+
+## What Limbo Health Helps With
+
+Limbo Health currently focuses on:
+
+- preparing medical-records requests for supported workflows
+- generating and sharing filled request PDFs
+- storing and organizing encrypted personal medical records
+- managing on-device personal info used to prefill request packets
+- supporting local credential storage and portal-assistance flows
+
+## Common Support Topics
+
+We can help with issues such as:
+
+- sign-in problems
+- app crashes or launch failures
+- records-request workflow issues
+- PDF generation or sharing problems
+- account deletion questions
+- encryption-key or local-storage questions
+
+## Before You Contact Us
+
+Please include, if possible:
+
+- the device model and iOS version
+- the app version
+- the hospital system or workflow involved
+- a short description of what happened
+- screenshots or screen recordings if available
+
+Please do not send more sensitive information than necessary.
+
+## Important Limits
+
+- Limbo Health is not an emergency service.
+- Limbo Health does not provide medical advice.
+- We cannot guarantee that a hospital or third party will accept or fulfill a records request.
+- Email and share flows may depend on your iPhone settings and installed apps.`,
   },
 };
 

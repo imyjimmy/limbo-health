@@ -1,13 +1,13 @@
 # Limbo Health Support
 
-Last updated: April 5, 2026
-
-> Working draft for publication. Before publishing, confirm the final support email, website destination, and any additional business contact details you want to expose publicly.
+Last updated: April 6, 2026
 
 ## Contact
 
-- Email: [admin@limbohealth.com](mailto:admin@limbohealth.com)
+- Email: [support@limbo.health](mailto:support@limbo.health)
 - Website: [https://limbohealth.com](https://limbohealth.com)
+- Privacy Policy: [https://limbohealth.com/privacy-policy](https://limbohealth.com/privacy-policy)
+- Terms of Service: [https://limbohealth.com/terms-of-service](https://limbohealth.com/terms-of-service)
 
 ## What Limbo Health Helps With
 
@@ -48,9 +48,4 @@ Please do not send more sensitive information than necessary.
 - Limbo Health does not provide medical advice.
 - We cannot guarantee that a hospital or third party will accept or fulfill a records request.
 - Email and share flows may depend on your iPhone settings and installed apps.
-
-## Related Documents
-
-- [Privacy Policy](privacy-policy.md)
-- [Terms of Service](terms-of-service.md)
 

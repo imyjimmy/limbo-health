@@ -25,6 +25,11 @@ const legalPages: Array<{
     href: '/terms-of-service',
     label: 'Terms of Service',
   },
+  {
+    id: 'support',
+    href: '/support',
+    label: 'Support',
+  },
 ];
 
 function renderInline(text: string, keyPrefix: string) {
@@ -183,7 +188,7 @@ export function LegalDocumentPage({
         <div className="mx-auto flex w-full max-w-[980px] flex-col gap-8">
           <section className="flex flex-col gap-5">
             <div className="inline-flex w-fit rounded-full border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.04)] px-4 py-1.5">
-              <span className="font-anka text-xs text-[#ffd9cf] sm:text-sm">Public legal page</span>
+              <span className="font-anka text-xs text-[#ffd9cf] sm:text-sm">Public information page</span>
             </div>
             <div className="flex flex-wrap gap-3">
               {legalPages.map((page) =>

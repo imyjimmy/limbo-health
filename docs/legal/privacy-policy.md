@@ -1,8 +1,6 @@
 # Limbo Health Privacy Policy
 
-Last updated: April 5, 2026
-
-> Working draft for publication. This document should be reviewed by counsel before it is published or linked from App Store Connect.
+Last updated: April 6, 2026
 
 This Privacy Policy explains how Limbo Health collects, uses, stores, and shares information when you use the Limbo Health mobile app, website, and related services.
 
@@ -151,7 +149,6 @@ We may update this Privacy Policy from time to time. If we make material changes
 
 If you have questions about this Privacy Policy, contact:
 
-- Email: [admin@limbohealth.com](mailto:admin@limbohealth.com)
+- Email: [support@limbo.health](mailto:support@limbo.health)
 - Website: [https://limbohealth.com](https://limbohealth.com)
-- Support: [support.md](support.md)
-
+- Support: [https://limbohealth.com/support](https://limbohealth.com/support)

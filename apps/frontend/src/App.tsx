@@ -13,6 +13,7 @@ import { GoogleCallbackPage } from '@/pages/GoogleCallbackPage';
 import { ScanPage } from '@/pages/ScanPage';
 import { PrivacyPolicyPage } from '@/pages/PrivacyPolicyPage';
 import { TermsOfServicePage } from '@/pages/TermsOfServicePage';
+import { SupportPage } from '@/pages/SupportPage';
 
 
 function AppRoutes() {
@@ -48,6 +49,7 @@ function AppRoutes() {
         <Route path="/meeting/:roomId" element={<MeetingPage token={token || ''}/>} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+        <Route path="/support" element={<SupportPage />} />
         {/* Public profile route - must be last to avoid matching other routes */}
         <Route path="/scan" element={<ScanPage />} />
         <Route 

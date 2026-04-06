@@ -159,6 +159,12 @@ export function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link
+              to="/support"
+              className="transition-colors hover:text-[#fff3e9]"
+            >
+              Support
+            </Link>
+            <Link
               to="/privacy-policy"
               className="transition-colors hover:text-[#fff3e9]"
             >

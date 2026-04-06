@@ -23,6 +23,10 @@ export default function LegalLayout() {
         name="terms-of-service"
         options={{ title: 'Terms of Service' }}
       />
+      <Stack.Screen
+        name="support"
+        options={{ title: 'Support' }}
+      />
     </Stack>
   );
 }

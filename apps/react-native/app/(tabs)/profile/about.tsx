@@ -38,6 +38,14 @@ export default function AboutScreen() {
         </Pressable>
         <View style={styles.rowSeparator} />
         <Pressable
+          onPress={() => router.push('/support')}
+          style={({ pressed }) => [styles.linkRow, pressed && styles.linkRowPressed]}
+        >
+          <Text style={styles.linkLabel}>Support</Text>
+          <Text style={styles.linkChevron}>›</Text>
+        </Pressable>
+        <View style={styles.rowSeparator} />
+        <Pressable
           onPress={() => router.push('/terms-of-service')}
           style={({ pressed }) => [styles.linkRow, pressed && styles.linkRowPressed]}
         >
