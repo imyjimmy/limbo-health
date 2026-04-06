@@ -6,7 +6,7 @@ export type LegalDocument = {
   markdown: string;
 };
 
-// Mirrors the legal drafts in docs/legal/ with link targets adjusted for in-app navigation.
+// Keep this copy aligned with apps/react-native/core/legal/documents.ts.
 const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
   'privacy-policy': {
     id: 'privacy-policy',

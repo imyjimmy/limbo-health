@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import {
   getLegalDocument,
   type LegalDocumentId,
-} from '../../../react-native/core/legal/documents';
+} from '@/legal/documents';
 import {
   parseLegalMarkdown,
   tokenizeLegalInline,
   type LegalMarkdownBlock,
-} from '../../../react-native/core/legal/markdown';
+} from '@/legal/markdown';
 
 const legalPages: Array<{
   id: LegalDocumentId;
