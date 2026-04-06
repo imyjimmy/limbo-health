@@ -1,5 +1,5 @@
 import type { ElementType } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   IconArrowRight,
   IconCpu,
@@ -152,12 +152,26 @@ export function LandingPage() {
       </section>
 
       <footer className="border-t border-[rgba(255,255,255,0.10)] px-4 py-8 sm:px-6 md:px-8 lg:px-0">
-        <div className="mx-auto flex w-full max-w-[1060px] items-center justify-between text-sm text-[rgba(246,239,231,0.62)]">
+        <div className="mx-auto flex w-full max-w-[1060px] flex-col gap-4 text-sm text-[rgba(246,239,231,0.62)] sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <img src={appIconSrc} alt="MedRepo" className="h-5 w-5 rounded" />
             <span>Limbo Health</span>
           </div>
-          <span>© {new Date().getFullYear()} All rights reserved.</span>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/privacy-policy"
+              className="transition-colors hover:text-[#fff3e9]"
+            >
+              Privacy Policy
+            </Link>
+            <Link
+              to="/terms-of-service"
+              className="transition-colors hover:text-[#fff3e9]"
+            >
+              Terms of Service
+            </Link>
+            <span>© {new Date().getFullYear()} All rights reserved.</span>
+          </div>
         </div>
       </footer>
     </div>

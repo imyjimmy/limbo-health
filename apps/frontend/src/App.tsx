@@ -11,6 +11,8 @@ import { PublicProfile } from '@/pages/PublicProfile';
 import { BookAppointment } from '@/pages/BookAppointment';
 import { GoogleCallbackPage } from '@/pages/GoogleCallbackPage';
 import { ScanPage } from '@/pages/ScanPage';
+import { PrivacyPolicyPage } from '@/pages/PrivacyPolicyPage';
+import { TermsOfServicePage } from '@/pages/TermsOfServicePage';
 
 
 function AppRoutes() {
@@ -44,6 +46,8 @@ function AppRoutes() {
           element={isAuthenticated && token  ? <EditProfile token={token} /> : <Navigate to="/login" replace />}
         />
         <Route path="/meeting/:roomId" element={<MeetingPage token={token || ''}/>} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms-of-service" element={<TermsOfServicePage />} />
         {/* Public profile route - must be last to avoid matching other routes */}
         <Route path="/scan" element={<ScanPage />} />
         <Route 
