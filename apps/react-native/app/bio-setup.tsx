@@ -91,12 +91,13 @@ export default function BioSetupScreen() {
         eyebrow: 'Step 2 of 3',
         title: 'Basic details',
         body:
-          'Add the identity details that hospitals commonly require on request forms, including date of birth and the last 4 digits of your Social Security number.',
+          'Add the patient details hospitals may ask for on request forms. Date of birth, the last 4 digits of your Social Security number, phone number, and email are optional here and can be added later.',
       },
       {
         eyebrow: 'Step 3 of 3',
         title: 'Mailing address',
-        body: 'Add the address that should appear on outgoing request forms and response mail.',
+        body:
+          'Add a mailing address if a hospital form or mailed response needs it. You can skip this step for now and come back later.',
       },
     ],
     [hasProfile],
@@ -388,13 +389,16 @@ export default function BioSetupScreen() {
 
           <View style={styles.introCard}>
             <Text style={styles.introCardTitle}>What we will ask for</Text>
-            <Text style={styles.introCardBody}>Full name</Text>
-            <Text style={styles.introCardBody}>Date of birth</Text>
-            <Text style={styles.introCardBody}>Last 4 of Social Security number</Text>
+            <Text style={styles.introCardBody}>Full name (required)</Text>
+            <Text style={styles.introCardBody}>Date of birth (optional)</Text>
+            <Text style={styles.introCardBody}>Last 4 of Social Security number (optional)</Text>
             <Text style={styles.introCardBody}>Phone number (optional)</Text>
             <Text style={styles.introCardBody}>Email (optional)</Text>
-            <Text style={styles.introCardBody}>Mailing address</Text>
-            <Text style={styles.introCardFootnote}>Stored only on this device.</Text>
+            <Text style={styles.introCardBody}>Mailing address (optional)</Text>
+            <Text style={styles.introCardFootnote}>
+              Stored only on this device. Optional details can be added later when a hospital form
+              asks for them.
+            </Text>
           </View>
 
           <Pressable
@@ -450,7 +454,7 @@ export default function BioSetupScreen() {
             </View>
 
             <View onLayout={registerFieldLayout(1, 'dateOfBirth')}>
-              <Text style={styles.fieldLabel}>Date of birth</Text>
+              <Text style={styles.fieldLabel}>Date of birth (optional)</Text>
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('dateOfBirth')}
@@ -485,7 +489,7 @@ export default function BioSetupScreen() {
             </View>
 
             <View onLayout={registerFieldLayout(1, 'last4Ssn')}>
-              <Text style={styles.fieldLabel}>Last 4 of Social Security number</Text>
+              <Text style={styles.fieldLabel}>Last 4 of Social Security number (optional)</Text>
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('last4Ssn')}
@@ -520,7 +524,7 @@ export default function BioSetupScreen() {
             </View>
 
             <View onLayout={registerFieldLayout(1, 'phoneNumber')}>
-              <Text style={styles.fieldLabel}>Phone number</Text>
+              <Text style={styles.fieldLabel}>Phone number (optional)</Text>
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('phoneNumber')}
@@ -552,7 +556,7 @@ export default function BioSetupScreen() {
             </View>
 
             <View onLayout={registerFieldLayout(1, 'email')}>
-              <Text style={styles.fieldLabel}>Email</Text>
+              <Text style={styles.fieldLabel}>Email (optional)</Text>
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('email')}
@@ -608,7 +612,7 @@ export default function BioSetupScreen() {
 
           <View style={styles.card}>
             <View onLayout={registerFieldLayout(2, 'addressLine1')}>
-              <Text style={styles.fieldLabel}>Address line 1</Text>
+              <Text style={styles.fieldLabel}>Address line 1 (optional)</Text>
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('addressLine1')}
@@ -633,7 +637,7 @@ export default function BioSetupScreen() {
             </View>
 
             <View onLayout={registerFieldLayout(2, 'addressLine2')}>
-              <Text style={styles.fieldLabel}>Address line 2</Text>
+              <Text style={styles.fieldLabel}>Address line 2 (optional)</Text>
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('addressLine2')}
@@ -659,7 +663,7 @@ export default function BioSetupScreen() {
 
             <View style={styles.inlineRow}>
               <View style={styles.inlineFieldWide} onLayout={registerFieldLayout(2, 'city')}>
-                <Text style={styles.fieldLabel}>City</Text>
+                <Text style={styles.fieldLabel}>City (optional)</Text>
                 <View style={styles.inputShell}>
                   <TextInput
                     ref={registerInputRef('city')}
@@ -684,7 +688,7 @@ export default function BioSetupScreen() {
               </View>
 
               <View style={styles.inlineFieldNarrow} onLayout={registerFieldLayout(2, 'state')}>
-                <Text style={styles.fieldLabel}>State</Text>
+                <Text style={styles.fieldLabel}>State (optional)</Text>
                 <View style={styles.inputShell}>
                   <TextInput
                     ref={registerInputRef('state')}
@@ -711,7 +715,7 @@ export default function BioSetupScreen() {
             </View>
 
             <View onLayout={registerFieldLayout(2, 'postalCode')}>
-              <Text style={styles.fieldLabel}>Postal code</Text>
+              <Text style={styles.fieldLabel}>Postal code (optional)</Text>
               <View style={styles.inputShell}>
                 <TextInput
                   ref={registerInputRef('postalCode')}

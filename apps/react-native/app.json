@@ -43,19 +43,19 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to capture photos of your ID and supporting records."
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can photograph your ID and supporting documents for a medical-records request, such as attaching a driver's license to a hospital release form."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow $(PRODUCT_NAME) to access your photo library so you can attach ID images and supporting records."
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photo library so you can attach saved ID photos and supporting documents to a medical-records request."
         }
       ],
       [
         "expo-av",
         {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to record audio for medical notes."
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can record audio notes for your personal medical record, such as a reminder after a visit."
         }
       ],
       "./plugins/withCrashDiagnostics",

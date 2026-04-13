@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Limbo Health Support</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b1220;
+        --panel: rgba(15, 23, 42, 0.82);
+        --border: rgba(148, 163, 184, 0.2);
+        --text: #e5edf7;
+        --muted: #bfd0e3;
+        --accent: #ff8b73;
+        --accent-soft: rgba(255, 139, 115, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background:
+          radial-gradient(circle at top, rgba(255, 139, 115, 0.14), transparent 34%),
+          linear-gradient(180deg, #0f172a 0%, var(--bg) 100%);
+        color: var(--text);
+      }
+
+      main {
+        width: min(860px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 56px 0 72px;
+      }
+
+      .eyebrow {
+        display: inline-block;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      h1 {
+        margin: 18px 0 12px;
+        font-size: clamp(2.2rem, 4vw, 3.5rem);
+        line-height: 1.05;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      section {
+        margin-top: 28px;
+        padding: 28px;
+        border-radius: 24px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        backdrop-filter: blur(14px);
+      }
+
+      h2 {
+        margin: 0 0 16px;
+        font-size: 1.3rem;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      li + li {
+        margin-top: 10px;
+      }
+
+      a {
+        color: #ffd0c6;
+      }
+
+      .contact-card {
+        display: grid;
+        gap: 16px;
+      }
+
+      .contact-item {
+        padding: 16px 18px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .contact-label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--muted);
+        font-size: 0.88rem;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+      }
+
+      .contact-value {
+        color: var(--text);
+        font-size: 1.03rem;
+        font-weight: 600;
+      }
+
+      .highlight {
+        padding: 16px 18px;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 139, 115, 0.28);
+        background: var(--accent-soft);
+      }
+
+      .footer-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding-top: 32px;
+        }
+
+        section {
+          padding: 22px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="eyebrow">Public support page</span>
+      <h1>Limbo Health Support</h1>
+      <p>
+        Use this page to ask questions or request support for the Limbo Health app.
+      </p>
+
+      <section>
+        <h2>Contact</h2>
+        <div class="contact-card">
+          <div class="contact-item">
+            <span class="contact-label">Support email</span>
+            <div class="contact-value">
+              <a href="mailto:support@limbo.health">support@limbo.health</a>
+            </div>
+          </div>
+          <div class="contact-item">
+            <span class="contact-label">Website</span>
+            <div class="contact-value">
+              <a href="https://limbohealth.com">limbohealth.com</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <div class="highlight">
+          Email <a href="mailto:support@limbo.health">support@limbo.health</a> if you need help with sign-in,
+          records-request workflows, generated PDFs, account deletion questions, or app issues.
+        </div>
+      </section>
+
+      <section>
+        <h2>What we can help with</h2>
+        <ul>
+          <li>Sign-in and account-access problems</li>
+          <li>Medical-records request workflow issues</li>
+          <li>Generated PDF or sharing problems</li>
+          <li>Questions about local storage, encryption keys, or account deletion</li>
+          <li>App crashes or launch failures</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>What to include</h2>
+        <ul>
+          <li>Your device model and iOS version</li>
+          <li>Your app version</li>
+          <li>The hospital system or workflow involved, if applicable</li>
+          <li>A short description of what happened</li>
+          <li>Screenshots or screen recordings, if available</li>
+        </ul>
+        <p style="margin-top: 16px;">Please do not send more sensitive information than necessary.</p>
+      </section>
+
+      <section>
+        <h2>Important limits</h2>
+        <ul>
+          <li>Limbo Health is not an emergency service.</li>
+          <li>Limbo Health does not provide medical advice.</li>
+          <li>We cannot guarantee that a hospital or third party will accept or fulfill a records request.</li>
+        </ul>
+        <div class="footer-links">
+          <a href="https://limbohealth.com/privacy-policy">Privacy Policy</a>
+          <a href="https://limbohealth.com/terms-of-service">Terms of Service</a>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

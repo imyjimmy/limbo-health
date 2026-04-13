@@ -69,29 +69,53 @@ export function isValidPhoneNumber(value: string): boolean {
   return digits.length === 10 || (digits.length === 11 && digits.startsWith('1'));
 }
 
+function hasAnyMailingAddressValue(profile: BioProfile): boolean {
+  return [
+    profile.addressLine1,
+    profile.addressLine2,
+    profile.city,
+    profile.state,
+    profile.postalCode,
+  ].some((value) => value.trim().length > 0);
+}
+
+function formatCityStatePostalLine(city: string, state: string, postalCode: string): string {
+  const cityState = [city.trim(), state.trim()].filter(Boolean).join(', ');
+  return [cityState, postalCode.trim()].filter(Boolean).join(' ');
+}
+
 export function validateBioProfileBasicDetails(profile: BioProfile): string | null {
   if (!profile.fullName.trim()) return 'Please enter your full name.';
-  if (!isValidDateOfBirth(profile.dateOfBirth.trim())) return 'Please enter a valid date of birth.';
-  if (!isValidLast4Ssn(profile.last4Ssn)) {
+  if (profile.dateOfBirth.trim() && !isValidDateOfBirth(profile.dateOfBirth.trim())) {
+    return 'Please enter a valid date of birth.';
+  }
+  if (profile.last4Ssn.trim() && !isValidLast4Ssn(profile.last4Ssn)) {
     return 'Please enter the last 4 digits of your Social Security number.';
   }
-  if (!isValidPhoneNumber(profile.phoneNumber)) {
+  if (profile.phoneNumber.trim() && !isValidPhoneNumber(profile.phoneNumber)) {
     return 'Please enter a valid phone number.';
   }
-  if (!profile.email.trim()) {
-    return 'Please enter your email address.';
-  }
-  if (!SIMPLE_EMAIL_PATTERN.test(profile.email.trim())) {
+  if (profile.email.trim() && !SIMPLE_EMAIL_PATTERN.test(profile.email.trim())) {
     return 'Please enter a valid email address.';
   }
   return null;
 }
 
 export function validateBioProfileAddress(profile: BioProfile): string | null {
-  if (!profile.addressLine1.trim()) return 'Please enter your street address.';
-  if (!profile.city.trim()) return 'Please enter your city.';
-  if (!profile.state.trim()) return 'Please enter your state.';
-  if (profile.postalCode.trim().length < 5) return 'Please enter a valid postal code.';
+  if (!hasAnyMailingAddressValue(profile)) return null;
+
+  if (!profile.addressLine1.trim()) {
+    return 'Please add a street address or clear the mailing address fields for now.';
+  }
+  if (!profile.city.trim()) {
+    return 'Please add a city or clear the mailing address fields for now.';
+  }
+  if (!profile.state.trim()) {
+    return 'Please add a state or clear the mailing address fields for now.';
+  }
+  if (profile.postalCode.trim().length < 5) {
+    return 'Please add a valid postal code or clear the mailing address fields for now.';
+  }
   return null;
 }
 
@@ -100,26 +124,15 @@ export function validateBioProfile(profile: BioProfile): string | null {
 }
 
 export function isBioProfileComplete(profile: BioProfile | null | undefined): profile is BioProfile {
-  if (!profile) return false;
-
-  return (
-    profile.fullName.trim().length > 0 &&
-    isValidDateOfBirth(profile.dateOfBirth) &&
-    isValidLast4Ssn(profile.last4Ssn) &&
-    isValidPhoneNumber(profile.phoneNumber) &&
-    SIMPLE_EMAIL_PATTERN.test(profile.email.trim()) &&
-    profile.addressLine1.trim().length > 0 &&
-    profile.city.trim().length > 0 &&
-    profile.state.trim().length > 0 &&
-    profile.postalCode.trim().length >= 5
-  );
+  return Boolean(profile) && validateBioProfile(profile) === null;
 }
 
 export function formatMailingAddress(profile: BioProfile): string {
+  const cityStatePostalLine = formatCityStatePostalLine(profile.city, profile.state, profile.postalCode);
   return [
     profile.addressLine1.trim(),
     profile.addressLine2.trim(),
-    `${profile.city.trim()}, ${profile.state.trim()} ${profile.postalCode.trim()}`.trim(),
+    cityStatePostalLine,
   ]
     .filter(Boolean)
     .join('\n');
@@ -153,13 +166,7 @@ export function formatMaskedMailingAddress(profile: BioProfile): string {
   const city = maskAddressSegment(profile.city.trim());
   const state = profile.state.trim();
   const postalCode = maskAddressSegment(profile.postalCode.trim());
-  const cityStateZipLine = [
-    city ? `${city}${state || postalCode ? ',' : ''}` : '',
-    state,
-    postalCode,
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const cityStateZipLine = formatCityStatePostalLine(city, state, postalCode);
 
   return [
     maskAddressLine(profile.addressLine1.trim(), 2),

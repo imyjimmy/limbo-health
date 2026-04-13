@@ -20,33 +20,51 @@ const completeProfile: BioProfile = {
 };
 
 describe('bio setup validation module', () => {
-  it('uses the same step-completion module for every basic-details Done-eligible field', () => {
-    const incompleteBasicDetails = {
+  it('treats basic-details optional fields as skippable while still validating malformed input', () => {
+    const minimalBasicDetails = {
       ...completeProfile,
+      dateOfBirth: '',
+      last4Ssn: '',
       phoneNumber: '',
+      email: '',
     };
 
-    expect(validateBioSetupStep(1, incompleteBasicDetails)).toBe('Please enter a valid phone number.');
-    expect(isBioSetupStepComplete(1, incompleteBasicDetails)).toBe(false);
-    expect(shouldShowBioSetupDoneButton('dateOfBirth', incompleteBasicDetails)).toBe(false);
-    expect(shouldShowBioSetupDoneButton('last4Ssn', incompleteBasicDetails)).toBe(false);
-    expect(shouldShowBioSetupDoneButton('phoneNumber', incompleteBasicDetails)).toBe(false);
-    expect(shouldShowBioSetupDoneButton('email', incompleteBasicDetails)).toBe(false);
+    expect(validateBioSetupStep(1, minimalBasicDetails)).toBeNull();
+    expect(isBioSetupStepComplete(1, minimalBasicDetails)).toBe(true);
+    expect(shouldShowBioSetupDoneButton('dateOfBirth', minimalBasicDetails)).toBe(true);
+    expect(shouldShowBioSetupDoneButton('last4Ssn', minimalBasicDetails)).toBe(true);
+    expect(shouldShowBioSetupDoneButton('phoneNumber', minimalBasicDetails)).toBe(true);
+    expect(shouldShowBioSetupDoneButton('email', minimalBasicDetails)).toBe(true);
 
-    expect(isBioSetupStepComplete(1, completeProfile)).toBe(true);
-    expect(shouldShowBioSetupDoneButton('dateOfBirth', completeProfile)).toBe(true);
-    expect(shouldShowBioSetupDoneButton('last4Ssn', completeProfile)).toBe(true);
-    expect(shouldShowBioSetupDoneButton('phoneNumber', completeProfile)).toBe(true);
-    expect(shouldShowBioSetupDoneButton('email', completeProfile)).toBe(true);
+    expect(
+      validateBioSetupStep(1, {
+        ...minimalBasicDetails,
+        phoneNumber: '555-123',
+      }),
+    ).toBe('Please enter a valid phone number.');
   });
 
-  it('reuses the same step-completion module for the address postal code Done behavior', () => {
+  it('treats the address step as optional until the user starts entering a mailing address', () => {
+    const blankAddress = {
+      ...completeProfile,
+      addressLine1: '',
+      addressLine2: '',
+      city: '',
+      state: '',
+      postalCode: '',
+    };
     const incompleteAddress = {
       ...completeProfile,
       postalCode: '',
     };
 
-    expect(validateBioSetupStep(2, incompleteAddress)).toBe('Please enter a valid postal code.');
+    expect(validateBioSetupStep(2, blankAddress)).toBeNull();
+    expect(isBioSetupStepComplete(2, blankAddress)).toBe(true);
+    expect(shouldShowBioSetupDoneButton('postalCode', blankAddress)).toBe(true);
+
+    expect(validateBioSetupStep(2, incompleteAddress)).toBe(
+      'Please add a valid postal code or clear the mailing address fields for now.',
+    );
     expect(isBioSetupStepComplete(2, incompleteAddress)).toBe(false);
     expect(shouldShowBioSetupDoneButton('postalCode', incompleteAddress)).toBe(false);
 

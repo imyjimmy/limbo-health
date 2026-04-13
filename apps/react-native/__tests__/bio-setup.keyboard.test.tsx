@@ -94,7 +94,7 @@ describe('BioSetupScreen keyboard done behavior', () => {
     jest.spyOn(ReactNative.Keyboard, 'dismiss').mockImplementation(jest.fn());
   });
 
-  it('keeps Done hidden until every required field in basic details is valid, then shows it on the phone keypad', () => {
+  it('shows Done on optional basic-details fields as soon as the required name is present', () => {
     let tree: any;
 
     act(() => {
@@ -102,20 +102,13 @@ describe('BioSetupScreen keyboard done behavior', () => {
     });
 
     changeText(tree!, 'bio-setup-full-name-input', 'Jimmy Zhang');
-    changeText(tree!, 'bio-setup-date-of-birth-input', '01/14/1989');
-    changeText(tree!, 'bio-setup-last4-ssn-input', '7116');
-    changeText(tree!, 'bio-setup-email-input', 'imyjimmy@gmail.com');
 
+    expect(getInput(tree!, 'bio-setup-date-of-birth-input').props.inputAccessoryViewButtonLabel).toBe(
+      'Done',
+    );
     expect(getInput(tree!, 'bio-setup-last4-ssn-input').props.inputAccessoryViewButtonLabel).toBe(
-      undefined,
+      'Done',
     );
-    expect(getInput(tree!, 'bio-setup-phone-number-input').props.inputAccessoryViewButtonLabel).toBe(
-      undefined,
-    );
-    expect(getInput(tree!, 'bio-setup-email-input').props.returnKeyType).toBe('default');
-
-    changeText(tree!, 'bio-setup-phone-number-input', '2532257825');
-
     expect(getInput(tree!, 'bio-setup-phone-number-input').props.inputAccessoryViewButtonLabel).toBe(
       'Done',
     );
@@ -123,22 +116,12 @@ describe('BioSetupScreen keyboard done behavior', () => {
     expect(getInput(tree!, 'bio-setup-email-input').props.returnKeyType).toBe('done');
   });
 
-  it('keeps the address postal-code Done hidden until the whole address step is valid', () => {
+  it('shows Done on the address postal code input when the optional address step is blank', () => {
     let tree: any;
 
     act(() => {
       tree = create(<BioSetupScreen />);
     });
-
-    changeText(tree!, 'bio-setup-address-line1-input', '801 W 5th St');
-    changeText(tree!, 'bio-setup-city-input', 'Austin');
-    changeText(tree!, 'bio-setup-state-input', 'TX');
-
-    expect(getInput(tree!, 'bio-setup-postal-code-input').props.inputAccessoryViewButtonLabel).toBe(
-      undefined,
-    );
-
-    changeText(tree!, 'bio-setup-postal-code-input', '78703');
 
     expect(getInput(tree!, 'bio-setup-postal-code-input').props.inputAccessoryViewButtonLabel).toBe(
       'Done',

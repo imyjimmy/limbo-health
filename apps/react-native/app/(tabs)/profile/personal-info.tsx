@@ -85,7 +85,8 @@ export default function PersonalInfoScreen() {
         <View style={styles.card}>
           <Text style={styles.helperText}>
             Used to prefill medical-records request packets, including contact fields when a form
-            asks for them. Stored only on this device.
+            asks for them. Only your name is required here. Everything else can be added later and
+            is stored only on this device.
           </Text>
         </View>
 
@@ -109,7 +110,7 @@ export default function PersonalInfoScreen() {
           <View style={styles.rowSeparator} />
 
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Date of birth</Text>
+            <Text style={styles.fieldLabel}>Date of birth (optional)</Text>
             <TextInput
               value={form.dateOfBirth}
               onChangeText={(value) =>
@@ -129,7 +130,7 @@ export default function PersonalInfoScreen() {
           <View style={styles.rowSeparator} />
 
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Last 4 of Social Security number</Text>
+            <Text style={styles.fieldLabel}>Last 4 of Social Security number (optional)</Text>
             <TextInput
               value={form.last4Ssn}
               onChangeText={(value) =>
@@ -150,7 +151,7 @@ export default function PersonalInfoScreen() {
         <Text style={styles.sectionLabel}>CONTACT DETAILS</Text>
         <View style={styles.card}>
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Phone number</Text>
+            <Text style={styles.fieldLabel}>Phone number (optional)</Text>
             <TextInput
               value={form.phoneNumber}
               onChangeText={(value) => setForm((prev) => ({ ...prev, phoneNumber: value }))}
@@ -167,7 +168,7 @@ export default function PersonalInfoScreen() {
           <View style={styles.rowSeparator} />
 
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Email</Text>
+            <Text style={styles.fieldLabel}>Email (optional)</Text>
             <TextInput
               value={form.email}
               onChangeText={(value) => setForm((prev) => ({ ...prev, email: value }))}
@@ -185,7 +186,7 @@ export default function PersonalInfoScreen() {
         <Text style={styles.sectionLabel}>MAILING ADDRESS</Text>
         <View style={styles.card}>
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Address line 1</Text>
+            <Text style={styles.fieldLabel}>Address line 1 (optional)</Text>
             <TextInput
               value={form.addressLine1}
               onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine1: value }))}
@@ -201,7 +202,7 @@ export default function PersonalInfoScreen() {
           <View style={styles.rowSeparator} />
 
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>Address line 2</Text>
+            <Text style={styles.fieldLabel}>Address line 2 (optional)</Text>
             <TextInput
               value={form.addressLine2}
               onChangeText={(value) => setForm((prev) => ({ ...prev, addressLine2: value }))}
@@ -217,7 +218,7 @@ export default function PersonalInfoScreen() {
           <View style={styles.rowSeparator} />
 
           <View style={styles.fieldBlock}>
-            <Text style={styles.fieldLabel}>City</Text>
+            <Text style={styles.fieldLabel}>City (optional)</Text>
             <TextInput
               value={form.city}
               onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
@@ -234,7 +235,7 @@ export default function PersonalInfoScreen() {
 
           <View style={styles.inlineRow}>
             <View style={[styles.fieldBlock, styles.inlineField]}>
-              <Text style={styles.fieldLabel}>State</Text>
+              <Text style={styles.fieldLabel}>State (optional)</Text>
               <TextInput
                 value={form.state}
                 onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
@@ -251,7 +252,7 @@ export default function PersonalInfoScreen() {
             <View style={styles.inlineDivider} />
 
             <View style={[styles.fieldBlock, styles.inlineField]}>
-              <Text style={styles.fieldLabel}>Postal code</Text>
+              <Text style={styles.fieldLabel}>Postal code (optional)</Text>
               <TextInput
                 value={form.postalCode}
                 onChangeText={(value) =>

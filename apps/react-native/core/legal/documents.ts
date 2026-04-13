@@ -319,6 +319,8 @@ Last updated: April 6, 2026
 - Privacy Policy: [Privacy Policy](/privacy-policy)
 - Terms of Service: [Terms of Service](/terms-of-service)
 
+To ask a question or request support, email [support@limbo.health](mailto:support@limbo.health).
+
 ## What Limbo Health Helps With
 
 Limbo Health currently focuses on:

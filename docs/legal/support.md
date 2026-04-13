@@ -9,6 +9,8 @@ Last updated: April 6, 2026
 - Privacy Policy: [https://limbohealth.com/privacy-policy](https://limbohealth.com/privacy-policy)
 - Terms of Service: [https://limbohealth.com/terms-of-service](https://limbohealth.com/terms-of-service)
 
+To ask a question or request support, email [support@limbo.health](mailto:support@limbo.health).
+
 ## What Limbo Health Helps With
 
 Limbo Health currently focuses on:
@@ -48,4 +50,3 @@ Please do not send more sensitive information than necessary.
 - Limbo Health does not provide medical advice.
 - We cannot guarantee that a hospital or third party will accept or fulfill a records request.
 - Email and share flows may depend on your iPhone settings and installed apps.
-
