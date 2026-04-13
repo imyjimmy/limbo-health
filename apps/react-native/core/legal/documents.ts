@@ -13,7 +13,7 @@ const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: 'Privacy Policy',
     markdown: `# Limbo Health Privacy Policy
 
-Last updated: April 6, 2026
+Last updated: April 13, 2026
 
 This Privacy Policy explains how Limbo Health collects, uses, stores, and shares information when you use the Limbo Health mobile app, website, and related services.
 
@@ -24,7 +24,6 @@ Limbo Health is designed to help people organize personal medical information, p
 This Privacy Policy applies to:
 
 - the Limbo Health mobile app
-- limbohealth.com
 - limbo.health
 - related support, authentication, storage, and records-request services we operate
 
@@ -163,7 +162,7 @@ We may update this Privacy Policy from time to time. If we make material changes
 If you have questions about this Privacy Policy, contact:
 
 - Email: [support@limbo.health](mailto:support@limbo.health)
-- Website: [limbohealth.com](https://limbohealth.com)
+- Website: [limbo.health](https://limbo.health)
 - Support: [Support](/support)`,
   },
   'terms-of-service': {
@@ -171,7 +170,7 @@ If you have questions about this Privacy Policy, contact:
     title: 'Terms of Service',
     markdown: `# Limbo Health Terms of Service
 
-Last updated: April 6, 2026
+Last updated: April 13, 2026
 
 These Terms of Service govern your access to and use of the Limbo Health mobile app, website, and related services.
 
@@ -301,7 +300,7 @@ Your continued use of Limbo Health after updated Terms become effective means yo
 If you have questions about these Terms, contact:
 
 - Email: [support@limbo.health](mailto:support@limbo.health)
-- Website: [limbohealth.com](https://limbohealth.com)
+- Website: [limbo.health](https://limbo.health)
 - Privacy Policy: [Privacy Policy](/privacy-policy)
 - Support: [Support](/support)`,
   },
@@ -310,12 +309,12 @@ If you have questions about these Terms, contact:
     title: 'Support',
     markdown: `# Limbo Health Support
 
-Last updated: April 6, 2026
+Last updated: April 13, 2026
 
 ## Contact
 
 - Email: [support@limbo.health](mailto:support@limbo.health)
-- Website: [limbohealth.com](https://limbohealth.com)
+- Website: [limbo.health](https://limbo.health)
 - Privacy Policy: [Privacy Policy](/privacy-policy)
 - Terms of Service: [Terms of Service](/terms-of-service)
 

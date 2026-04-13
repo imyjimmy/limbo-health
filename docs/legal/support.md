@@ -1,13 +1,13 @@
 # Limbo Health Support
 
-Last updated: April 6, 2026
+Last updated: April 13, 2026
 
 ## Contact
 
 - Email: [support@limbo.health](mailto:support@limbo.health)
-- Website: [https://limbohealth.com](https://limbohealth.com)
-- Privacy Policy: [https://limbohealth.com/privacy-policy](https://limbohealth.com/privacy-policy)
-- Terms of Service: [https://limbohealth.com/terms-of-service](https://limbohealth.com/terms-of-service)
+- Website: [https://limbo.health](https://limbo.health)
+- Privacy Policy: [https://limbo.health/privacy-policy/](https://limbo.health/privacy-policy/)
+- Terms of Service: [https://limbo.health/terms-of-service/](https://limbo.health/terms-of-service/)
 
 To ask a question or request support, email [support@limbo.health](mailto:support@limbo.health).
 

@@ -478,8 +478,8 @@ values
   (1, null, null, 'company_working_plan', '{"monday":{"start":"09:00","end":"23:55","breaks":[{"start":"14:30","end":"15:00"}]},"tuesday":{"start":"09:00","end":"23:55","breaks":[{"start":"14:30","end":"15:00"}]},"wednesday":{"start":"09:00","end":"23:55","breaks":[{"start":"14:30","end":"15:00"}]},"thursday":{"start":"09:00","end":"23:55","breaks":[{"start":"14:30","end":"15:00"}]},"friday":{"start":"09:00","end":"23:55","breaks":[{"start":"14:30","end":"15:00"}]},"saturday":{"start":"09:00","end":"23:55","breaks":[{"start":"14:30","end":"15:00"}]},"sunday":{"start":"09:00","end":"23:55","breaks":[{"start":"14:30","end":"15:00"}]}}'),
   (2, null, null, 'book_advance_timeout', '30'),
   (71, null, null, 'company_name', 'Limbo Health'),
-  (72, null, null, 'company_email', 'admin@limbohealth.com'),
-  (73, null, null, 'company_link', 'https://limbohealth.com')
+  (72, null, null, 'company_email', 'support@limbo.health'),
+  (73, null, null, 'company_link', 'https://limbo.health')
 on conflict (id) do update
 set
   name = excluded.name,

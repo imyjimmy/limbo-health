@@ -1,6 +1,6 @@
 # Limbo Health Privacy Policy
 
-Last updated: April 6, 2026
+Last updated: April 13, 2026
 
 This Privacy Policy explains how Limbo Health collects, uses, stores, and shares information when you use the Limbo Health mobile app, website, and related services.
 
@@ -11,7 +11,6 @@ Limbo Health is designed to help people organize personal medical information, p
 This Privacy Policy applies to:
 
 - the Limbo Health mobile app
-- `limbohealth.com`
 - `limbo.health`
 - related support, authentication, storage, and records-request services we operate
 
@@ -150,5 +149,5 @@ We may update this Privacy Policy from time to time. If we make material changes
 If you have questions about this Privacy Policy, contact:
 
 - Email: [support@limbo.health](mailto:support@limbo.health)
-- Website: [https://limbohealth.com](https://limbohealth.com)
-- Support: [https://limbohealth.com/support](https://limbohealth.com/support)
+- Website: [https://limbo.health](https://limbo.health)
+- Support: [https://limbo.health/support/](https://limbo.health/support/)

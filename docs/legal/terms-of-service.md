@@ -1,6 +1,6 @@
 # Limbo Health Terms of Service
 
-Last updated: April 6, 2026
+Last updated: April 13, 2026
 
 These Terms of Service govern your access to and use of the Limbo Health mobile app, website, and related services.
 
@@ -130,6 +130,6 @@ Your continued use of Limbo Health after updated Terms become effective means yo
 If you have questions about these Terms, contact:
 
 - Email: [support@limbo.health](mailto:support@limbo.health)
-- Website: [https://limbohealth.com](https://limbohealth.com)
-- Privacy Policy: [https://limbohealth.com/privacy-policy](https://limbohealth.com/privacy-policy)
-- Support: [https://limbohealth.com/support](https://limbohealth.com/support)
+- Website: [https://limbo.health](https://limbo.health)
+- Privacy Policy: [https://limbo.health/privacy-policy/](https://limbo.health/privacy-policy/)
+- Support: [https://limbo.health/support/](https://limbo.health/support/)

@@ -354,8 +354,8 @@ INSERT INTO `settings` (`id`, `create_datetime`, `update_datetime`, `name`, `val
 (1, NULL, NULL, 'company_working_plan', '{\"monday\":{\"start\":\"09:00\",\"end\":\"23:55\",\"breaks\":[{\"start\":\"14:30\",\"end\":\"15:00\"}]},\"tuesday\":{\"start\":\"09:00\",\"end\":\"23:55\",\"breaks\":[{\"start\":\"14:30\",\"end\":\"15:00\"}]},\"wednesday\":{\"start\":\"09:00\",\"end\":\"23:55\",\"breaks\":[{\"start\":\"14:30\",\"end\":\"15:00\"}]},\"thursday\":{\"start\":\"09:00\",\"end\":\"23:55\",\"breaks\":[{\"start\":\"14:30\",\"end\":\"15:00\"}]},\"friday\":{\"start\":\"09:00\",\"end\":\"23:55\",\"breaks\":[{\"start\":\"14:30\",\"end\":\"15:00\"}]},\"saturday\":{\"start\":\"09:00\",\"end\":\"23:55\",\"breaks\":[{\"start\":\"14:30\",\"end\":\"15:00\"}]},\"sunday\":{\"start\":\"09:00\",\"end\":\"23:55\",\"breaks\":[{\"start\":\"14:30\",\"end\":\"15:00\"}]}}'),
 (2, NULL, NULL, 'book_advance_timeout', '30'),
 (71, NULL, NULL, 'company_name', 'Limbo Health'),
-(72, NULL, NULL, 'company_email', 'admin@limbohealth.com'),
-(73, NULL, NULL, 'company_link', 'https://limbohealth.com');
+(72, NULL, NULL, 'company_email', 'support@limbo.health'),
+(73, NULL, NULL, 'company_link', 'https://limbo.health');
 
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;
